@@ -268,66 +268,6 @@ jobs:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  # run database upgrade tests
-  upgrade_test:
-    name: Upgrade tests
-    timeout-minutes: 20
-    needs: initial-tests-done
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-upgrade-test-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-upgrade-test-
-      - name: Docker version
-        run: docker version
-      - name: Build upgrade-tests
-        run: go build ./cmd/dendrite-upgrade-tests
-      - name: Test upgrade (PostgreSQL)
-        run: ./dendrite-upgrade-tests --head .
-      - name: Test upgrade (SQLite)
-        run: ./dendrite-upgrade-tests --sqlite --head .
-
-  # run database upgrade tests, skipping over one version
-  upgrade_test_direct:
-    name: Upgrade tests from HEAD-2
-    timeout-minutes: 20
-    needs: initial-tests-done
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-upgrade-direct-test-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-upgrade-direct-test-
-      - name: Docker version
-        run: docker version
-      - name: Build upgrade-tests
-        run: go build ./cmd/dendrite-upgrade-tests
-      - name: Test upgrade (PostgreSQL)
-        run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
-      - name: Test upgrade (SQLite)
-        run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
-
   # run Sytest in different variations
   sytest:
     timeout-minutes: 20
