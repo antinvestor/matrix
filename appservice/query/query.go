@@ -27,9 +27,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/appservice/api"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/setup/config"
 )
 
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI

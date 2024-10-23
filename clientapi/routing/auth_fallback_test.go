@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
+	"github.com/antinvestor/matrix/setup/config"
 )
 
 func Test_AuthFallback(t *testing.T) {

@@ -25,12 +25,12 @@ import (
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/federationapi/queue"
-	"github.com/matrix-org/dendrite/federationapi/storage"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
-	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/antinvestor/matrix/federationapi/queue"
+	"github.com/antinvestor/matrix/federationapi/storage"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/process"
+	syncTypes "github.com/antinvestor/matrix/syncapi/types"
 )
 
 // OutputSendToDeviceConsumer consumes events that originate in the clientapi.

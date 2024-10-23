@@ -26,9 +26,9 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
+	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/syncapi/synctypes"
 )
 
 var (

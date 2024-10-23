@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
-	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
-	"github.com/matrix-org/dendrite/syncapi/storage/tables"
-	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/dendrite/test"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/syncapi/storage/postgres"
+	"github.com/antinvestor/matrix/syncapi/storage/sqlite3"
+	"github.com/antinvestor/matrix/syncapi/storage/tables"
+	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
 

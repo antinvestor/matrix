@@ -20,11 +20,11 @@ package storage
 import (
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/relayapi/storage/postgres"
-	"github.com/matrix-org/dendrite/relayapi/storage/sqlite3"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/relayapi/storage/postgres"
+	"github.com/antinvestor/matrix/relayapi/storage/sqlite3"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

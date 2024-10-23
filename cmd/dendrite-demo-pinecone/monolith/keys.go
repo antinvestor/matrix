@@ -18,8 +18,8 @@ import (
 	"crypto/ed25519"
 	"os"
 
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/test"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/test"
 )
 
 func GetOrCreateKey(keyfile string, oldKeyfile string) (ed25519.PrivateKey, ed25519.PublicKey) {

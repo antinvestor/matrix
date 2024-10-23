@@ -25,11 +25,11 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/federationapi/producers"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/config"
-	userAPI "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/federationapi/producers"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/setup/config"
+	userAPI "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

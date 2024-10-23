@@ -25,12 +25,12 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/state"
+	"github.com/antinvestor/matrix/roomserver/storage/shared"
+	"github.com/antinvestor/matrix/roomserver/types"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the

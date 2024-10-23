@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
@@ -20,13 +20,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/constraints"
 
-	clientapi "github.com/matrix-org/dendrite/clientapi/api"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/userapi/api"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	clientapi "github.com/antinvestor/matrix/clientapi/api"
+	"github.com/antinvestor/matrix/internal/httputil"
+	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/userapi/api"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
 var validRegistrationTokenRegex = regexp.MustCompile("^[[:ascii:][:digit:]_]*$")

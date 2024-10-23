@@ -23,10 +23,10 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/sync"
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
-	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/syncapi/storage"
+	"github.com/antinvestor/matrix/syncapi/sync"
+	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

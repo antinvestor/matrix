@@ -20,14 +20,14 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/dendrite/internal/eventutil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	rstypes "github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/syncapi/storage/shared"
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
-	"github.com/matrix-org/dendrite/syncapi/types"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/internal/eventutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/api"
+	rstypes "github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/syncapi/storage/shared"
+	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/antinvestor/matrix/syncapi/types"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
 type DatabaseTransaction interface {

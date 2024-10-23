@@ -21,9 +21,9 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/federationapi/types"
-	rstypes "github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
+	"github.com/antinvestor/matrix/federationapi/types"
+	rstypes "github.com/antinvestor/matrix/roomserver/types"
 )
 
 type Database interface {

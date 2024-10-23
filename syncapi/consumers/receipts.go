@@ -22,13 +22,13 @@ import (
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/streams"
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/process"
+	"github.com/antinvestor/matrix/syncapi/notifier"
+	"github.com/antinvestor/matrix/syncapi/storage"
+	"github.com/antinvestor/matrix/syncapi/streams"
+	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

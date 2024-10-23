@@ -20,11 +20,11 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/postgres/deltas"
-	"github.com/matrix-org/dendrite/federationapi/storage/shared"
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/federationapi/storage/postgres/deltas"
+	"github.com/antinvestor/matrix/federationapi/storage/shared"
+	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

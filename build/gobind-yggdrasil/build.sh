@@ -22,4 +22,4 @@ fi
 gomobile bind -v \
     -target $TARGET \
     -ldflags "-X github.com/yggdrasil-network/yggdrasil-go/src/version.buildName=dendrite" \
-    github.com/matrix-org/dendrite/build/gobind-pinecone
+    github.com/antinvestor/matrix/build/gobind-pinecone

@@ -21,11 +21,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
-	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/storage/postgres"
+	"github.com/antinvestor/matrix/roomserver/storage/sqlite3"
+	"github.com/antinvestor/matrix/setup/config"
 )
 
 // Open opens a database connection.

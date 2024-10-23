@@ -26,9 +26,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

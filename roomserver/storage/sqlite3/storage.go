@@ -21,12 +21,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
-	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/storage/shared"
+	"github.com/antinvestor/matrix/roomserver/storage/sqlite3/deltas"
+	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 

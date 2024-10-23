@@ -17,9 +17,9 @@ package internal
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/relayapi/api"
+	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"

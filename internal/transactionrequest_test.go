@@ -29,15 +29,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gotest.tools/v3/poll"
 
-	"github.com/matrix-org/dendrite/federationapi/producers"
-	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
-	rstypes "github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/dendrite/test"
-	keyAPI "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/federationapi/producers"
+	rsAPI "github.com/antinvestor/matrix/roomserver/api"
+	rstypes "github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/process"
+	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/antinvestor/matrix/test"
+	keyAPI "github.com/antinvestor/matrix/userapi/api"
 )
 
 const (

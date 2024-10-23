@@ -20,11 +20,11 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/clientapi/producers"
-	"github.com/matrix-org/dendrite/internal/eventutil"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/clientapi/httputil"
+	"github.com/antinvestor/matrix/clientapi/producers"
+	"github.com/antinvestor/matrix/internal/eventutil"
+	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/matrix-org/util"

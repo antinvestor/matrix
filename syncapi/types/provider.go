@@ -6,8 +6,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/syncapi/synctypes"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

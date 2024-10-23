@@ -22,14 +22,14 @@ import (
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal/pushgateway"
-	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/antinvestor/matrix/internal/pushgateway"
+	"github.com/antinvestor/matrix/userapi/storage"
 
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/dendrite/userapi/producers"
-	"github.com/matrix-org/dendrite/userapi/util"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/process"
+	"github.com/antinvestor/matrix/userapi/producers"
+	"github.com/antinvestor/matrix/userapi/util"
 )
 
 // OutputReceiptEventConsumer consumes events that originated in the clientAPI.

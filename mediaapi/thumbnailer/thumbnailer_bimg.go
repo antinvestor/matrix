@@ -22,9 +22,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/matrix-org/dendrite/mediaapi/storage"
-	"github.com/matrix-org/dendrite/mediaapi/types"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/mediaapi/storage"
+	"github.com/antinvestor/matrix/mediaapi/types"
+	"github.com/antinvestor/matrix/setup/config"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/h2non/bimg.v1"
 )

@@ -19,11 +19,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	rstypes "github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/api"
+	rstypes "github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/syncapi/storage"
+	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	log "github.com/sirupsen/logrus"
 )

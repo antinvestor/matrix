@@ -21,25 +21,25 @@ import (
 	"errors"
 	"fmt"
 
-	//"github.com/matrix-org/dendrite/roomserver/internal"
-	"github.com/matrix-org/dendrite/setup/config"
+	//"github.com/antinvestor/matrix/roomserver/internal"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/roomserver/storage/tables"
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
+	"github.com/antinvestor/matrix/syncapi/synctypes"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/roomserver/acls"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
-	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
+	fsAPI "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/roomserver/acls"
+	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/internal/helpers"
+	"github.com/antinvestor/matrix/roomserver/state"
+	"github.com/antinvestor/matrix/roomserver/storage"
+	"github.com/antinvestor/matrix/roomserver/types"
 )
 
 type Queryer struct {

@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/antinvestor/matrix/clientapi/userutil"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
+	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
-	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

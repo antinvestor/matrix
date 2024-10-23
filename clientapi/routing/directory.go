@@ -23,11 +23,11 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/config"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/clientapi/httputil"
+	federationAPI "github.com/antinvestor/matrix/federationapi/api"
+	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/setup/config"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
 type roomDirectoryResponse struct {

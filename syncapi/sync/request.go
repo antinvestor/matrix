@@ -27,10 +27,10 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/synctypes"
-	"github.com/matrix-org/dendrite/syncapi/types"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/syncapi/storage"
+	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/antinvestor/matrix/syncapi/types"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
 const defaultSyncTimeout = time.Duration(0)

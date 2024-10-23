@@ -17,23 +17,23 @@ package userapi
 import (
 	"time"
 
-	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/federationapi/statistics"
-	"github.com/matrix-org/dendrite/internal/pushgateway"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/process"
+	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/federationapi/statistics"
+	"github.com/antinvestor/matrix/internal/pushgateway"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/process"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
-	rsapi "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/consumers"
-	"github.com/matrix-org/dendrite/userapi/internal"
-	"github.com/matrix-org/dendrite/userapi/producers"
-	"github.com/matrix-org/dendrite/userapi/storage"
-	"github.com/matrix-org/dendrite/userapi/util"
+	rsapi "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/antinvestor/matrix/userapi/consumers"
+	"github.com/antinvestor/matrix/userapi/internal"
+	"github.com/antinvestor/matrix/userapi/producers"
+	"github.com/antinvestor/matrix/userapi/storage"
+	"github.com/antinvestor/matrix/userapi/util"
 )
 
 // NewInternalAPI returns a concrete implementation of the internal API. Callers

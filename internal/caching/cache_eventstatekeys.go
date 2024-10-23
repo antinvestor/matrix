@@ -1,6 +1,6 @@
 package caching
 
-import "github.com/matrix-org/dendrite/roomserver/types"
+import "github.com/antinvestor/matrix/roomserver/types"
 
 // EventStateKeyCache contains the subset of functions needed for
 // a room event state key cache.

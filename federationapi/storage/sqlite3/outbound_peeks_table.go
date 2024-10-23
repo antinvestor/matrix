@@ -19,9 +19,9 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/types"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/antinvestor/matrix/federationapi/types"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

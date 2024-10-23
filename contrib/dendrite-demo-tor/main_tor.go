@@ -25,19 +25,19 @@ import (
 	"sync/atomic"
 	"text/template"
 
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/setup/process"
 	"github.com/cretz/bine/tor"
 	"github.com/eyedeekay/onramp"
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/gorilla/mux"
 	"github.com/kardianos/minwinsvc"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 
-	basepkg "github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/config"
+	basepkg "github.com/antinvestor/matrix/setup/base"
+	"github.com/antinvestor/matrix/setup/config"
 )
 
 func start() (*tor.Tor, error) {

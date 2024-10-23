@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/antinvestor/matrix/syncapi/types"
 )
 
 // UserDeviceStream represents a communication mechanism between the /sync request goroutine

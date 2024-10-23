@@ -18,10 +18,10 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
-	"github.com/matrix-org/dendrite/roomserver/storage/tables"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/storage/sqlite3/deltas"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
 )
 
 const publishedSchema = `

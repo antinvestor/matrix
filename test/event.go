@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )

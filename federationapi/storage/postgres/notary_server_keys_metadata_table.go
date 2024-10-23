@@ -19,10 +19,10 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/federationapi/storage/tables"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )

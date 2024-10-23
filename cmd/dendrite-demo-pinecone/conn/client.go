@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"nhooyr.io/websocket"
 

@@ -20,9 +20,9 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/clientapi/auth"
+	"github.com/antinvestor/matrix/clientapi/httputil"
+	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"

@@ -9,7 +9,7 @@ FROM golang:1.14-alpine AS gobuild
 
 # Download and build dendrite
 WORKDIR /build
-ADD https://github.com/matrix-org/dendrite/archive/main.tar.gz /build/main.tar.gz
+ADD https://github.com/antinvestor/matrix/archive/main.tar.gz /build/main.tar.gz
 RUN tar xvfz main.tar.gz
 WORKDIR /build/dendrite-main
 RUN GOOS=js GOARCH=wasm go build -o main.wasm ./cmd/dendritejs

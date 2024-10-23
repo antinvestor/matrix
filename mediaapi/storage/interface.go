@@ -17,7 +17,7 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/mediaapi/types"
+	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

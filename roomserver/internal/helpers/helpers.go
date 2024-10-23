@@ -11,13 +11,13 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/auth"
-	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
-	"github.com/matrix-org/dendrite/roomserver/storage/tables"
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/auth"
+	"github.com/antinvestor/matrix/roomserver/state"
+	"github.com/antinvestor/matrix/roomserver/storage"
+	"github.com/antinvestor/matrix/roomserver/storage/shared"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
+	"github.com/antinvestor/matrix/roomserver/types"
 )
 
 // TODO: temporary package which has helper functions used by both internal/perform packages.

@@ -426,7 +426,7 @@ The last three missing federation API Sytests have been fixed - bringing us to 1
 ### Features
 
 * High performance full-text searching has been added to Dendrite
-  * Search must be enabled in the [`search` section of the `sync_api` config](https://github.com/matrix-org/dendrite/blob/6348486a1365c7469a498101f5035a9b6bd16d22/dendrite-sample.monolith.yaml#L279-L290) before it can be used
+  * Search must be enabled in the [`search` section of the `sync_api` config](https://github.com/antinvestor/matrix/blob/6348486a1365c7469a498101f5035a9b6bd16d22/dendrite-sample.monolith.yaml#L279-L290) before it can be used
   * The search index is stored on the filesystem rather than the sync API database, so a path to a suitable storage location on disk must be configured
 * Sync requests should now complete faster and use considerably less database connections as a result of better transactional isolation
 * The notifications code has been refactored to hopefully make notifications more reliable
@@ -468,7 +468,7 @@ The last three missing federation API Sytests have been fixed - bringing us to 1
 
 ### Important
 
-* This is a **security release** to fix a vulnerability where missing events retrieved from other servers did not have their signatures verified in all cases, affecting all versions of Dendrite before 0.9.8. Upgrading to this version is highly recommended. For more information, [see here](https://github.com/matrix-org/dendrite/security/advisories/GHSA-pfw4-xjgm-267c).
+* This is a **security release** to fix a vulnerability where missing events retrieved from other servers did not have their signatures verified in all cases, affecting all versions of Dendrite before 0.9.8. Upgrading to this version is highly recommended. For more information, [see here](https://github.com/antinvestor/matrix/security/advisories/GHSA-pfw4-xjgm-267c).
 
 ### Features
 
@@ -600,9 +600,9 @@ The last three missing federation API Sytests have been fixed - bringing us to 1
 * Dendrite now uses Ristretto for managing in-memory caches
   * Should improve cache utilisation considerably over time by more intelligently selecting and managing cache entries compared to the previous LRU-based cache
   * Defaults to a 1GB cache size if not configured otherwise
-  * The estimated cache size in memory and maximum age can now be configured with new [configuration options](https://github.com/matrix-org/dendrite/blob/e94ef84aaba30e12baf7f524c4e7a36d2fdeb189/dendrite-sample.monolith.yaml#L44-L61) to prevent unbounded cache growth
+  * The estimated cache size in memory and maximum age can now be configured with new [configuration options](https://github.com/antinvestor/matrix/blob/e94ef84aaba30e12baf7f524c4e7a36d2fdeb189/dendrite-sample.monolith.yaml#L44-L61) to prevent unbounded cache growth
 * Added support for serving the `/.well-known/matrix/client` hint directly from Dendrite
-  * Configurable with the new [configuration option](https://github.com/matrix-org/dendrite/blob/e94ef84aaba30e12baf7f524c4e7a36d2fdeb189/dendrite-sample.monolith.yaml#L67-L69)
+  * Configurable with the new [configuration option](https://github.com/antinvestor/matrix/blob/e94ef84aaba30e12baf7f524c4e7a36d2fdeb189/dendrite-sample.monolith.yaml#L67-L69)
 * Refactored membership updater, which should eliminate some bugs caused by the membership table getting out of sync with the room state
 * The User API is now responsible for sending account data updates to other components, which may fix some races and duplicate account data events
 * Optimised database query for checking whether a remote server is allowed to request an event over federation without using anywhere near as much CPU time (PostgreSQL only)
@@ -1247,11 +1247,11 @@ The last three missing federation API Sytests have been fixed - bringing us to 1
 
 ### Fixes
 
-* Forward extremities are now calculated using only references from other extremities, rather than including outliers, which should fix cases where state can become corrupted ([#1556](https://github.com/matrix-org/dendrite/pull/1556))
-* Old state events will no longer be processed by the sync API as new, which should fix some cases where clients incorrectly believe they have joined or left rooms ([#1548](https://github.com/matrix-org/dendrite/pull/1548))
-* More SQLite database locking issues have been resolved in the latest events updater ([#1554](https://github.com/matrix-org/dendrite/pull/1554))
-* Internal HTTP API calls are now made using H2C (HTTP/2) in polylith mode, mitigating some potential head-of-line blocking issues ([#1541](https://github.com/matrix-org/dendrite/pull/1541))
-* Roomserver output events no longer incorrectly flag state rewrites ([#1557](https://github.com/matrix-org/dendrite/pull/1557))
+* Forward extremities are now calculated using only references from other extremities, rather than including outliers, which should fix cases where state can become corrupted ([#1556](https://github.com/antinvestor/matrix/pull/1556))
+* Old state events will no longer be processed by the sync API as new, which should fix some cases where clients incorrectly believe they have joined or left rooms ([#1548](https://github.com/antinvestor/matrix/pull/1548))
+* More SQLite database locking issues have been resolved in the latest events updater ([#1554](https://github.com/antinvestor/matrix/pull/1554))
+* Internal HTTP API calls are now made using H2C (HTTP/2) in polylith mode, mitigating some potential head-of-line blocking issues ([#1541](https://github.com/antinvestor/matrix/pull/1541))
+* Roomserver output events no longer incorrectly flag state rewrites ([#1557](https://github.com/antinvestor/matrix/pull/1557))
 * Notification levels are now parsed correctly in power level events ([gomatrixserverlib#228](https://github.com/matrix-org/gomatrixserverlib/pull/228), contributed by [Pestdoktor](https://github.com/Pestdoktor))
 * Invalid UTF-8 is now correctly rejected when making federation requests ([gomatrixserverlib#229](https://github.com/matrix-org/gomatrixserverlib/pull/229), contributed by [Pestdoktor](https://github.com/Pestdoktor))
 
@@ -1264,7 +1264,7 @@ The last three missing federation API Sytests have been fixed - bringing us to 1
 * This release also makes breaking changes for Docker deployments, as are now publishing images to Docker Hub in separate repositories for monolith and polylith
   * New repositories are as follows: [matrixdotorg/dendrite-monolith](https://hub.docker.com/repository/docker/matrixdotorg/dendrite-monolith) and [matrixdotorg/dendrite-polylith](https://hub.docker.com/repository/docker/matrixdotorg/dendrite-polylith)
   * The new `latest` tag will be updated with the latest release, and new versioned tags, e.g. `v0.2.0`, will preserve specific release versions
-  * [Sample Compose configs](https://github.com/matrix-org/dendrite/tree/master/build/docker) have been updated - if you are running a Docker deployment, please review the changes
+  * [Sample Compose configs](https://github.com/antinvestor/matrix/tree/master/build/docker) have been updated - if you are running a Docker deployment, please review the changes
   * Images for the client API proxy and federation API proxy are no longer provided as they are unsupported - please use [nginx](docs/nginx/) (or another reverse proxy) instead
 
 ### Features

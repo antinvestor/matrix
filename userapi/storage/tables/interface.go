@@ -20,14 +20,14 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	clientapi "github.com/matrix-org/dendrite/clientapi/api"
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/userapi/types"
+	clientapi "github.com/antinvestor/matrix/clientapi/api"
+	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
+	"github.com/antinvestor/matrix/userapi/types"
 )
 
 type RegistrationTokensTable interface {

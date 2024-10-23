@@ -20,8 +20,8 @@ import (
 
 	"github.com/matrix-org/util"
 
-	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
-	"github.com/matrix-org/dendrite/userapi/api"
+	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
+	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

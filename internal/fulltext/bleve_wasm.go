@@ -17,7 +17,7 @@ package fulltext
 import (
 	"time"
 
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/setup/config"
 )
 
 type Search struct{}

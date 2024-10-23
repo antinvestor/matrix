@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 )
 
 const queueJSONSchema = `

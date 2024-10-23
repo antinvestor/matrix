@@ -17,10 +17,10 @@ package postgres
 
 import (
 	// Import the postgres database driver.
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/mediaapi/storage/shared"
+	"github.com/antinvestor/matrix/setup/config"
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/mediaapi/storage/shared"
-	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // NewDatabase opens a postgres database.

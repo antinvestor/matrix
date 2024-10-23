@@ -21,10 +21,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
-	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/syncapi/storage/postgres"
+	"github.com/antinvestor/matrix/syncapi/storage/sqlite3"
 )
 
 // NewSyncServerDatasource opens a database connection.

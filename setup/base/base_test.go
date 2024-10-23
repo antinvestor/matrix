@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	basepkg "github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/httputil"
+	basepkg "github.com/antinvestor/matrix/setup/base"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/process"
 	"github.com/stretchr/testify/assert"
 )
 

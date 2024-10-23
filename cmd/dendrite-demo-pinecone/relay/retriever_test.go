@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	relayServerAPI "github.com/matrix-org/dendrite/relayapi/api"
+	federationAPI "github.com/antinvestor/matrix/federationapi/api"
+	relayServerAPI "github.com/antinvestor/matrix/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"

@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
-	"github.com/matrix-org/dendrite/userapi/storage/shared"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
+	"github.com/antinvestor/matrix/userapi/storage/shared"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	// Import the postgres database driver.

@@ -21,21 +21,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
-	"github.com/matrix-org/dendrite/roomserver/internal/input"
-	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/setup/config"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	fsAPI "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/roomserver/api"
+	rsAPI "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/internal/helpers"
+	"github.com/antinvestor/matrix/roomserver/internal/input"
+	"github.com/antinvestor/matrix/roomserver/storage"
+	"github.com/antinvestor/matrix/setup/config"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
 type Leaver struct {

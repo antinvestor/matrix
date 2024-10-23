@@ -15,12 +15,12 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/federationapi/consumers"
-	"github.com/matrix-org/dendrite/federationapi/statistics"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/roomserver/version"
+	"github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/federationapi/consumers"
+	"github.com/antinvestor/matrix/federationapi/statistics"
+	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/roomserver/version"
 )
 
 // PerformLeaveRequest implements api.FederationInternalAPI

@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )

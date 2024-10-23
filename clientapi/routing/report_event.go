@@ -17,9 +17,9 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	userAPI "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/clientapi/httputil"
+	"github.com/antinvestor/matrix/roomserver/api"
+	userAPI "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"
 )

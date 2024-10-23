@@ -4,15 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/matrix-org/dendrite/userapi/storage/postgres"
-	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
+	"github.com/antinvestor/matrix/userapi/storage/postgres"
+	"github.com/antinvestor/matrix/userapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/config"
 
-	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
 
 func mustCreateTable(t *testing.T, dbType test.DBType) (tab tables.StaleDeviceLists, close func()) {

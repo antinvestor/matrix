@@ -24,8 +24,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/dendrite/internal/eventutil"
-	rstypes "github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/antinvestor/matrix/internal/eventutil"
+	rstypes "github.com/antinvestor/matrix/roomserver/types"
 )
 
 type Preset int

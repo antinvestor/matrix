@@ -17,26 +17,26 @@ package syncapi
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/internal/fulltext"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/antinvestor/matrix/internal/fulltext"
+	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/process"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/antinvestor/matrix/internal/caching"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/setup/jetstream"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 
-	"github.com/matrix-org/dendrite/syncapi/consumers"
-	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/producers"
-	"github.com/matrix-org/dendrite/syncapi/routing"
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/streams"
-	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/antinvestor/matrix/syncapi/consumers"
+	"github.com/antinvestor/matrix/syncapi/notifier"
+	"github.com/antinvestor/matrix/syncapi/producers"
+	"github.com/antinvestor/matrix/syncapi/routing"
+	"github.com/antinvestor/matrix/syncapi/storage"
+	"github.com/antinvestor/matrix/syncapi/streams"
+	"github.com/antinvestor/matrix/syncapi/sync"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the SyncAPI

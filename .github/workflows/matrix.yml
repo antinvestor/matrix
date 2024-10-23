@@ -1,4 +1,4 @@
-name: Dendrite
+name: Matrix
 
 on:
   push:
@@ -74,7 +74,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v6
 
   # run go test with different go versions
   test:
@@ -86,7 +86,7 @@ jobs:
       # Label used to access the service container
       postgres:
         # Docker Hub image
-        image: postgres:13-alpine
+        image: postgres:17-alpine
         # Provide the password for postgres
         env:
           POSTGRES_USER: postgres
@@ -219,7 +219,7 @@ jobs:
       # Label used to access the service container
       postgres:
         # Docker Hub image
-        image: postgres:13-alpine
+        image: postgres:17-alpine
         # Provide the password for postgres
         env:
           POSTGRES_USER: postgres
@@ -483,15 +483,3 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
-
-  update-docker-images:
-    name: Update Docker images
-    permissions:
-      packages: write
-      contents: read
-      security-events: write # To upload Trivy sarif files
-    if: github.repository == 'matrix-org/dendrite' && github.ref_name == 'main'
-    needs: [integration-tests-done]
-    uses: matrix-org/dendrite/.github/workflows/docker.yml@main
-    secrets:
-      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}

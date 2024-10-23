@@ -20,11 +20,11 @@ import (
 	"database/sql"
 
 	// Import the postgres database driver.
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/syncapi/storage/postgres/deltas"
+	"github.com/antinvestor/matrix/syncapi/storage/shared"
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
-	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages

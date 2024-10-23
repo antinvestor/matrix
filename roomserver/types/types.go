@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/util"

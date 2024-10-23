@@ -17,7 +17,7 @@ package api
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"

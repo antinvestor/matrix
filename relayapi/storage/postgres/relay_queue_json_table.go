@@ -18,9 +18,9 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const relayQueueJSONSchema = `

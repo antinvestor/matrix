@@ -28,11 +28,11 @@ import (
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/federationapi/statistics"
-	"github.com/matrix-org/dendrite/federationapi/storage"
-	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/antinvestor/matrix/federationapi/statistics"
+	"github.com/antinvestor/matrix/federationapi/storage"
+	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
+	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/setup/process"
 )
 
 // OutgoingQueues is a collection of queues for sending transactions to other

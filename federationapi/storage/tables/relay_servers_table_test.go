@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/postgres"
-	"github.com/matrix-org/dendrite/federationapi/storage/sqlite3"
-	"github.com/matrix-org/dendrite/federationapi/storage/tables"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/test"
+	"github.com/antinvestor/matrix/federationapi/storage/postgres"
+	"github.com/antinvestor/matrix/federationapi/storage/sqlite3"
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/test"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
