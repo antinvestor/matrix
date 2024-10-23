@@ -26,7 +26,7 @@ require (
 	github.com/matrix-org/pinecone v0.11.1-0.20230810010612-ea4c33717fd7
 	github.com/matrix-org/util v0.0.0-20221111132719-399730281e66
 	github.com/mattn/go-sqlite3 v1.14.24
-	github.com/nats-io/nats-server/v2 v2.10.20
+	github.com/nats-io/nats-server/v2 v2.10.22
 	github.com/nats-io/nats.go v1.36.0
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
@@ -98,7 +98,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hjson/hjson-go/v4 v4.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.17.9 // indirect
+	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/minio/highwayhash v1.0.3 // indirect
@@ -127,7 +127,7 @@ require (
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
-	golang.org/x/time v0.6.0 // indirect
+	golang.org/x/time v0.7.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
