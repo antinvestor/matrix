@@ -4,7 +4,7 @@ go 1.23.2
 
 require (
 	github.com/Arceliar/phony v0.0.0-20220903101357-530938a4b13d
-	github.com/DATA-DOG/go-sqlmock v1.5.0
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/blevesearch/bleve/v2 v2.4.0
 	github.com/cretz/bine v0.2.0
