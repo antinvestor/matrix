@@ -410,8 +410,6 @@ jobs:
     needs:
       [
         initial-tests-done,
-        upgrade_test,
-        upgrade_test_direct,
         sytest,
         complement,
         integration
