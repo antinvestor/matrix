@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/codeclysm/extract"
+	"github.com/codeclysm/extract/v4"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -255,7 +255,7 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir 
 }
 
 func getAndSortVersionsFromGithub(httpClient *http.Client) (semVers []*semver.Version, err error) {
-	u := "https://api.github.com/repos/matrix-org/dendrite/tags"
+	u := "https://api.github.com/repos/antinvestor/matrix/tags"
 
 	var res *http.Response
 	for i := 0; i < 3; i++ {

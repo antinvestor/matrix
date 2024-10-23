@@ -8,7 +8,7 @@ require (
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/blevesearch/bleve/v2 v2.4.0
-	github.com/codeclysm/extract v2.2.0+incompatible
+	github.com/codeclysm/extract/v4 v4.0.0
 	github.com/cretz/bine v0.2.0
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/docker/docker v25.0.6+incompatible
@@ -136,6 +136,7 @@ require (
 	github.com/rs/zerolog v1.29.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/ulikunitz/xz v0.5.12 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
 	go.opentelemetry.io/otel v1.28.0 // indirect
