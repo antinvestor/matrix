@@ -37,11 +37,11 @@ LABEL org.opencontainers.image.vendor="Ant Investor Ltd"
 COPY --from=build /out/create-account /usr/bin/create-account
 COPY --from=build /out/generate-config /usr/bin/generate-config
 COPY --from=build /out/generate-keys /usr/bin/generate-keys
-COPY --from=build /out/dendrite /usr/bin/dendrite
+COPY --from=build /out/matrix /usr/bin/matrix
 
-VOLUME /etc/dendrite
-WORKDIR /etc/dendrite
+VOLUME /etc/matrix
+WORKDIR /etc/matrix
 
-ENTRYPOINT ["/usr/bin/dendrite"]
+ENTRYPOINT ["/usr/bin/matrix"]
 EXPOSE 8008 8448
 

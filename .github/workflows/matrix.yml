@@ -22,43 +22,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  wasm:
-    name: WASM build test
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    if: ${{ false }} # disable for now
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-
-      - name: Install Node
-        uses: actions/setup-node@v2
-        with:
-          node-version: 14
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Reconfigure Git to use HTTPS auth for repo packages
-        run: >
-          git config --global url."https://github.com/".insteadOf
-          ssh://git@github.com/
-
-      - name: Install test dependencies
-        working-directory: ./test/wasm
-        run: npm ci
-
-      - name: Test
-        run: ./test-dendritejs.sh
 
   # Run golangci-lint
   lint:

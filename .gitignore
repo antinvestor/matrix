@@ -52,7 +52,7 @@ _testmain.go
 *.crt
 
 # Default configuration file
-dendrite.yaml
+matrix.yaml
 
 # Database files
 *.db
@@ -79,5 +79,7 @@ build
 # golang workspaces
 go.work*
 
-# helm chart
-helm/dendrite/charts/
+.idea/
+
+# runtime for docker compose
+runtime/

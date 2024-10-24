@@ -25,7 +25,7 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 COPY --from=base /build/bin/* /usr/bin/
 
-VOLUME /etc/dendrite
-WORKDIR /etc/dendrite
+VOLUME /etc/matrix
+WORKDIR /etc/matrix
 
 ENTRYPOINT ["/usr/bin/dendrite-demo-pinecone"]

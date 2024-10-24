@@ -188,7 +188,7 @@ logging:
 - type: file
   level: info
   params:
-    path: /var/log/dendrite
+    path: /var/log/matrix
 `
 
 type mockReadFile map[string]string

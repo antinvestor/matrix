@@ -24,7 +24,7 @@ RUN echo '\
 
 # we will dump the binaries and config file to this location to ensure any local untracked files
 # that come from the COPY . . file don't contaminate the build
-RUN mkdir /dendrite
+RUN mkdir /matrix
 
 # Utilise Docker caching when downloading dependencies, this stops us needlessly
 # downloading dependencies every time.
@@ -34,11 +34,11 @@ RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-config && \
     CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-keys && \
-    CGO_ENABLED=${CGO} go build -o /dendrite/dendrite ./cmd/dendrite && \
-    CGO_ENABLED=${CGO} go build -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite && \
+    CGO_ENABLED=${CGO} go build -o /dendrite/dendrite ./cmd/matrix && \
+    CGO_ENABLED=${CGO} go build -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/matrix-org/..." ./cmd/matrix&& \
     cp build/scripts/complement-cmd.sh /complement-cmd.sh
 
-WORKDIR /dendrite
+WORKDIR /matrix
 RUN ./generate-keys --private-key matrix_key.pem
 
 ENV SERVER_NAME=localhost
@@ -50,8 +50,8 @@ EXPOSE 8008 8448
 # At runtime, generate TLS cert based on the CA now mounted at /ca
 # At runtime, replace the SERVER_NAME with what we are told
 CMD /build/run_postgres.sh && ./generate-keys --keysize 1024 --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key && \
-    ./generate-config -server $SERVER_NAME --ci --db "user=postgres database=postgres host=/var/run/postgresql/" > dendrite.yaml && \
+    ./generate-config -server $SERVER_NAME --ci --db "user=postgres database=postgres host=/var/run/postgresql/" > matrix.yaml && \
     # Bump max_open_conns up here in the global database config
-    sed -i 's/max_open_conns:.*$/max_open_conns: 1990/g' dendrite.yaml && \
+    sed -i 's/max_open_conns:.*$/max_open_conns: 1990/g' matrix.yaml && \
     cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
     exec /complement-cmd.sh

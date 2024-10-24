@@ -10,12 +10,12 @@ if [[ "${COVER}" -eq 1 ]]; then
     --really-enable-open-registration \
     --tls-cert server.crt \
     --tls-key server.key \
-    --config dendrite.yaml
+    --config matrix.yaml
 else
   echo "Not running with coverage"
   exec /dendrite/dendrite \
     --really-enable-open-registration \
     --tls-cert server.crt \
     --tls-key server.key \
-    --config dendrite.yaml
+    --config matrix.yaml
 fi

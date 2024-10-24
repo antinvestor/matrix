@@ -1,4 +1,4 @@
-# This is the Dendrite configuration file.
+# This is the Matrix configuration file.
 #
 # The configuration is split up into sections - each Dendrite component has a
 # configuration section, in addition to the "global" section which applies to
@@ -41,7 +41,7 @@ global:
   # sections. For monolith deployments using SQLite databases,
   # you must configure the "database" block for each component instead.
   database:
-    connection_string: postgresql://username:password@hostname/dendrite?sslmode=disable
+    connection_string: postgresql://matrix:s3cret@datastore/matrix?sslmode=disable
     max_open_conns: 90
     max_idle_conns: 5
     conn_max_lifetime: -1
@@ -78,13 +78,11 @@ global:
 
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
-  trusted_third_party_id_servers:
-    - matrix.org
-    - vector.im
+  trusted_third_party_id_servers: []
 
   # Disables federation. Dendrite will not be able to communicate with other servers
   # in the Matrix federation and the federation API will not be exposed.
-  disable_federation: false
+  disable_federation: true
 
   # Configures the handling of presence events. Inbound controls whether we receive
   # presence events from other servers, outbound controls whether we send presence
@@ -359,6 +357,6 @@ logging:
   - type: std
     level: info
   - type: file
-    level: info
+    level: error
     params:
-      path: ./logs
+      path: /var/log/matrix

@@ -28,12 +28,12 @@ services:
       - 8008:8008
       - 8448:8448
     volumes:
-      - ./config:/etc/dendrite
+      - ./config:/etc/matrix
       # The following volumes use docker volumes, change this
       # if you prefer to have those files outside of docker.
-      - dendrite_media:/var/dendrite/media
-      - dendrite_jetstream:/var/dendrite/jetstream
-      - dendrite_search_index:/var/dendrite/searchindex
+      - dendrite_media:/var/matrix/media
+      - dendrite_jetstream:/var/matrix/jetstream
+      - dendrite_search_index:/var/matrix/searchindex
     depends_on:
       postgres:
         condition: service_healthy

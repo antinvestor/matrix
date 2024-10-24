@@ -10,11 +10,13 @@ import (
 
 // This is an instrumented main, used when running integration tests (sytest) with code coverage.
 // Compile: go test -c -race -cover -covermode=atomic -o monolith.debug -coverpkg "github.com/matrix-org/..." ./cmd/dendrite
-// Run the monolith: ./monolith.debug -test.coverprofile=/somewhere/to/dump/integrationcover.out DEVEL --config dendrite.yaml
+// Run the monolith: ./monolith.debug -test.coverprofile=/somewhere/to/dump/integrationcover.out DEVEL --config matrix.yaml
 // Generate HTML with coverage: go tool cover -html=/somewhere/where/there/is/integrationcover.out -o cover.html
 // Source: https://dzone.com/articles/measuring-integration-test-coverage-rate-in-pouchc
-func TestMain(t *testing.T) {
-	var args []string
+func TestMain(_ *testing.T) {
+	var (
+		args []string
+	)
 
 	for _, arg := range os.Args {
 		switch {
@@ -24,12 +26,10 @@ func TestMain(t *testing.T) {
 			args = append(args, arg)
 		}
 	}
-
 	// only run the tests if there are args to be passed
 	if len(args) <= 1 {
 		return
 	}
-	t.Log(args)
 
 	waitCh := make(chan int, 1)
 	os.Args = args

@@ -1,0 +1,42 @@
+services:
+  datastore:
+    hostname: datastore
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: s3cr3t
+      POSTGRES_USER: dendrite
+      POSTGRES_DATABASE: dendrite
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U dendrite" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+    volumes:
+      # This will create a docker volume to persist the database files in.
+      # If you prefer those files to be outside of docker, you'll need to change this.
+      - ./runtime/postgres_data:/var/lib/postgresql/data
+
+  matrix:
+    hostname: matrix
+    build: .
+    ports:
+      - 8008:8008
+      - 8448:8448
+    depends_on:
+      datastore:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    volumes:
+      - ./runtime/config:/etc/matrix
+      - ./runtime/media:/var/matrix/media
+      - ./runtime/jetstream:/var/matrix/jetstream
+      - ./runtime/search_index:/var/matrix/searchindex
+
+networks:
+  internal:
+    attachable: true

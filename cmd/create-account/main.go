@@ -44,14 +44,14 @@ Creates a new user account on the homeserver.
 Example:
 
 	# provide password by parameter
-  	%s --config dendrite.yaml -username alice -password foobarbaz
+  	%s --config matrix.yaml -username alice -password foobarbaz
 	# use password from file
-  	%s --config dendrite.yaml -username alice -passwordfile my.pass
+  	%s --config matrix.yaml -username alice -passwordfile my.pass
 	# ask user to provide password
-	%s --config dendrite.yaml -username alice
+	%s --config matrix.yaml -username alice
 	# read password from stdin
-	%s --config dendrite.yaml -username alice -passwordstdin < my.pass
-	cat my.pass | %s --config dendrite.yaml -username alice -passwordstdin
+	%s --config matrix.yaml -username alice -passwordstdin < my.pass
+	cat my.pass | %s --config matrix.yaml -username alice -passwordstdin
 
 Arguments:
 
