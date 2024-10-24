@@ -5,7 +5,7 @@
 # $ docker build -t dendritejs -f DendriteJS.Dockerfile .
 # $ docker run --rm -p 8888:80 dendritejs
 # Then visit http://localhost:8888
-FROM golang:1.14-alpine AS gobuild
+FROM golang:1.23-alpine AS gobuild
 
 # Download and build dendrite
 WORKDIR /build
