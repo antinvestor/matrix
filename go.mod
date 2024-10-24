@@ -8,7 +8,7 @@ require (
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/blevesearch/bleve/v2 v2.4.2
 	github.com/cretz/bine v0.2.0
-	github.com/dgraph-io/ristretto v0.1.1
+	github.com/dgraph-io/ristretto v0.2.0
 	github.com/eyedeekay/goSam v0.32.54
 	github.com/eyedeekay/onramp v0.33.8
 	github.com/getsentry/sentry-go v0.29.1
