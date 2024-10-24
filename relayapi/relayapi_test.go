@@ -18,12 +18,12 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/antinvestor/matrix/setup/signing"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"

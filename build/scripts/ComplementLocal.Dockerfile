@@ -25,7 +25,7 @@ RUN echo '\
     fi \n\
     cd /dendrite \n\
     go build -v -o /runtime /dendrite/cmd/matrix\n\
-    go test -c -cover -covermode=atomic -o /runtime/dendrite-cover -coverpkg "github.com/matrix-org/..." /dendrite/cmd/matrix\n\
+    go test -c -cover -covermode=atomic -o /runtime/dendrite-cover -coverpkg "github.com/antinvestor/..." /dendrite/cmd/matrix\n\
     ' > compile.sh && chmod +x compile.sh
 
 # This script runs Dendrite for us. Must be run in the /runtime directory.
