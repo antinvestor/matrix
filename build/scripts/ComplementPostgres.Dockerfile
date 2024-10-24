@@ -1,4 +1,4 @@
-#syntax=docker/dockerfile:1.2
+#syntax=docker/dockerfile:1.10
 
 FROM golang:1.23-bookworm as build
 RUN apt-get update && apt-get install -y postgresql

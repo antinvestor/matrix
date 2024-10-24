@@ -8,10 +8,10 @@ require (
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/blevesearch/bleve/v2 v2.4.2
 	github.com/cretz/bine v0.2.0
-	github.com/dgraph-io/ristretto v0.1.1
+	github.com/dgraph-io/ristretto v0.2.0
 	github.com/eyedeekay/goSam v0.32.54
 	github.com/eyedeekay/onramp v0.33.8
-	github.com/getsentry/sentry-go v0.14.0
+	github.com/getsentry/sentry-go v0.29.1
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
@@ -27,7 +27,7 @@ require (
 	github.com/matrix-org/util v0.0.0-20221111132719-399730281e66
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/nats-io/nats-server/v2 v2.10.22
-	github.com/nats-io/nats.go v1.36.0
+	github.com/nats-io/nats.go v1.37.0
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -100,7 +100,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/minio/highwayhash v1.0.3 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
