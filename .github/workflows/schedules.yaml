@@ -66,7 +66,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-sytest-
       - name: Run Sytest
-        run: /bootstrap.sh dendrite
+        run: /bootstrap.sh matrix
         working-directory: /src
       - name: Summarise results.tap
         if: ${{ always() }}
