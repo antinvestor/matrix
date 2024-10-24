@@ -7,10 +7,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/blevesearch/bleve/v2 v2.4.2
-	github.com/cretz/bine v0.2.0
 	github.com/dgraph-io/ristretto v0.2.0
-	github.com/eyedeekay/goSam v0.32.54
-	github.com/eyedeekay/onramp v0.33.8
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.6.0
@@ -84,14 +81,11 @@ require (
 	github.com/coder/websocket v1.8.12 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/eyedeekay/i2pkeys v0.33.8 // indirect
-	github.com/eyedeekay/sam3 v0.33.8 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/gobwas/ws v1.1.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
-	github.com/golang/glog v1.2.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/pprof v0.0.0-20230808223545-4887780b67fb // indirect

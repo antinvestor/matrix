@@ -14,10 +14,6 @@ services:
       retries: 5
     networks:
       - internal
-    volumes:
-      # This will create a docker volume to persist the database files in.
-      # If you prefer those files to be outside of docker, you'll need to change this.
-      - ./runtime/postgres_data:/var/lib/postgresql/data
 
   matrix:
     hostname: matrix
@@ -32,10 +28,7 @@ services:
       - internal
     restart: unless-stopped
     volumes:
-      - ./runtime/config:/etc/matrix
-      - ./runtime/media:/var/matrix/media
-      - ./runtime/jetstream:/var/matrix/jetstream
-      - ./runtime/search_index:/var/matrix/searchindex
+      - ./sample-matrix.yaml:/etc/matrix/matrix.yaml
 
 networks:
   internal:
