@@ -3,7 +3,7 @@ version: "3.4"
 services:
   postgres:
     hostname: postgres
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     restart: always
     volumes:
       # This will create a docker volume to persist the database files in.
