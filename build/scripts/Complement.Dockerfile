@@ -6,7 +6,7 @@ WORKDIR /build
 
 # we will dump the binaries and config file to this location to ensure any local untracked files
 # that come from the COPY . . file don't contaminate the build
-RUN mkdir /dendrite
+RUN mkdir /matrix
 
 # Utilise Docker caching when downloading dependencies, this stops us needlessly
 # downloading dependencies every time.
@@ -14,13 +14,13 @@ ARG CGO
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-config && \
-    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-keys && \
-    CGO_ENABLED=${CGO} go build -o /dendrite/dendrite ./cmd/matrix&& \
-    CGO_ENABLED=${CGO} go build -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/matrix-org/..." ./cmd/matrix&& \
+    CGO_ENABLED=${CGO} go build -o /matrix ./cmd/generate-config && \
+    CGO_ENABLED=${CGO} go build -o /matrix ./cmd/generate-keys && \
+    CGO_ENABLED=${CGO} go build -o /matrix/matrix ./cmd/matrix&& \
+    CGO_ENABLED=${CGO} go build -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/antinvestor/..." ./cmd/matrix && \
     cp build/scripts/complement-cmd.sh /complement-cmd.sh
 
-WORKDIR /dendrite
+WORKDIR /matrix
 RUN ./generate-keys --private-key matrix_key.pem
 
 ENV SERVER_NAME=localhost

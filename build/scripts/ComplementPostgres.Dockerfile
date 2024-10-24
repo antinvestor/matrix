@@ -32,10 +32,10 @@ ARG CGO
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-config && \
-    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-keys && \
-    CGO_ENABLED=${CGO} go build -o /dendrite/dendrite ./cmd/matrix && \
-    CGO_ENABLED=${CGO} go build -cover -covermode=atomic -o /dendrite/dendrite-cover -coverpkg "github.com/matrix-org/..." ./cmd/matrix&& \
+    CGO_ENABLED=${CGO} go build -o /matrix ./cmd/generate-config && \
+    CGO_ENABLED=${CGO} go build -o /matrix ./cmd/generate-keys && \
+    CGO_ENABLED=${CGO} go build -o /matrix/matrix ./cmd/matrix && \
+    CGO_ENABLED=${CGO} go build -cover -covermode=atomic -o /matrix/matrix-cover -coverpkg "github.com/antinvestor/..." ./cmd/matrix&& \
     cp build/scripts/complement-cmd.sh /complement-cmd.sh
 
 WORKDIR /matrix

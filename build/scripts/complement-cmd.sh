@@ -6,14 +6,14 @@ export GOCOVERDIR=/tmp/covdatafiles
 mkdir -p "${GOCOVERDIR}"
 if [[ "${COVER}" -eq 1 ]]; then
   echo "Running with coverage"
-  exec /dendrite/dendrite-cover \
+  exec /matrix/matrix-cover \
     --really-enable-open-registration \
     --tls-cert server.crt \
     --tls-key server.key \
     --config matrix.yaml
 else
   echo "Not running with coverage"
-  exec /dendrite/dendrite \
+  exec /matrix/matrix \
     --really-enable-open-registration \
     --tls-cert server.crt \
     --tls-key server.key \
