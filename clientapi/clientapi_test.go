@@ -1695,7 +1695,7 @@ func TestKeys(t *testing.T) {
 
 		cs := crypto.NewMemoryStore(nil)
 		oc := crypto.NewOlmMachine(cl, nil, cs, dummyStore{})
-		if err = oc.Load(); err != nil {
+		if err = oc.Load(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1704,8 +1704,19 @@ func TestKeys(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		callback := func(uiResp *mautrix.RespUserInteractive) any {
+			return &mautrix.ReqUIAuthLogin{
+				BaseAuthData: mautrix.BaseAuthData{
+					Type:    mautrix.AuthTypePassword,
+					Session: uiResp.Session,
+				},
+				User:     oc.Client.UserID.String(),
+				Password: accessTokens[alice].password,
+			}
+		}
+
 		// tests `/keys/device_signing/upload`
-		_, err = oc.GenerateAndUploadCrossSigningKeys(accessTokens[alice].password, "passphrase")
+		_, _, err = oc.GenerateAndUploadCrossSigningKeys(ctx, callback, "passphrase")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1726,7 +1737,7 @@ func TestKeys(t *testing.T) {
 		}
 
 		// tests `/keys/signatures/upload`
-		if err = oc.SignOwnMasterKey(); err != nil {
+		if err = oc.SignOwnMasterKey(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1768,16 +1779,16 @@ type claimKeysRequest struct {
 
 type dummyStore struct{}
 
-func (d dummyStore) IsEncrypted(roomID id.RoomID) bool {
-	return true
+func (d dummyStore) IsEncrypted(ctx context.Context, roomID id.RoomID) (bool, error) {
+	return true, nil
 }
 
-func (d dummyStore) GetEncryptionEvent(roomID id.RoomID) *event.EncryptionEventContent {
-	return &event.EncryptionEventContent{}
+func (d dummyStore) GetEncryptionEvent(ctx context.Context, roomID id.RoomID) (*event.EncryptionEventContent, error) {
+	return &event.EncryptionEventContent{}, nil
 }
 
-func (d dummyStore) FindSharedRooms(userID id.UserID) []id.RoomID {
-	return []id.RoomID{}
+func (d dummyStore) FindSharedRooms(ctx context.Context, userID id.UserID) ([]id.RoomID, error) {
+	return []id.RoomID{}, nil
 }
 
 func TestKeyBackup(t *testing.T) {

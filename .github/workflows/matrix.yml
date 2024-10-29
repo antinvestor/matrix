@@ -185,9 +185,9 @@ jobs:
         image: postgres:17-alpine
         # Provide the password for postgres
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: dendrite
+          POSTGRES_USER: matrix
+          POSTGRES_PASSWORD: s3cr3t
+          POSTGRES_DB: matrix
         ports:
           # Maps tcp port 5432 on service container to the host
           - 5432:5432
@@ -221,9 +221,9 @@ jobs:
       - run: go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt -hide all
         env:
           POSTGRES_HOST: localhost
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: dendrite
+          POSTGRES_USER: matrix
+          POSTGRES_PASSWORD: s3cr3t
+          POSTGRES_DB: matrix
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:

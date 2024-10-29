@@ -97,7 +97,7 @@ func currentUser() string {
 	return user.Username
 }
 
-// Prepare a sqlite or postgres connection string for testing.
+// PrepareDBConnectionString Prepare a sqlite or postgres connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
@@ -164,7 +164,7 @@ func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, clo
 	}
 }
 
-// Creates subtests with each known DBType
+// WithAllDatabases Creates subtests with each known DBType
 func WithAllDatabases(t *testing.T, testFn func(t *testing.T, db DBType)) {
 	dbs := map[string]DBType{
 		"postgres": DBTypePostgres,
