@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"golang.org/x/crypto/bcrypt"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/spec"
