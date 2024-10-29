@@ -7,7 +7,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/blevesearch/bleve/v2 v2.4.2
-	github.com/dgraph-io/ristretto v0.2.0
+	github.com/dgraph-io/ristretto v1.0.1
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
