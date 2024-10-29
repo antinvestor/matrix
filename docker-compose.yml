@@ -5,15 +5,17 @@ services:
     restart: always
     environment:
       POSTGRES_PASSWORD: s3cr3t
-      POSTGRES_USER: dendrite
-      POSTGRES_DATABASE: dendrite
+      POSTGRES_USER: matrix
+      POSTGRES_DATABASE: matrix
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U dendrite" ]
+      test: [ "CMD-SHELL", "pg_isready -U matrix" ]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
       - internal
+    ports:
+      - 5431:5432
 
   matrix:
     hostname: matrix
@@ -28,7 +30,7 @@ services:
       - internal
     restart: unless-stopped
     volumes:
-      - ./sample-matrix.yaml:/etc/matrix/matrix.yaml
+      - ./runtime/config:/etc/matrix
 
 networks:
   internal:

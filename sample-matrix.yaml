@@ -41,7 +41,7 @@ global:
   # sections. For monolith deployments using SQLite databases,
   # you must configure the "database" block for each component instead.
   database:
-    connection_string: postgresql://matrix:s3cret@datastore/matrix?sslmode=disable
+    connection_string: postgresql://matrix:s3cr3t@datastore/matrix?sslmode=disable
     max_open_conns: 90
     max_idle_conns: 5
     conn_max_lifetime: -1
@@ -55,7 +55,7 @@ global:
     # 'kb' suffix is specified. Note that this is not a hard limit, nor is it a
     # memory limit for the entire process. A cache that is too small may ultimately
     # provide little or no benefit.
-    max_size_estimated: 1gb
+    max_size_estimated: 1gb     0772516363
 
     # The maximum amount of time that a cache entry can live for in memory before
     # it will be evicted and/or refreshed from the database. Lower values result in

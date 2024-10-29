@@ -91,7 +91,7 @@ func main() {
 
 	basepkg.PlatformSanityChecks()
 
-	logrus.Infof("Dendrite version %s", internal.VersionString())
+	logrus.Infof("Matrix version %s", internal.VersionString())
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
 		logrus.Warn("Open registration is enabled")
 	}

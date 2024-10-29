@@ -75,8 +75,8 @@ func main() {
 
 		scan := bufio.NewScanner(os.Stdin)
 		for scan.Scan() {
-			bytes := scan.Bytes()
-			bodyBytes = append(bodyBytes, bytes...)
+			scannedBytes := scan.Bytes()
+			bodyBytes = append(bodyBytes, scannedBytes...)
 		}
 		fmt.Println("Done!")
 		if err = json.Unmarshal(bodyBytes, &bodyObj); err != nil {
