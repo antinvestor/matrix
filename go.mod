@@ -39,6 +39,7 @@ require (
 	golang.org/x/term v0.25.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.1
 	maunium.net/go/mautrix v0.15.1
 	modernc.org/sqlite v1.33.1
@@ -104,7 +105,6 @@ require (
 	golang.org/x/time v0.7.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	maunium.net/go/maulogger/v2 v2.4.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.55.3 // indirect
