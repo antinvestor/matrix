@@ -60,6 +60,10 @@ type JSONWebKeys struct {
 // QueryLoginJWT returns the data associated with a valid login token
 func (a *UserInternalAPI) QueryLoginJWT(ctx context.Context, req *api.QueryLoginJWTRequest, res *api.QueryLoginJWTResponse) error {
 
+	if a.Config.JWTLogin.Audience == "" || a.Config.JWTLogin.Issuer == "" {
+		return errors.New("oauth2 jwt setting for audience or issuer is required")
+	}
+
 	options := []jwt.ParserOption{
 		jwt.WithAudience(a.Config.JWTLogin.Audience),
 		jwt.WithIssuer(a.Config.JWTLogin.Issuer)}

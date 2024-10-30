@@ -45,7 +45,6 @@ func (c *UserAPI) Defaults(opts DefaultOpts) {
 }
 
 func (c *UserAPI) Verify(configErrs *ConfigErrors) {
-	c.JWTLogin.Verify(configErrs)
 	checkPositive(configErrs, "user_api.openid_token_lifetime_ms", c.OpenIDTokenLifetimeMS)
 	if c.Matrix.DatabaseOptions.ConnectionString == "" {
 		checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
@@ -56,17 +55,4 @@ type JWTLogin struct {
 	Issuer                string `yaml:"issuer"`
 	Audience              string `yaml:"audience"`
 	Oauth2WellKnownJwkUri string `yaml:"oauth2_well_known_jwk_uri"`
-}
-
-func (jl *JWTLogin) Verify(configErrs *ConfigErrors) {
-	checkNotEmpty(configErrs, "client_api.jwt_login.oauth2_well_known_jwk_uri", jl.Oauth2WellKnownJwkUri)
-	checkNotEmpty(configErrs, "client_api.jwt_login.issuer", jl.Issuer)
-	checkNotEmpty(configErrs, "client_api.jwt_login.audience", jl.Audience)
-}
-
-func (jl *JWTLogin) Defaults(_ DefaultOpts) {
-	jl.Oauth2WellKnownJwkUri = "https://oauth2.example.com/.well-known/jwks.json"
-	jl.Audience = "test_service"
-	jl.Issuer = "https://oauth2.example.com"
-
 }
