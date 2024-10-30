@@ -1,38 +1,47 @@
 package caching
 
-import "github.com/antinvestor/matrix/roomserver/types"
+import (
+	"context"
+	"github.com/antinvestor/matrix/roomserver/types"
+)
 
 // EventStateKeyCache contains the subset of functions needed for
 // a room event state key cache.
 type EventStateKeyCache interface {
-	GetEventStateKey(eventStateKeyNID types.EventStateKeyNID) (string, bool)
-	StoreEventStateKey(eventStateKeyNID types.EventStateKeyNID, eventStateKey string)
-	GetEventStateKeyNID(eventStateKey string) (types.EventStateKeyNID, bool)
+	GetEventStateKey(ctx context.Context, eventStateKeyNID types.EventStateKeyNID) (string, bool)
+	StoreEventStateKey(ctx context.Context, eventStateKeyNID types.EventStateKeyNID, eventStateKey string) error
+	GetEventStateKeyNID(ctx context.Context, eventStateKey string) (types.EventStateKeyNID, bool)
 }
 
-func (c Caches) GetEventStateKey(eventStateKeyNID types.EventStateKeyNID) (string, bool) {
-	return c.RoomServerStateKeys.Get(eventStateKeyNID)
+func (c Caches) GetEventStateKey(ctx context.Context, eventStateKeyNID types.EventStateKeyNID) (string, bool) {
+	return c.RoomServerStateKeys.Get(ctx, eventStateKeyNID)
 }
 
-func (c Caches) StoreEventStateKey(eventStateKeyNID types.EventStateKeyNID, eventStateKey string) {
-	c.RoomServerStateKeys.Set(eventStateKeyNID, eventStateKey)
-	c.RoomServerStateKeyNIDs.Set(eventStateKey, eventStateKeyNID)
+func (c Caches) StoreEventStateKey(ctx context.Context, eventStateKeyNID types.EventStateKeyNID, eventStateKey string) error {
+	err := c.RoomServerStateKeys.Set(ctx, eventStateKeyNID, eventStateKey)
+	if err != nil {
+		return err
+	}
+	return c.RoomServerStateKeyNIDs.Set(ctx, eventStateKey, eventStateKeyNID)
 }
 
-func (c Caches) GetEventStateKeyNID(eventStateKey string) (types.EventStateKeyNID, bool) {
-	return c.RoomServerStateKeyNIDs.Get(eventStateKey)
+func (c Caches) GetEventStateKeyNID(ctx context.Context, eventStateKey string) (types.EventStateKeyNID, bool) {
+	return c.RoomServerStateKeyNIDs.Get(ctx, eventStateKey)
 }
 
 type EventTypeCache interface {
-	GetEventTypeKey(eventType string) (types.EventTypeNID, bool)
-	StoreEventTypeKey(eventTypeNID types.EventTypeNID, eventType string)
+	GetEventTypeKey(ctx context.Context, eventType string) (types.EventTypeNID, bool)
+	StoreEventTypeKey(ctx context.Context, eventTypeNID types.EventTypeNID, eventType string) error
 }
 
-func (c Caches) StoreEventTypeKey(eventTypeNID types.EventTypeNID, eventType string) {
-	c.RoomServerEventTypeNIDs.Set(eventType, eventTypeNID)
-	c.RoomServerEventTypes.Set(eventTypeNID, eventType)
+func (c Caches) StoreEventTypeKey(ctx context.Context, eventTypeNID types.EventTypeNID, eventType string) error {
+	err := c.RoomServerEventTypeNIDs.Set(ctx, eventType, eventTypeNID)
+	if err != nil {
+		return err
+	}
+	return c.RoomServerEventTypes.Set(ctx, eventTypeNID, eventType)
 }
 
-func (c Caches) GetEventTypeKey(eventType string) (types.EventTypeNID, bool) {
-	return c.RoomServerEventTypeNIDs.Get(eventType)
+func (c Caches) GetEventTypeKey(ctx context.Context, eventType string) (types.EventTypeNID, bool) {
+	return c.RoomServerEventTypeNIDs.Get(ctx, eventType)
 }

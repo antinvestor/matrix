@@ -419,7 +419,7 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 	if caller.Device() == nil {
 		return nil
 	}
-	resp, ok := querier.Cache.GetRoomHierarchy(roomID.String())
+	resp, ok := querier.Cache.GetRoomHierarchy(ctx, roomID.String())
 	if ok {
 		util.GetLogger(ctx).Debugf("Returning cached response for %s", roomID)
 		return &resp
@@ -447,7 +447,10 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 			}
 			res.Children[i] = child
 		}
-		querier.Cache.StoreRoomHierarchy(roomID.String(), res)
+		err = querier.Cache.StoreRoomHierarchy(ctx, roomID.String(), res)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Warnf("failed to cache RoomHierarchies on server %s", serverName)
+		}
 
 		return &res
 	}

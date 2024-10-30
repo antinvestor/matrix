@@ -1,6 +1,7 @@
 package caching
 
 import (
+	"context"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
@@ -12,13 +13,13 @@ type lazyLoadingCacheKey struct {
 }
 
 type LazyLoadCache interface {
-	StoreLazyLoadedUser(device *userapi.Device, roomID, userID, eventID string)
-	IsLazyLoadedUserCached(device *userapi.Device, roomID, userID string) (string, bool)
-	InvalidateLazyLoadedUser(device *userapi.Device, roomID, userID string)
+	StoreLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, userID, eventID string) error
+	IsLazyLoadedUserCached(ctx context.Context, device *userapi.Device, roomID, userID string) (string, bool)
+	InvalidateLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, userID string) error
 }
 
-func (c Caches) StoreLazyLoadedUser(device *userapi.Device, roomID, userID, eventID string) {
-	c.LazyLoading.Set(lazyLoadingCacheKey{
+func (c Caches) StoreLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, userID, eventID string) error {
+	return c.LazyLoading.Set(ctx, lazyLoadingCacheKey{
 		UserID:       device.UserID,
 		DeviceID:     device.ID,
 		RoomID:       roomID,
@@ -26,8 +27,8 @@ func (c Caches) StoreLazyLoadedUser(device *userapi.Device, roomID, userID, even
 	}, eventID)
 }
 
-func (c Caches) IsLazyLoadedUserCached(device *userapi.Device, roomID, userID string) (string, bool) {
-	return c.LazyLoading.Get(lazyLoadingCacheKey{
+func (c Caches) IsLazyLoadedUserCached(ctx context.Context, device *userapi.Device, roomID, userID string) (string, bool) {
+	return c.LazyLoading.Get(ctx, lazyLoadingCacheKey{
 		UserID:       device.UserID,
 		DeviceID:     device.ID,
 		RoomID:       roomID,
@@ -35,8 +36,8 @@ func (c Caches) IsLazyLoadedUserCached(device *userapi.Device, roomID, userID st
 	})
 }
 
-func (c Caches) InvalidateLazyLoadedUser(device *userapi.Device, roomID, userID string) {
-	c.LazyLoading.Unset(lazyLoadingCacheKey{
+func (c Caches) InvalidateLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, userID string) error {
+	return c.LazyLoading.Unset(ctx, lazyLoadingCacheKey{
 		UserID:       device.UserID,
 		DeviceID:     device.ID,
 		RoomID:       roomID,

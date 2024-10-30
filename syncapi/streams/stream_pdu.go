@@ -101,7 +101,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		// TODO: This might be inefficient, when joined to many and/or large rooms.
 		joinedUsers := p.notifier.JoinedUsers(roomID)
 		for _, sharedUser := range joinedUsers {
-			p.lazyLoadCache.InvalidateLazyLoadedUser(req.Device, roomID, sharedUser)
+			_ = p.lazyLoadCache.InvalidateLazyLoadedUser(ctx, req.Device, roomID, sharedUser)
 		}
 
 		// get the join response for each room
@@ -668,7 +668,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	// Add all users the client doesn't know about yet to a list
 	for _, event := range timelineEvents {
 		// Membership is not yet cached, add it to the list
-		if _, ok := p.lazyLoadCache.IsLazyLoadedUserCached(device, roomID, string(event.SenderID())); !ok {
+		if _, ok := p.lazyLoadCache.IsLazyLoadedUserCached(ctx, device, roomID, string(event.SenderID())); !ok {
 			timelineUsers[string(event.SenderID())] = struct{}{}
 		}
 	}
@@ -688,7 +688,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			if _, ok := timelineUsers[userID]; ok || isGappedIncremental || userID == device.UserID {
 				newStateEvents = append(newStateEvents, event)
 				if !stateFilter.IncludeRedundantMembers {
-					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, userID, event.EventID())
+					_ = p.lazyLoadCache.StoreLazyLoadedUser(ctx, device, roomID, userID, event.EventID())
 				}
 				delete(timelineUsers, userID)
 			}
@@ -710,7 +710,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	}
 	// cache the membership events
 	for _, membership := range memberships {
-		p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, *membership.StateKey(), membership.EventID())
+		_ = p.lazyLoadCache.StoreLazyLoadedUser(ctx, device, roomID, *membership.StateKey(), membership.EventID())
 	}
 	stateEvents = append(newStateEvents, memberships...)
 	return stateEvents, nil

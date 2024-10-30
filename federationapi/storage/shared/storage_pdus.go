@@ -73,7 +73,7 @@ func (d *Database) GetPendingPDUs(
 
 		retrieve := make([]int64, 0, len(nids))
 		for _, nid := range nids {
-			if event, ok := d.Cache.GetFederationQueuedPDU(nid); ok {
+			if event, ok := d.Cache.GetFederationQueuedPDU(ctx, nid); ok {
 				newReceipt := receipt.NewReceipt(nid)
 				events[&newReceipt] = event
 			} else {
@@ -93,7 +93,7 @@ func (d *Database) GetPendingPDUs(
 			}
 			newReceipt := receipt.NewReceipt(nid)
 			events[&newReceipt] = &event
-			d.Cache.StoreFederationQueuedPDU(nid, &event)
+			_ = d.Cache.StoreFederationQueuedPDU(ctx, nid, &event)
 		}
 
 		return nil
@@ -131,7 +131,7 @@ func (d *Database) CleanPDUs(
 			}
 			if count == 0 {
 				deleteNIDs = append(deleteNIDs, nid)
-				d.Cache.EvictFederationQueuedPDU(nid)
+				_ = d.Cache.EvictFederationQueuedPDU(ctx, nid)
 			}
 		}
 

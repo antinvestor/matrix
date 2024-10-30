@@ -87,7 +87,7 @@ func (d *EventDatabase) eventTypeNIDs(
 	// first try the cache
 	fetchEventTypes := make([]string, 0, len(eventTypes))
 	for _, eventType := range eventTypes {
-		eventTypeNID, ok := d.Cache.GetEventTypeKey(eventType)
+		eventTypeNID, ok := d.Cache.GetEventTypeKey(ctx, eventType)
 		if ok {
 			result[eventType] = eventTypeNID
 			continue
@@ -101,7 +101,7 @@ func (d *EventDatabase) eventTypeNIDs(
 		}
 		for eventType, nid := range nids {
 			result[eventType] = nid
-			d.Cache.StoreEventTypeKey(nid, eventType)
+			_ = d.Cache.StoreEventTypeKey(ctx, nid, eventType)
 		}
 	}
 	return result, nil
@@ -113,7 +113,7 @@ func (d *EventDatabase) EventStateKeys(
 	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
 	fetch := make([]types.EventStateKeyNID, 0, len(eventStateKeyNIDs))
 	for _, nid := range eventStateKeyNIDs {
-		if key, ok := d.Cache.GetEventStateKey(nid); ok {
+		if key, ok := d.Cache.GetEventStateKey(ctx, nid); ok {
 			result[nid] = key
 		} else {
 			fetch = append(fetch, nid)
@@ -126,7 +126,7 @@ func (d *EventDatabase) EventStateKeys(
 		}
 		for nid, key := range fromDB {
 			result[nid] = key
-			d.Cache.StoreEventStateKey(nid, key)
+			_ = d.Cache.StoreEventStateKey(ctx, nid, key)
 		}
 	}
 	return result, nil
@@ -146,7 +146,7 @@ func (d *EventDatabase) eventStateKeyNIDs(
 	// first ask the cache about these keys
 	fetchEventStateKeys := make([]string, 0, len(eventStateKeys))
 	for _, eventStateKey := range eventStateKeys {
-		eventStateKeyNID, ok := d.Cache.GetEventStateKeyNID(eventStateKey)
+		eventStateKeyNID, ok := d.Cache.GetEventStateKeyNID(ctx, eventStateKey)
 		if ok {
 			result[eventStateKey] = eventStateKeyNID
 			continue
@@ -161,7 +161,7 @@ func (d *EventDatabase) eventStateKeyNIDs(
 		}
 		for eventStateKey, nid := range nids {
 			result[eventStateKey] = nid
-			d.Cache.StoreEventStateKey(nid, eventStateKey)
+			_ = d.Cache.StoreEventStateKey(ctx, nid, eventStateKey)
 		}
 	}
 
@@ -250,8 +250,8 @@ func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*t
 		return nil, err
 	}
 	if roomInfo != nil {
-		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
-		d.Cache.StoreRoomVersion(roomID, roomInfo.RoomVersion)
+		_ = d.Cache.StoreRoomServerRoomID(ctx, roomInfo.RoomNID, roomID)
+		_ = d.Cache.StoreRoomVersion(ctx, roomID, roomInfo.RoomVersion)
 	}
 	return roomInfo, err
 }
@@ -553,7 +553,7 @@ func (d *EventDatabase) events(
 	events := make(map[types.EventNID]gomatrixserverlib.PDU, len(inputEventNIDs))
 	eventNIDs := make([]types.EventNID, 0, len(inputEventNIDs))
 	for _, nid := range inputEventNIDs {
-		if event, ok := d.Cache.GetRoomServerEvent(nid); ok && event != nil {
+		if event, ok := d.Cache.GetRoomServerEvent(ctx, nid); ok && event != nil {
 			events[nid] = event
 		} else {
 			eventNIDs = append(eventNIDs, nid)
@@ -600,7 +600,7 @@ func (d *EventDatabase) events(
 			return nil, err
 		}
 		if event := events[eventJSON.EventNID]; event != nil {
-			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, &types.HeaderedEvent{PDU: event})
+			_ = d.Cache.StoreRoomServerEvent(ctx, eventJSON.EventNID, &types.HeaderedEvent{PDU: event})
 		}
 	}
 	results := make([]types.Event, 0, len(inputEventNIDs))
@@ -697,8 +697,8 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserver
 		return nil, fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 	}
 
-	roomNID, nidOK := d.Cache.GetRoomServerRoomNID(event.RoomID().String())
-	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(event.RoomID().String())
+	roomNID, nidOK := d.Cache.GetRoomServerRoomNID(ctx, event.RoomID().String())
+	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(ctx, event.RoomID().String())
 	// if we found both, the roomNID and version in our cache, no need to query the database
 	if nidOK && versionOK {
 		return &types.RoomInfo{
@@ -715,7 +715,7 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserver
 		return nil
 	})
 	if roomVersion != "" {
-		d.Cache.StoreRoomVersion(event.RoomID().String(), roomVersion)
+		_ = d.Cache.StoreRoomVersion(ctx, event.RoomID().String(), roomVersion)
 	}
 	return &types.RoomInfo{
 		RoomVersion: roomVersion,
@@ -724,7 +724,7 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserver
 }
 
 func (d *Database) GetRoomVersion(ctx context.Context, roomID string) (gomatrixserverlib.RoomVersion, error) {
-	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(roomID)
+	cachedRoomVersion, versionOK := d.Cache.GetRoomVersion(ctx, roomID)
 	if versionOK {
 		return cachedRoomVersion, nil
 	}
@@ -884,7 +884,7 @@ func (d *Database) MissingAuthPrevEvents(
 func (d *Database) assignRoomNID(
 	ctx context.Context, txn *sql.Tx, roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
-	roomNID, ok := d.Cache.GetRoomServerRoomNID(roomID)
+	roomNID, ok := d.Cache.GetRoomServerRoomNID(ctx, roomID)
 	if ok {
 		return roomNID, nil
 	}
@@ -901,15 +901,15 @@ func (d *Database) assignRoomNID(
 	if err != nil {
 		return 0, err
 	}
-	d.Cache.StoreRoomServerRoomID(roomNID, roomID)
-	d.Cache.StoreRoomVersion(roomID, roomVersion)
+	_ = d.Cache.StoreRoomServerRoomID(ctx, roomNID, roomID)
+	_ = d.Cache.StoreRoomVersion(ctx, roomID, roomVersion)
 	return roomNID, nil
 }
 
 func (d *Database) assignEventTypeNID(
 	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
-	eventTypeNID, ok := d.Cache.GetEventTypeKey(eventType)
+	eventTypeNID, ok := d.Cache.GetEventTypeKey(ctx, eventType)
 	if ok {
 		return eventTypeNID, nil
 	}
@@ -926,14 +926,14 @@ func (d *Database) assignEventTypeNID(
 	if err != nil {
 		return 0, err
 	}
-	d.Cache.StoreEventTypeKey(eventTypeNID, eventType)
+	_ = d.Cache.StoreEventTypeKey(ctx, eventTypeNID, eventType)
 	return eventTypeNID, nil
 }
 
 func (d *EventDatabase) assignStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
-	eventStateKeyNID, ok := d.Cache.GetEventStateKeyNID(eventStateKey)
+	eventStateKeyNID, ok := d.Cache.GetEventStateKeyNID(ctx, eventStateKey)
 	if ok {
 		return eventStateKeyNID, nil
 	}
@@ -950,7 +950,7 @@ func (d *EventDatabase) assignStateKeyNID(
 	if err != nil {
 		return 0, err
 	}
-	d.Cache.StoreEventStateKey(eventStateKeyNID, eventStateKey)
+	_ = d.Cache.StoreEventStateKey(ctx, eventStateKeyNID, eventStateKey)
 	return eventStateKeyNID, nil
 }
 
@@ -1089,7 +1089,7 @@ func (d *EventDatabase) MaybeRedactEvent(
 
 		// We remove the entry from the cache, as if we just "StoreRoomServerEvent", we can't be
 		// certain that the cached entry actually is updated, since ristretto is eventual-persistent.
-		d.Cache.InvalidateRoomServerEvent(redactedEvent.EventNID)
+		_ = d.Cache.InvalidateRoomServerEvent(ctx, redactedEvent.EventNID)
 
 		return nil
 	})
@@ -1263,7 +1263,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	// return the event requested
 	for _, e := range entries {
 		if e.EventTypeNID == eventTypeNID && e.EventStateKeyNID == stateKeyNID {
-			cachedEvent, ok := d.Cache.GetRoomServerEvent(e.EventNID)
+			cachedEvent, ok := d.Cache.GetRoomServerEvent(ctx, e.EventNID)
 			if ok {
 				return &types.HeaderedEvent{PDU: cachedEvent}, nil
 			}
@@ -1837,7 +1837,7 @@ func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys ma
 	query := make(map[types.RoomNID][]ed25519.PublicKey)
 	rooms := make(map[types.RoomNID]spec.RoomID)
 	for roomID, keys := range publicKeys {
-		roomNID, ok := d.Cache.GetRoomServerRoomNID(roomID.String())
+		roomNID, ok := d.Cache.GetRoomServerRoomNID(ctx, roomID.String())
 		if !ok {
 			roomInfo, rErr := d.roomInfo(ctx, nil, roomID.String())
 			if rErr != nil {

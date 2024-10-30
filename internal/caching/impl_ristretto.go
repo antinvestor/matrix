@@ -15,6 +15,7 @@
 package caching
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -29,22 +30,6 @@ import (
 
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-)
-
-const (
-	roomVersionsCache byte = iota + 1
-	serverKeysCache
-	roomNIDsCache
-	roomIDsCache
-	roomEventsCache
-	federationPDUsCache
-	federationEDUsCache
-	spaceSummaryRoomsCache
-	lazyLoadingCache
-	eventStateKeyCache
-	eventTypeCache
-	eventTypeNIDCache
-	eventStateKeyNIDCache
 )
 
 const (
@@ -166,9 +151,10 @@ type RistrettoCostedCachePartition[k keyable, v costable] struct {
 	*RistrettoCachePartition[k, v]
 }
 
-func (c *RistrettoCostedCachePartition[K, V]) Set(key K, value V) {
+func (c *RistrettoCostedCachePartition[K, V]) Set(_ context.Context, key K, value V) error {
 	cost := value.CacheCost()
 	c.setWithCost(key, value, int64(cost))
+	return nil
 }
 
 type RistrettoCachePartition[K keyable, V any] struct {
@@ -188,7 +174,7 @@ func (c *RistrettoCachePartition[K, V]) setWithCost(key K, value V, cost int64) 
 	c.cache.SetWithTTL(bkey, value, int64(len(bkey))+cost, c.MaxAge)
 }
 
-func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
+func (c *RistrettoCachePartition[K, V]) Set(_ context.Context, key K, value V) error {
 	var cost int64
 	if cv, ok := any(value).(string); ok {
 		cost = int64(len(cv))
@@ -196,17 +182,19 @@ func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
 		cost = int64(unsafe.Sizeof(value))
 	}
 	c.setWithCost(key, value, cost)
+	return nil
 }
 
-func (c *RistrettoCachePartition[K, V]) Unset(key K) {
+func (c *RistrettoCachePartition[K, V]) Unset(_ context.Context, key K) error {
 	bkey := fmt.Sprintf("%c%v", c.Prefix, key)
 	if !c.Mutable {
 		panic(fmt.Sprintf("invalid use of immutable cache tries to unset value of %v", key))
 	}
 	c.cache.Del(bkey)
+	return nil
 }
 
-func (c *RistrettoCachePartition[K, V]) Get(key K) (value V, ok bool) {
+func (c *RistrettoCachePartition[K, V]) Get(_ context.Context, key K) (value V, ok bool) {
 	bkey := fmt.Sprintf("%c%v", c.Prefix, key)
 	v, ok := c.cache.Get(bkey)
 	if !ok || v == nil {

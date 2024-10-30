@@ -309,7 +309,7 @@ func (r *RoomserverInternalAPI) StoreUserRoomPublicKey(ctx context.Context, send
 }
 
 func (r *RoomserverInternalAPI) SigningIdentityFor(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error) {
-	roomVersion, ok := r.Cache.GetRoomVersion(roomID.String())
+	roomVersion, ok := r.Cache.GetRoomVersion(ctx, roomID.String())
 	if !ok {
 		roomInfo, err := r.DB.RoomInfo(ctx, roomID.String())
 		if err != nil {

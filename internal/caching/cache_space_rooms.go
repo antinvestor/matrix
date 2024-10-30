@@ -1,17 +1,20 @@
 package caching
 
-import "github.com/matrix-org/gomatrixserverlib/fclient"
+import (
+	"context"
+	"github.com/matrix-org/gomatrixserverlib/fclient"
+)
 
 // RoomHierarchy cache caches responses to federated room hierarchy requests (A.K.A. 'space summaries')
 type RoomHierarchyCache interface {
-	GetRoomHierarchy(roomID string) (r fclient.RoomHierarchyResponse, ok bool)
-	StoreRoomHierarchy(roomID string, r fclient.RoomHierarchyResponse)
+	GetRoomHierarchy(ctx context.Context, roomID string) (r fclient.RoomHierarchyResponse, ok bool)
+	StoreRoomHierarchy(ctx context.Context, roomID string, r fclient.RoomHierarchyResponse) error
 }
 
-func (c Caches) GetRoomHierarchy(roomID string) (r fclient.RoomHierarchyResponse, ok bool) {
-	return c.RoomHierarchies.Get(roomID)
+func (c Caches) GetRoomHierarchy(ctx context.Context, roomID string) (r fclient.RoomHierarchyResponse, ok bool) {
+	return c.RoomHierarchies.Get(ctx, roomID)
 }
 
-func (c Caches) StoreRoomHierarchy(roomID string, r fclient.RoomHierarchyResponse) {
-	c.RoomHierarchies.Set(roomID, r)
+func (c Caches) StoreRoomHierarchy(ctx context.Context, roomID string, r fclient.RoomHierarchyResponse) error {
+	return c.RoomHierarchies.Set(ctx, roomID, r)
 }

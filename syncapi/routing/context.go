@@ -320,7 +320,7 @@ func applyLazyLoadMembers(
 	// get members who actually send an event
 	for _, e := range events {
 		// Don't add membership events the client should already know about
-		if _, cached := lazyLoadCache.IsLazyLoadedUserCached(device, e.RoomID, e.Sender); cached {
+		if _, cached := lazyLoadCache.IsLazyLoadedUserCached(ctx, device, e.RoomID, e.Sender); cached {
 			continue
 		}
 		eventSenders[e.Sender] = struct{}{}
@@ -342,7 +342,7 @@ func applyLazyLoadMembers(
 
 	// cache the membership events
 	for _, membership := range memberships {
-		lazyLoadCache.StoreLazyLoadedUser(device, roomID, *membership.StateKey(), membership.EventID())
+		_ = lazyLoadCache.StoreLazyLoadedUser(ctx, device, roomID, *membership.StateKey(), membership.EventID())
 	}
 
 	return memberships, nil

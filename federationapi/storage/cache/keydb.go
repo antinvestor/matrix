@@ -41,7 +41,7 @@ func (d *KeyDatabase) FetchKeys(
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	results := make(map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult)
 	for req, ts := range requests {
-		if res, cached := d.cache.GetServerKey(req, ts); cached {
+		if res, cached := d.cache.GetServerKey(ctx, req, ts); cached {
 			results[req] = res
 			delete(requests, req)
 		}
@@ -56,7 +56,7 @@ func (d *KeyDatabase) FetchKeys(
 	}
 	for req, res := range fromDB {
 		results[req] = res
-		d.cache.StoreServerKey(req, res)
+		_ = d.cache.StoreServerKey(ctx, req, res)
 	}
 	return results, nil
 }
@@ -67,7 +67,7 @@ func (d *KeyDatabase) StoreKeys(
 	keyMap map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
 	for req, res := range keyMap {
-		d.cache.StoreServerKey(req, res)
+		_ = d.cache.StoreServerKey(ctx, req, res)
 	}
 	return d.inner.StoreKeys(ctx, keyMap)
 }

@@ -1,6 +1,7 @@
 package caching
 
 import (
+	"context"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -8,35 +9,35 @@ import (
 // FederationCache contains the subset of functions needed for
 // a federation event cache.
 type FederationCache interface {
-	GetFederationQueuedPDU(eventNID int64) (event *types.HeaderedEvent, ok bool)
-	StoreFederationQueuedPDU(eventNID int64, event *types.HeaderedEvent)
-	EvictFederationQueuedPDU(eventNID int64)
+	GetFederationQueuedPDU(ctx context.Context, eventNID int64) (event *types.HeaderedEvent, ok bool)
+	StoreFederationQueuedPDU(ctx context.Context, eventNID int64, event *types.HeaderedEvent) error
+	EvictFederationQueuedPDU(ctx context.Context, eventNID int64) error
 
-	GetFederationQueuedEDU(eventNID int64) (event *gomatrixserverlib.EDU, ok bool)
-	StoreFederationQueuedEDU(eventNID int64, event *gomatrixserverlib.EDU)
-	EvictFederationQueuedEDU(eventNID int64)
+	GetFederationQueuedEDU(ctx context.Context, eventNID int64) (event *gomatrixserverlib.EDU, ok bool)
+	StoreFederationQueuedEDU(ctx context.Context, eventNID int64, event *gomatrixserverlib.EDU) error
+	EvictFederationQueuedEDU(ctx context.Context, eventNID int64) error
 }
 
-func (c Caches) GetFederationQueuedPDU(eventNID int64) (*types.HeaderedEvent, bool) {
-	return c.FederationPDUs.Get(eventNID)
+func (c Caches) GetFederationQueuedPDU(ctx context.Context, eventNID int64) (*types.HeaderedEvent, bool) {
+	return c.FederationPDUs.Get(ctx, eventNID)
 }
 
-func (c Caches) StoreFederationQueuedPDU(eventNID int64, event *types.HeaderedEvent) {
-	c.FederationPDUs.Set(eventNID, event)
+func (c Caches) StoreFederationQueuedPDU(ctx context.Context, eventNID int64, event *types.HeaderedEvent) error {
+	return c.FederationPDUs.Set(ctx, eventNID, event)
 }
 
-func (c Caches) EvictFederationQueuedPDU(eventNID int64) {
-	c.FederationPDUs.Unset(eventNID)
+func (c Caches) EvictFederationQueuedPDU(ctx context.Context, eventNID int64) error {
+	return c.FederationPDUs.Unset(ctx, eventNID)
 }
 
-func (c Caches) GetFederationQueuedEDU(eventNID int64) (*gomatrixserverlib.EDU, bool) {
-	return c.FederationEDUs.Get(eventNID)
+func (c Caches) GetFederationQueuedEDU(ctx context.Context, eventNID int64) (*gomatrixserverlib.EDU, bool) {
+	return c.FederationEDUs.Get(ctx, eventNID)
 }
 
-func (c Caches) StoreFederationQueuedEDU(eventNID int64, event *gomatrixserverlib.EDU) {
-	c.FederationEDUs.Set(eventNID, event)
+func (c Caches) StoreFederationQueuedEDU(ctx context.Context, eventNID int64, event *gomatrixserverlib.EDU) error {
+	return c.FederationEDUs.Set(ctx, eventNID, event)
 }
 
-func (c Caches) EvictFederationQueuedEDU(eventNID int64) {
-	c.FederationEDUs.Unset(eventNID)
+func (c Caches) EvictFederationQueuedEDU(ctx context.Context, eventNID int64) error {
+	return c.FederationEDUs.Unset(ctx, eventNID)
 }

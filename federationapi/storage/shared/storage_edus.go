@@ -95,7 +95,7 @@ func (d *Database) GetPendingEDUs(
 
 		retrieve := make([]int64, 0, len(nids))
 		for _, nid := range nids {
-			if edu, ok := d.Cache.GetFederationQueuedEDU(nid); ok {
+			if edu, ok := d.Cache.GetFederationQueuedEDU(ctx, nid); ok {
 				newReceipt := receipt.NewReceipt(nid)
 				edus[&newReceipt] = edu
 			} else {
@@ -115,7 +115,7 @@ func (d *Database) GetPendingEDUs(
 			}
 			newReceipt := receipt.NewReceipt(nid)
 			edus[&newReceipt] = &event
-			d.Cache.StoreFederationQueuedEDU(nid, &event)
+			_ = d.Cache.StoreFederationQueuedEDU(ctx, nid, &event)
 		}
 
 		return nil
@@ -152,7 +152,7 @@ func (d *Database) CleanEDUs(
 			}
 			if count == 0 {
 				deleteNIDs = append(deleteNIDs, nid)
-				d.Cache.EvictFederationQueuedEDU(nid)
+				_ = d.Cache.EvictFederationQueuedEDU(ctx, nid)
 			}
 		}
 
@@ -199,7 +199,7 @@ func (d *Database) DeleteExpiredEDUs(ctx context.Context) error {
 	}
 
 	for i := range jsonNIDs {
-		d.Cache.EvictFederationQueuedEDU(jsonNIDs[i])
+		_ = d.Cache.EvictFederationQueuedEDU(ctx, jsonNIDs[i])
 	}
 
 	return nil

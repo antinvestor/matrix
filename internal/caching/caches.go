@@ -15,9 +15,26 @@
 package caching
 
 import (
+	"context"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+)
+
+const (
+	roomVersionsCache byte = iota + 1
+	serverKeysCache
+	roomNIDsCache
+	roomIDsCache
+	roomEventsCache
+	federationPDUsCache
+	federationEDUsCache
+	spaceSummaryRoomsCache
+	lazyLoadingCache
+	eventStateKeyCache
+	eventTypeCache
+	eventTypeNIDCache
+	eventStateKeyNIDCache
 )
 
 // Caches contains a set of references to caches. They may be
@@ -41,9 +58,9 @@ type Caches struct {
 
 // Cache is the interface that an implementation must satisfy.
 type Cache[K keyable, T any] interface {
-	Get(key K) (value T, ok bool)
-	Set(key K, value T)
-	Unset(key K)
+	Get(ctx context.Context, key K) (value T, ok bool)
+	Set(ctx context.Context, key K, value T) error
+	Unset(ctx context.Context, key K) error
 }
 
 type keyable interface {

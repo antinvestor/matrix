@@ -1,6 +1,7 @@
 package caching
 
 import (
+	"context"
 	"github.com/antinvestor/matrix/roomserver/types"
 )
 
@@ -16,22 +17,25 @@ type RoomServerCaches interface {
 // RoomServerNIDsCache contains the subset of functions needed for
 // a roomserver NID cache.
 type RoomServerNIDsCache interface {
-	GetRoomServerRoomID(roomNID types.RoomNID) (string, bool)
+	GetRoomServerRoomID(ctx context.Context, roomNID types.RoomNID) (string, bool)
 	// StoreRoomServerRoomID stores roomNID -> roomID and roomID -> roomNID
-	StoreRoomServerRoomID(roomNID types.RoomNID, roomID string)
-	GetRoomServerRoomNID(roomID string) (types.RoomNID, bool)
+	StoreRoomServerRoomID(ctx context.Context, roomNID types.RoomNID, roomID string) error
+	GetRoomServerRoomNID(ctx context.Context, roomID string) (types.RoomNID, bool)
 }
 
-func (c Caches) GetRoomServerRoomID(roomNID types.RoomNID) (string, bool) {
-	return c.RoomServerRoomIDs.Get(roomNID)
+func (c Caches) GetRoomServerRoomID(ctx context.Context, roomNID types.RoomNID) (string, bool) {
+	return c.RoomServerRoomIDs.Get(ctx, roomNID)
 }
 
 // StoreRoomServerRoomID stores roomNID -> roomID and roomID -> roomNID
-func (c Caches) StoreRoomServerRoomID(roomNID types.RoomNID, roomID string) {
-	c.RoomServerRoomNIDs.Set(roomID, roomNID)
-	c.RoomServerRoomIDs.Set(roomNID, roomID)
+func (c Caches) StoreRoomServerRoomID(ctx context.Context, roomNID types.RoomNID, roomID string) error {
+	err := c.RoomServerRoomNIDs.Set(ctx, roomID, roomNID)
+	if err != nil {
+		return err
+	}
+	return c.RoomServerRoomIDs.Set(ctx, roomNID, roomID)
 }
 
-func (c Caches) GetRoomServerRoomNID(roomID string) (types.RoomNID, bool) {
-	return c.RoomServerRoomNIDs.Get(roomID)
+func (c Caches) GetRoomServerRoomNID(ctx context.Context, roomID string) (types.RoomNID, bool) {
+	return c.RoomServerRoomNIDs.Get(ctx, roomID)
 }
