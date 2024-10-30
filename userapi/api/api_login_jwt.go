@@ -162,18 +162,6 @@ func (a *JWTClaims) ServiceName() string {
 	return result
 }
 
-func (a *JWTClaims) isInternalSystem() bool {
-
-	roles := a.GetRoles()
-	if len(roles) == 1 {
-		if strings.HasPrefix(roles[0], "system_internal") {
-			return true
-		}
-	}
-
-	return false
-}
-
 // AsMetadata Creates a string map to be used as metadata in queue data
 func (a *JWTClaims) AsMetadata() map[string]string {
 
