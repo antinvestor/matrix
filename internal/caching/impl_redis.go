@@ -27,9 +27,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var ctx = context.Background()
-
-// Define the RedisCachePartition type to replace Ristretto
+// RedisCachePartition Define the RedisCachePartition type to replace Ristretto
 type RedisCachePartition[K comparable, V any] struct {
 	client  *redis.Client
 	Prefix  byte
@@ -37,7 +35,7 @@ type RedisCachePartition[K comparable, V any] struct {
 	MaxAge  time.Duration
 }
 
-// Main Redis-based caching setup
+// NewRedisCache Main Redis-based caching setup
 func NewRedisCache(redisAddr string, maxAge time.Duration) *Caches {
 	client := redis.NewClient(&redis.Options{
 		Addr: redisAddr,
@@ -52,14 +50,14 @@ func NewRedisCache(redisAddr string, maxAge time.Duration) *Caches {
 		RoomServerStateKeyNIDs:  &RedisCachePartition[string, types.EventStateKeyNID]{client, eventStateKeyNIDCache, false, maxAge},
 		RoomServerEventTypeNIDs: &RedisCachePartition[string, types.EventTypeNID]{client, eventTypeCache, false, maxAge},
 		RoomServerEventTypes:    &RedisCachePartition[types.EventTypeNID, string]{client, eventTypeNIDCache, false, maxAge},
-		FederationPDUs:          &RedisCachePartition[int64, *types.HeaderedEvent]{client, federationPDUsCache, true, lesserOf(time.Hour/2, maxAge)},
-		FederationEDUs:          &RedisCachePartition[int64, *gomatrixserverlib.EDU]{client, federationEDUsCache, true, lesserOf(time.Hour/2, maxAge)},
+		FederationPDUs:          &RedisCachePartition[int64, *types.HeaderedEvent]{client, federationPDUsCache, true, maxAgeOfHalfHour(maxAge)},
+		FederationEDUs:          &RedisCachePartition[int64, *gomatrixserverlib.EDU]{client, federationEDUsCache, true, maxAgeOfHalfHour(maxAge)},
 		RoomHierarchies:         &RedisCachePartition[string, fclient.RoomHierarchyResponse]{client, spaceSummaryRoomsCache, true, maxAge},
 		LazyLoading:             &RedisCachePartition[lazyLoadingCacheKey, string]{client, lazyLoadingCache, true, maxAge},
 	}
 }
 
-// Set value in Redis with JSON serialization
+// Set value in Redis with JSON serialisation
 func (c *RedisCachePartition[K, V]) Set(ctx context.Context, key K, value V) error {
 	bkey := fmt.Sprintf("%c%v", c.Prefix, key)
 	val, err := json.Marshal(value)
@@ -69,7 +67,7 @@ func (c *RedisCachePartition[K, V]) Set(ctx context.Context, key K, value V) err
 	return c.client.Set(ctx, bkey, val, c.MaxAge).Err()
 }
 
-// Get value from Redis with JSON deserialization
+// Get value from Redis with JSON deserialisation
 func (c *RedisCachePartition[K, V]) Get(ctx context.Context, key K) (V, bool) {
 	bkey := fmt.Sprintf("%c%v", c.Prefix, key)
 	result, err := c.client.Get(ctx, bkey).Result()
@@ -86,7 +84,7 @@ func (c *RedisCachePartition[K, V]) Get(ctx context.Context, key K) (V, bool) {
 	return value, true
 }
 
-// Delete key from Redis
+// Unset key from Redis
 func (c *RedisCachePartition[K, V]) Unset(ctx context.Context, key K) error {
 	bkey := fmt.Sprintf("%c%v", c.Prefix, key)
 	return c.client.Del(ctx, bkey).Err()

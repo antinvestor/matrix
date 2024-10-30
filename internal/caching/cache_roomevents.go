@@ -2,6 +2,7 @@ package caching
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/roomserver/types"
 )
 

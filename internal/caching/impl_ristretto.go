@@ -121,7 +121,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				cache:   cache,
 				Prefix:  federationPDUsCache,
 				Mutable: true,
-				MaxAge:  lesserOf(time.Hour/2, maxAge),
+				MaxAge:  maxAgeOfHalfHour(maxAge),
 			},
 		},
 		FederationEDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.EDU]{ // queue NID -> EDU
@@ -129,7 +129,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				cache:   cache,
 				Prefix:  federationEDUsCache,
 				Mutable: true,
-				MaxAge:  lesserOf(time.Hour/2, maxAge),
+				MaxAge:  maxAgeOfHalfHour(maxAge),
 			},
 		},
 		RoomHierarchies: &RistrettoCachePartition[string, fclient.RoomHierarchyResponse]{ // room ID -> space response
@@ -205,7 +205,8 @@ func (c *RistrettoCachePartition[K, V]) Get(_ context.Context, key K) (value V, 
 	return
 }
 
-func lesserOf(a, b time.Duration) time.Duration {
+func maxAgeOfHalfHour(b time.Duration) time.Duration {
+	a := time.Hour / 2
 	if a < b {
 		return a
 	}
