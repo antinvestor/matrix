@@ -32,10 +32,6 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 	})
 	cfg.Global.JetStream.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
-	cfg.UserAPI.JWTLogin.Defaults(config.DefaultOpts{
-		Generate:       true,
-		SingleDatabase: true,
-	})
 	ctx := process.NewProcessContext()
 	switch dbType {
 	case test.DBTypePostgres:
