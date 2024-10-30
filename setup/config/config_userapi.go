@@ -1,6 +1,8 @@
 package config
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"golang.org/x/crypto/bcrypt"
+)
 
 type UserAPI struct {
 	Matrix *Global `yaml:"-"`
@@ -25,6 +27,8 @@ type UserAPI struct {
 	// The number of workers to start for the DeviceListUpdater. Defaults to 8.
 	// This only needs updating if the "InputDeviceListUpdate" stream keeps growing indefinitely.
 	WorkerCount int `yaml:"worker_count"`
+
+	JWTLogin JWTLogin `yaml:"jwt_login"`
 }
 
 const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
@@ -41,8 +45,20 @@ func (c *UserAPI) Defaults(opts DefaultOpts) {
 }
 
 func (c *UserAPI) Verify(configErrs *ConfigErrors) {
+	c.JWTLogin.Verify(configErrs)
 	checkPositive(configErrs, "user_api.openid_token_lifetime_ms", c.OpenIDTokenLifetimeMS)
 	if c.Matrix.DatabaseOptions.ConnectionString == "" {
 		checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
 	}
+}
+
+type JWTLogin struct {
+	Issuer                string `yaml:"issuer"`
+	Audience              string `yaml:"audience"`
+	Oauth2WellKnownJwkUri string `yaml:"oauth2_well_known_jwk_uri"`
+}
+
+func (c *JWTLogin) Verify(configErrs *ConfigErrors) {
+	checkNotEmpty(configErrs, "client_api.jwt_login.issuer", c.Issuer)
+	checkNotEmpty(configErrs, "client_api.jwt_login.audience", c.Audience)
 }

@@ -264,7 +264,7 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 
 var activeSyncRequests = prometheus.NewGauge(
 	prometheus.GaugeOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "syncapi",
 		Name:      "active_sync_requests",
 		Help:      "The number of sync requests that are active right now",
@@ -273,7 +273,7 @@ var activeSyncRequests = prometheus.NewGauge(
 
 var waitingSyncRequests = prometheus.NewGauge(
 	prometheus.GaugeOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "syncapi",
 		Name:      "waiting_sync_requests",
 		Help:      "The number of sync requests that are waiting to be woken by a notifier",

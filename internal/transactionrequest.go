@@ -38,7 +38,7 @@ import (
 var (
 	PDUCountTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "dendrite",
+			Namespace: "matrix",
 			Subsystem: "federationapi",
 			Name:      "recv_pdus",
 			Help:      "Number of incoming PDUs from remote servers with labels for success",
@@ -47,7 +47,7 @@ var (
 	)
 	EDUCountTotal = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: "dendrite",
+			Namespace: "matrix",
 			Subsystem: "federationapi",
 			Name:      "recv_edus",
 			Help:      "Number of incoming EDUs from remote servers",

@@ -62,6 +62,8 @@ type UserInternalAPI struct {
 	PgClient    pushgateway.Client
 	FedClient   fedsenderapi.KeyserverFederationAPI
 	Updater     *DeviceListUpdater
+
+	JWTCertMap map[string]string
 }
 
 func (a *UserInternalAPI) PerformAdminCreateRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (bool, error) {
@@ -469,7 +471,7 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, userID string) (*aut
 	}
 	prof, err := a.DB.GetProfileByLocalpart(ctx, local, domain)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, appserviceAPI.ErrProfileNotExists
 		}
 		return nil, err

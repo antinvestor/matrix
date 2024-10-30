@@ -58,7 +58,7 @@ func init() {
 
 var destinationQueueTotal = prometheus.NewGauge(
 	prometheus.GaugeOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "federationapi",
 		Name:      "destination_queues_total",
 	},
@@ -66,7 +66,7 @@ var destinationQueueTotal = prometheus.NewGauge(
 
 var destinationQueueRunning = prometheus.NewGauge(
 	prometheus.GaugeOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "federationapi",
 		Name:      "destination_queues_running",
 	},
@@ -74,7 +74,7 @@ var destinationQueueRunning = prometheus.NewGauge(
 
 var destinationQueueBackingOff = prometheus.NewGauge(
 	prometheus.GaugeOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "federationapi",
 		Name:      "destination_queues_backing_off",
 	},

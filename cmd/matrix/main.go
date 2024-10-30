@@ -190,7 +190,7 @@ func main() {
 	}
 
 	upCounter := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Name:      "up",
 		ConstLabels: map[string]string{
 			"version": internal.VersionString(),

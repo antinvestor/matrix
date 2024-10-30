@@ -44,7 +44,7 @@ import (
 var (
 	deviceListUpdateCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "dendrite",
+			Namespace: "matrix",
 			Subsystem: "keyserver",
 			Name:      "device_list_update",
 			Help:      "Number of times we have attempted to update device lists from this server",
@@ -148,7 +148,7 @@ type KeyChangeProducer interface {
 
 var deviceListUpdaterBackpressure = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "keyserver",
 		Name:      "worker_backpressure",
 		Help:      "How many device list updater requests are queued",
@@ -157,7 +157,7 @@ var deviceListUpdaterBackpressure = prometheus.NewGaugeVec(
 )
 var deviceListUpdaterServersRetrying = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "keyserver",
 		Name:      "worker_servers_retrying",
 		Help:      "How many servers are queued for retry",

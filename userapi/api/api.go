@@ -85,6 +85,7 @@ type SyncUserAPI interface {
 type ClientUserAPI interface {
 	QueryAcccessTokenAPI
 	LoginTokenInternalAPI
+	LoginJWTInternalAPI
 	UserLoginAPI
 	ClientKeyAPI
 	ProfileAPI

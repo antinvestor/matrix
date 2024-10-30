@@ -67,14 +67,14 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 	}
 	if enablePrometheus {
 		promauto.NewGaugeFunc(prometheus.GaugeOpts{
-			Namespace: "dendrite",
+			Namespace: "matrix",
 			Subsystem: "caching_ristretto",
 			Name:      "ratio",
 		}, func() float64 {
 			return float64(cache.Metrics.Ratio())
 		})
 		promauto.NewGaugeFunc(prometheus.GaugeOpts{
-			Namespace: "dendrite",
+			Namespace: "matrix",
 			Subsystem: "caching_ristretto",
 			Name:      "cost",
 		}, func() float64 {

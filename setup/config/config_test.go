@@ -156,6 +156,10 @@ sync_api:
     max_idle_conns: 2
     conn_max_lifetime: -1
 user_api:
+  jwt_login:
+    issuer: https://accounts.google.com
+    audience: service_matrix
+    oauth2_well_known_jwk_uri: https://www.googleapis.com/oauth2/v3/certs
   account_database:
     connection_string: file:userapi_accounts.db
     max_open_conns: 100

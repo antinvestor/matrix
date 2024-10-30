@@ -56,7 +56,7 @@ const MaximumMissingProcessingTime = time.Minute * 5
 
 var processRoomEventDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "roomserver",
 		Name:      "processroomevent_duration_millis",
 		Help:      "How long it takes the roomserver to process an event",

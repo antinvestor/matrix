@@ -39,7 +39,7 @@ func init() {
 // calculate the history visibility.
 var calculateHistoryVisibilityDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "syncapi",
 		Name:      "calculateHistoryVisibility_duration_millis",
 		Help:      "How long it takes to calculate the history visibility",

@@ -308,6 +308,11 @@ sync_api:
 
 # Configuration for the User API.
 user_api:
+  jwt_login:
+    issuer: https://oauth2.example.com
+    audience: test_service
+    oauth2_well_known_jwk_uri: https://oauth2.example.com/.well-known/jwks.json
+
   # The cost when hashing passwords on registration/login. Default: 10. Min: 4, Max: 31
   # See https://pkg.go.dev/golang.org/x/crypto/bcrypt for more information.
   # Setting this lower makes registration/login consume less CPU resources at the cost

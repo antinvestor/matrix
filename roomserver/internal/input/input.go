@@ -481,7 +481,7 @@ func (r *Inputer) InputRoomEvents(
 
 var roomserverInputBackpressure = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "roomserver",
 		Name:      "input_backpressure",
 		Help:      "How many events are queued for input for a given room",

@@ -250,7 +250,7 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 			prometheus.CounterOpts{
 				Name:      metricsName,
 				Help:      "Total number of http requests for HTML resources",
-				Namespace: "dendrite",
+				Namespace: "matrix",
 			},
 			[]string{"code"},
 		),

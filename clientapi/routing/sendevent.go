@@ -50,7 +50,7 @@ var (
 
 var sendEventDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "clientapi",
 		Name:      "sendevent_duration_millis",
 		Help:      "How long it takes to build and submit a new event from the client API to the roomserver",

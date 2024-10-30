@@ -125,7 +125,7 @@ func Setup(
 
 var thumbnailCounter = promauto.NewCounterVec(
 	prometheus.CounterOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "mediaapi",
 		Name:      "thumbnail",
 		Help:      "Total number of media_api requests for thumbnails",
@@ -135,7 +135,7 @@ var thumbnailCounter = promauto.NewCounterVec(
 
 var thumbnailSize = promauto.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "mediaapi",
 		Name:      "thumbnail_size_bytes",
 		Help:      "Total size of media_api requests for thumbnails",
@@ -146,7 +146,7 @@ var thumbnailSize = promauto.NewHistogramVec(
 
 var downloadCounter = promauto.NewCounterVec(
 	prometheus.CounterOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "mediaapi",
 		Name:      "download",
 		Help:      "Total size of media_api requests for full downloads",
@@ -156,7 +156,7 @@ var downloadCounter = promauto.NewCounterVec(
 
 var downloadSize = promauto.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Namespace: "dendrite",
+		Namespace: "matrix",
 		Subsystem: "mediaapi",
 		Name:      "download_size_bytes",
 		Help:      "Total size of media_api requests for full downloads",

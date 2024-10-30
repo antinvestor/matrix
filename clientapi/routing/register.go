@@ -54,8 +54,10 @@ var (
 	// Prometheus metrics
 	amtRegUsers = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "dendrite_clientapi_reg_users_total",
-			Help: "Total number of registered users",
+			Namespace: "matrix",
+			Subsystem: "client_api",
+			Name:      "registered_users_total",
+			Help:      "Total number of registered users",
 		},
 	)
 )
