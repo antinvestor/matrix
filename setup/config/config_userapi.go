@@ -58,7 +58,15 @@ type JWTLogin struct {
 	Oauth2WellKnownJwkUri string `yaml:"oauth2_well_known_jwk_uri"`
 }
 
-func (c *JWTLogin) Verify(configErrs *ConfigErrors) {
-	checkNotEmpty(configErrs, "client_api.jwt_login.issuer", c.Issuer)
-	checkNotEmpty(configErrs, "client_api.jwt_login.audience", c.Audience)
+func (jl *JWTLogin) Verify(configErrs *ConfigErrors) {
+	checkNotEmpty(configErrs, "client_api.jwt_login.oauth2_well_known_jwk_uri", jl.Oauth2WellKnownJwkUri)
+	checkNotEmpty(configErrs, "client_api.jwt_login.issuer", jl.Issuer)
+	checkNotEmpty(configErrs, "client_api.jwt_login.audience", jl.Audience)
+}
+
+func (jl *JWTLogin) Defaults(_ DefaultOpts) {
+	jl.Oauth2WellKnownJwkUri = "https://oauth2.example.com/.well-known/jwks.json"
+	jl.Audience = "test_service"
+	jl.Issuer = "https://oauth2.example.com"
+
 }
