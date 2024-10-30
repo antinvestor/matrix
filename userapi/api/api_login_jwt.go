@@ -16,8 +16,9 @@ package api
 
 import (
 	"context"
-	"github.com/golang-jwt/jwt/v5"
 	"strings"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type LoginJWTInternalAPI interface {

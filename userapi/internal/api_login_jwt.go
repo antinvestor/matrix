@@ -21,14 +21,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
 	"io"
 	"math/big"
 	"net/http"
 	"strings"
+
+	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
