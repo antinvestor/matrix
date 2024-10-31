@@ -3,6 +3,7 @@ package streams
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -263,7 +264,7 @@ func (p *PDUStreamProvider) getRecentEvents(ctx context.Context, stateDeltas []t
 			&eventFilter, true, true,
 		)
 		if err != nil {
-			if err != sql.ErrNoRows {
+			if !errors.Is(err, sql.ErrNoRows) {
 				return nil, err
 			}
 		}
@@ -294,7 +295,7 @@ func (p *PDUStreamProvider) getRecentEvents(ctx context.Context, stateDeltas []t
 			&filter, true, true,
 		)
 		if err != nil {
-			if err != sql.ErrNoRows {
+			if !errors.Is(err, sql.ErrNoRows) {
 				return nil, err
 			}
 		}
@@ -362,7 +363,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 			ctx, snapshot, delta.RoomID, true, limited, stateFilter,
 			device, recentEvents, delta.StateEvents,
 		)
-		if err != nil && err != sql.ErrNoRows {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return r.From, fmt.Errorf("p.lazyLoadMembers: %w", err)
 		}
 	}
@@ -607,7 +608,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			false, limited, stateFilter,
 			device, recentEvents, stateEvents,
 		)
-		if err != nil && err != sql.ErrNoRows {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
 	}
@@ -721,7 +722,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, snapshot storage.DatabaseTransaction, req *types.SyncRequest, eventFilter *synctypes.RoomEventFilter) error {
 	ignores, err := snapshot.IgnoresForUser(ctx, req.Device.UserID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		return err

@@ -17,6 +17,7 @@ package deltas
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal"
@@ -28,7 +29,7 @@ func UpDropEventReferenceSHA(ctx context.Context, tx *sql.Tx) error {
 	var count int
 	err := tx.QueryRowContext(ctx, `SELECT count(*) FROM roomserver_events GROUP BY event_id HAVING count(event_id) > 1`).
 		Scan(&count)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed to query duplicate event ids")
 	}
 	if count > 0 {

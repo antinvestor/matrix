@@ -17,6 +17,7 @@ package deltas
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -182,7 +183,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 			err = tx.QueryRowContext(ctx,
 				`SELECT event_nid FROM roomserver_events WHERE state_snapshot_nid = $1 AND event_type_nid = 1`, s.StateSnapshotNID,
 			).Scan(&createEventNID)
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				continue
 			}
 			if err != nil {
@@ -255,7 +256,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 		var res sql.Result
 		var c int64
 		res, err = tx.ExecContext(ctx, `UPDATE roomserver_events SET state_snapshot_nid = 0 WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid)
-		if err != nil && err != sql.ErrNoRows {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("failed to reset invalid state snapshots: %w", err)
 		}
 		if c, err = res.RowsAffected(); err != nil {

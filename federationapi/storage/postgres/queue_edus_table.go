@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/lib/pq"
 
@@ -174,7 +175,7 @@ func (s *queueEDUsStatements) SelectQueueEDUReferenceJSONCount(
 	var count int64
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUReferenceJSONCountStmt)
 	err := stmt.QueryRowContext(ctx, jsonNID).Scan(&count)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return -1, nil
 	}
 	return count, err

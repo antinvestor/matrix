@@ -1,6 +1,5 @@
 # RoomServer
 
-
 ## RoomServer Internals
 
 ### Numeric IDs

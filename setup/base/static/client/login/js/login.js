@@ -35,7 +35,7 @@ function submitLogin(type, data, extra, callback) {
         data.initial_device_display_name = extra.initial_device_display_name;
     }
 
-    $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
+    $.post(matrixLogin.endpoint, JSON.stringify(data), function (response) {
         if (callback) {
             callback();
         }
@@ -53,8 +53,7 @@ function errorFunc(err) {
 
     if (err.responseJSON && err.responseJSON.error) {
         setFeedbackString(err.responseJSON.error + " (" + err.responseJSON.errcode + ")");
-    }
-    else {
+    } else {
         setFeedbackString("Request failed: " + err.status);
     }
 }
@@ -136,7 +135,7 @@ function setTitle(title) {
  * This populates matrixLogin.serverAccepts* variables.
  */
 function fetchLoginFlows(cb) {
-    $.get(matrixLogin.endpoint, function(response) {
+    $.get(matrixLogin.endpoint, function (response) {
         for (var i = 0; i < response.flows.length; i++) {
             var flow = response.flows[i];
             if ("m.login.sso" === flow.type) {
@@ -156,8 +155,8 @@ function fetchLoginFlows(cb) {
 /*
  * Called on load to fetch login flows and attempt SSO login (if a token is available).
  */
-matrixLogin.onLoad = function() {
-    fetchLoginFlows(function() {
+matrixLogin.onLoad = function () {
+    fetchLoginFlows(function () {
         // (Maybe) attempt logging in via SSO if a token is available.
         if (!tryTokenLogin()) {
             showLogin(false);
@@ -168,7 +167,7 @@ matrixLogin.onLoad = function() {
 /*
  * Submit simple user & password login.
  */
-matrixLogin.passwordLogin = function() {
+matrixLogin.passwordLogin = function () {
     var user = $("#user_id").val();
     var pwd = $("#password").val();
 
@@ -188,7 +187,7 @@ matrixLogin.passwordLogin = function() {
  * login is complete. The response to the login call is provided as the single
  * parameter.
  */
-matrixLogin.onLogin = function(response) {
+matrixLogin.onLogin = function (response) {
     // clobber this function
     console.warn("onLogin - This function should be replaced to proceed.");
 };
@@ -204,7 +203,7 @@ function parseQsFromUrl() {
     var query = window.location.href.substr(pos + 1);
 
     var result = {};
-    query.split("&").forEach(function(part) {
+    query.split("&").forEach(function (part) {
         var item = part.split("=");
         var key = item[0];
         var val = item[1];
@@ -223,7 +222,7 @@ function parseQsFromUrl() {
 function parseCookies() {
     var allCookies = document.cookie;
     var result = {};
-    allCookies.split(";").forEach(function(part) {
+    allCookies.split(";").forEach(function (part) {
         var item = part.split("=");
         // Cookies might have arbitrary whitespace between them.
         var key = item[0].trim();

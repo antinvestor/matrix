@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -517,7 +518,7 @@ func (s *statsStatements) DailyRoomsMessages(
 
 	err = stmt.QueryRowContext(ctx, serverName, spec.AsTimestamp(timestamp)).
 		Scan(&msgStats.Messages, &msgStats.SentMessages, &msgStats.MessagesE2EE, &msgStats.SentMessagesE2EE, &activeRooms, &activeE2EERooms)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return msgStats, 0, 0, err
 	}
 	return msgStats, activeRooms, activeE2EERooms, nil

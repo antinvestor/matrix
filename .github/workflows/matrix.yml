@@ -14,7 +14,7 @@ on:
       - 'go.sum'                # or dependency updates
       - '.github/workflows/**'
   release:
-    types: [published]
+    types: [ published ]
   workflow_dispatch:
 
 concurrency:
@@ -44,26 +44,6 @@ jobs:
     timeout-minutes: 10
     name: Unit tests
     runs-on: ubuntu-latest
-    # Service containers to run with `container-job`
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: postgres:17-alpine
-        # Provide the password for postgres
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: dendrite
-        ports:
-          # Maps tcp port 5432 on service container to the host
-          - 5432:5432
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - name: Install libolm
@@ -101,8 +81,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        goos: ["linux"]
-        goarch: ["amd64", "386"]
+        goos: [ "linux" ]
+        goarch: [ "amd64", "386" ]
     steps:
       - uses: actions/checkout@v4
       - name: Setup go
@@ -134,8 +114,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: ["windows"]
-        goarch: ["amd64"]
+        goos: [ "windows" ]
+        goarch: [ "amd64" ]
     steps:
       - uses: actions/checkout@v4
       - name: Setup Go
@@ -162,7 +142,7 @@ jobs:
   # Dummy step to gate other tests on without repeating the whole list
   initial-tests-done:
     name: Initial tests passed
-    needs: [lint, test, build, build_windows]
+    needs: [ lint, test, build, build_windows ]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     steps:

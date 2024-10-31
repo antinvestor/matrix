@@ -161,7 +161,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(ctx context.Context, senderID sp
 	}
 
 	ev, err := r.DB.GetStateEvent(ctx, roomID, spec.MRoomCanonicalAlias, "")
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return true, false, err
 	} else if ev != nil {
 		stateAlias := gjson.GetBytes(ev.Content(), "alias").Str

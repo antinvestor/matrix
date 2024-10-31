@@ -15,7 +15,9 @@ see: https://www.matrix.org/security-disclosure-policy/
 -->
 
 ### Background information
+
 <!-- Please include versions of all software when known e.g database versions, docker versions, client versions -->
+
 - **Dendrite version or git SHA**:
 - **SQLite3 or Postgres?**:
 - **Running in Docker?**:
@@ -49,6 +51,7 @@ Examples of bad descriptions:
 -->
 
 ### Steps to reproduce
+
 <!-- Please try reproducing this bug before submitting it. Issues which cannot be reproduced risk being closed. -->
 
 - list the steps

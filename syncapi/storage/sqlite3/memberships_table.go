@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal"
@@ -139,7 +140,7 @@ func (s *membershipsStatements) SelectMembershipForUser(
 	stmt := sqlutil.TxStmt(txn, s.selectMembershipForUserStmt)
 	err = stmt.QueryRowContext(ctx, roomID, userID, pos).Scan(&membership, &topologyPos)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return "leave", 0, nil
 		}
 		return "", 0, err

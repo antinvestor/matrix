@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -102,7 +103,7 @@ func (s *publishedStatements) SelectPublishedFromRoomID(
 ) (published bool, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectPublishedStmt)
 	err = stmt.QueryRowContext(ctx, roomID).Scan(&published)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	return

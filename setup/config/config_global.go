@@ -83,7 +83,7 @@ type Global struct {
 	ReportStats ReportStats `yaml:"report_stats"`
 
 	// Configuration for the caches.
-	Cache Cache `yaml:"cache"`
+	Cache CacheOptions `yaml:"cache"`
 }
 
 func (c *Global) Defaults(opts DefaultOpts) {
@@ -305,21 +305,22 @@ func (c *ServerNotices) Defaults(opts DefaultOpts) {
 
 func (c *ServerNotices) Verify(errors *ConfigErrors) {}
 
-type Cache struct {
+type CacheOptions struct {
 	// The connection string,
 	ConnectionString string `yaml:"connection_string"`
 
 	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
 	MaxAge           time.Duration `yaml:"max_age"`
+	EnablePrometheus bool          `yaml:"enable_prometheus"`
 }
 
-func (c *Cache) Defaults() {
-	c.ConnectionString = "localhost:6379"
+func (c *CacheOptions) Defaults() {
+	//c.ConnectionString = "redis://user:password@localhost:6379/0?protocol=3"
 	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
 	c.MaxAge = time.Hour
 }
 
-func (c *Cache) Verify(errors *ConfigErrors) {
+func (c *CacheOptions) Verify(errors *ConfigErrors) {
 	checkPositive(errors, "max_size_estimated", int64(c.EstimatedMaxSize))
 }
 

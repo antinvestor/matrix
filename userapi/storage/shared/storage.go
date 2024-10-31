@@ -398,7 +398,7 @@ func (d *Database) GetThreePIDsForLocalpart(
 // If the DB returns sql.ErrNoRows the Localpart isn't taken.
 func (d *Database) CheckAccountAvailability(ctx context.Context, localpart string, serverName spec.ServerName) (bool, error) {
 	_, err := d.Accounts.SelectAccountByLocalpart(ctx, localpart, serverName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return true, nil
 	}
 	return false, err
@@ -411,7 +411,7 @@ func (d *Database) GetAccountByLocalpart(ctx context.Context, localpart string, 
 ) (*api.Account, error) {
 	// try to get the account with lowercase localpart (majority)
 	acc, err := d.Accounts.SelectAccountByLocalpart(ctx, strings.ToLower(localpart), serverName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		acc, err = d.Accounts.SelectAccountByLocalpart(ctx, localpart, serverName) // try with localpart as passed by the request
 	}
 	return acc, err
@@ -732,7 +732,7 @@ func (d *Database) RemoveDevices(
 	devices []string,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.Devices.DeleteDevices(ctx, txn, localpart, serverName, devices); err != sql.ErrNoRows {
+		if err := d.Devices.DeleteDevices(ctx, txn, localpart, serverName, devices); !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 		return nil
@@ -752,7 +752,7 @@ func (d *Database) RemoveAllDevices(
 		if err != nil {
 			return err
 		}
-		if err := d.Devices.DeleteDevicesByLocalpart(ctx, txn, localpart, serverName, exceptDeviceID); err != sql.ErrNoRows {
+		if err := d.Devices.DeleteDevicesByLocalpart(ctx, txn, localpart, serverName, exceptDeviceID); !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 		return nil
@@ -892,7 +892,7 @@ func (d *Database) RemovePusher(
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		err := d.Pushers.DeletePusher(ctx, txn, appid, pushkey, localpart, serverName)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		return err
@@ -1051,13 +1051,13 @@ func (d *KeyDatabase) MarkDeviceListStale(ctx context.Context, userID string, is
 func (d *KeyDatabase) DeleteDeviceKeys(ctx context.Context, userID string, deviceIDs []gomatrixserverlib.KeyID) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		for _, deviceID := range deviceIDs {
-			if err := d.CrossSigningSigsTable.DeleteCrossSigningSigsForTarget(ctx, txn, userID, deviceID); err != nil && err != sql.ErrNoRows {
+			if err := d.CrossSigningSigsTable.DeleteCrossSigningSigsForTarget(ctx, txn, userID, deviceID); err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("d.CrossSigningSigsTable.DeleteCrossSigningSigsForTarget: %w", err)
 			}
-			if err := d.DeviceKeysTable.DeleteDeviceKeys(ctx, txn, userID, string(deviceID)); err != nil && err != sql.ErrNoRows {
+			if err := d.DeviceKeysTable.DeleteDeviceKeys(ctx, txn, userID, string(deviceID)); err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("d.DeviceKeysTable.DeleteDeviceKeys: %w", err)
 			}
-			if err := d.OneTimeKeysTable.DeleteOneTimeKeys(ctx, txn, userID, string(deviceID)); err != nil && err != sql.ErrNoRows {
+			if err := d.OneTimeKeysTable.DeleteOneTimeKeys(ctx, txn, userID, string(deviceID)); err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("d.OneTimeKeysTable.DeleteOneTimeKeys: %w", err)
 			}
 		}

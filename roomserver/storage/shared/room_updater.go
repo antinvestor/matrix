@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -196,7 +197,7 @@ func (u *RoomUpdater) IsReferenced(eventID string) (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	return false, fmt.Errorf("u.d.PrevEventsTable.SelectPreviousEventExists: %w", err)

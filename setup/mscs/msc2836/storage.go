@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -266,7 +267,7 @@ func (p *DB) ChildMetadata(ctx context.Context, eventID string) (count int, hash
 	var b64hash string
 	var exploredInt int
 	if err = p.selectChildMetadataStmt.QueryRowContext(ctx, eventID).Scan(&count, &b64hash, &exploredInt); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			err = nil
 		}
 		return
@@ -307,7 +308,7 @@ func (p *DB) ChildrenForParent(ctx context.Context, eventID, relType string, rec
 func (p *DB) ParentForChild(ctx context.Context, eventID, relType string) (*eventInfo, error) {
 	var ei eventInfo
 	err := p.selectParentForChildStmt.QueryRowContext(ctx, eventID, relType).Scan(&ei.EventID, &ei.RoomID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err

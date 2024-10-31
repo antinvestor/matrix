@@ -15,86 +15,45 @@
 package test
 
 import (
+	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"os"
-	"os/exec"
-	"os/user"
 	"path/filepath"
 	"testing"
+	"time"
 
-	"github.com/lib/pq"
+	"github.com/testcontainers/testcontainers-go"
+	tcPostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
+
+const PostgresqlImage = "postgres:17"
 
 type DBType int
 
 var DBTypeSQLite DBType = 1
 var DBTypePostgres DBType = 2
 
-var Quiet = false
-var Required = os.Getenv("DENDRITE_TEST_SKIP_NODB") == ""
+func setupPostgres(ctx context.Context, dbName, user, connStr string) (*tcPostgres.PostgresContainer, error) {
 
-func fatalError(t *testing.T, format string, args ...interface{}) {
-	if Required {
-		t.Fatalf(format, args...)
-	} else {
-		t.Skipf(format, args...)
-	}
-}
+	postgresContainer, err := tcPostgres.Run(ctx,
+		PostgresqlImage,
+		tcPostgres.WithDatabase(dbName),
+		tcPostgres.WithUsername(user),
+		tcPostgres.WithPassword(connStr),
 
-func createLocalDB(t *testing.T, dbName string) {
-	if _, err := exec.LookPath("createdb"); err != nil {
-		fatalError(t, "Note: tests require a postgres install accessible to the current user")
-		return
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(30*time.Second)),
+	)
+	if err != nil {
+		return nil, err
 	}
-	createDB := exec.Command("createdb", dbName)
-	if !Quiet {
-		createDB.Stdout = os.Stdout
-		createDB.Stderr = os.Stderr
-	}
-	err := createDB.Run()
-	if err != nil && !Quiet {
-		fmt.Println("createLocalDB returned error:", err)
-	}
-}
 
-func createRemoteDB(t *testing.T, dbName, user, connStr string) {
-	db, err := sql.Open("postgres", connStr+" dbname=postgres")
-	if err != nil {
-		fatalError(t, "failed to open postgres conn with connstr=%s : %s", connStr, err)
-	}
-	if err = db.Ping(); err != nil {
-		fatalError(t, "failed to open postgres conn with connstr=%s : %s", connStr, err)
-	}
-	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s;`, dbName))
-	if err != nil {
-		pqErr, ok := err.(*pq.Error)
-		if !ok {
-			t.Fatalf("failed to CREATE DATABASE: %s", err)
-		}
-		// we ignore duplicate database error as we expect this
-		if pqErr.Code != "42P04" {
-			t.Fatalf("failed to CREATE DATABASE with code=%s msg=%s", pqErr.Code, pqErr.Message)
-		}
-	}
-	_, err = db.Exec(fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE %s TO %s`, dbName, user))
-	if err != nil {
-		t.Fatalf("failed to GRANT: %s", err)
-	}
-	_ = db.Close()
-}
-
-func currentUser() string {
-	user, err := user.Current()
-	if err != nil {
-		if !Quiet {
-			fmt.Println("cannot get current user: ", err)
-		}
-		os.Exit(2)
-	}
-	return user.Username
+	return postgresContainer, nil
 }
 
 // PrepareDBConnectionString Prepare a sqlite or postgres connection string for testing.
@@ -102,6 +61,7 @@ func currentUser() string {
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
 func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, close func()) {
+	ctx := context.Background()
 	if dbType == DBTypeSQLite {
 		// this will be made in the t.TempDir, which is unique per test
 		dbname := filepath.Join(t.TempDir(), "dendrite_test.db")
@@ -114,24 +74,14 @@ func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, clo
 	// We'll try to infer from the local env if they are missing
 	user := os.Getenv("POSTGRES_USER")
 	if user == "" {
-		user = currentUser()
+		user = "matrix"
 	}
-	connStr = fmt.Sprintf(
-		"user=%s sslmode=disable",
-		user,
-	)
 	// optional vars, used in CI
 	password := os.Getenv("POSTGRES_PASSWORD")
-	if password != "" {
-		connStr += fmt.Sprintf(" password=%s", password)
-	}
-	host := os.Getenv("POSTGRES_HOST")
-	if host != "" {
-		connStr += fmt.Sprintf(" host=%s", host)
+	if password == "" {
+		password = "s3cr3t"
 	}
 
-	// superuser database
-	postgresDB := os.Getenv("POSTGRES_DB")
 	// we cannot use 'dendrite_test' here else 2x concurrently running packages will try to use the same db.
 	// instead, hash the current working directory, snaffle the first 16 bytes and append that to dendrite_test
 	// and use that as the unique db name. We do this because packages are per-directory hence by hashing the
@@ -142,25 +92,19 @@ func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, clo
 	}
 	hash := sha256.Sum256([]byte(wd))
 	dbName := fmt.Sprintf("dendrite_test_%s", hex.EncodeToString(hash[:16]))
-	if postgresDB == "" { // local server, use createdb
-		createLocalDB(t, dbName)
-	} else { // remote server, shell into the postgres user and CREATE DATABASE
-		createRemoteDB(t, dbName, user, connStr)
+
+	pgContainer, err := setupPostgres(ctx, dbName, user, password)
+	if err != nil {
+		t.Fatalf("cannot instantiate postgresql %s", err)
 	}
-	connStr += fmt.Sprintf(" dbname=%s", dbName)
+
+	connStr, err = pgContainer.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		t.Fatalf("cannot get postgresql connection %s", err)
+	}
 
 	return connStr, func() {
-		// Drop all tables on the database to get a fresh instance
-		db, err := sql.Open("postgres", connStr)
-		if err != nil {
-			t.Fatalf("failed to connect to postgres db '%s': %s", connStr, err)
-		}
-		_, err = db.Exec(`DROP SCHEMA public CASCADE;
-		CREATE SCHEMA public;`)
-		if err != nil {
-			t.Fatalf("failed to cleanup postgres db '%s': %s", connStr, err)
-		}
-		_ = db.Close()
+		_ = pgContainer.Terminate(ctx)
 	}
 }
 

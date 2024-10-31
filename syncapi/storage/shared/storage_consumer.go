@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/tidwall/gjson"
@@ -184,7 +185,7 @@ func (d *Database) DeletePeek(
 		sp, err = d.Peeks.DeletePeek(ctx, txn, roomID, userID, deviceID)
 		return err
 	})
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		sp = 0
 		err = nil
 	}
@@ -201,7 +202,7 @@ func (d *Database) DeletePeeks(
 		sp, err = d.Peeks.DeletePeeks(ctx, txn, roomID, userID)
 		return err
 	})
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		sp = 0
 		err = nil
 	}

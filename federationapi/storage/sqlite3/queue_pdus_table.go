@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -142,7 +143,7 @@ func (s *queuePDUsStatements) SelectQueuePDUNextTransactionID(
 	var transactionID gomatrixserverlib.TransactionID
 	stmt := sqlutil.TxStmt(txn, s.selectQueueNextTransactionIDStmt)
 	err := stmt.QueryRowContext(ctx, serverName).Scan(&transactionID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	return transactionID, err
@@ -154,7 +155,7 @@ func (s *queuePDUsStatements) SelectQueuePDUReferenceJSONCount(
 	var count int64
 	stmt := sqlutil.TxStmt(txn, s.selectQueueReferenceJSONCountStmt)
 	err := stmt.QueryRowContext(ctx, jsonNID).Scan(&count)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return -1, nil
 	}
 	return count, err

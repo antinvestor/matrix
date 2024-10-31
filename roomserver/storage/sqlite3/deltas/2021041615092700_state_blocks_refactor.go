@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal"
@@ -177,7 +178,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 		var res sql.Result
 		var c int64
 		res, err = tx.ExecContext(ctx, `UPDATE roomserver_events SET state_snapshot_nid = 0 WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, oldMaxSnapshotID)
-		if err != nil && err != sql.ErrNoRows {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("failed to reset invalid state snapshots: %w", err)
 		}
 		if c, err = res.RowsAffected(); err != nil {

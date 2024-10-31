@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -478,7 +479,7 @@ func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 			}
 
 			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, keyID)
-			if err != nil && err != sql.ErrNoRows {
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				logrus.WithError(err).Errorf("Failed to get cross-signing signatures for user %q key %q", targetUserID, keyID)
 				continue
 			}
@@ -524,7 +525,7 @@ func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 func (a *UserInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySignaturesRequest, res *api.QuerySignaturesResponse) {
 	for targetUserID, forTargetUser := range req.TargetIDs {
 		keyMap, err := a.KeyDatabase.CrossSigningKeysForUser(ctx, targetUserID)
-		if err != nil && err != sql.ErrNoRows {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			res.Error = &api.KeyError{
 				Err: fmt.Sprintf("a.DB.CrossSigningKeysForUser: %s", err),
 			}
@@ -556,7 +557,7 @@ func (a *UserInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySig
 		for _, targetKeyID := range forTargetUser {
 			// Get own signatures only.
 			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, targetUserID, targetUserID, targetKeyID)
-			if err != nil && err != sql.ErrNoRows {
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				res.Error = &api.KeyError{
 					Err: fmt.Sprintf("a.DB.CrossSigningSigsForTarget: %s", err),
 				}

@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -390,7 +391,7 @@ func (s *membershipStatements) SelectLocalServerInRoom(ctx context.Context, txn 
 	stmt := sqlutil.TxStmt(txn, s.selectLocalServerInRoomStmt)
 	err := stmt.QueryRowContext(ctx, tables.MembershipStateJoin, roomNID).Scan(&nid)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 		return false, err
@@ -404,7 +405,7 @@ func (s *membershipStatements) SelectServerInRoom(ctx context.Context, txn *sql.
 	stmt := sqlutil.TxStmt(txn, s.selectServerInRoomStmt)
 	err := stmt.QueryRowContext(ctx, tables.MembershipStateJoin, roomNID, serverName).Scan(&nid)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 		return false, err

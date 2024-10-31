@@ -416,7 +416,7 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 		return fmt.Errorf("server name %s is not local", domain)
 	}
 	dev, err := a.DB.GetDeviceByID(ctx, localpart, domain, req.DeviceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		res.DeviceExists = false
 		return nil
 	} else if err != nil {
@@ -578,7 +578,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 	}
 	device, err := a.DB.GetDeviceByAccessToken(ctx, req.AccessToken)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		return err

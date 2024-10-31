@@ -229,7 +229,7 @@ func makeDownloadAPI(
 			}
 		}
 
-		// Cache media for at least one day.
+		// CacheOptions media for at least one day.
 		w.Header().Set("Cache-Control", "public,max-age=86400,s-maxage=86400")
 
 		Download(

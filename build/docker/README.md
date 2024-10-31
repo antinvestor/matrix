@@ -47,7 +47,8 @@ The key files will now exist in your current working directory, and can be mount
 
 ## Starting Dendrite
 
-Create your config based on the [`dendrite-sample.yaml`](https://github.com/antinvestor/matrix/blob/main/dendrite-sample.yaml) sample configuration file.
+Create your config based on the [
+`dendrite-sample.yaml`](https://github.com/antinvestor/matrix/blob/main/dendrite-sample.yaml) sample configuration file.
 
 Then start the deployment:
 

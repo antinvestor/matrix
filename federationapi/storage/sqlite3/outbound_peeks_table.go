@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/antinvestor/matrix/federationapi/types"
@@ -114,7 +115,7 @@ func (s *outboundPeeksStatements) SelectOutboundPeek(
 		&outboundPeek.RenewedTimestamp,
 		&outboundPeek.RenewalInterval,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

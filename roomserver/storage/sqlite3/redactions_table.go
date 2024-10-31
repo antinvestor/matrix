@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -92,7 +93,7 @@ func (s *redactionStatements) SelectRedactionInfoByRedactionEventID(
 	err = stmt.QueryRowContext(ctx, redactionEventID).Scan(
 		&info.RedactionEventID, &info.RedactsEventID, &info.Validated,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		info = nil
 		err = nil
 	}
@@ -107,7 +108,7 @@ func (s *redactionStatements) SelectRedactionInfoByEventBeingRedacted(
 	err = stmt.QueryRowContext(ctx, eventID).Scan(
 		&info.RedactionEventID, &info.RedactsEventID, &info.Validated,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		info = nil
 		err = nil
 	}

@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/antinvestor/matrix/federationapi/types"
@@ -115,7 +116,7 @@ func (s *inboundPeeksStatements) SelectInboundPeek(
 		&inboundPeek.RenewedTimestamp,
 		&inboundPeek.RenewalInterval,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

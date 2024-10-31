@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -115,7 +116,7 @@ func (s *filterStatements) InsertFilter(
 	err = sqlutil.TxStmt(txn, s.selectFilterIDByContentStmt).QueryRowContext(
 		ctx, localpart, filterJSON,
 	).Scan(&existingFilterID)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
 	// If it does, return the existing ID

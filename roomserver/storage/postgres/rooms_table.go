@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -135,7 +136,7 @@ func (s *roomStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID
 	err := stmt.QueryRowContext(ctx, roomID).Scan(
 		&info.RoomVersion, &info.RoomNID, &stateSnapshotNID, &latestNIDs,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	info.SetStateSnapshotNID(stateSnapshotNID)

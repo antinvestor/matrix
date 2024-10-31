@@ -506,7 +506,7 @@ func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, req
 		d.MembershipTable.SelectMembershipFromRoomAndTarget(
 			ctx, nil, roomNID, requestSenderUserNID,
 		)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// The user has never been a member of that room
 		return 0, false, false, nil
 	} else if err != nil {
@@ -790,7 +790,7 @@ func (d *EventDatabase) StoreEvent(
 			event.Depth(),
 			isRejected,
 		); err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				// We've already inserted the event so select the numeric event ID
 				eventNID, stateNID, err = d.EventsTable.SelectEvent(ctx, txn, event.EventID())
 			} else if err != nil {
@@ -1227,7 +1227,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		return nil, nil
 	}
 	eventTypeNID, err := d.GetOrCreateEventTypeNID(ctx, evType)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No rooms have an event of this type, otherwise we'd have an event type NID
 		return nil, nil
 	}
@@ -1235,7 +1235,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		return nil, err
 	}
 	stateKeyNID, err := d.GetOrCreateEventStateKeyNID(ctx, &stateKey)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No rooms have a state event with this state key, otherwise we'd have an state key NID
 		return nil, nil
 	}
@@ -1300,7 +1300,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No rooms have an event of this type, otherwise we'd have an event type NID
 		return nil, nil
 	}
@@ -1364,7 +1364,7 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID spec.UserID,
 	// Convert provided user ID to NID
 	userNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID.String())
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		} else {
 			return nil, fmt.Errorf("SelectEventStateKeyNID: cannot map user ID to state key NIDs: %w", err)
@@ -1374,7 +1374,7 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID spec.UserID,
 	// Use this NID to fetch all associated room keys (for pseudo ID rooms)
 	roomKeyMap, err := d.UserRoomKeyTable.SelectAllPublicKeysForUser(ctx, nil, userNID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			roomKeyMap = map[types.RoomNID]ed25519.PublicKey{}
 		} else {
 			return nil, fmt.Errorf("SelectAllPublicKeysForUser: could not select user room public keys for user: %w", err)
@@ -1396,7 +1396,7 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID spec.UserID,
 		// Convert the string representation to its NID
 		pseudoIDStateKeys, sqlErr := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, userRoomKeys)
 		if sqlErr != nil {
-			if sqlErr == sql.ErrNoRows {
+			if errors.Is(sqlErr, sql.ErrNoRows) {
 				pseudoIDStateKeys = map[string]types.EventStateKeyNID{}
 			} else {
 				return nil, fmt.Errorf("BulkSelectEventStateKeyNID: could not select state keys for public room keys: %w", err)
@@ -1671,7 +1671,7 @@ func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		roomNID, err := d.RoomsTable.SelectRoomNIDForUpdate(ctx, txn, roomID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("room %s does not exist", roomID)
 			}
 			return fmt.Errorf("failed to lock the room: %w", err)

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -79,7 +80,7 @@ func (s *openIDTokenStatements) SelectOpenIDTokenAtrributes(
 	)
 	openIDTokenAttrs.UserID = fmt.Sprintf("@%s:%s", localpart, serverName)
 	if err != nil {
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			log.WithError(err).Error("Unable to retrieve token from the db")
 		}
 		return nil, err

@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -177,7 +178,7 @@ func (s *accountsStatements) SelectAccountByLocalpart(
 	stmt := s.selectAccountByLocalpartStmt
 	err := stmt.QueryRowContext(ctx, localpart, serverName).Scan(&acc.Localpart, &acc.ServerName, &appserviceIDPtr, &acc.AccountType)
 	if err != nil {
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			log.WithError(err).Error("Unable to retrieve user from the db")
 		}
 		return nil, err

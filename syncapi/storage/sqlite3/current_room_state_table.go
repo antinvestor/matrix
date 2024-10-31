@@ -446,7 +446,7 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 	stmt := sqlutil.TxStmt(txn, s.selectStateEventStmt)
 	var res []byte
 	err := stmt.QueryRowContext(ctx, roomID, evType, stateKey).Scan(&res)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

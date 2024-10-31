@@ -3,6 +3,7 @@ package deltas
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -35,7 +36,7 @@ func UpRenameTables(ctx context.Context, tx *sql.Tx) error {
 		if err := tx.QueryRowContext(
 			ctx, "SELECT name FROM sqlite_schema WHERE type = 'table' AND name = $1;", old,
 		).Scan(&name); err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				continue
 			}
 			return err
@@ -52,7 +53,7 @@ func UpRenameTables(ctx context.Context, tx *sql.Tx) error {
 		if err := tx.QueryRowContext(
 			ctx, "SELECT sql FROM sqlite_schema WHERE type = 'index' AND name = $1;", old,
 		).Scan(&query); err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				continue
 			}
 			return err
@@ -75,7 +76,7 @@ func DownRenameTables(ctx context.Context, tx *sql.Tx) error {
 		if err := tx.QueryRowContext(
 			ctx, "SELECT name FROM sqlite_schema WHERE type = 'table' AND name = $1;", new,
 		).Scan(&name); err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				continue
 			}
 			return err
@@ -92,7 +93,7 @@ func DownRenameTables(ctx context.Context, tx *sql.Tx) error {
 		if err := tx.QueryRowContext(
 			ctx, "SELECT sql FROM sqlite_schema WHERE type = 'index' AND name = $1;", new,
 		).Scan(&query); err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				continue
 			}
 			return err

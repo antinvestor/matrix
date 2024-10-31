@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/antinvestor/matrix/clientapi/userutil"
@@ -177,7 +178,7 @@ func (s *accountsStatements) SelectAccountByLocalpart(
 	stmt := s.selectAccountByLocalpartStmt
 	err := stmt.QueryRowContext(ctx, localpart, serverName).Scan(&acc.Localpart, &acc.ServerName, &appserviceIDPtr, &acc.AccountType)
 	if err != nil {
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			log.WithError(err).Error("Unable to retrieve user from the db")
 		}
 		return nil, err
@@ -198,7 +199,7 @@ func (s *accountsStatements) SelectNewNumericLocalpart(
 		stmt = sqlutil.TxStmt(txn, stmt)
 	}
 	err = stmt.QueryRowContext(ctx, serverName).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 1, nil
 	}
 	return id + 1, err

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/antinvestor/matrix/clientapi/api"
@@ -93,7 +94,7 @@ func (s *registrationTokenStatements) RegistrationTokenExists(ctx context.Contex
 	stmt := sqlutil.TxStmt(tx, s.selectTokenStatement)
 	err := stmt.QueryRowContext(ctx, token).Scan(&existingToken)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 		return false, err

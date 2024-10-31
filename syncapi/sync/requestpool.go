@@ -19,6 +19,7 @@ package sync
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net"
 	"net/http"
 	"strings"
@@ -200,7 +201,7 @@ func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence stri
 
 	// ensure we also send the current status_msg to federated servers and not nil
 	dbPresence, err := db.GetPresences(context.Background(), []string{userID})
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return
 	}
 	if len(dbPresence) > 0 && dbPresence[0] != nil {

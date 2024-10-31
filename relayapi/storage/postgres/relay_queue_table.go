@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -147,7 +148,7 @@ func (s *relayQueueStatements) SelectQueueEntryCount(
 	var count int64
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEntryCountStmt)
 	err := stmt.QueryRowContext(ctx, serverName).Scan(&count)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// It's acceptable for there to be no rows referencing a given
 		// JSON NID but it's not an error condition. Just return as if
 		// there's a zero count.

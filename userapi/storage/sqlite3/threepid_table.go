@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -84,7 +85,7 @@ func (s *threepidStatements) SelectLocalpartForThreePID(
 ) (localpart string, serverName spec.ServerName, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectLocalpartForThreePIDStmt)
 	err = stmt.QueryRowContext(ctx, threepid, medium).Scan(&localpart, &serverName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", nil
 	}
 	return

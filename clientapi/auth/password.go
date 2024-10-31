@@ -115,7 +115,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 				JSON: spec.Unknown("Unable to fetch account by password."),
 			}
 		}
-		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
+		// Technically we could tell them if the user does not exist by checking if errors.Is(err, sql.ErrNoRows)
 		// but that would leak the existence of the user.
 		if !res.Exists {
 			return nil, &util.JSONResponse{

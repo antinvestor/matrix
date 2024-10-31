@@ -1,10 +1,10 @@
 # Matrix
 
-[![Build status](https://github.com/antinvestor/matrix/actions/workflows/matrix.yml/badge.svg?event=push)](https://github.com/antinvestor/matrix/actions/workflows/matrix.yml) 
+[![Build status](https://github.com/antinvestor/matrix/actions/workflows/matrix.yml/badge.svg?event=push)](https://github.com/antinvestor/matrix/actions/workflows/matrix.yml)
 
 Matrix server written in Golang.
 
-It intends to provide an **efficient**, **reliable** and **scalable** matrix server service 
+It intends to provide an **efficient**, **reliable** and **scalable** matrix server service
 
 - Efficient: A small memory footprint with good baseline performance
 - Reliable: Implements the Matrix specification as written, using the
@@ -32,16 +32,19 @@ For a usable federating Matrix deployment, you will also need:
 Also recommended are:
 
 - A PostgreSQL database engine, which will perform better than SQLite with many users and/or larger rooms
-- A reverse proxy server, such as nginx, configured [like this sample](https://github.com/antinvestor/matrix/blob/main/docs/nginx/dendrite-sample.conf)
+- A reverse proxy server, such as nginx,
+  configured [like this sample](https://github.com/antinvestor/matrix/blob/main/docs/nginx/dendrite-sample.conf)
 
 The [Federation Tester](https://federationtester.matrix.org) can be used to verify your deployment.
 
 ## Get started
 
-If you wish to build a fully-federating matrix instance, see [the Installation documentation](https://matrix-org.github.io/dendrite/installation). 
+If you wish to build a fully-federating matrix instance,
+see [the Installation documentation](https://matrix-org.github.io/dendrite/installation).
 For running in Docker, see [build/docker](build/docker).
 
-The following instructions are enough to get matrix started as a non-federating test deployment using self-signed certificates and SQLite databases:
+The following instructions are enough to get matrix started as a non-federating test deployment using self-signed
+certificates and SQLite databases:
 
 ```bash
 $ git clone https://github.com/antinvestor/matrix
@@ -73,10 +76,12 @@ Then point your favourite Matrix client at `http://localhost:8008` or `https://l
 
 We use a script called "Are We Synapse Yet" which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on matrix and it
-updates with CI. As of January 2023, we have 100% server-server parity with Synapse, and the client-server parity is at 93% , 
-though check CI for the latest numbers. 
+updates with CI. As of January 2023, we have 100% server-server parity with Synapse, and the client-server parity is at
+93% ,
+though check CI for the latest numbers.
 
-In practice, this means you can communicate locally and via federation with Synapse servers such as matrix.org reasonably well, 
+In practice, this means you can communicate locally and via federation with Synapse servers such as matrix.org
+reasonably well,
 although there are still some missing features (like SSO and Third-party ID APIs).
 
 We are prioritising features that will benefit single-user home servers first (e.g Receipts, E2E) rather
@@ -104,8 +109,9 @@ This means Matrix support amongst others:
 
 ## Contributing
 
-We would be grateful for any help on issues marked as [Are We Synapse Yet](https://github.com/antinvestor/matrix/labels/are-we-synapse-yet). These issues all have related 
-Sytests which need to pass in order for the issue to be closed. Once you've written your code, 
+We would be grateful for any help on issues marked
+as [Are We Synapse Yet](https://github.com/antinvestor/matrix/labels/are-we-synapse-yet). These issues all have related
+Sytests which need to pass in order for the issue to be closed. Once you've written your code,
 you can quickly run Sytest to ensure that the test names are now passing.
 
 If you're new to the project, see our

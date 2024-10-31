@@ -13,17 +13,28 @@ h1 {
     font-size: 20pt;
 }
 
-a:link    { color: #666; }
-a:visited { color: #666; }
-a:hover   { color: #000; }
-a:active  { color: #000; }
+a:link {
+    color: #666;
+}
+
+a:visited {
+    color: #666;
+}
+
+a:hover {
+    color: #000;
+}
+
+a:active {
+    color: #000;
+}
 
 input {
-   margin: 5px;
+    margin: 5px;
 }
 
 textbox, input[type="text"], input[type="password"] {
-   width: 90%;
+    width: 90%;
 }
 
 form {
@@ -42,6 +53,7 @@ ul.radiobuttons {
 #container {
     padding: 10px;
 }
+
 /*
  * Center all direct children of the main form.
  */
@@ -62,7 +74,7 @@ ul.radiobuttons {
     margin-bottom: 40px;
 
     border-radius: 10px;
-    box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.15);
+    box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, 0.15);
 
     background-color: #f8f8f8;
     border: 1px #ccc solid;

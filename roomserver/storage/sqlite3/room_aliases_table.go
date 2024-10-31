@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -95,7 +96,7 @@ func (s *roomAliasesStatements) SelectRoomIDFromAlias(
 ) (roomID string, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectRoomIDFromAliasStmt)
 	err = stmt.QueryRowContext(ctx, alias).Scan(&roomID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	return
@@ -130,7 +131,7 @@ func (s *roomAliasesStatements) SelectCreatorIDFromAlias(
 ) (creatorID string, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectCreatorIDFromAliasStmt)
 	err = stmt.QueryRowContext(ctx, alias).Scan(&creatorID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	return

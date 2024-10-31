@@ -149,7 +149,7 @@ func (r *Inputer) processRoomEvent(
 	if input.Kind == api.KindOutlier && roomInfo != nil {
 		wasRejected, werr := r.DB.IsEventRejected(ctx, roomInfo.RoomNID, event.EventID())
 		switch {
-		case werr == sql.ErrNoRows:
+		case errors.Is(werr, sql.ErrNoRows):
 			// We haven't seen this event before so continue.
 		case werr != nil:
 			// Something has gone wrong trying to find out if we rejected
@@ -550,7 +550,7 @@ func (r *Inputer) processRoomEvent(
 
 	// If guest_access changed and is not can_join, kick all guest users.
 	if event.Type() == spec.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
-		if err = r.kickGuests(ctx, event, roomInfo); err != nil && err != sql.ErrNoRows {
+		if err = r.kickGuests(ctx, event, roomInfo); err != nil && !errors.Is(err, sql.ErrNoRows) {
 			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
 		}
 	}

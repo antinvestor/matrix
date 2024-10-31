@@ -78,7 +78,7 @@ global:
 
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
-  trusted_third_party_id_servers: []
+  trusted_third_party_id_servers: [ ]
 
   # Disables federation. Dendrite will not be able to communicate with other servers
   # in the Matrix federation and the federation API will not be exposed.
@@ -348,7 +348,7 @@ tracing:
     serviceName: ""
     disabled: false
     rpc_metrics: false
-    tags: []
+    tags: [ ]
     sampler: null
     reporter: null
     headers: null

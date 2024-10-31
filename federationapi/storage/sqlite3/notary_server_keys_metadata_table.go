@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -109,7 +110,7 @@ func (s *notaryServerKeysMetadataStatements) UpsertKey(
 	var existingNotaryID tables.NotaryID
 	var existingValidUntil spec.Timestamp
 	if err := txn.Stmt(s.selectNotaryKeyMetadataStmt).QueryRowContext(ctx, serverName, keyID).Scan(&existingNotaryID, &existingValidUntil); err != nil {
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			return 0, err
 		}
 	}

@@ -16,8 +16,8 @@ package caching
 
 import (
 	"context"
-
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
@@ -71,4 +71,18 @@ type keyable interface {
 
 type costable interface {
 	CacheCost() int
+}
+
+func NewCache(cfg *config.CacheOptions) *Caches {
+
+	if cfg.ConnectionString != "" {
+
+		redisCache, err := NewRedisCache(cfg.ConnectionString, cfg.MaxAge)
+		if err == nil {
+			return redisCache
+		}
+	}
+
+	return NewRistrettoCache(cfg.EstimatedMaxSize, cfg.MaxAge, cfg.EnablePrometheus)
+
 }

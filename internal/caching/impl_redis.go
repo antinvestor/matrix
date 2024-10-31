@@ -36,10 +36,14 @@ type RedisCachePartition[K comparable, V any] struct {
 }
 
 // NewRedisCache Main Redis-based caching setup
-func NewRedisCache(redisAddr string, maxAge time.Duration) *Caches {
-	client := redis.NewClient(&redis.Options{
-		Addr: redisAddr,
-	})
+func NewRedisCache(redisAddr string, maxAge time.Duration) (*Caches, error) {
+
+	opts, err := redis.ParseURL(redisAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	client := redis.NewClient(opts)
 	return &Caches{
 		RoomVersions:            &RedisCachePartition[string, gomatrixserverlib.RoomVersion]{client, roomVersionsCache, false, maxAge},
 		ServerKeys:              &RedisCachePartition[string, gomatrixserverlib.PublicKeyLookupResult]{client, serverKeysCache, true, maxAge},
@@ -54,7 +58,7 @@ func NewRedisCache(redisAddr string, maxAge time.Duration) *Caches {
 		FederationEDUs:          &RedisCachePartition[int64, *gomatrixserverlib.EDU]{client, federationEDUsCache, true, maxAgeOfHalfHour(maxAge)},
 		RoomHierarchies:         &RedisCachePartition[string, fclient.RoomHierarchyResponse]{client, spaceSummaryRoomsCache, true, maxAge},
 		LazyLoading:             &RedisCachePartition[lazyLoadingCacheKey, string]{client, lazyLoadingCache, true, maxAge},
-	}
+	}, nil
 }
 
 // Set value in Redis with JSON serialisation
