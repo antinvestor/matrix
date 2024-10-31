@@ -17,8 +17,9 @@ package test
 import (
 	"context"
 
-	tcRedis "github.com/testcontainers/testcontainers-go/modules/redis"
 	"testing"
+
+	tcRedis "github.com/testcontainers/testcontainers-go/modules/redis"
 )
 
 const RedisImage = "redis:7"

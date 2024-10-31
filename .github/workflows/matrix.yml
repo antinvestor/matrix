@@ -67,11 +67,7 @@ jobs:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
       - run: go test -json -v ./... 2>&1 | gotestfmt -hide all
-        env:
-          POSTGRES_HOST: localhost
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: dendrite
+
 
   # build Dendrite for linux with different architectures and go versions
   build:
