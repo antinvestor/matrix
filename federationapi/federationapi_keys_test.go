@@ -68,7 +68,7 @@ func TestMain(m *testing.M) {
 			}
 
 			// Create a new cache but don't enable prometheus!
-			s.cache = caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
+			s.cache = caching.NewCache(&config.CacheOptions{})
 			natsInstance := jetstream.NATSInstance{}
 			// Create a temporary directory for JetStream.
 			d, err := os.MkdirTemp("./", "jetstream*")

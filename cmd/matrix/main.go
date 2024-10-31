@@ -148,7 +148,9 @@ func main() {
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	routers := httputil.NewRouters()
 
-	caches := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, caching.EnableMetrics)
+	cfg.Global.Cache.EnablePrometheus = caching.EnableMetrics
+	caches := caching.NewCache(&cfg.Global.Cache)
+
 	natsInstance := jetstream.NATSInstance{}
 	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
 	fsAPI := federationapi.NewInternalAPI(

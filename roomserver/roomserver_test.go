@@ -54,7 +54,7 @@ func TestUsers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
@@ -195,7 +195,7 @@ func Test_QueryLeftUsers(t *testing.T) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
 
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
@@ -252,7 +252,7 @@ func TestPurgeRoom(t *testing.T) {
 		defer close()
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		db, err := storage.Open(processCtx.Context(), cm, &cfg.RoomServer.Database, caches)
 		if err != nil {
 			t.Fatal(err)
@@ -537,7 +537,7 @@ func TestRedaction(t *testing.T) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		db, err := storage.Open(processCtx.Context(), cm, &cfg.RoomServer.Database, caches)
 		if err != nil {
 			t.Fatal(err)
@@ -730,7 +730,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 		defer close()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
@@ -1054,7 +1054,7 @@ func TestUpgrade(t *testing.T) {
 		defer close()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
@@ -1107,7 +1107,7 @@ func TestStateReset(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := jetstream.NATSInstance{}
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 
@@ -1212,7 +1212,7 @@ func TestNewServerACLs(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := &jetstream.NATSInstance{}
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		// start JetStream listeners
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
@@ -1267,7 +1267,7 @@ func TestRoomConsumerRecreation(t *testing.T) {
 	_, err := jsCtx.AddConsumer(streamName, consumerConfig)
 	assert.NoError(t, err)
 
-	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	// start JetStream listeners
 	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 	rsAPI.SetFederationAPI(nil, nil)
@@ -1302,7 +1302,7 @@ func TestRoomsWithACLs(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := &jetstream.NATSInstance{}
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		// start JetStream listeners
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)

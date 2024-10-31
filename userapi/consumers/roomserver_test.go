@@ -158,7 +158,7 @@ func TestLocalRoomMembers(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := &jetstream.NATSInstance{}
-		caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 		db, err := storage.NewUserDatabase(processCtx.Context(), cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
@@ -303,7 +303,7 @@ func BenchmarkLocalRoomMembers(b *testing.B) {
 	defer close()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	natsInstance := &jetstream.NATSInstance{}
-	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 	rsAPI.SetFederationAPI(nil, nil)
 	db, err := storage.NewUserDatabase(processCtx.Context(), cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")

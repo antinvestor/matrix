@@ -45,7 +45,7 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase
 		// Real Database/s
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
 		db, err := storage.NewDatabase(processCtx.Context(), cm, &config.DatabaseOptions{
 			ConnectionString: config.DataSource(connStr),

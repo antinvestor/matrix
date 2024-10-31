@@ -4,11 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/state"
@@ -19,6 +14,10 @@ import (
 	"github.com/antinvestor/matrix/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // This is a utility for inspecting state snapshots and running state resolution
@@ -75,11 +74,11 @@ func main() {
 		dbOpts = cfg.Global.DatabaseOptions
 	}
 
+	cfg.Global.Cache.MaxAge = time.Minute * 5
+	caches := caching.NewCache(&cfg.Global.Cache)
+
 	fmt.Println("Opening database")
-	roomserverDB, err := storage.Open(
-		processCtx.Context(), cm, &dbOpts,
-		caching.NewRistrettoCache(8*1024*1024, time.Minute*5, caching.DisableMetrics),
-	)
+	roomserverDB, err := storage.Open(processCtx.Context(), cm, &dbOpts, caches)
 	if err != nil {
 		panic(err)
 	}

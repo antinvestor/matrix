@@ -18,9 +18,15 @@ import (
 )
 
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
+
+	ctx := context.TODO()
+	cacheConnStr, closeCache := test.PrepareRedisConnectionString(ctx, t)
+	caches := caching.NewCache(&config.CacheOptions{
+		ConnectionString: cacheConnStr,
+	})
+
 	connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
-	ctx := context.Background()
+
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
@@ -29,6 +35,7 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Dat
 		t.Fatalf("NewDatabase returned %s", err)
 	}
 	return db, func() {
+		closeCache()
 		dbClose()
 	}
 }

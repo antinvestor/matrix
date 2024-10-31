@@ -3,23 +3,20 @@ package shared_test
 import (
 	"context"
 	"crypto/ed25519"
-	"testing"
-	"time"
-
 	"github.com/antinvestor/matrix/internal/caching"
-	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/stretchr/testify/assert"
-	ed255192 "golang.org/x/crypto/ed25519"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
 	"github.com/antinvestor/matrix/roomserver/storage/sqlite3"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
+	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/stretchr/testify/assert"
+	ed255192 "golang.org/x/crypto/ed25519"
+	"testing"
 )
 
 func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Database, func()) {
@@ -27,6 +24,11 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 
 	connStr, clearDB := test.PrepareDBConnectionString(t, dbType)
 	dbOpts := &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)}
+
+	cacheConnStr, closeCache := test.PrepareRedisConnectionString(context.TODO(), t)
+	cache := caching.NewCache(&config.CacheOptions{
+		ConnectionString: cacheConnStr,
+	})
 
 	writer := sqlutil.NewExclusiveWriter()
 	db, err := sqlutil.Open(dbOpts, writer)
@@ -72,8 +74,6 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 	}
 	assert.NoError(t, err)
 
-	cache := caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
-
 	evDb := shared.EventDatabase{EventStateKeysTable: stateKeyTable, Cache: cache, Writer: writer}
 
 	return &shared.Database{
@@ -85,6 +85,7 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 			Writer:           writer,
 			Cache:            cache,
 		}, func() {
+			closeCache()
 			clearDB()
 			err = db.Close()
 			assert.NoError(t, err)

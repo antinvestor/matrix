@@ -153,7 +153,8 @@ func TestAppserviceInternalAPI(t *testing.T) {
 			ctx.ShutdownDendrite()
 			ctx.WaitForShutdown()
 		})
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
+
 		// Create required internal APIs
 		natsInstance := jetstream.NATSInstance{}
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
@@ -248,7 +249,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 		ctx.ShutdownDendrite()
 		ctx.WaitForShutdown()
 	})
-	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	// Create required internal APIs
 	natsInstance := jetstream.NATSInstance{}
 	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
@@ -389,7 +390,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		// Create a dummy application service
 		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
 
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		// Create required internal APIs
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
@@ -433,7 +434,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 
 		evChan := make(chan struct{})
 
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		// Create required internal APIs
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)

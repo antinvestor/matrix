@@ -139,7 +139,7 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	natsInstance := jetstream.NATSInstance{}
 	defer close()
 
@@ -239,7 +239,7 @@ func testSyncEventFormatPowerLevels(t *testing.T, dbType test.DBType) {
 	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	natsInstance := jetstream.NATSInstance{}
 	defer close()
 
@@ -385,7 +385,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	defer close()
 	natsInstance := jetstream.NATSInstance{}
 
@@ -479,7 +479,7 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	cfg.Global.Presence.EnableOutbound = true
 	cfg.Global.Presence.EnableInbound = true
 	defer close()
@@ -599,7 +599,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		defer close()
 		natsInstance := jetstream.NATSInstance{}
 
@@ -869,7 +869,7 @@ func TestGetMembership(t *testing.T) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		defer close()
 		natsInstance := jetstream.NATSInstance{}
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
@@ -943,7 +943,7 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	defer close()
 	natsInstance := jetstream.NATSInstance{}
 
@@ -1164,7 +1164,7 @@ func testContext(t *testing.T, dbType test.DBType) {
 	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	defer close()
 
 	// Use an actual roomserver for this
@@ -1341,7 +1341,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	cfg, processCtx, close := testrig.CreateConfig(t, test.DBTypeSQLite)
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	defer close()
 
 	// Use an actual roomserver for this

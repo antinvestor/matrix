@@ -2,14 +2,12 @@ package helpers
 
 import (
 	"context"
-	"testing"
-	"time"
-
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
+	"testing"
 
 	"github.com/antinvestor/matrix/roomserver/types"
 
@@ -18,14 +16,21 @@ import (
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	conStr, close := test.PrepareDBConnectionString(t, dbType)
-	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics)
+	conStr, closeDb := test.PrepareDBConnectionString(t, dbType)
+	cacheConnStr, closeCache := test.PrepareRedisConnectionString(context.TODO(), t)
+
+	caches := caching.NewCache(&config.CacheOptions{
+		ConnectionString: cacheConnStr,
+	})
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.Open(context.Background(), cm, &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}
-	return db, close
+	return db, func() {
+		closeCache()
+		closeDb()
+	}
 }
 
 func TestIsInvitePendingWithoutNID(t *testing.T) {

@@ -185,7 +185,7 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+	caches := caching.NewCache(&cfg.Global.Cache)
 	natsInstance := jetstream.NATSInstance{}
 	cfg.FederationAPI.PreferDirectFetch = true
 	cfg.FederationAPI.KeyPerspectives = nil
@@ -458,7 +458,7 @@ func TestNotaryServer(t *testing.T) {
 		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
 		defer close()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewRistrettoCache(128*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
 		fc := &fedClient{
 			keys: map[spec.ServerName]struct {

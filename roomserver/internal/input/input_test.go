@@ -25,7 +25,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 
 		natsInstance := &jetstream.NATSInstance{}
 		js, jc := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
-		caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics)
+		caches := caching.NewCache(&cfg.Global.Cache)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 

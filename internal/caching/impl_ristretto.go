@@ -38,6 +38,14 @@ const (
 )
 
 func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enablePrometheus bool) *Caches {
+
+	if maxCost <= 0 {
+		maxCost = 8 * 1024 * 1024
+	}
+	if maxAge <= 0 {
+		maxAge = time.Hour
+	}
+
 	cache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: int64((maxCost / 1024) * 10), // 10 counters per 1KB data, affects bloom filter size
 		BufferItems: 64,                           // recommended by the ristretto godocs as a sane buffer size value

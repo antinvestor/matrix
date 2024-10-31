@@ -17,9 +17,6 @@ package query
 import (
 	"context"
 	"encoding/json"
-	"testing"
-	"time"
-
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage"
@@ -28,6 +25,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
+	"testing"
 )
 
 // used to implement RoomserverInternalAPIEventDB to test getAuthChain
@@ -161,14 +159,23 @@ func TestGetAuthChainMultiple(t *testing.T) {
 }
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	conStr, close := test.PrepareDBConnectionString(t, dbType)
-	caches := caching.NewRistrettoCache(8*1024*1024, time.Hour, caching.DisableMetrics)
+	conStr, closeDb := test.PrepareDBConnectionString(t, dbType)
+
+	cacheConnStr, closeCache := test.PrepareRedisConnectionString(context.TODO(), t)
+
+	caches := caching.NewCache(&config.CacheOptions{
+		ConnectionString: cacheConnStr,
+	})
+
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.Open(context.Background(), cm, &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}
-	return db, close
+	return db, func() {
+		closeCache()
+		closeDb()
+	}
 }
 
 func TestCurrentEventIsNil(t *testing.T) {
