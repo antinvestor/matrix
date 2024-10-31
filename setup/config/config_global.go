@@ -306,11 +306,15 @@ func (c *ServerNotices) Defaults(opts DefaultOpts) {
 func (c *ServerNotices) Verify(errors *ConfigErrors) {}
 
 type Cache struct {
+	// The connection string,
+	ConnectionString string `yaml:"connection_string"`
+
 	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
 	MaxAge           time.Duration `yaml:"max_age"`
 }
 
 func (c *Cache) Defaults() {
+	c.ConnectionString = "localhost:6379"
 	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
 	c.MaxAge = time.Hour
 }

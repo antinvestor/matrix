@@ -15,7 +15,16 @@ services:
     networks:
       - internal
     ports:
-      - 5432:5432
+      - "5432:5432"
+
+  cache:
+    hostname: cache
+    image: redis
+    restart: always
+    networks:
+      - internal
+    ports:
+      - "6379:6379"
 
   matrix:
     hostname: matrix
