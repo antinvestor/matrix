@@ -16,6 +16,7 @@ package caching
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"

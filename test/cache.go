@@ -25,7 +25,6 @@ import (
 const RedisImage = "redis:7"
 
 func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
-
 	return tcRedis.Run(ctx, RedisImage)
 }
 
