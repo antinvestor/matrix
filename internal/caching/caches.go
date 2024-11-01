@@ -88,6 +88,4 @@ func NewCache(cfg *config.CacheOptions) *Caches {
 	debug.PrintStack()
 	panic("No url to cache specified")
 
-	//return NewRistrettoCache(cfg.EstimatedMaxSize, cfg.MaxAge, cfg.EnablePrometheus)
-
 }
