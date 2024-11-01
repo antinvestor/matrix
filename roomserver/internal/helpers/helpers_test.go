@@ -48,8 +48,8 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat))
 	_ = bob
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateDatabase(t, dbType)
+		defer closeDb()
 
 		// store all events
 		var authNIDs []types.EventNID
