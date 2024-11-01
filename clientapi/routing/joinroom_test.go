@@ -33,8 +33,8 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)

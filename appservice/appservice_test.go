@@ -131,8 +131,8 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, ctx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, ctx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 
 		// Create a dummy application service
 		as := &config.ApplicationService{

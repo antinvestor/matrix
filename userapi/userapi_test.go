@@ -72,7 +72,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
-	cfg, ctx, close := testrig.CreateConfig(t, dbType)
+	cfg, ctx, closeRig := testrig.CreateConfig(t, dbType)
 	sName := serverName
 	if opts.serverName != "" {
 		sName = spec.ServerName(opts.serverName)
@@ -106,7 +106,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, pub
 			SyncProducer:      syncProducer,
 			KeyChangeProducer: keyChangeProducer,
 		}, accountDB, func() {
-			close()
+			closeRig()
 		}
 }
 

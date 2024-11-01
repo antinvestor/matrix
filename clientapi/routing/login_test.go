@@ -33,8 +33,9 @@ func TestLogin(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		natsInstance := jetstream.NATSInstance{}
 		// add a vhost

@@ -35,7 +35,6 @@ import (
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/test"
 )
@@ -43,20 +42,21 @@ import (
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *process.ProcessContext, func()) {
 	if realDatabase {
 		// Real Database/s
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+
+		dbOptions := cfg.Global.DatabaseOptions
+		if dbType == test.DBTypeSQLite {
+			dbOptions = cfg.FederationAPI.Database
+		}
+
+		cm := sqlutil.NewConnectionManager(processCtx, dbOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
-		connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
-		db, err := storage.NewDatabase(processCtx.Context(), cm, &config.DatabaseOptions{
-			ConnectionString: config.DataSource(connStr),
-		}, caches, cfg.Global.IsLocalServerName)
+
+		db, err := storage.NewDatabase(processCtx.Context(), cm, &dbOptions, caches, cfg.Global.IsLocalServerName)
 		if err != nil {
-			t.Fatalf("NewDatabase returned %s", err)
+			t.Fatalf("NewDatabase failed for %v with : %s", dbType, err)
 		}
-		return db, processCtx, func() {
-			close()
-			dbClose()
-		}
+		return db, processCtx, closeRig
 	} else {
 		// Fake Database
 		db := test.NewInMemoryFederationDatabase()
@@ -134,8 +134,8 @@ func TestSendPDUOnSuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
+	defer closeSetup()
 	defer func() {
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
@@ -163,8 +163,8 @@ func TestSendEDUOnSuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
+	defer closeSetup()
 	defer func() {
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
@@ -192,8 +192,8 @@ func TestSendPDUOnFailStoredInDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
+	defer closeSetup()
 	defer func() {
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()

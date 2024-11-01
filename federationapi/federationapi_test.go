@@ -183,13 +183,13 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 }
 
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
-	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	caches := caching.NewCache(&cfg.Global.Cache)
 	natsInstance := jetstream.NATSInstance{}
 	cfg.FederationAPI.PreferDirectFetch = true
 	cfg.FederationAPI.KeyPerspectives = nil
-	defer close()
+	defer closeRig()
 	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
@@ -319,8 +319,8 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 		},
 	}
 
-	cfg, processCtx, close := testrig.CreateConfig(t, test.DBTypeSQLite)
-	defer close()
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DBTypeSQLite)
+	defer closeRig()
 	routers := httputil.NewRouters()
 
 	_, privKey, _ := ed25519.GenerateKey(nil)
@@ -455,8 +455,8 @@ func TestNotaryServer(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}

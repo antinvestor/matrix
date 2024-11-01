@@ -419,8 +419,8 @@ func Test_register(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
@@ -591,8 +591,8 @@ func Test_register(t *testing.T) {
 
 func TestRegisterUserWithDisplayName(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 		cfg.Global.ServerName = "server"
 
 		caches := caching.NewCache(&cfg.Global.Cache)
@@ -630,8 +630,8 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 		natsInstance := jetstream.NATSInstance{}
 		cfg.Global.ServerName = "server"
 		sharedSecret := "dendritetest"

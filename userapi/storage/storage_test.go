@@ -579,13 +579,13 @@ func Test_Notification(t *testing.T) {
 }
 
 func mustCreateKeyDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
-	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	db, err := storage.NewKeyDatabase(cm, &cfg.KeyServer.Database)
 	if err != nil {
 		t.Fatalf("failed to create new database: %v", err)
 	}
-	return db, close
+	return db, closeRig
 }
 
 func MustNotError(t *testing.T, err error) {

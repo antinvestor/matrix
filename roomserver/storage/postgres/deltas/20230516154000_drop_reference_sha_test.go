@@ -12,8 +12,8 @@ import (
 
 func TestUpDropEventReferenceSHAPrevEvents(t *testing.T) {
 
-	cfg, ctx, close := testrig.CreateConfig(t, test.DBTypePostgres)
-	defer close()
+	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	defer closeRig()
 
 	db, err := sqlutil.Open(&cfg.Global.DatabaseOptions, sqlutil.NewDummyWriter())
 	assert.Nil(t, err)

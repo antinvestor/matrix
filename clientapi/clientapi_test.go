@@ -117,10 +117,11 @@ func TestGetPutDevices(t *testing.T) {
 			},
 		}
 
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
 
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -627,8 +628,8 @@ func TestTyping(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
@@ -710,9 +711,10 @@ func TestMembership(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		defer close()
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
@@ -949,9 +951,10 @@ func TestCapabilities(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		defer close()
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
@@ -1095,10 +1098,11 @@ func Test3PID(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		cfg.FederationAPI.DisableTLSValidation = true // needed to be able to connect to our identityServer below
-		defer close()
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
@@ -1274,11 +1278,12 @@ func TestPushRules(t *testing.T) {
 	ruleID3 := "myrule3"
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
 
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -1661,11 +1666,12 @@ func TestKeys(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
 
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -2134,11 +2140,12 @@ func TestKeyBackup(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
 
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -2236,11 +2243,13 @@ func TestGetMembership(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
-		defer close()
+
 		natsInstance := jetstream.NATSInstance{}
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
@@ -2299,11 +2308,12 @@ func TestCreateRoomInvite(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
-		defer close()
+
 		natsInstance := jetstream.NATSInstance{}
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
@@ -2370,11 +2380,12 @@ func TestReportEvent(t *testing.T) {
 	eventToReport := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
-		defer close()
 		natsInstance := jetstream.NATSInstance{}
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)

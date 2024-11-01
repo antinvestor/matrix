@@ -51,10 +51,10 @@ func (u *fakeUserAPI) QueryProfile(ctx context.Context, userID string) (*authtyp
 
 func TestHandleQueryProfile(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		t.Cleanup(closeRig)
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		routers := httputil.NewRouters()
-		defer close()
 
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
 		natsInstance := jetstream.NATSInstance{}

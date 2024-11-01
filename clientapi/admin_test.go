@@ -38,9 +38,9 @@ func TestAdminCreateToken(t *testing.T) {
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		cfg.ClientAPI.RegistrationRequiresToken = true
-		defer close()
+		defer closeRig()
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -189,9 +189,11 @@ func TestAdminListRegistrationTokens(t *testing.T) {
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RegistrationRequiresToken = true
-		defer close()
+
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -307,9 +309,10 @@ func TestAdminGetRegistrationToken(t *testing.T) {
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 		cfg.ClientAPI.RegistrationRequiresToken = true
-		defer close()
+
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -408,9 +411,10 @@ func TestAdminDeleteRegistrationToken(t *testing.T) {
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RegistrationRequiresToken = true
-		defer close()
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -502,9 +506,10 @@ func TestAdminUpdateRegistrationToken(t *testing.T) {
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RegistrationRequiresToken = true
-		defer close()
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -681,8 +686,8 @@ func TestAdminResetPassword(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 		natsInstance := jetstream.NATSInstance{}
 		// add a vhost
 		cfg.Global.VirtualHosts = append(cfg.Global.VirtualHosts, &config.VirtualHost{
@@ -776,13 +781,13 @@ func TestPurgeRoom(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
 		defer func() {
 			// give components the time to process purge requests
 			time.Sleep(time.Millisecond * 50)
-			close()
+			closeRig()
 		}()
 
 		routers := httputil.NewRouters()
@@ -852,10 +857,11 @@ func TestAdminEvacuateRoom(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
 
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -953,10 +959,11 @@ func TestAdminEvacuateUser(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
 
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -1048,10 +1055,11 @@ func TestAdminMarkAsStale(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
 
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -1126,11 +1134,12 @@ func TestAdminQueryEventReports(t *testing.T) {
 		/*if dbType == test.DBTypeSQLite {
 			t.Skip()
 		}*/
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
-		defer close()
 		natsInstance := jetstream.NATSInstance{}
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
@@ -1358,11 +1367,13 @@ func TestEventReportsGetDelete(t *testing.T) {
 	eventIDToReport := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
-		defer close()
+
 		natsInstance := jetstream.NATSInstance{}
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)

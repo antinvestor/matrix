@@ -136,12 +136,13 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	defer closeRig()
+
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	caches := caching.NewCache(&cfg.Global.Cache)
 	natsInstance := jetstream.NATSInstance{}
-	defer close()
 
 	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
@@ -236,12 +237,13 @@ func testSyncEventFormatPowerLevels(t *testing.T, dbType test.DBType) {
 		},
 	}, test.WithStateKey(""))
 
-	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	defer closeRig()
+
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	caches := caching.NewCache(&cfg.Global.Cache)
 	natsInstance := jetstream.NATSInstance{}
-	defer close()
 
 	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
@@ -382,11 +384,12 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	defer closeRig()
+
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	caches := caching.NewCache(&cfg.Global.Cache)
-	defer close()
 	natsInstance := jetstream.NATSInstance{}
 
 	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
@@ -476,13 +479,14 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	defer closeRig()
+
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	caches := caching.NewCache(&cfg.Global.Cache)
 	cfg.Global.Presence.EnableOutbound = true
 	cfg.Global.Presence.EnableInbound = true
-	defer close()
 	natsInstance := jetstream.NATSInstance{}
 
 	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
@@ -595,12 +599,13 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 			userType = "real user"
 		}
 
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
-		defer close()
 		natsInstance := jetstream.NATSInstance{}
 
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
@@ -866,11 +871,12 @@ func TestGetMembership(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
-		defer close()
 		natsInstance := jetstream.NATSInstance{}
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
@@ -940,11 +946,13 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	defer closeRig()
+
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	caches := caching.NewCache(&cfg.Global.Cache)
-	defer close()
+
 	natsInstance := jetstream.NATSInstance{}
 
 	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
@@ -1161,11 +1169,12 @@ func testContext(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	defer closeRig()
+
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	caches := caching.NewCache(&cfg.Global.Cache)
-	defer close()
 
 	// Use an actual roomserver for this
 	natsInstance := jetstream.NATSInstance{}
@@ -1303,9 +1312,11 @@ func TestUpdateRelations(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		t.Cleanup(closeRig)
+
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		t.Cleanup(close)
+
 		db, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
 		if err != nil {
 			t.Fatal(err)

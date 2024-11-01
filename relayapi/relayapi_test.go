@@ -38,9 +38,11 @@ import (
 
 func TestCreateNewRelayInternalAPI(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		caches := caching.NewCache(&cfg.Global.Cache)
-		defer close()
+
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		relayAPI := relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, true, caches)
 		assert.NotNil(t, relayAPI)
@@ -49,13 +51,13 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 
 func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		if dbType == test.DBTypeSQLite {
 			cfg.RelayAPI.Database.ConnectionString = "file:"
 		} else {
 			cfg.RelayAPI.Database.ConnectionString = "test"
 		}
-		defer close()
+		defer closeRig()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		assert.Panics(t, func() {
 			relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, true, nil)
@@ -65,8 +67,8 @@ func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 
 func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, _, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, _, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 		routers := httputil.NewRouters()
 		assert.Panics(t, func() {
 			relayapi.AddPublicRoutes(routers, cfg, nil, nil)
@@ -111,8 +113,9 @@ func createSendRelayTxnHTTPRequest(serverName spec.ServerName, txnID string, use
 
 func TestCreateRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		routers := httputil.NewRouters()
 		caches := caching.NewCache(&cfg.Global.Cache)
 
@@ -164,8 +167,9 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 
 func TestDisableRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
+
 		routers := httputil.NewRouters()
 		caches := caching.NewCache(&cfg.Global.Cache)
 

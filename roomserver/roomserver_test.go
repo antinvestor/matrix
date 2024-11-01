@@ -52,8 +52,8 @@ func (f *FakeQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.Room
 
 func TestUsers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -192,8 +192,8 @@ func Test_QueryLeftUsers(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 
 		caches := caching.NewCache(&cfg.Global.Cache)
 		natsInstance := jetstream.NATSInstance{}
@@ -247,9 +247,9 @@ func TestPurgeRoom(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
+		defer closeRig()
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
@@ -534,8 +534,8 @@ func TestRedaction(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
 		db, err := storage.Open(processCtx.Context(), cm, &cfg.RoomServer.Database, caches)
@@ -725,9 +725,9 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
+		defer closeRig()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
@@ -1049,9 +1049,9 @@ func TestUpgrade(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
+		defer closeRig()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
@@ -1102,8 +1102,8 @@ func TestStateReset(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		// Prepare APIs
-		cfg, processCtx, close := testrig.CreateConfig(t, dbType)
-		defer close()
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		defer closeRig()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := jetstream.NATSInstance{}
