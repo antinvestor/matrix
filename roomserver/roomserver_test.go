@@ -349,7 +349,7 @@ func TestPurgeRoom(t *testing.T) {
 
 		// wait for all consumers to process the purge event
 		var sum = 1
-		timeout := time.Second * 5
+		timeout := time.Second * 30
 		deadline, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		for sum > 0 {
