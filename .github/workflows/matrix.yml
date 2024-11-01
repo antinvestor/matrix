@@ -62,11 +62,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-stable-unit-
       - name: Set up gotestfmt
-        uses: gotesttools/gotestfmt-action@v2
+        uses: GoTestTools/gotestfmt-action@v2
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: go test -json -v ./... 2>&1 | gotestfmt -hide all
+      - run: |
+          set -euo pipefail
+          go test -json -v ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
 
 
   # build Dendrite for linux with different architectures and go versions
@@ -126,18 +128,27 @@ jobs:
       # Label used to access the service container
       postgres:
         # Docker Hub image
-        image: postgres:17-alpine
-        # Provide the password for postgres
+        image: postgres:17
         env:
           POSTGRES_USER: matrix
           POSTGRES_PASSWORD: s3cr3t
           POSTGRES_DB: matrix
         ports:
-          # Maps tcp port 5432 on service container to the host
           - 5432:5432
-        # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      cache:
+        # Docker Hub image
+        image: redis:7
+        env:
+          POSTGRES_USER: matrix
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd redis-cli ping | grep PONG
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
