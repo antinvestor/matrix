@@ -66,7 +66,8 @@ jobs:
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: |
+      - name: Run unit tests
+        run: |
           set -euo pipefail
           go test -json -v ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
 
@@ -143,12 +144,10 @@ jobs:
       cache:
         # Docker Hub image
         image: redis:7
-        env:
-          POSTGRES_USER: matrix
         ports:
           - 6379:6379
         options: >-
-          --health-cmd redis-cli ping | grep PONG
+          --health-cmd "redis-cli ping | grep PONG || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -218,10 +217,10 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
           go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
-      - name: Run actions/checkout@v4 for dendrite
+      - name: Run actions/checkout@v4 for matrix
         uses: actions/checkout@v4
         with:
-          path: dendrite
+          path: matrix
 
       # Attempt to check out the same branch of Complement as the PR. If it
       # doesn't exist, fallback to main.
@@ -245,9 +244,9 @@ jobs:
             fi
             (wget -O - "https://github.com/antinvestor/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
-      # Build initial Dendrite image
-      - run: docker build --build-arg=CGO=${{ matrix.cgo }} -t complement-dendrite:${{ matrix.postgres }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
-        working-directory: dendrite
+      # Build initial Matrix image
+      - run: docker build --build-arg=CGO=${{ matrix.cgo }} -t complement-matrix:${{ matrix.postgres }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
+        working-directory: matrix
         env:
           DOCKER_BUILDKIT: 1
 
@@ -258,7 +257,7 @@ jobs:
         shell: bash
         name: Run Complement Tests
         env:
-          COMPLEMENT_BASE_IMAGE: complement-dendrite:${{ matrix.postgres }}${{ matrix.cgo }}
+          COMPLEMENT_BASE_IMAGE: complement-matrix:${{ matrix.postgres }}${{ matrix.cgo }}
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_DENDRITE_
         working-directory: complement
 
