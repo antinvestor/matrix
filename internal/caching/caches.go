@@ -17,6 +17,7 @@ package caching
 import (
 	"context"
 	"runtime/debug"
+	"time"
 
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -76,8 +77,12 @@ type keyable interface {
 	~uint64 | ~string | []byte | byte | ~int | ~int32 | ~uint32 | ~int64 | lazyLoadingCacheKey
 }
 
-type costable interface {
-	CacheCost() int
+func maxAgeOfHalfHour(b time.Duration) time.Duration {
+	a := time.Hour / 2
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func NewCache(cfg *config.CacheOptions) *Caches {
