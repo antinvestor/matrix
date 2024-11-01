@@ -2,13 +2,14 @@ package routing
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/test"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/antinvestor/matrix/test"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage"

@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func mustCreateFederationDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
 
 	ctx := context.TODO()
 	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(ctx)
@@ -54,8 +54,8 @@ func TestExpireEDUs(t *testing.T) {
 	ctx := context.Background()
 	destinations := map[spec.ServerName]struct{}{"localhost": {}}
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateFederationDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateFederationDatabase(t, dbType)
+		defer closeDb()
 		// insert some data
 		for i := 0; i < 100; i++ {
 			receipt, err := db.StoreJSON(ctx, "{}")

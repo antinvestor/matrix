@@ -366,7 +366,7 @@ func TestDebounce(t *testing.T) {
 	}
 }
 
-func mustCreateKeyserverDB(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
+func mustCreateKeyserverDB(t *testing.T, _ test.DBType) (storage.KeyDatabase, func()) {
 	t.Helper()
 
 	connStr, clearDB, err := test.PrepareDBConnectionString(ctx)

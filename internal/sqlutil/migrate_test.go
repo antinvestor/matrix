@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/antinvestor/matrix/setup/process"
 	"reflect"
 	"testing"
+
+	"github.com/antinvestor/matrix/setup/process"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/test"

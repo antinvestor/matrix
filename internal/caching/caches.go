@@ -40,6 +40,11 @@ const (
 	eventStateKeyNIDCache
 )
 
+const (
+	DisableMetrics = false
+	EnableMetrics  = true
+)
+
 // Caches contains a set of references to caches. They may be
 // different implementations as long as they satisfy the Cache
 // interface.
