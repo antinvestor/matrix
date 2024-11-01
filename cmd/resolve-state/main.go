@@ -4,6 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/state"
@@ -14,10 +19,6 @@ import (
 	"github.com/antinvestor/matrix/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // This is a utility for inspecting state snapshots and running state resolution

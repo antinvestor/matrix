@@ -2,12 +2,13 @@ package helpers
 
 import (
 	"context"
+	"testing"
+
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
-	"testing"
 
 	"github.com/antinvestor/matrix/roomserver/types"
 

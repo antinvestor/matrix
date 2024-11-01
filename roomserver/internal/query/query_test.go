@@ -17,6 +17,8 @@ package query
 import (
 	"context"
 	"encoding/json"
+	"testing"
+
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage"
@@ -25,7 +27,6 @@ import (
 	"github.com/antinvestor/matrix/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"testing"
 )
 
 // used to implement RoomserverInternalAPIEventDB to test getAuthChain
