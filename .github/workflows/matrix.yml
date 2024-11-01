@@ -251,11 +251,11 @@ jobs:
           DOCKER_BUILDKIT: 1
 
       # Run Complement
-      - run: |
+      - name: Run Complement Tests
+        run: |
           set -o pipefail &&
           go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
-        name: Run Complement Tests
         env:
           COMPLEMENT_BASE_IMAGE: complement-matrix:${{ matrix.postgres }}${{ matrix.cgo }}
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_DENDRITE_
