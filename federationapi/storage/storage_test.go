@@ -20,7 +20,10 @@ import (
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 
 	ctx := context.TODO()
-	cacheConnStr, closeCache := test.PrepareRedisConnectionString(ctx, t)
+	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("Could not create redis container %s", err)
+	}
 	caches := caching.NewCache(&config.CacheOptions{
 		ConnectionString: cacheConnStr,
 	})

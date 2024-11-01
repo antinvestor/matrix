@@ -18,7 +18,10 @@ import (
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	conStr, closeDb := test.PrepareDBConnectionString(t, dbType)
-	cacheConnStr, closeCache := test.PrepareRedisConnectionString(context.TODO(), t)
+	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(context.TODO())
+	if err != nil {
+		t.Fatalf("Could not create redis container %s", err)
+	}
 
 	caches := caching.NewCache(&config.CacheOptions{
 		ConnectionString: cacheConnStr,

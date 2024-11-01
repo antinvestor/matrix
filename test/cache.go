@@ -17,8 +17,6 @@ package test
 import (
 	"context"
 
-	"testing"
-
 	tcRedis "github.com/testcontainers/testcontainers-go/modules/redis"
 )
 
@@ -32,16 +30,16 @@ func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareRedisConnectionString(ctx context.Context, t *testing.T) (connStr string, close func()) {
+func PrepareRedisConnectionString(ctx context.Context) (connStr string, close func(), err error) {
 
 	redisContainer, err := setupRedis(ctx)
 	if err != nil {
-		t.Fatalf("cannot instantiate redis %s", err)
+		return "", nil, err
 	}
 
 	connStr, err = redisContainer.ConnectionString(ctx)
 	if err != nil {
-		t.Fatalf("cannot get redis connection string: %s", err)
+		return "", nil, err
 	}
 
 	return connStr, func() {
@@ -50,5 +48,5 @@ func PrepareRedisConnectionString(ctx context.Context, t *testing.T) (connStr st
 		if err != nil {
 			//t.Fatalf("failed to close down redis '%s': %s", connStr, err)
 		}
-	}
+	}, nil
 }

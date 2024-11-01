@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/test"
 	"io"
 	"net/http"
 	"os"
@@ -67,8 +68,6 @@ func TestMain(m *testing.M) {
 				panic("can't generate identity key: " + err.Error())
 			}
 
-			// Create a new cache but don't enable prometheus!
-			s.cache = caching.NewCache(&config.CacheOptions{})
 			natsInstance := jetstream.NATSInstance{}
 			// Create a temporary directory for JetStream.
 			d, err := os.MkdirTemp("./", "jetstream*")
@@ -114,6 +113,16 @@ func TestMain(m *testing.M) {
 
 			// Finally, build the server key APIs.
 			processCtx := process.NewProcessContext()
+
+			cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(processCtx.Context())
+			defer closeCache()
+			if err != nil {
+				panic(err)
+			}
+			s.cache = caching.NewCache(&config.CacheOptions{
+				ConnectionString: cacheConnStr,
+			})
+
 			cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 			s.api = NewInternalAPI(processCtx, cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)
 		}

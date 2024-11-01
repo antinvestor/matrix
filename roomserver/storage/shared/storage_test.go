@@ -26,7 +26,10 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 	connStr, clearDB := test.PrepareDBConnectionString(t, dbType)
 	dbOpts := &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)}
 
-	cacheConnStr, closeCache := test.PrepareRedisConnectionString(context.TODO(), t)
+	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(context.TODO())
+	if err != nil {
+		t.Fatalf("Could not create redis container %s", err)
+	}
 	cache := caching.NewCache(&config.CacheOptions{
 		ConnectionString: cacheConnStr,
 	})

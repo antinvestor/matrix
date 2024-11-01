@@ -16,6 +16,7 @@ package caching
 
 import (
 	"context"
+	"runtime/debug"
 
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -84,6 +85,9 @@ func NewCache(cfg *config.CacheOptions) *Caches {
 		}
 	}
 
-	return NewRistrettoCache(cfg.EstimatedMaxSize, cfg.MaxAge, cfg.EnablePrometheus)
+	debug.PrintStack()
+	panic("No url to cache specified")
+
+	//return NewRistrettoCache(cfg.EstimatedMaxSize, cfg.MaxAge, cfg.EnablePrometheus)
 
 }

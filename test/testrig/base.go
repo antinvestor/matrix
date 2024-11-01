@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/process"
@@ -32,7 +33,21 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 	})
 	cfg.Global.JetStream.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
-	ctx := process.NewProcessContext()
+	processContext := process.NewProcessContext()
+
+	ctx := processContext.Context()
+	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("Could not create redis container %s", err)
+	}
+
+	cfg.Global.Cache = config.CacheOptions{
+		MaxAge:           time.Minute * 5,
+		EstimatedMaxSize: 8 * 1024 * 1024,
+		ConnectionString: cacheConnStr,
+		EnablePrometheus: false,
+	}
+
 	switch dbType {
 	case test.DBTypePostgres:
 		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
@@ -60,10 +75,11 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 			MaxIdleConnections:     2,
 			ConnMaxLifetimeSeconds: 60,
 		}
-		return &cfg, ctx, func() {
-			ctx.ShutdownDendrite()
-			ctx.WaitForShutdown()
+		return &cfg, processContext, func() {
+			processContext.ShutdownDendrite()
+			processContext.WaitForShutdown()
 			closeDb()
+			closeCache()
 		}
 	case test.DBTypeSQLite:
 		cfg.Defaults(config.DefaultOpts{
@@ -88,9 +104,10 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "userapi.db"))
 		cfg.RelayAPI.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "relayapi.db"))
 
-		return &cfg, ctx, func() {
-			ctx.ShutdownDendrite()
-			ctx.WaitForShutdown()
+		return &cfg, processContext, func() {
+			processContext.ShutdownDendrite()
+			processContext.WaitForShutdown()
+			closeCache()
 			t.Cleanup(func() {}) // removes t.TempDir, where all database files are created
 		}
 	default:
