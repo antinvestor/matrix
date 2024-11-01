@@ -16,7 +16,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
 	ctx := context.TODO()
 	conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
 	if err != nil {
