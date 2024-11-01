@@ -62,6 +62,25 @@ func TestMain(m *testing.M) {
 	// Set up the server key API for each "server" that we
 	// will use in our tests.
 	os.Exit(func() int {
+
+		processCtx := process.NewProcessContext()
+		ctx := processCtx.Context()
+
+		dbConnStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+		if err != nil {
+			panic(err)
+		}
+		defer closeDb()
+		if err != nil {
+			panic(err)
+		}
+
+		cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(ctx)
+		defer closeCache()
+		if err != nil {
+			panic(err)
+		}
+
 		for _, s := range servers {
 			// Generate a new key.
 			_, testPriv, err := ed25519.GenerateKey(nil)
@@ -82,7 +101,7 @@ func TestMain(m *testing.M) {
 			cfg := &config.Dendrite{}
 			cfg.Defaults(config.DefaultOpts{
 				Generate:       true,
-				SingleDatabase: false,
+				SingleDatabase: true,
 			})
 			cfg.Global.ServerName = spec.ServerName(s.name)
 			cfg.Global.PrivateKey = testPriv
@@ -92,13 +111,13 @@ func TestMain(m *testing.M) {
 			cfg.Global.KeyID = serverKeyID
 			cfg.Global.KeyValidityPeriod = s.validity
 			cfg.FederationAPI.KeyPerspectives = nil
-			f, err := os.CreateTemp(d, "federation_keys_test*.db")
-			if err != nil {
-				return -1
-			}
-			defer f.Close()
-			cfg.FederationAPI.Database.ConnectionString = config.DataSource("file:" + f.Name())
+
+			cfg.Global.DatabaseOptions.ConnectionString = config.DataSource(dbConnStr)
 			s.config = &cfg.FederationAPI
+
+			s.cache = caching.NewCache(&config.CacheOptions{
+				ConnectionString: cacheConnStr,
+			})
 
 			// Create a transport which redirects federation requests to
 			// the mock round tripper. Since we're not *really* listening for
@@ -113,16 +132,6 @@ func TestMain(m *testing.M) {
 			)
 
 			// Finally, build the server key APIs.
-			processCtx := process.NewProcessContext()
-
-			cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(processCtx.Context())
-			defer closeCache()
-			if err != nil {
-				panic(err)
-			}
-			s.cache = caching.NewCache(&config.CacheOptions{
-				ConnectionString: cacheConnStr,
-			})
 
 			cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 			s.api = NewInternalAPI(processCtx, cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)

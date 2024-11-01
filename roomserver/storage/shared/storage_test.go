@@ -9,7 +9,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
-	"github.com/antinvestor/matrix/roomserver/storage/sqlite3"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -23,10 +22,14 @@ import (
 func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Database, func()) {
 	t.Helper()
 
-	connStr, clearDB := test.PrepareDBConnectionString(t, dbType)
+	ctx := context.TODO()
+	connStr, clearDB, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	dbOpts := &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)}
 
-	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(context.TODO())
+	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(ctx)
 	if err != nil {
 		t.Fatalf("Could not create redis container %s", err)
 	}
@@ -59,22 +62,6 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 		stateKeyTable, err = postgres.PrepareEventStateKeysTable(db)
 		assert.NoError(t, err)
 		userRoomKeys, err = postgres.PrepareUserRoomKeysTable(db)
-	case test.DBTypeSQLite:
-		err = sqlite3.CreateRoomsTable(db)
-		assert.NoError(t, err)
-		err = sqlite3.CreateEventStateKeysTable(db)
-		assert.NoError(t, err)
-		err = sqlite3.CreateMembershipTable(db)
-		assert.NoError(t, err)
-		err = sqlite3.CreateUserRoomKeysTable(db)
-		assert.NoError(t, err)
-		roomsTable, err = sqlite3.PrepareRoomsTable(db)
-		assert.NoError(t, err)
-		membershipTable, err = sqlite3.PrepareMembershipTable(db)
-		assert.NoError(t, err)
-		stateKeyTable, err = sqlite3.PrepareEventStateKeysTable(db)
-		assert.NoError(t, err)
-		userRoomKeys, err = sqlite3.PrepareUserRoomKeysTable(db)
 	}
 	assert.NoError(t, err)
 

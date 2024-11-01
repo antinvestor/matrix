@@ -6,16 +6,19 @@ import (
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
-	"github.com/antinvestor/matrix/roomserver/storage/sqlite3"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRoomAliasesTable(t *testing.T, dbType test.DBType) (tab tables.RoomAliases, close func()) {
+func mustCreateRoomAliasesTable(t *testing.T, dbType test.DBType) (tab tables.RoomAliases, closeDb func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -25,14 +28,10 @@ func mustCreateRoomAliasesTable(t *testing.T, dbType test.DBType) (tab tables.Ro
 		err = postgres.CreateRoomAliasesTable(db)
 		assert.NoError(t, err)
 		tab, err = postgres.PrepareRoomAliasesTable(db)
-	case test.DBTypeSQLite:
-		err = sqlite3.CreateRoomAliasesTable(db)
-		assert.NoError(t, err)
-		tab, err = sqlite3.PrepareRoomAliasesTable(db)
 	}
 	assert.NoError(t, err)
 
-	return tab, close
+	return tab, closeDb
 }
 
 func TestRoomAliasesTable(t *testing.T) {

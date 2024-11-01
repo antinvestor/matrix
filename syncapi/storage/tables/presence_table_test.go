@@ -10,7 +10,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
-	"github.com/antinvestor/matrix/syncapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -20,7 +19,11 @@ import (
 
 func mustPresenceTable(t *testing.T, dbType test.DBType) (tables.Presence, func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -32,17 +35,11 @@ func mustPresenceTable(t *testing.T, dbType test.DBType) (tables.Presence, func(
 	switch dbType {
 	case test.DBTypePostgres:
 		tab, err = postgres.NewPostgresPresenceTable(db)
-	case test.DBTypeSQLite:
-		var stream sqlite3.StreamIDStatements
-		if err = stream.Prepare(db); err != nil {
-			t.Fatalf("failed to prepare stream stmts: %s", err)
-		}
-		tab, err = sqlite3.NewSqlitePresenceTable(db, &stream)
 	}
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
-	return tab, close
+	return tab, closeDb
 }
 
 func TestPresence(t *testing.T) {

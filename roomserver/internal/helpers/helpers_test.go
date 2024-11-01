@@ -17,8 +17,12 @@ import (
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	conStr, closeDb := test.PrepareDBConnectionString(t, dbType)
-	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(context.TODO())
+	ctx := context.TODO()
+	conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
+	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(ctx)
 	if err != nil {
 		t.Fatalf("Could not create redis container %s", err)
 	}
@@ -27,7 +31,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 		ConnectionString: cacheConnStr,
 	})
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
-	db, err := storage.Open(context.Background(), cm, &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}, caches)
+	db, err := storage.Open(ctx, cm, &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}

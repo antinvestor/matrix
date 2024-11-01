@@ -24,15 +24,12 @@ import (
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
-	"github.com/antinvestor/matrix/roomserver/storage/sqlite3"
 	"github.com/antinvestor/matrix/setup/config"
 )
 
 // Open opens a database connection.
 func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
 	switch {
-	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.Open(ctx, conMan, dbProperties, cache)
 	case dbProperties.ConnectionString.IsPostgres():
 		return postgres.Open(ctx, conMan, dbProperties, cache)
 	default:

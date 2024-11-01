@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
-	"github.com/antinvestor/matrix/federationapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -17,7 +16,11 @@ import (
 )
 
 func mustCreateOutboundpeeksTable(t *testing.T, dbType test.DBType) (tables.FederationOutboundPeeks, func()) {
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -28,17 +31,15 @@ func mustCreateOutboundpeeksTable(t *testing.T, dbType test.DBType) (tables.Fede
 	switch dbType {
 	case test.DBTypePostgres:
 		tab, err = postgres.NewPostgresOutboundPeeksTable(db)
-	case test.DBTypeSQLite:
-		tab, err = sqlite3.NewSQLiteOutboundPeeksTable(db)
 	}
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)
 	}
-	return tab, close
+	return tab, closeDb
 }
 
 func TestOutboundPeeksTable(t *testing.T) {
-	ctx := context.Background()
+	ctx := context.TODO()
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)

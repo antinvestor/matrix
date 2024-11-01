@@ -28,7 +28,10 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Dat
 		ConnectionString: cacheConnStr,
 	})
 
-	connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{
@@ -39,7 +42,7 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Dat
 	}
 	return db, func() {
 		closeCache()
-		dbClose()
+		closeDb()
 	}
 }
 

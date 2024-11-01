@@ -7,7 +7,6 @@ import (
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
-	"github.com/antinvestor/matrix/roomserver/storage/sqlite3"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -17,7 +16,12 @@ import (
 
 func mustCreateMembershipTable(t *testing.T, dbType test.DBType) (tab tables.Membership, stateKeyTab tables.EventStateKeys, close func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -31,18 +35,10 @@ func mustCreateMembershipTable(t *testing.T, dbType test.DBType) (tab tables.Mem
 		tab, err = postgres.PrepareMembershipTable(db)
 		assert.NoError(t, err)
 		stateKeyTab, err = postgres.PrepareEventStateKeysTable(db)
-	case test.DBTypeSQLite:
-		err = sqlite3.CreateEventStateKeysTable(db)
-		assert.NoError(t, err)
-		err = sqlite3.CreateMembershipTable(db)
-		assert.NoError(t, err)
-		tab, err = sqlite3.PrepareMembershipTable(db)
-		assert.NoError(t, err)
-		stateKeyTab, err = sqlite3.PrepareEventStateKeysTable(db)
 	}
 	assert.NoError(t, err)
 
-	return tab, stateKeyTab, close
+	return tab, stateKeyTab, closeDb
 }
 
 func TestMembershipTable(t *testing.T) {

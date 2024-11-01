@@ -25,8 +25,11 @@ import (
 
 var ctx = context.Background()
 
-func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+func MustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewSyncServerDatasource(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
@@ -34,7 +37,7 @@ func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
-	return db, close
+	return db, closeDb
 }
 
 func MustWriteEvents(t *testing.T, db storage.Database, events []*rstypes.HeaderedEvent) (positions []types.StreamPosition) {

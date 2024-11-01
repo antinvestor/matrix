@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
-	"github.com/antinvestor/matrix/federationapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -17,7 +16,11 @@ import (
 )
 
 func mustCreateServerKeyDB(t *testing.T, dbType test.DBType) (tables.FederationServerSigningKeys, func()) {
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -28,21 +31,19 @@ func mustCreateServerKeyDB(t *testing.T, dbType test.DBType) (tables.FederationS
 	switch dbType {
 	case test.DBTypePostgres:
 		tab, err = postgres.NewPostgresServerSigningKeysTable(db)
-	case test.DBTypeSQLite:
-		tab, err = sqlite3.NewSQLiteServerSigningKeysTable(db)
 	}
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)
 	}
-	return tab, close
+	return tab, closeDb
 }
 
 func TestServerKeysTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		ctx, cancel := context.WithCancel(context.Background())
-		tab, close := mustCreateServerKeyDB(t, dbType)
+		tab, closeKeyDb := mustCreateServerKeyDB(t, dbType)
 		t.Cleanup(func() {
-			close()
+			closeKeyDb()
 			cancel()
 		})
 

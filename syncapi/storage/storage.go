@@ -24,14 +24,11 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
-	"github.com/antinvestor/matrix/syncapi/storage/sqlite3"
 )
 
 // NewSyncServerDatasource opens a database connection.
 func NewSyncServerDatasource(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
-	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(ctx, conMan, dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
 		return postgres.NewDatabase(ctx, conMan, dbProperties)
 	default:

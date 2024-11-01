@@ -226,7 +226,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	srv.Start()
 	defer srv.Close()
 
-	cfg, ctx, tearDown := testrig.CreateConfig(t, test.DBTypeSQLite)
+	cfg, ctx, tearDown := testrig.CreateConfig(t, test.DBTypePostgres)
 	defer tearDown()
 
 	// Create a dummy application service

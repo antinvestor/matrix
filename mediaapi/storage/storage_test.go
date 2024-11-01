@@ -12,8 +12,12 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewMediaAPIDatasource(cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
@@ -21,7 +25,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
-	return db, close
+	return db, closeDb
 }
 func TestMediaRepository(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {

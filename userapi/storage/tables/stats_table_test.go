@@ -16,7 +16,6 @@ import (
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
-	"github.com/antinvestor/matrix/userapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
 )
@@ -33,7 +32,11 @@ func mustMakeDBs(t *testing.T, dbType test.DBType) (
 		err        error
 	)
 
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, nil)
@@ -42,19 +45,6 @@ func mustMakeDBs(t *testing.T, dbType test.DBType) (
 	}
 
 	switch dbType {
-	case test.DBTypeSQLite:
-		accTable, err = sqlite3.NewSQLiteAccountsTable(db, "localhost")
-		if err != nil {
-			t.Fatalf("unable to create acc db: %v", err)
-		}
-		devTable, err = sqlite3.NewSQLiteDevicesTable(db, "localhost")
-		if err != nil {
-			t.Fatalf("unable to open device db: %v", err)
-		}
-		statsTable, err = sqlite3.NewSQLiteStatsTable(db, "localhost")
-		if err != nil {
-			t.Fatalf("unable to open stats db: %v", err)
-		}
 	case test.DBTypePostgres:
 		accTable, err = postgres.NewPostgresAccountsTable(db, "localhost")
 		if err != nil {
@@ -70,7 +60,7 @@ func mustMakeDBs(t *testing.T, dbType test.DBType) (
 		}
 	}
 
-	return db, accTable, devTable, statsTable, close
+	return db, accTable, devTable, statsTable, closeDb
 }
 
 func mustMakeAccountAndDevice(

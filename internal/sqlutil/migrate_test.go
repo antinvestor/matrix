@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/antinvestor/matrix/setup/process"
 	"reflect"
 	"testing"
 
@@ -79,10 +80,16 @@ func Test_migrations_Up(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		conStr, close := test.PrepareDBConnectionString(t, dbType)
-		defer close()
+
+		processCtx := process.NewProcessContext()
+		ctx := processCtx.Context()
+
+		conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+		if err != nil {
+			t.Fatalf("failed to open database: %s", err)
+		}
+		defer closeDb()
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -113,8 +120,16 @@ func Test_migrations_Up(t *testing.T) {
 
 func Test_insertMigration(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		conStr, close := test.PrepareDBConnectionString(t, dbType)
-		defer close()
+
+		processCtx := process.NewProcessContext()
+		ctx := processCtx.Context()
+
+		conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+		if err != nil {
+			t.Fatalf("failed to open database: %s", err)
+		}
+		defer closeDb()
+
 		driverName := sqlutil.SQLITE_DRIVER_NAME
 		if dbType == test.DBTypePostgres {
 			driverName = "postgres"

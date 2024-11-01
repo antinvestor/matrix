@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
-	"github.com/antinvestor/matrix/federationapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -33,7 +32,12 @@ func mustCreateRelayServersTable(
 	dbType test.DBType,
 ) (database RelayServersDatabase, close func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -43,9 +47,6 @@ func mustCreateRelayServersTable(
 	case test.DBTypePostgres:
 		tab, err = postgres.NewPostgresRelayServersTable(db)
 		assert.NoError(t, err)
-	case test.DBTypeSQLite:
-		tab, err = sqlite3.NewSQLiteRelayServersTable(db)
-		assert.NoError(t, err)
 	}
 	assert.NoError(t, err)
 
@@ -54,7 +55,7 @@ func mustCreateRelayServersTable(
 		Writer: sqlutil.NewDummyWriter(),
 		Table:  tab,
 	}
-	return database, close
+	return database, closeDb
 }
 
 func Equal(a, b []spec.ServerName) bool {

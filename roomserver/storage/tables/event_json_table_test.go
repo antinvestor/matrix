@@ -7,7 +7,6 @@ import (
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
-	"github.com/antinvestor/matrix/roomserver/storage/sqlite3"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -17,7 +16,11 @@ import (
 
 func mustCreateEventJSONTable(t *testing.T, dbType test.DBType) (tables.EventJSON, func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -28,14 +31,10 @@ func mustCreateEventJSONTable(t *testing.T, dbType test.DBType) (tables.EventJSO
 		err = postgres.CreateEventJSONTable(db)
 		assert.NoError(t, err)
 		tab, err = postgres.PrepareEventJSONTable(db)
-	case test.DBTypeSQLite:
-		err = sqlite3.CreateEventJSONTable(db)
-		assert.NoError(t, err)
-		tab, err = sqlite3.PrepareEventJSONTable(db)
 	}
 	assert.NoError(t, err)
 
-	return tab, close
+	return tab, closeDb
 }
 
 func Test_EventJSONTable(t *testing.T) {

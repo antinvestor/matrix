@@ -8,7 +8,6 @@ import (
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
-	"github.com/antinvestor/matrix/roomserver/storage/sqlite3"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -18,10 +17,15 @@ import (
 	ed255192 "golang.org/x/crypto/ed25519"
 )
 
-func mustCreateUserRoomKeysTable(t *testing.T, dbType test.DBType) (tab tables.UserRoomKeys, db *sql.DB, close func()) {
+func mustCreateUserRoomKeysTable(t *testing.T, dbType test.DBType) (tab tables.UserRoomKeys, db *sql.DB, closeDb func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := sqlutil.Open(&config.DatabaseOptions{
+
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
+	db, err = sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
@@ -30,20 +34,16 @@ func mustCreateUserRoomKeysTable(t *testing.T, dbType test.DBType) (tab tables.U
 		err = postgres.CreateUserRoomKeysTable(db)
 		assert.NoError(t, err)
 		tab, err = postgres.PrepareUserRoomKeysTable(db)
-	case test.DBTypeSQLite:
-		err = sqlite3.CreateUserRoomKeysTable(db)
-		assert.NoError(t, err)
-		tab, err = sqlite3.PrepareUserRoomKeysTable(db)
 	}
 	assert.NoError(t, err)
 
-	return tab, db, close
+	return tab, db, closeDb
 }
 
 func TestUserRoomKeysTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, db, close := mustCreateUserRoomKeysTable(t, dbType)
-		defer close()
+		tab, db, closeDb := mustCreateUserRoomKeysTable(t, dbType)
+		defer closeDb()
 		userNID := types.EventStateKeyNID(1)
 		roomNID := types.RoomNID(1)
 		_, key, err := ed25519.GenerateKey(nil)

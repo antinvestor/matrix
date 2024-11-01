@@ -20,7 +20,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -60,15 +59,7 @@ func setupPostgres(ctx context.Context, dbName, user, connStr string) (*tcPostgr
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, close func()) {
-	ctx := context.Background()
-	if dbType == DBTypeSQLite {
-		// this will be made in the t.TempDir, which is unique per test
-		dbname := filepath.Join(t.TempDir(), "dendrite_test.db")
-		return fmt.Sprintf("file:%s", dbname), func() {
-			t.Cleanup(func() {}) // removes the t.TempDir
-		}
-	}
+func PrepareDBConnectionString(ctx context.Context) (connStr string, close func(), err error) {
 
 	// Required vars: user and db
 	// We'll try to infer from the local env if they are missing
@@ -88,31 +79,30 @@ func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, clo
 	// working (test) directory we ensure we get a consistent hash and don't hash against concurrent packages.
 	wd, err := os.Getwd()
 	if err != nil {
-		t.Fatalf("cannot get working directory: %s", err)
+		return "", nil, err
 	}
 	hash := sha256.Sum256([]byte(wd))
 	dbName := fmt.Sprintf("dendrite_test_%s", hex.EncodeToString(hash[:16]))
 
 	pgContainer, err := setupPostgres(ctx, dbName, user, password)
 	if err != nil {
-		t.Fatalf("cannot instantiate postgresql %s", err)
+		return "", nil, err
 	}
 
 	connStr, err = pgContainer.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
-		t.Fatalf("cannot get postgresql connection %s", err)
+		return "", nil, err
 	}
 
 	return connStr, func() {
 		_ = pgContainer.Terminate(ctx)
-	}
+	}, nil
 }
 
 // WithAllDatabases Creates subtests with each known DBType
 func WithAllDatabases(t *testing.T, testFn func(t *testing.T, db DBType)) {
 	dbs := map[string]DBType{
 		"postgres": DBTypePostgres,
-		"sqlite":   DBTypeSQLite,
 	}
 	for dbName, dbType := range dbs {
 		dbt := dbType

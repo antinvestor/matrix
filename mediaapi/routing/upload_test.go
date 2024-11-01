@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/test"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/mediaapi/fileutils"
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -47,15 +47,17 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		DynamicThumbnails: false,
 	}
 
+	ctx := context.TODO()
 	// create testdata folder and remove when done
-	_ = os.Mkdir(testdataPath, os.ModePerm)
-	defer fileutils.RemoveDir(types.Path(testdataPath), nil)
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
+	defer closeDb()
+
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewMediaAPIDatasource(cm, &config.DatabaseOptions{
-		ConnectionString:       "file::memory:?cache=shared",
-		MaxOpenConnections:     100,
-		MaxIdleConnections:     2,
-		ConnMaxLifetimeSeconds: -1,
+		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {
 		t.Errorf("error opening mediaapi database: %v", err)

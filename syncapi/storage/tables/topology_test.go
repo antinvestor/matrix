@@ -9,7 +9,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
-	"github.com/antinvestor/matrix/syncapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
@@ -18,7 +17,12 @@ import (
 
 func newTopologyTable(t *testing.T, dbType test.DBType) (tables.Topology, *sql.DB, func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -30,13 +34,11 @@ func newTopologyTable(t *testing.T, dbType test.DBType) (tables.Topology, *sql.D
 	switch dbType {
 	case test.DBTypePostgres:
 		tab, err = postgres.NewPostgresTopologyTable(db)
-	case test.DBTypeSQLite:
-		tab, err = sqlite3.NewSqliteTopologyTable(db)
 	}
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
-	return tab, db, close
+	return tab, db, closeDb
 }
 
 func TestTopologyTable(t *testing.T) {
@@ -44,8 +46,8 @@ func TestTopologyTable(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, db, close := newTopologyTable(t, dbType)
-		defer close()
+		tab, db, closeDb := newTopologyTable(t, dbType)
+		defer closeDb()
 		events := room.Events()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			var highestPos types.StreamPosition

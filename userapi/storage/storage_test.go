@@ -36,8 +36,11 @@ var (
 	ctx              = context.Background()
 )
 
-func mustCreateUserDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+func mustCreateUserDatabase(t *testing.T, _ test.DBType) (storage.UserDatabase, func()) {
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
@@ -45,16 +48,14 @@ func mustCreateUserDatabase(t *testing.T, dbType test.DBType) (storage.UserDatab
 	if err != nil {
 		t.Fatalf("NewUserDatabase returned %s", err)
 	}
-	return db, func() {
-		close()
-	}
+	return db, closeDb
 }
 
 // Tests storing and getting account data
 func Test_AccountData(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateUserDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateUserDatabase(t, dbType)
+		defer closeDb()
 		alice := test.NewUser(t)
 		localpart, domain, err := gomatrixserverlib.SplitID('@', alice.ID)
 		assert.NoError(t, err)

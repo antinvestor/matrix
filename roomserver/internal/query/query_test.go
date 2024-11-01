@@ -83,7 +83,7 @@ func (db *getEventDB) addFakeEvents(graph map[string][]string) error {
 }
 
 // EventsFromIDs implements RoomserverInternalAPIEventDB
-func (db *getEventDB) EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) (res []types.Event, err error) {
+func (db *getEventDB) EventsFromIDs(_ context.Context, _ *types.RoomInfo, eventIDs []string) (res []types.Event, err error) {
 	for _, evID := range eventIDs {
 		res = append(res, types.Event{
 			EventNID: 0,
@@ -159,8 +159,13 @@ func TestGetAuthChainMultiple(t *testing.T) {
 	}
 }
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	conStr, closeDb := test.PrepareDBConnectionString(t, dbType)
+func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
+
+	ctx := context.TODO()
+	conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 
 	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(context.TODO())
 	if err != nil {
@@ -184,8 +189,8 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 
 func TestCurrentEventIsNil(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateDatabase(t, dbType)
+		defer closeDb()
 		querier := Queryer{
 			DB: db,
 		}

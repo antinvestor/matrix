@@ -37,10 +37,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite native
-
-          - label: SQLite Cgo
-            cgo: 1
 
           - label: PostgreSQL
             postgres: postgres
@@ -128,11 +124,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite native
-            cgo: 0
-
-          - label: SQLite Cgo
-            cgo: 1
 
           - label: PostgreSQL
             postgres: Postgres

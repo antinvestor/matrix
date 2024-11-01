@@ -9,7 +9,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
-	"github.com/antinvestor/matrix/syncapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -19,7 +18,11 @@ import (
 
 func newCurrentRoomStateTable(t *testing.T, dbType test.DBType) (tables.CurrentRoomState, *sql.DB, func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -31,17 +34,11 @@ func newCurrentRoomStateTable(t *testing.T, dbType test.DBType) (tables.CurrentR
 	switch dbType {
 	case test.DBTypePostgres:
 		tab, err = postgres.NewPostgresCurrentRoomStateTable(db)
-	case test.DBTypeSQLite:
-		var stream sqlite3.StreamIDStatements
-		if err = stream.Prepare(db); err != nil {
-			t.Fatalf("failed to prepare stream stmts: %s", err)
-		}
-		tab, err = sqlite3.NewSqliteCurrentRoomStateTable(db, &stream)
 	}
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
-	return tab, db, close
+	return tab, db, closeDb
 }
 
 func TestCurrentRoomStateTable(t *testing.T) {

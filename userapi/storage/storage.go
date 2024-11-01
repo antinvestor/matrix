@@ -27,7 +27,6 @@ import (
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
-	"github.com/antinvestor/matrix/userapi/storage/sqlite3"
 )
 
 // NewUserDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
@@ -43,8 +42,6 @@ func NewUserDatabase(
 	serverNoticesLocalpart string,
 ) (UserDatabase, error) {
 	switch {
-	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewUserDatabase(ctx, conMan, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
 	case dbProperties.ConnectionString.IsPostgres():
 		return postgres.NewDatabase(ctx, conMan, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
 	default:
@@ -56,8 +53,6 @@ func NewUserDatabase(
 // and sets postgres connection parameters.
 func NewKeyDatabase(conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
 	switch {
-	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewKeyDatabase(conMan, dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
 		return postgres.NewKeyDatabase(conMan, dbProperties)
 	default:

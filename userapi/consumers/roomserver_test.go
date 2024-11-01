@@ -27,9 +27,13 @@ import (
 	userAPITypes "github.com/antinvestor/matrix/userapi/types"
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase, func()) {
+func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.UserDatabase, func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
@@ -37,9 +41,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.UserDatabase,
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
-	return db, func() {
-		close()
-	}
+	return db, closeDb
 }
 
 func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
@@ -61,8 +63,8 @@ func Test_evaluatePushRules(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateDatabase(t, dbType)
+		defer closeDb()
 		consumer := OutputRoomEventConsumer{db: db, rsAPI: &FakeUserRoomserverAPI{}}
 
 		testCases := []struct {
@@ -257,8 +259,8 @@ func TestMessageStats(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateDatabase(t, dbType)
+		defer closeDb()
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {

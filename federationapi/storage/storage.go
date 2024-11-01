@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
-	"github.com/antinvestor/matrix/federationapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -32,8 +31,6 @@ import (
 // NewDatabase opens a new database
 func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (Database, error) {
 	switch {
-	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(ctx, conMan, dbProperties, cache, isLocalServerName)
 	case dbProperties.ConnectionString.IsPostgres():
 		return postgres.NewDatabase(ctx, conMan, dbProperties, cache, isLocalServerName)
 	default:

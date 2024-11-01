@@ -1350,10 +1350,14 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	routers := httputil.NewRouters()
 
-	cfg, processCtx, close := testrig.CreateConfig(t, test.DBTypeSQLite)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	defer closeRig()
+
+	cfg.SyncAPI.Fulltext.Enabled = true
+
+	ctx := processCtx.Context()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	caches := caching.NewCache(&cfg.Global.Cache)
-	defer close()
 
 	// Use an actual roomserver for this
 	natsInstance := jetstream.NATSInstance{}
@@ -1366,7 +1370,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 	room := test.NewRoom(t, user)
 	AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
 
-	if err := api.SendEvents(processCtx.Context(), rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+	if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 		t.Fatalf("failed to send events: %v", err)
 	}
 
@@ -1386,7 +1390,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	for _, e := range events {
 		roomEvents := append([]*rstypes.HeaderedEvent{}, e)
-		if err := api.SendEvents(processCtx.Context(), rsAPI, api.KindNew, roomEvents, "test", "test", "test", nil, false); err != nil {
+		if err := api.SendEvents(ctx, rsAPI, api.KindNew, roomEvents, "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 

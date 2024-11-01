@@ -23,7 +23,6 @@ import (
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/postgres"
-	"github.com/antinvestor/matrix/relayapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
@@ -36,8 +35,6 @@ func NewDatabase(
 	isLocalServerName func(spec.ServerName) bool,
 ) (Database, error) {
 	switch {
-	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(conMan, dbProperties, cache, isLocalServerName)
 	case dbProperties.ConnectionString.IsPostgres():
 		return postgres.NewDatabase(conMan, dbProperties, cache, isLocalServerName)
 	default:

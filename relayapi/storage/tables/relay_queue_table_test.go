@@ -23,7 +23,6 @@ import (
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/postgres"
-	"github.com/antinvestor/matrix/relayapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
@@ -43,7 +42,12 @@ func mustCreateQueueTable(
 	dbType test.DBType,
 ) (database RelayQueueDatabase, close func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -53,9 +57,6 @@ func mustCreateQueueTable(
 	case test.DBTypePostgres:
 		tab, err = postgres.NewPostgresRelayQueueTable(db)
 		assert.NoError(t, err)
-	case test.DBTypeSQLite:
-		tab, err = sqlite3.NewSQLiteRelayQueueTable(db)
-		assert.NoError(t, err)
 	}
 	assert.NoError(t, err)
 
@@ -64,7 +65,7 @@ func mustCreateQueueTable(
 		Writer: sqlutil.NewDummyWriter(),
 		Table:  tab,
 	}
-	return database, close
+	return database, closeDb
 }
 
 func TestShoudInsertQueueTransaction(t *testing.T) {

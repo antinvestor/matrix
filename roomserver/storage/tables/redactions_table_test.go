@@ -6,7 +6,6 @@ import (
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
-	"github.com/antinvestor/matrix/roomserver/storage/sqlite3"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
@@ -14,9 +13,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRedactionsTable(t *testing.T, dbType test.DBType) (tab tables.Redactions, close func()) {
+func mustCreateRedactionsTable(t *testing.T, dbType test.DBType) (tab tables.Redactions, closeDb func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
@@ -26,14 +30,10 @@ func mustCreateRedactionsTable(t *testing.T, dbType test.DBType) (tab tables.Red
 		err = postgres.CreateRedactionsTable(db)
 		assert.NoError(t, err)
 		tab, err = postgres.PrepareRedactionsTable(db)
-	case test.DBTypeSQLite:
-		err = sqlite3.CreateRedactionsTable(db)
-		assert.NoError(t, err)
-		tab, err = sqlite3.PrepareRedactionsTable(db)
 	}
 	assert.NoError(t, err)
 
-	return tab, close
+	return tab, closeDb
 }
 
 func TestRedactionsTable(t *testing.T) {

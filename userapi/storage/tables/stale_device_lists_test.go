@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
-	"github.com/antinvestor/matrix/userapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -15,8 +14,12 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
 
-func mustCreateTable(t *testing.T, dbType test.DBType) (tab tables.StaleDeviceLists, close func()) {
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+func mustCreateTable(t *testing.T, dbType test.DBType) (tab tables.StaleDeviceLists, closeDb func()) {
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, nil)
@@ -26,13 +29,11 @@ func mustCreateTable(t *testing.T, dbType test.DBType) (tab tables.StaleDeviceLi
 	switch dbType {
 	case test.DBTypePostgres:
 		tab, err = postgres.NewPostgresStaleDeviceListsTable(db)
-	case test.DBTypeSQLite:
-		tab, err = sqlite3.NewSqliteStaleDeviceListsTable(db)
 	}
 	if err != nil {
 		t.Fatalf("failed to create new table: %s", err)
 	}
-	return tab, close
+	return tab, closeDb
 }
 
 func TestStaleDeviceLists(t *testing.T) {

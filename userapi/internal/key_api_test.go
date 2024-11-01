@@ -13,9 +13,14 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage"
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
+func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.KeyDatabase, func()) {
 	t.Helper()
-	connStr, close := test.PrepareDBConnectionString(t, dbType)
+
+	ctx := context.TODO()
+	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewKeyDatabase(cm, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
@@ -23,9 +28,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, 
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
-	return db, func() {
-		close()
-	}
+	return db, closeDb
 }
 
 func Test_QueryDeviceMessages(t *testing.T) {

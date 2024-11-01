@@ -19,18 +19,14 @@ package storage
 
 import (
 	"fmt"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/postgres"
-	"github.com/antinvestor/matrix/mediaapi/storage/sqlite3"
 	"github.com/antinvestor/matrix/setup/config"
 )
 
 // NewMediaAPIDatasource opens a database connection.
 func NewMediaAPIDatasource(conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
-	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(conMan, dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
 		return postgres.NewDatabase(conMan, dbProperties)
 	default:
