@@ -41,7 +41,7 @@ jobs:
 
   # run go test with different go versions
   test:
-    timeout-minutes: 30
+    timeout-minutes: 20
     name: Unit tests
     runs-on: ubuntu-latest
     steps:
@@ -69,7 +69,7 @@ jobs:
       - name: Run unit tests
         run: |
           set -euo pipefail
-          go test -json -v ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
+          go test -json -v ./... 2>&1 | tee /tmp/gotest.log | gotestfmt  
 
 
   # build Dendrite for linux with different architectures and go versions

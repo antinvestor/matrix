@@ -1051,7 +1051,7 @@ func TestUpgrade(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		natsInstance := jetstream.NATSInstance{}
-		defer close()
+		defer closeRig()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
@@ -1103,7 +1103,7 @@ func TestStateReset(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		// Prepare APIs
 		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
-		defer close()
+		defer closeRig()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := jetstream.NATSInstance{}
