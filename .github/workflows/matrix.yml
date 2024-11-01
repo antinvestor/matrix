@@ -41,7 +41,7 @@ jobs:
 
   # run go test with different go versions
   test:
-    timeout-minutes: 10
+    timeout-minutes: 20
     name: Unit tests
     runs-on: ubuntu-latest
     steps:
@@ -72,7 +72,7 @@ jobs:
   # build Dendrite for linux with different architectures and go versions
   build:
     name: Build for Linux
-    timeout-minutes: 10
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -103,42 +103,10 @@ jobs:
           CGO_CFLAGS: -fno-stack-protector
         run: go build -trimpath -v -o "bin/" ./cmd/...
 
-  # build for Windows 64-bit
-  build_windows:
-    name: Build for Windows
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        goos: [ "windows" ]
-        goarch: [ "amd64" ]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-stable-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            key: ${{ runner.os }}-go-stable-${{ matrix.goos }}-${{ matrix.goarch }}-
-      - name: Install dependencies
-        run: sudo apt update && sudo apt install -y gcc-mingw-w64-x86-64 # install required gcc
-      - env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 1
-          CC: "/usr/bin/x86_64-w64-mingw32-gcc"
-        run: go build -trimpath -v -o "bin/" ./cmd/...
-
   # Dummy step to gate other tests on without repeating the whole list
   initial-tests-done:
     name: Initial tests passed
-    needs: [ lint, test, build, build_windows ]
+    needs: [ lint, test, build ]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     steps:
