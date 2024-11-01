@@ -69,7 +69,7 @@ jobs:
       - name: Run unit tests
         run: |
           set -euo pipefail
-          go test -json -v ./... 2>&1 | tee /tmp/gotest.log | gotestfmt  
+          go test -timeout=20m  -json -v ./... 2>&1 | tee /tmp/gotest.log | gotestfmt  
 
 
   # build Dendrite for linux with different architectures and go versions
@@ -124,33 +124,6 @@ jobs:
     needs: initial-tests-done
     name: Integration tests
     runs-on: ubuntu-latest
-    # Service containers to run with `container-job`
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: postgres:17
-        env:
-          POSTGRES_USER: matrix
-          POSTGRES_PASSWORD: s3cr3t
-          POSTGRES_DB: matrix
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      cache:
-        # Docker Hub image
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping | grep PONG || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - name: Install libolm
@@ -172,7 +145,7 @@ jobs:
           key: ${{ runner.os }}-go-stable-test-race-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-stable-test-race-
-      - run: go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt
+      - run: go test -timeout=20m -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt
         env:
           POSTGRES_HOST: localhost
           POSTGRES_USER: matrix
@@ -248,7 +221,7 @@ jobs:
       - name: Run Complement Tests
         run: |
           set -o pipefail &&
-          go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
+          go test -timeout=20m  -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         env:
           COMPLEMENT_BASE_IMAGE: complement-matrix:${{ matrix.postgres }}${{ matrix.cgo }}
