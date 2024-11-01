@@ -2310,9 +2310,6 @@ func TestCreateRoomInvite(t *testing.T) {
 
 		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		defer closeRig()
-
-		ctx := processCtx.Context()
-
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
@@ -2355,7 +2352,7 @@ func TestCreateRoomInvite(t *testing.T) {
 		roomID := gjson.GetBytes(w.Body.Bytes(), "room_id").Str
 		validRoomID, _ := spec.NewRoomID(roomID)
 		// Now ask the roomserver about the membership event of Bob
-		ev, err := rsAPI.CurrentStateEvent(ctx, *validRoomID, spec.MRoomMember, bob.ID)
+		ev, err := rsAPI.CurrentStateEvent(context.Background(), *validRoomID, spec.MRoomMember, bob.ID)
 		if err != nil {
 			t.Fatal(err)
 		}

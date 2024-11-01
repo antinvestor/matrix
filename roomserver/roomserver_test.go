@@ -349,7 +349,7 @@ func TestPurgeRoom(t *testing.T) {
 
 		// wait for all consumers to process the purge event
 		var sum = 1
-		timeout := time.Second * 30
+		timeout := time.Second * 5
 		deadline, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		for sum > 0 {
@@ -1051,7 +1051,7 @@ func TestUpgrade(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		natsInstance := jetstream.NATSInstance{}
-		defer closeRig()
+		defer close()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches := caching.NewCache(&cfg.Global.Cache)
@@ -1103,7 +1103,7 @@ func TestStateReset(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		// Prepare APIs
 		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
-		defer closeRig()
+		defer close()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := jetstream.NATSInstance{}
