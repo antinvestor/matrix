@@ -23,26 +23,27 @@ concurrency:
 
 jobs:
 
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install libolm and dependencies
+        run: sudo apt-get install libolm-dev libolm3
+      - name: Cache Go dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-stable-unit-${{ hashFiles('**/go.sum') }}
+    outputs:
+      cache-key: ${{ steps.cache.outputs.cache-hit }}
+
   # Run golangci-lint
   lint:
     timeout-minutes: 5
+    needs: setup
     name: Linting
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install libolm
-        run: sudo apt-get install libolm-dev libolm3
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-
-  # run go test with different go versions
-  test:
-    timeout-minutes: 20
-    name: Unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +53,23 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+          cache: true
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+
+  # run go test with different go versions
+  test:
+    timeout-minutes: 20
+    needs: setup
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
         with:
@@ -60,12 +78,19 @@ jobs:
       - name: Run unit tests
         run: |
           set -euo pipefail
-          go test -timeout=20m  -json -v ./... 2>&1 | tee /tmp/gotest.log | gotestfmt  
+          go test -timeout=20m -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          flags: unittests
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
 
 
   # build Dendrite for linux with different architectures and go versions
   build:
     name: Build for Linux
+    needs: setup
     timeout-minutes: 5
     runs-on: ubuntu-latest
     strategy:
@@ -79,6 +104,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+          cache: true
       - name: Install dependencies x86
         if: ${{ matrix.goarch == '386' }}
         run: sudo apt update && sudo apt-get install -y gcc-multilib
@@ -101,68 +127,26 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
 
-  # run go test with different go versions
-  integration:
-    timeout-minutes: 20
-    needs: initial-tests-done
-    name: Integration tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install libolm
-        run: sudo apt-get install libolm-dev libolm3
-      - name: Setup go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-      - name: Set up gotestfmt
-        uses: gotesttools/gotestfmt-action@v2
-        with:
-          # Optional: pass GITHUB_TOKEN to avoid rate limiting.
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - run: go test -timeout=20m -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt
-        env:
-          POSTGRES_HOST: localhost
-          POSTGRES_USER: matrix
-          POSTGRES_PASSWORD: s3cr3t
-          POSTGRES_DB: matrix
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          flags: unittests
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-
   # run Complement
   complement:
-    name: "Complement (${{ matrix.label }})"
+    name: "Complement (Postgresql)"
     timeout-minutes: 20
-    needs: initial-tests-done
+    needs:
+      - setup
+      - initial-tests-done
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - label: PostgreSQL
-            postgres: Postgres
-            cgo: 0
     steps:
-      # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
-      # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
-      - name: "Set Go Version"
-        run: |
-          echo "$GOROOT_1_23_X64/bin" >> $GITHUB_PATH
-          echo "~/go/bin" >> $GITHUB_PATH
-      - name: "Install Complement Dependencies"
-        # We don't need to install Go because it is included on the Ubuntu 20.04 image:
-        # See https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md specifically GOROOT_1_17_X64
-        run: |
-          sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
-          go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
       - name: Run actions/checkout@v4 for matrix
         uses: actions/checkout@v4
         with:
           path: matrix
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
 
       # Attempt to check out the same branch of Complement as the PR. If it
       # doesn't exist, fallback to main.
@@ -187,7 +171,7 @@ jobs:
             (wget -O - "https://github.com/antinvestor/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
       # Build initial Matrix image
-      - run: docker build --build-arg=CGO=${{ matrix.cgo }} -t complement-matrix:${{ matrix.postgres }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
+      - run: docker build --build-arg=CGO=0 -t complement-matrix:Postgres -f build/scripts/ComplementPostgres.Dockerfile .
         working-directory: matrix
         env:
           DOCKER_BUILDKIT: 1
@@ -199,8 +183,8 @@ jobs:
           go test -timeout=20m  -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         env:
-          COMPLEMENT_BASE_IMAGE: complement-matrix:${{ matrix.postgres }}${{ matrix.cgo }}
-          COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_DENDRITE_
+          COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
+          COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
         working-directory: complement
 
   integration-tests-done:
@@ -208,8 +192,7 @@ jobs:
     needs:
       [
         initial-tests-done,
-        complement,
-        integration
+        complement
       ]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
