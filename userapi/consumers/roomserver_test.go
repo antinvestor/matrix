@@ -55,7 +55,7 @@ func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
 
 type FakeUserRoomserverAPI struct{ rsapi.UserRoomserverAPI }
 
-func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, _ spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 	return spec.NewUserID(string(senderID), true)
 }
 
@@ -301,8 +301,8 @@ func TestMessageStats(t *testing.T) {
 func BenchmarkLocalRoomMembers(b *testing.B) {
 	t := &testing.T{}
 
-	cfg, processCtx, close := testrig.CreateConfig(t, test.DBTypePostgres)
-	defer close()
+	cfg, processCtx, closeDb := testrig.CreateConfig(t, test.DBTypePostgres)
+	defer closeDb()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	natsInstance := &jetstream.NATSInstance{}
 	caches := caching.NewCache(&cfg.Global.Cache)
