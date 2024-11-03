@@ -80,7 +80,9 @@ func clearDatabase(_ context.Context, connectionStr string) error {
 		return err
 	}
 
-	defer db.Close()
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
 
 	_, err = db.Exec(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`)
 	if err != nil {

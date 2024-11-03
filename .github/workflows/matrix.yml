@@ -110,7 +110,7 @@ jobs:
       - name: Run unit tests
         run: |
           set -euo pipefail
-          go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt
+          go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt -hide all
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
