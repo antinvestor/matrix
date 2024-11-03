@@ -23,26 +23,9 @@ concurrency:
 
 jobs:
 
-  setup:
-    name: Setup
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install libolm and dependencies
-        run: sudo apt-get install libolm-dev libolm3
-      - name: Cache Go dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-stable-unit-${{ hashFiles('**/go.sum') }}
-    outputs:
-      cache-key: ${{ steps.cache.outputs.cache-hit }}
-
   # Run golangci-lint
   lint:
     timeout-minutes: 5
-    needs: setup
     name: Linting
     runs-on: ubuntu-latest
     steps:
@@ -53,14 +36,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
-          cache: true
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
 
   # run go test with different go versions
   test:
     timeout-minutes: 20
-    needs: setup
     name: Unit tests
     runs-on: ubuntu-latest
     # Service containers to run with `container-job`
@@ -89,7 +70,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
-          cache: true
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
         with:
@@ -106,7 +86,6 @@ jobs:
   # build Dendrite for linux with different architectures and go versions
   build:
     name: Build for Linux
-    needs: setup
     timeout-minutes: 5
     runs-on: ubuntu-latest
     strategy:
@@ -120,7 +99,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
-          cache: true
       - name: Install dependencies x86
         if: ${{ matrix.goarch == '386' }}
         run: sudo apt update && sudo apt-get install -y gcc-multilib
@@ -148,7 +126,6 @@ jobs:
     name: "Complement (Postgresql)"
     timeout-minutes: 20
     needs:
-      - setup
       - initial-tests-done
     runs-on: ubuntu-latest
     strategy:
@@ -182,8 +159,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'matrix/go.mod'
-          cache: true
-
       # Attempt to check out the same branch of Complement as the PR. If it
       # doesn't exist, fallback to main.
       - name: Checkout complement
