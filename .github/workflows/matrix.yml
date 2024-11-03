@@ -211,7 +211,11 @@ jobs:
         working-directory: matrix
         env:
           DOCKER_BUILDKIT: 1
-
+      - name: Set up gotestfmt
+        uses: GoTestTools/gotestfmt-action@v2
+        with:
+          # Optional: pass GITHUB_TOKEN to avoid rate limiting.
+          token: ${{ secrets.GITHUB_TOKEN }}
       # Run Complement
       - name: Run Complement Tests
         run: |
