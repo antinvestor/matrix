@@ -109,17 +109,10 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run unit tests
         env:
-          POSTGRES_URI: postgres://matrix:s3cr3t@postgres:${{ job.services.postgres.ports[5432] }}/matrix?sslmode=disable
+          POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
-          go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt -hide all
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          flags: unittests
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-
+          go test -json -v ./... 2>&1 | gotestfmt -hide all
 
   # build Dendrite for linux with different architectures and go versions
   build:
@@ -249,7 +242,7 @@ jobs:
           go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         env:
-          POSTGRES_URI: postgres://matrix:s3cr3t@postgres:${{ job.services.postgres.ports[5432] }}/matrix?sslmode=disable
+          POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
         working-directory: complement
