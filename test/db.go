@@ -17,8 +17,12 @@ package test
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"github.com/lib/pq"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -55,47 +59,104 @@ func setupPostgres(ctx context.Context, dbName, user, connStr string) (*tcPostgr
 	return postgresContainer, nil
 }
 
-// PrepareDBConnectionString Prepare a sqlite or postgres connection string for testing.
-// Returns the connection string to use and a close function which must be called when the test finishes.
-// Calling this function twice will return the same database, which will have data from previous tests
-// unless close() is called.
-func PrepareDBConnectionString(ctx context.Context) (connStr string, close func(), err error) {
+// ensureDatabaseExists checks if a specific database exists and creates it if it does not.
+func ensureDatabaseExists(_ context.Context, postgresUri *url.URL, newDbName string) (*url.URL, error) {
 
-	// Required vars: user and db
-	// We'll try to infer from the local env if they are missing
-	user := os.Getenv("POSTGRES_USER")
-	if user == "" {
-		user = "matrix"
+	var connectionString = postgresUri.String()
+	db, err := sql.Open("postgres", connectionString)
+	if err != nil {
+		return postgresUri, err
 	}
-	// optional vars, used in CI
-	password := os.Getenv("POSTGRES_PASSWORD")
-	if password == "" {
-		password = "s3cr3t"
+	defer db.Close()
+
+	if err = db.Ping(); err != nil {
+		return postgresUri, err
+	}
+	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s;`, newDbName))
+	if err != nil {
+		var pqErr *pq.Error
+		ok := errors.As(err, &pqErr)
+		if !ok {
+			return postgresUri, err
+		}
+		// we ignore duplicate database error as we expect this
+		if pqErr.Code != "42P04" {
+			return postgresUri, pqErr
+		}
 	}
 
-	// we cannot use 'dendrite_test' here else 2x concurrently running packages will try to use the same db.
-	// instead, hash the current working directory, snaffle the first 16 bytes and append that to dendrite_test
+	dbUserName := postgresUri.User.Username()
+
+	_, err = db.Exec(fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE %s TO %s;`, newDbName, dbUserName))
+	if err != nil {
+		return postgresUri, err
+	}
+
+	postgresUri.Path = newDbName
+
+	return postgresUri, nil
+}
+
+func clearDatabase(_ context.Context, connectionStr string) error {
+
+	db, err := sql.Open("postgres", connectionStr)
+	if err != nil {
+		return err
+	}
+
+	defer db.Close()
+
+	_, err = db.Exec(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func generateNewDBName() (string, error) {
+	// we cannot use 'matrix_test' here else 2x concurrently running packages will try to use the same db.
+	// instead, hash the current working directory, snaffle the first 16 bytes and append that to matrix_test
 	// and use that as the unique db name. We do this because packages are per-directory hence by hashing the
 	// working (test) directory we ensure we get a consistent hash and don't hash against concurrent packages.
 	wd, err := os.Getwd()
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 	hash := sha256.Sum256([]byte(wd))
-	dbName := fmt.Sprintf("dendrite_test_%s", hex.EncodeToString(hash[:16]))
+	databaseName := fmt.Sprintf("matrix_tests_%s", hex.EncodeToString(hash[:16]))
+	return databaseName, nil
+}
 
-	pgContainer, err := setupPostgres(ctx, dbName, user, password)
-	if err != nil {
-		return "", nil, err
+// PrepareDBConnectionString Prepare a sqlite or postgres connection string for testing.
+// Returns the connection string to use and a close function which must be called when the test finishes.
+// Calling this function twice will return the same database, which will have data from previous tests
+// unless close() is called.
+func PrepareDBConnectionString(ctx context.Context) (postgresUriStr string, close func(), err error) {
+
+	var connectionUri *url.URL
+	postgresUriStr = os.Getenv("POSTGRES_URI")
+	if postgresUriStr == "" {
+		postgresUriStr = "postgres://matrix:s3cr3t@127.0.0.1:5432/matrix?sslmode=disable"
 	}
 
-	connStr, err = pgContainer.ConnectionString(ctx, "sslmode=disable")
+	parsedPostgresUri, err := url.Parse(postgresUriStr)
 	if err != nil {
-		return "", nil, err
+		return "", func() {}, err
 	}
 
-	return connStr, func() {
-		_ = pgContainer.Terminate(ctx)
+	newDatabaseName, err := generateNewDBName()
+	if err != nil {
+		return "", func() {}, err
+	}
+
+	connectionUri, err = ensureDatabaseExists(ctx, parsedPostgresUri, newDatabaseName)
+	if err != nil {
+		return "", func() {}, err
+	}
+
+	postgresUriStr = connectionUri.String()
+	return postgresUriStr, func() {
+		_ = clearDatabase(ctx, postgresUriStr)
 	}, nil
 }
 

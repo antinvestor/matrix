@@ -63,6 +63,36 @@ jobs:
     needs: setup
     name: Unit tests
     runs-on: ubuntu-latest
+    # Service containers to run with `container-job`
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres:17
+        env:
+          POSTGRES_USER: matrix
+          POSTGRES_PASSWORD: s3cr3t
+          POSTGRES_DB: matrix
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      cache:
+        # Docker Hub image
+        image: redis:7
+        env:
+          POSTGRES_USER: matrix
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping | grep PONG"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
       - name: Setup go
@@ -78,7 +108,7 @@ jobs:
       - name: Run unit tests
         run: |
           set -euo pipefail
-          go test -timeout=20m -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt
+          go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -137,6 +167,36 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+    # Service containers to run with `container-job`
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres:17
+        env:
+          POSTGRES_USER: matrix
+          POSTGRES_PASSWORD: s3cr3t
+          POSTGRES_DB: matrix
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      cache:
+        # Docker Hub image
+        image: redis:7
+        env:
+          POSTGRES_USER: matrix
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping | grep PONG"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Run actions/checkout@v4 for matrix
         uses: actions/checkout@v4
@@ -180,7 +240,7 @@ jobs:
       - name: Run Complement Tests
         run: |
           set -o pipefail &&
-          go test -timeout=20m  -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
+          go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         env:
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
