@@ -21,43 +21,17 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/lib/pq"
 	"net/url"
 	"os"
 	"testing"
-	"time"
 
-	"github.com/testcontainers/testcontainers-go"
-	tcPostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/lib/pq"
 )
-
-const PostgresqlImage = "postgres:17"
 
 type DBType int
 
 var DBTypeSQLite DBType = 1
 var DBTypePostgres DBType = 2
-
-func setupPostgres(ctx context.Context, dbName, user, connStr string) (*tcPostgres.PostgresContainer, error) {
-
-	postgresContainer, err := tcPostgres.Run(ctx,
-		PostgresqlImage,
-		tcPostgres.WithDatabase(dbName),
-		tcPostgres.WithUsername(user),
-		tcPostgres.WithPassword(connStr),
-
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(30*time.Second)),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return postgresContainer, nil
-}
 
 // ensureDatabaseExists checks if a specific database exists and creates it if it does not.
 func ensureDatabaseExists(_ context.Context, postgresUri *url.URL, newDbName string) (*url.URL, error) {
@@ -67,7 +41,9 @@ func ensureDatabaseExists(_ context.Context, postgresUri *url.URL, newDbName str
 	if err != nil {
 		return postgresUri, err
 	}
-	defer db.Close()
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
 
 	if err = db.Ping(); err != nil {
 		return postgresUri, err
