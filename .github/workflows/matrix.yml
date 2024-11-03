@@ -80,22 +80,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      cache:
-        # Docker Hub image
-        image: redis:7
-        command: >
-          redis-server
-          --databases 2000
-          --user matrix on >s3cr3t ~* +@all
-        environment:
-          - REDIS_PASSWORD=s3cr3t
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping | grep PONG"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -183,22 +167,6 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      cache:
-        # Docker Hub image
-        image: redis:7
-        command: >
-          redis-server
-          --databases 2000
-          --user matrix on >s3cr3t ~* +@all
-        environment:
-          - REDIS_PASSWORD=s3cr3t
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping | grep PONG"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
