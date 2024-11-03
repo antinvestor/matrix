@@ -16,20 +16,14 @@ package test
 
 import (
 	"context"
-	"github.com/redis/go-redis/v9"
-	"os"
+
+	tcRedis "github.com/testcontainers/testcontainers-go/modules/redis"
 )
 
-func clearCache(_ context.Context, redisUriStr string) error {
+const RedisImage = "redis:7"
 
-	_, err := redis.ParseURL(redisUriStr)
-	if err != nil {
-		return err
-	}
-
-	//client := redis.NewClient(opts)
-	//return client.FlushDB(ctx).Err()
-	return nil
+func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
+	return tcRedis.Run(ctx, RedisImage)
 }
 
 // PrepareRedisConnectionString Prepare a redis connection string for testing.
@@ -38,12 +32,62 @@ func clearCache(_ context.Context, redisUriStr string) error {
 // unless close() is called.
 func PrepareRedisConnectionString(ctx context.Context) (connStr string, close func(), err error) {
 
-	redisUriStr := os.Getenv("REDIS_URI")
-	if redisUriStr == "" {
-		redisUriStr = "redis://localhost:6379/0?protocol=3"
+	redisContainer, err := setupRedis(ctx)
+	if err != nil {
+		return "", nil, err
 	}
 
-	return redisUriStr, func() {
-		_ = clearCache(ctx, redisUriStr)
+	connStr, err = redisContainer.ConnectionString(ctx)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return connStr, func() {
+		// Drop container to get a fresh instance
+		err = redisContainer.Terminate(ctx)
+		if err != nil {
+			//t.Fatalf("failed to close down redis '%s': %s", connStr, err)
+		}
 	}, nil
 }
+
+//var dbCounter int64
+//
+//func clearCache(ctx context.Context, redisUriStr string) error {
+//
+//	opts, err := redis.ParseURL(redisUriStr)
+//	if err != nil {
+//		return err
+//	}
+//
+//	client := redis.NewClient(opts)
+//	return client.FlushDB(ctx).Err()
+//	return nil
+//}
+//
+//// PrepareRedisConnectionString Prepare a redis connection string for testing.
+//// Returns the connection string to use and a close function which must be called when the test finishes.
+//// Calling this function twice will return the same database, which will have data from previous tests
+//// unless close() is called.
+//func PrepareRedisConnectionString(ctx context.Context) (connStr string, close func(), err error) {
+//
+//	redisUriStr := os.Getenv("REDIS_URI")
+//	if redisUriStr == "" {
+//		redisUriStr = "redis://matrix:s3cr3t@localhost:6379/0"
+//	}
+//
+//	parsedRedisUri, err := url.Parse(redisUriStr)
+//	if err != nil {
+//		return "", func() {}, err
+//	}
+//
+//	newDb := atomic.AddInt64(&dbCounter, 1)
+//
+//	parsedRedisUri.Path = fmt.Sprintf("/%d", newDb)
+//	redisUriStr = parsedRedisUri.String()
+//
+//	return redisUriStr, func() {
+//		_ = clearCache(ctx, redisUriStr)
+//	}, nil
+//}
+//

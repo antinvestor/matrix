@@ -19,12 +19,20 @@ services:
 
   cache:
     hostname: cache
-    image: redis
+    image: redis:7
     restart: always
     networks:
       - internal
     ports:
       - "6379:6379"
+    environment:
+      REDIS_PASSWORD: "s3cr3t"
+    command: [
+      "redis-server",
+      "--databases", "10000",
+      "--requirepass", "s3cr3t",
+      "--user", "matrix", "on", ">s3cr3t", "~*", "+@all"
+    ]
 
   matrix:
     hostname: matrix
