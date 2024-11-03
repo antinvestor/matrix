@@ -101,7 +101,14 @@ jobs:
           POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
-          go test -json -v ./... 2>&1 | gotestfmt -hide all
+          go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/matrix*) 2>&1 | gotestfmt -hide all
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          flags: unittests
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
 
   # build Dendrite for linux with different architectures and go versions
   build:
@@ -181,7 +188,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: 'matrix/go.mod'
           cache: true
 
       # Attempt to check out the same branch of Complement as the PR. If it
