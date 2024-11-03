@@ -83,3 +83,4 @@ go.work*
 
 # runtime for docker compose
 runtime/
+mediaapi/routing/testdata/
