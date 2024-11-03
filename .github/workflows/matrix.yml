@@ -83,8 +83,6 @@ jobs:
       cache:
         # Docker Hub image
         image: redis:7
-        env:
-          POSTGRES_USER: matrix
         ports:
           - 6379:6379
         options: >-
@@ -109,6 +107,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run unit tests
         env:
+          REDIS_URI: redis://localhost:6379/0?protocol=3
           POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
@@ -184,8 +183,6 @@ jobs:
       cache:
         # Docker Hub image
         image: redis:7
-        env:
-          POSTGRES_USER: matrix
         ports:
           - 6379:6379
         options: >-
@@ -242,6 +239,7 @@ jobs:
           go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         env:
+          REDIS_URI: redis://localhost:6379/0?protocol=3
           POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_

@@ -16,14 +16,20 @@ package test
 
 import (
 	"context"
-
-	tcRedis "github.com/testcontainers/testcontainers-go/modules/redis"
+	"github.com/redis/go-redis/v9"
+	"os"
 )
 
-const RedisImage = "redis:7"
+func clearCache(_ context.Context, redisUriStr string) error {
 
-func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
-	return tcRedis.Run(ctx, RedisImage)
+	_, err := redis.ParseURL(redisUriStr)
+	if err != nil {
+		return err
+	}
+
+	//client := redis.NewClient(opts)
+	//return client.FlushDB(ctx).Err()
+	return nil
 }
 
 // PrepareRedisConnectionString Prepare a redis connection string for testing.
@@ -32,21 +38,12 @@ func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
 // unless close() is called.
 func PrepareRedisConnectionString(ctx context.Context) (connStr string, close func(), err error) {
 
-	redisContainer, err := setupRedis(ctx)
-	if err != nil {
-		return "", nil, err
+	redisUriStr := os.Getenv("REDIS_URI")
+	if redisUriStr == "" {
+		redisUriStr = "redis://localhost:6379/0?protocol=3"
 	}
 
-	connStr, err = redisContainer.ConnectionString(ctx)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return connStr, func() {
-		// Drop container to get a fresh instance
-		err = redisContainer.Terminate(ctx)
-		if err != nil {
-			//t.Fatalf("failed to close down redis '%s': %s", connStr, err)
-		}
+	return redisUriStr, func() {
+		_ = clearCache(ctx, redisUriStr)
 	}, nil
 }
