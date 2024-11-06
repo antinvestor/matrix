@@ -90,6 +90,7 @@ func Setup(
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
+	ssoAuth := auth.NewAuthenticator(&cfg.LoginSSO)
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
@@ -731,6 +732,25 @@ func Setup(
 			return Login(req, userAPI, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
+
+	v3mux.Handle("/login/sso/callback",
+		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
+			return SSOCallback(req, userAPI, ssoAuth, &cfg.LoginSSO, cfg.Matrix.ServerName)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/login/sso/redirect",
+		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
+			return SSORedirect(req, "", ssoAuth, &cfg.LoginSSO)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/login/sso/redirect/{idpID}",
+		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
+			vars := mux.Vars(req)
+			return SSORedirect(req, vars["idpID"], ssoAuth, &cfg.LoginSSO)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/auth/{authType}/fallback/web",
 		httputil.MakeHTTPAPI("auth_fallback", userAPI, enableMetrics, func(w http.ResponseWriter, req *http.Request) {

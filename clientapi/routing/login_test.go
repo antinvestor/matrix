@@ -135,9 +135,12 @@ func TestLogin(t *testing.T) {
 
 			appServiceFound := false
 			passwordFound := false
+			ssoFound := false
 			for _, flow := range resp.Flows {
 				if flow.Type == "m.login.password" {
 					passwordFound = true
+				} else if flow.Type == "m.login.sso" {
+					ssoFound = true
 				} else if flow.Type == "m.login.application_service" {
 					appServiceFound = true
 				} else {
@@ -150,6 +153,10 @@ func TestLogin(t *testing.T) {
 			if !passwordFound {
 				t.Fatal("m.login.password missing from login flows")
 			}
+			if !ssoFound {
+				t.Fatal("m.login.sso missing from login flows")
+			}
+
 		})
 
 		for _, tc := range testCases {

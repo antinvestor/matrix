@@ -15,26 +15,10 @@
 package api
 
 import (
-	"context"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
-
-type LoginJWTInternalAPI interface {
-
-	// QueryLoginJWT returns the data associated with a login token
-	QueryLoginJWT(ctx context.Context, req *QueryLoginJWTRequest, res *QueryLoginJWTResponse) error
-}
-
-type QueryLoginJWTRequest struct {
-	Token string
-}
-
-type QueryLoginJWTResponse struct {
-	// Data is nil if the token was invalid.
-	Data *LoginTokenData
-}
 
 // JWTClaims Create a struct that will be encoded to a JWT.
 // We add jwt.StandardClaims as an embedded type, to provide fields like expiry time

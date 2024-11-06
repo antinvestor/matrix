@@ -66,16 +66,6 @@ func TestLoginFromJSONReader(t *testing.T) {
 			WantDeletedTokens: []string{"atoken"},
 		},
 		{
-			Name: "jwtWorks",
-			Body: `{
-				"type": "m.login.jwt",
-				"token": "atoken",
-				"device_id": "adevice"
-            }`,
-			WantUsername: "@auser:example.com",
-			WantDeviceID: "adevice",
-		},
-		{
 			Name: "appServiceWorksUserID",
 			Body: `{
 				"type": "m.login.application_service",
@@ -197,15 +187,6 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 			WantErrCode: spec.ErrorForbidden,
 		},
 		{
-			Name: "badJWT",
-			Body: `{
-				"type": "m.login.jwt",
-				"token": "invalidtoken",
-				"device_id": "adevice"
-            }`,
-			WantErrCode: spec.ErrorForbidden,
-		},
-		{
 			Name: "badType",
 			Body: `{
 				"type": "m.login.invalid",
@@ -321,15 +302,6 @@ func (ua *fakeUserInternalAPI) PerformLoginTokenCreation(ctx context.Context, re
 }
 
 func (*fakeUserInternalAPI) QueryLoginToken(ctx context.Context, req *uapi.QueryLoginTokenRequest, res *uapi.QueryLoginTokenResponse) error {
-	if req.Token == "invalidtoken" {
-		return nil
-	}
-
-	res.Data = &uapi.LoginTokenData{UserID: "@auser:example.com"}
-	return nil
-}
-
-func (*fakeUserInternalAPI) QueryLoginJWT(ctx context.Context, req *uapi.QueryLoginJWTRequest, res *uapi.QueryLoginJWTResponse) error {
 	if req.Token == "invalidtoken" {
 		return nil
 	}

@@ -85,8 +85,8 @@ func Test_AccountData(t *testing.T) {
 // Tests the creation of accounts
 func Test_Accounts(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateUserDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateUserDatabase(t, dbType)
+		defer closeDb()
 		alice := test.NewUser(t)
 		aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 		assert.NoError(t, err)
@@ -165,8 +165,8 @@ func Test_Devices(t *testing.T) {
 	accessToken := util.RandomString(16)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateUserDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateUserDatabase(t, dbType)
+		defer closeDb()
 
 		deviceWithID, err := db.CreateDevice(ctx, localpart, domain, &deviceID, accessToken, nil, "", "")
 		assert.NoError(t, err, "unable to create deviceWithoutID")
@@ -245,8 +245,8 @@ func Test_KeyBackup(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateUserDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateUserDatabase(t, dbType)
+		defer closeDb()
 
 		wantAuthData := json.RawMessage("my auth data")
 		wantVersion, err := db.CreateKeyBackup(ctx, alice.ID, "dummyAlgo", wantAuthData)
@@ -322,8 +322,8 @@ func Test_KeyBackup(t *testing.T) {
 func Test_LoginToken(t *testing.T) {
 	alice := test.NewUser(t)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateUserDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateUserDatabase(t, dbType)
+		defer closeDb()
 
 		// create a new token
 		wantLoginToken := &api.LoginTokenData{UserID: alice.ID}
@@ -354,8 +354,8 @@ func Test_OpenID(t *testing.T) {
 	token := util.RandomString(24)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateUserDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateUserDatabase(t, dbType)
+		defer closeDb()
 
 		expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + openIDLifetimeMS
 		expires, err := db.CreateOpenIDToken(ctx, token, alice.ID)
@@ -375,8 +375,8 @@ func Test_Profile(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateUserDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateUserDatabase(t, dbType)
+		defer closeDb()
 
 		// create account, which also creates a profile
 		_, err = db.CreateAccount(ctx, aliceLocalpart, aliceDomain, "testing", "", api.AccountTypeAdmin)
@@ -424,8 +424,8 @@ func Test_Pusher(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateUserDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateUserDatabase(t, dbType)
+		defer closeDb()
 
 		appID := util.RandomString(8)
 		var pushKeys []string
@@ -475,8 +475,8 @@ func Test_ThreePID(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateUserDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateUserDatabase(t, dbType)
+		defer closeDb()
 		threePID := util.RandomString(8)
 		medium := util.RandomString(8)
 		err = db.SaveThreePIDAssociation(ctx, threePID, aliceLocalpart, aliceDomain, medium)
@@ -514,8 +514,8 @@ func Test_Notification(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateUserDatabase(t, dbType)
-		defer close()
+		db, closeDb := mustCreateUserDatabase(t, dbType)
+		defer closeDb()
 		// generate some dummy notifications
 		for i := 0; i < 10; i++ {
 			eventID := util.RandomString(16)

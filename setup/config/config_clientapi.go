@@ -49,6 +49,8 @@ type ClientAPI struct {
 	// was successful
 	RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
 
+	LoginSSO LoginSSO `yaml:"login_sso"`
+
 	// TURN options
 	TURN TURN `yaml:"turn"`
 
@@ -103,6 +105,83 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
 				"should set the registration_disabled option in your Dendrite config.",
 		)
 	}
+}
+
+type LoginSSO struct {
+
+	// CallbackURL is the absolute URL where a user agent can reach
+	// the Dendrite `/_matrix/v3/login/sso/callback` endpoint. This is
+	// used to create LoginSSO redirect URLs passed to identity
+	// providers. If this is empty, a default is inferred from request
+	// headers. When Dendrite is running behind a proxy, this may not
+	// always be the right information.
+	CallbackURL string `yaml:"callback_url"`
+
+	// Providers list the identity providers this server is capable of confirming an
+	// identity with.
+	Providers []IdentityProvider `yaml:"providers"`
+
+	// DefaultProviderID is the provider to use when the client doesn't indicate one.
+	// This is legacy support. If empty, the first provider listed is used.
+	DefaultProviderID string `yaml:"default_provider"`
+}
+
+func (sso *LoginSSO) Verify(configErrs *ConfigErrors) {
+	var foundDefaultProvider bool
+	seenPIDs := make(map[string]bool, len(sso.Providers))
+	for _, p := range sso.Providers {
+		p = p.WithDefaults()
+		p.verifyNormalized(configErrs)
+		if p.ID == sso.DefaultProviderID {
+			foundDefaultProvider = true
+		}
+		if seenPIDs[p.ID] {
+			configErrs.Add(fmt.Sprintf("duplicate identity provider for config key %q: %s", "client_api.sso.providers", p.ID))
+		}
+		seenPIDs[p.ID] = true
+	}
+	if sso.DefaultProviderID != "" && !foundDefaultProvider {
+		configErrs.Add(fmt.Sprintf("identity provider ID not found for config key %q: %s", "client_api.sso.default_provider", sso.DefaultProviderID))
+	}
+
+	if len(sso.Providers) == 0 {
+		configErrs.Add(fmt.Sprintf("empty list for config key %q", "client_api.sso.providers"))
+	}
+
+}
+
+type IdentityProvider struct {
+
+	// ID is the unique identifier of this IdP. If empty, the brand will be used.
+	ID string `yaml:"id"`
+
+	// Name is a human-friendly name of the provider. If empty, a default based on
+	// the brand will be used.
+	Name string `yaml:"name"`
+
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	DiscoveryURL string `yaml:"discovery_url"`
+}
+
+func (idp *IdentityProvider) WithDefaults() IdentityProvider {
+	p := *idp
+
+	return p
+}
+
+func (idp *IdentityProvider) Verify(configErrs *ConfigErrors) {
+	p := idp.WithDefaults()
+	p.verifyNormalized(configErrs)
+}
+
+func (idp *IdentityProvider) verifyNormalized(configErrs *ConfigErrors) {
+	checkNotEmpty(configErrs, "client_api.sso.providers.id", idp.ID)
+	checkNotEmpty(configErrs, "client_api.sso.providers.name", idp.Name)
+
+	checkNotEmpty(configErrs, "client_api.sso.providers.client_id", idp.ClientID)
+	checkNotEmpty(configErrs, "client_api.sso.providers.client_secret", idp.ClientSecret)
+	checkNotEmpty(configErrs, "client_api.sso.providers.discovery_url", idp.DiscoveryURL)
 }
 
 type TURN struct {

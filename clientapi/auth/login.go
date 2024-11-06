@@ -69,11 +69,6 @@ func LoginFromJSONReader(
 			UserAPI: userAPI,
 			Config:  cfg,
 		}
-	case authtypes.LoginTypeJwt:
-		typ = &LoginTypeJWT{
-			UserAPI: userAPI,
-			Config:  cfg,
-		}
 	case authtypes.LoginTypeApplicationService:
 		token, err := ExtractAccessToken(req)
 		if err != nil {
@@ -102,5 +97,4 @@ func LoginFromJSONReader(
 // UserInternalAPIForLogin contains the aspects of UserAPI required for logging in.
 type UserInternalAPIForLogin interface {
 	uapi.LoginTokenInternalAPI
-	uapi.LoginJWTInternalAPI
 }

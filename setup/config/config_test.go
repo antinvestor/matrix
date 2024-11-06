@@ -95,6 +95,15 @@ client_api:
   recaptcha_private_key: ""
   recaptcha_bypass_secret: ""
   recaptcha_siteverify_api: ""
+  login_sso:
+    callback_url: "http://example.com:8071/_matrix/v3/login/sso/callback"
+    default_provider: custom
+    providers:
+      - id: custom
+        name: "Custom Provider"
+        discovery_url: "http://auth.example.com/.well-known/openid-configuration"
+        client_id: aclientid
+        client_secret: aclientsecret  	
   turn:
     turn_user_lifetime: ""
     turn_uris: []

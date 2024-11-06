@@ -81,11 +81,11 @@ type SyncUserAPI interface {
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 }
 
-// api functions required by the client api
+// ClientUserAPI api functions required by the client api
 type ClientUserAPI interface {
 	QueryAcccessTokenAPI
 	LoginTokenInternalAPI
-	LoginJWTInternalAPI
+	SSOAPI
 	UserLoginAPI
 	ClientKeyAPI
 	ProfileAPI

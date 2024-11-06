@@ -541,7 +541,7 @@ func TestAdminUpdateRegistrationToken(t *testing.T) {
 		}
 		for _, tkn := range tokens {
 			tkn := tkn
-			userAPI.PerformAdminCreateRegistrationToken(ctx, &tkn)
+			_, _ = userAPI.PerformAdminCreateRegistrationToken(ctx, &tkn)
 		}
 		testCases := []struct {
 			name           string

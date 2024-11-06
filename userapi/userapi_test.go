@@ -213,7 +213,7 @@ func TestLoginToken(t *testing.T) {
 				t.Fatalf("failed to make account: %s", err)
 			}
 
-			t.Log("Creating a login token like the SSO callback would...")
+			t.Log("Creating a login token like the LoginSSO callback would...")
 
 			creq := api.PerformLoginTokenCreationRequest{
 				Data: api.LoginTokenData{UserID: "@auser:example.com"},
