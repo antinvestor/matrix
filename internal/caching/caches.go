@@ -16,7 +16,6 @@ package caching
 
 import (
 	"context"
-	"runtime/debug"
 	"time"
 
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -95,7 +94,6 @@ func NewCache(cfg *config.CacheOptions) *Caches {
 		}
 	}
 
-	debug.PrintStack()
 	panic("No url to cache specified")
 
 }

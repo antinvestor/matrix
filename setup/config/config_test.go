@@ -68,6 +68,8 @@ global:
       max_open_conns: 100
       max_idle_conns: 2
       conn_max_lifetime: -1
+  cache:
+    connection_string: redis://user:password@localhost:6379/0?protocol=3
   metrics:
     enabled: false
     basic_auth:
