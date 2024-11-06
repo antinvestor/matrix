@@ -18,13 +18,14 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/antinvestor/matrix/clientapi/auth"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/antinvestor/matrix/clientapi/auth"
+	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/matrix/setup/config"
 	uapi "github.com/antinvestor/matrix/userapi/api"

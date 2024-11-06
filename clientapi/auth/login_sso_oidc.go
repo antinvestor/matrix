@@ -18,15 +18,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
-	"github.com/tidwall/gjson"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/matrix/setup/config"
 )
@@ -54,7 +55,6 @@ type oidcIdentityProvider struct {
 	scopes              []string
 	responseMimeType    string
 	subPath             string
-	emailPath           string
 	displayNamePath     string
 	suggestedUserIDPath string
 

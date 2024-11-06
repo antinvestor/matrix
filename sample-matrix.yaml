@@ -193,6 +193,15 @@ client_api:
   # recaptcha_form_field: "h-captcha-response"
   # recaptcha_sitekey_class: "h-captcha"
 
+  login_sso:
+    callback_url: "http://localhost:8008/_matrix/v3/login/sso/callback"
+    default_provider: auth0
+    providers:
+      - id: auth0
+        name: "Auth0 Test Provider"
+        discovery_url: "https://dev-k5lry2vvfpplshdn.eu.auth0.com/.well-known/openid-configuration"
+        client_id: ersbEAybgJe0HWMBuR9Adw63oUVoboIf
+        client_secret: MGP_j3QKywtjNpwsD9pVa7gauB8KQMFdJKZDTB7uBRpvcMER5h4MZ8XzTJuG659g
 
   # TURN server information that this homeserver should send to clients.
   turn:

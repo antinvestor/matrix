@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/util"
 )

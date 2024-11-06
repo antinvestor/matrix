@@ -16,6 +16,7 @@ package api
 
 import (
 	"context"
+
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 

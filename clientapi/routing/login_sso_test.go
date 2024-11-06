@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"github.com/antinvestor/matrix/clientapi/auth"
-	"github.com/antinvestor/matrix/clientapi/userutil"
 	"net/http"
 	"net/url"
 	"regexp"
 	"testing"
+
+	"github.com/antinvestor/matrix/clientapi/auth"
+	"github.com/antinvestor/matrix/clientapi/userutil"
 
 	"github.com/antinvestor/matrix/setup/config"
 	uapi "github.com/antinvestor/matrix/userapi/api"
