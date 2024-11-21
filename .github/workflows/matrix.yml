@@ -72,7 +72,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        entrypoint: >
+        command: >
           sh -c "
           echo 'user matrix on >s3cr3t ~* &* +@all' > /data/redis.acl &&
           redis-server --aclfile /data/redis.acl
@@ -174,7 +174,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        entrypoint: >
+        command: >
           sh -c "
           echo 'user matrix on >s3cr3t ~* &* +@all' > /data/redis.acl &&
           redis-server --aclfile /data/redis.acl
