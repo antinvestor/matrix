@@ -3,8 +3,13 @@
 #
 # base installs required dependencies and runs go mod download to cache dependencies
 #
-FROM --platform=${BUILDPLATFORM} docker.io/golang:1.23-alpine AS base
-RUN apk --update --no-cache add bash build-base curl git
+FROM --platform=${BUILDPLATFORM} docker.io/golang:1.23-bullseye AS base
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    build-essential \
+    curl \
+    git \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 #
 # build creates all needed binaries
@@ -24,7 +29,7 @@ RUN --mount=target=. \
 
 
 #
-# Builds the Dendrite image containing all required binaries
+# Builds the Matrix image containing all required binaries
 #
 FROM gcr.io/distroless/static:nonroot
 
@@ -46,5 +51,7 @@ COPY --from=build /out/matrix /usr/bin/matrix
 VOLUME /etc/matrix
 WORKDIR /etc/matrix
 
-ENTRYPOINT ["/usr/bin/matrix"]
+#HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+#    CMD [ "/usr/bin/matrix", "--healthcheck" ]
 
+ENTRYPOINT ["/usr/bin/matrix"]
