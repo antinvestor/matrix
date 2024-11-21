@@ -66,17 +66,10 @@ jobs:
         ports:
           - 6379:6379
         options: >-
-          --requirepass s3cr3t
-          --aclfile /data/redis.acl
-          --health-cmd "redis-cli -u redis://matrix:s3cr3t@localhost:6379 ping | grep PONG"
+          --health-cmd "redis-cli -u redis://localhost:6379 ping | grep PONG"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        command: >
-          sh -c "
-          echo 'user matrix on >s3cr3t ~* &* +@all' > /data/redis.acl &&
-          redis-server --aclfile /data/redis.acl
-          "
     steps:
       - uses: actions/checkout@v4
       - name: Install libolm and dependencies
@@ -92,7 +85,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run unit tests
         env:
-          REDIS_URI: redis://matrix:s3cr3t@localhost:6379/0?protocol=3
+          REDIS_URI: redis://localhost:6379/0
           POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
@@ -168,17 +161,10 @@ jobs:
         ports:
           - 6379:6379
         options: >-
-          --requirepass s3cr3t
-          --aclfile /data/redis.acl
-          --health-cmd "redis-cli -u redis://matrix:s3cr3t@localhost:6379 ping | grep PONG"
+          --health-cmd "redis-cli -u redis://localhost:6379 ping | grep PONG"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        command: >
-          sh -c "
-          echo 'user matrix on >s3cr3t ~* &* +@all' > /data/redis.acl &&
-          redis-server --aclfile /data/redis.acl
-          "
     steps:
       - name: Run actions/checkout@v4 for matrix
         uses: actions/checkout@v4
@@ -229,7 +215,7 @@ jobs:
           go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         env:
-          REDIS_URI: redis://matrix:s3cr3t@localhost:6379/0?protocol=3
+          REDIS_URI: redis://localhost:6379/0
           POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
