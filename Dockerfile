@@ -3,7 +3,7 @@
 #
 # base installs required dependencies and runs go mod download to cache dependencies
 #
-FROM --platform=${BUILDPLATFORM} docker.io/golang:1.23-bullseye AS base
+FROM --platform=${BUILDPLATFORM} docker.io/golang:1.23 AS base
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     build-essential \
