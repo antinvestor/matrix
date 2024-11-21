@@ -61,7 +61,22 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --requirepass s3cr3t
+          --aclfile /data/redis.acl
+          --health-cmd "redis-cli -u redis://matrix:s3cr3t@localhost:6379 ping | grep PONG"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        entrypoint: >
+          sh -c "
+          echo 'user matrix on >s3cr3t ~* &* +@all' > /data/redis.acl &&
+          redis-server --aclfile /data/redis.acl
+          "
     steps:
       - uses: actions/checkout@v4
       - name: Install libolm and dependencies
@@ -148,6 +163,22 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --requirepass s3cr3t
+          --aclfile /data/redis.acl
+          --health-cmd "redis-cli -u redis://matrix:s3cr3t@localhost:6379 ping | grep PONG"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        entrypoint: >
+          sh -c "
+          echo 'user matrix on >s3cr3t ~* &* +@all' > /data/redis.acl &&
+          redis-server --aclfile /data/redis.acl
+          "
     steps:
       - name: Run actions/checkout@v4 for matrix
         uses: actions/checkout@v4
