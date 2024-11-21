@@ -26,8 +26,12 @@ RUN --mount=target=. \
 #
 # Builds the Dendrite image containing all required binaries
 #
-FROM alpine:latest
-RUN apk --update --no-cache add curl
+FROM gcr.io/distroless/static:nonroot
+
+USER 65532:65532
+EXPOSE 8008
+EXPOSE 8448
+
 LABEL org.opencontainers.image.title="Matrix"
 LABEL org.opencontainers.image.description="Matrix messaging server written in Golang"
 LABEL org.opencontainers.image.source="https://github.com/antinvestor/matrix"
@@ -43,5 +47,4 @@ VOLUME /etc/matrix
 WORKDIR /etc/matrix
 
 ENTRYPOINT ["/usr/bin/matrix"]
-EXPOSE 8008 8448
 

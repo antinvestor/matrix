@@ -2,6 +2,7 @@ package jetstream
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -122,7 +123,7 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 	for _, stream := range streams { // streams are defined in streams.go
 		name := cfg.Prefixed(stream.Name)
 		info, err := s.StreamInfo(name)
-		if err != nil && err != natsclient.ErrStreamNotFound {
+		if err != nil && !errors.Is(err, natsclient.ErrStreamNotFound) {
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
 		subjects := stream.Subjects

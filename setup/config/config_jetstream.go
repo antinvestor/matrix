@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"net/url"
+	"os"
 )
 
 type JetStream struct {
@@ -36,7 +38,16 @@ func (c *JetStream) Durable(name string) string {
 
 func (c *JetStream) Defaults(opts DefaultOpts) {
 	c.Addresses = []string{}
-	c.TopicPrefix = "Dendrite"
+
+	natsUriStr := os.Getenv("NATS_URI")
+	if natsUriStr != "" {
+		_, err := url.Parse(natsUriStr)
+		if err == nil {
+			c.Addresses = []string{natsUriStr}
+		}
+	}
+
+	c.TopicPrefix = "Matrix"
 	if opts.Generate {
 		c.StoragePath = Path("./")
 		c.NoLog = true
