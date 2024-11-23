@@ -86,7 +86,7 @@ func Test_migrations_Up(t *testing.T) {
 		processCtx := process.NewProcessContext()
 		ctx := processCtx.Context()
 
-		conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+		conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 		if err != nil {
 			t.Fatalf("failed to open database: %s", err)
 		}
@@ -94,11 +94,8 @@ func Test_migrations_Up(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				driverName := sqlutil.SQLITE_DRIVER_NAME
-				if dbType == test.DBTypePostgres {
-					driverName = "postgres"
-				}
-				db, err := sql.Open(driverName, conStr)
+
+				db, err := sql.Open("postgres", string(conStr))
 				if err != nil {
 					t.Errorf("unable to open database: %v", err)
 				}
@@ -125,18 +122,13 @@ func Test_insertMigration(t *testing.T) {
 		processCtx := process.NewProcessContext()
 		ctx := processCtx.Context()
 
-		conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+		conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 		if err != nil {
 			t.Fatalf("failed to open database: %s", err)
 		}
 		defer closeDb()
 
-		driverName := sqlutil.SQLITE_DRIVER_NAME
-		if dbType == test.DBTypePostgres {
-			driverName = "postgres"
-		}
-
-		db, err := sql.Open(driverName, conStr)
+		db, err := sql.Open("postgres", string(conStr))
 		if err != nil {
 			t.Errorf("unable to open database: %v", err)
 		}

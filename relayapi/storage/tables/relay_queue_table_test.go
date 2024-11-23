@@ -44,7 +44,7 @@ func mustCreateQueueTable(
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -53,11 +53,9 @@ func mustCreateQueueTable(
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.RelayQueue
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresRelayQueueTable(db)
-		assert.NoError(t, err)
-	}
+	tab, err = postgres.NewPostgresRelayQueueTable(db)
+	assert.NoError(t, err)
+
 	assert.NoError(t, err)
 
 	database = RelayQueueDatabase{

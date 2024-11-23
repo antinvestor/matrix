@@ -18,7 +18,7 @@ import (
 func mustCreateInboundpeeksTable(t *testing.T, dbType test.DBType) (tables.FederationInboundPeeks, func()) {
 	ctx := context.TODO()
 
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -29,10 +29,8 @@ func mustCreateInboundpeeksTable(t *testing.T, dbType test.DBType) (tables.Feder
 		t.Fatalf("failed to open database: %s", err)
 	}
 	var tab tables.FederationInboundPeeks
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresInboundPeeksTable(db)
-	}
+	tab, err = postgres.NewPostgresInboundPeeksTable(db)
+
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)
 	}

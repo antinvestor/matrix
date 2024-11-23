@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 		processCtx := process.NewProcessContext()
 		ctx := processCtx.Context()
 
-		dbConnStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+		dbConnStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 		if err != nil {
 			panic(err)
 		}
@@ -75,47 +75,50 @@ func TestMain(m *testing.M) {
 			panic(err)
 		}
 
-		cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(ctx)
+		cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
 		defer closeCache()
 		if err != nil {
 			panic(err)
 		}
 
 		for _, s := range servers {
+
+			natsInstance := jetstream.NATSInstance{}
+
+			var jetstreamDir string
+			// Create a temporary directory for JetStream.
+			jetstreamDir, err = os.MkdirTemp("/tmp/", "jetstream*")
+			if err != nil {
+				panic(err)
+			}
+			defer os.RemoveAll(jetstreamDir)
+
+			// Draw up just enough Dendrite config for the server key
+			// API to work.
+
+			cfg := &config.Dendrite{}
+			cfg.Defaults(config.DefaultOpts{
+				DatabaseConnectionStr: dbConnStr,
+				CacheConnectionStr:    cacheConnStr,
+			})
+			cfg.Global.ServerName = spec.ServerName(s.name)
+
 			// Generate a new key.
-			_, testPriv, err := ed25519.GenerateKey(nil)
+			_, cfg.Global.PrivateKey, err = ed25519.GenerateKey(nil)
 			if err != nil {
 				panic("can't generate identity key: " + err.Error())
 			}
 
-			natsInstance := jetstream.NATSInstance{}
-			// Create a temporary directory for JetStream.
-			d, err := os.MkdirTemp("./", "jetstream*")
-			if err != nil {
-				panic(err)
-			}
-			defer os.RemoveAll(d)
-
-			// Draw up just enough Dendrite config for the server key
-			// API to work.
-			cfg := &config.Dendrite{}
-			cfg.Defaults(config.DefaultOpts{
-				Generate:       true,
-				SingleDatabase: true,
-			})
-			cfg.Global.ServerName = spec.ServerName(s.name)
-			cfg.Global.PrivateKey = testPriv
 			cfg.Global.JetStream.InMemory = true
 			cfg.Global.JetStream.TopicPrefix = string(s.name[:1])
-			cfg.Global.JetStream.StoragePath = config.Path(d)
+			cfg.Global.JetStream.StoragePath = config.Path(jetstreamDir)
 			cfg.Global.KeyID = serverKeyID
 			cfg.Global.KeyValidityPeriod = s.validity
 			cfg.FederationAPI.KeyPerspectives = nil
 
-			cfg.Global.DatabaseOptions.ConnectionString = config.DataSource(dbConnStr)
 			s.config = &cfg.FederationAPI
 
-			s.cache = caching.NewCache(&config.CacheOptions{
+			s.cache, err = caching.NewCache(&config.CacheOptions{
 				ConnectionString: cacheConnStr,
 			})
 

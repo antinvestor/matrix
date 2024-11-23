@@ -45,7 +45,10 @@ func TestLogin(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		routers := httputil.NewRouters()
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 		// Needed for /login

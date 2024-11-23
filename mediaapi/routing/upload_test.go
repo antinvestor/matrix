@@ -50,7 +50,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 
 	ctx := context.TODO()
 	// create testdata folder and remove when done
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}

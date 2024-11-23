@@ -17,7 +17,7 @@ func mustCreatePreviousEventsTable(t *testing.T, dbType test.DBType) (tab tables
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -25,12 +25,10 @@ func mustCreatePreviousEventsTable(t *testing.T, dbType test.DBType) (tab tables
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	switch dbType {
-	case test.DBTypePostgres:
-		err = postgres.CreatePrevEventsTable(db)
-		assert.NoError(t, err)
-		tab, err = postgres.PreparePrevEventsTable(db)
-	}
+	err = postgres.CreatePrevEventsTable(db)
+	assert.NoError(t, err)
+	tab, err = postgres.PreparePrevEventsTable(db)
+
 	assert.NoError(t, err)
 
 	return tab, closeDb

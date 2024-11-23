@@ -23,19 +23,23 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, clearDB, err := test.PrepareDBConnectionString(ctx)
+	connStr, clearDB, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
-	dbOpts := &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)}
+	dbOpts := &config.DatabaseOptions{ConnectionString: connStr}
 
-	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(ctx)
+	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
 	if err != nil {
 		t.Fatalf("Could not create redis container %s", err)
 	}
-	cache := caching.NewCache(&config.CacheOptions{
+	cache, err := caching.NewCache(&config.CacheOptions{
 		ConnectionString: cacheConnStr,
 	})
+
+	if err != nil {
+		t.Fatalf("Could not create cache %s", err)
+	}
 
 	writer := sqlutil.NewExclusiveWriter()
 	db, err := sqlutil.Open(dbOpts, writer)
@@ -45,24 +49,22 @@ func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Dat
 	var stateKeyTable tables.EventStateKeys
 	var userRoomKeys tables.UserRoomKeys
 	var roomsTable tables.Rooms
-	switch dbType {
-	case test.DBTypePostgres:
-		err = postgres.CreateRoomsTable(db)
-		assert.NoError(t, err)
-		err = postgres.CreateEventStateKeysTable(db)
-		assert.NoError(t, err)
-		err = postgres.CreateMembershipTable(db)
-		assert.NoError(t, err)
-		err = postgres.CreateUserRoomKeysTable(db)
-		assert.NoError(t, err)
-		roomsTable, err = postgres.PrepareRoomsTable(db)
-		assert.NoError(t, err)
-		membershipTable, err = postgres.PrepareMembershipTable(db)
-		assert.NoError(t, err)
-		stateKeyTable, err = postgres.PrepareEventStateKeysTable(db)
-		assert.NoError(t, err)
-		userRoomKeys, err = postgres.PrepareUserRoomKeysTable(db)
-	}
+	err = postgres.CreateRoomsTable(db)
+	assert.NoError(t, err)
+	err = postgres.CreateEventStateKeysTable(db)
+	assert.NoError(t, err)
+	err = postgres.CreateMembershipTable(db)
+	assert.NoError(t, err)
+	err = postgres.CreateUserRoomKeysTable(db)
+	assert.NoError(t, err)
+	roomsTable, err = postgres.PrepareRoomsTable(db)
+	assert.NoError(t, err)
+	membershipTable, err = postgres.PrepareMembershipTable(db)
+	assert.NoError(t, err)
+	stateKeyTable, err = postgres.PrepareEventStateKeysTable(db)
+	assert.NoError(t, err)
+	userRoomKeys, err = postgres.PrepareUserRoomKeysTable(db)
+
 	assert.NoError(t, err)
 
 	evDb := shared.EventDatabase{EventStateKeysTable: stateKeyTable, Cache: cache, Writer: writer}

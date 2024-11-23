@@ -21,7 +21,7 @@ func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, 
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -33,10 +33,8 @@ func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, 
 	}
 
 	var tab tables.Events
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresEventsTable(db)
-	}
+	tab, err = postgres.NewPostgresEventsTable(db)
+
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}

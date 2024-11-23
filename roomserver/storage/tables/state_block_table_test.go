@@ -17,7 +17,7 @@ func mustCreateStateBlockTable(t *testing.T, dbType test.DBType) (tab tables.Sta
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -25,12 +25,10 @@ func mustCreateStateBlockTable(t *testing.T, dbType test.DBType) (tab tables.Sta
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	switch dbType {
-	case test.DBTypePostgres:
-		err = postgres.CreateStateBlockTable(db)
-		assert.NoError(t, err)
-		tab, err = postgres.PrepareStateBlockTable(db)
-	}
+	err = postgres.CreateStateBlockTable(db)
+	assert.NoError(t, err)
+	tab, err = postgres.PrepareStateBlockTable(db)
+
 	assert.NoError(t, err)
 
 	return tab, closeDb

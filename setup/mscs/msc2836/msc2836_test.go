@@ -7,6 +7,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"io"
 	"net/http"
 	"sort"
@@ -14,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -25,7 +26,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserver "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/mscs/msc2836"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 )
@@ -559,17 +559,14 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 
 func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
 	t.Helper()
-	cfg := &config.Dendrite{}
-	cfg.Defaults(config.DefaultOpts{
-		Generate:       true,
-		SingleDatabase: true,
-	})
+
+	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	t.Cleanup(closeRig)
+
 	cfg.Global.ServerName = "localhost"
-	cfg.MSCs.Database.ConnectionString = "file:msc2836_test.db"
 	cfg.MSCs.MSCs = []string{"msc2836"}
 
-	processCtx := process.NewProcessContext()
-	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 	routers := httputil.NewRouters()
 	err := msc2836.Enable(cfg, cm, routers, rsAPI, nil, userAPI, nil)
 	if err != nil {

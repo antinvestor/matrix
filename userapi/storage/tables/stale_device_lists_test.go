@@ -16,7 +16,7 @@ import (
 
 func mustCreateTable(t *testing.T, dbType test.DBType) (tab tables.StaleDeviceLists, closeDb func()) {
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -26,10 +26,8 @@ func mustCreateTable(t *testing.T, dbType test.DBType) (tab tables.StaleDeviceLi
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresStaleDeviceListsTable(db)
-	}
+	tab, err = postgres.NewPostgresStaleDeviceListsTable(db)
+
 	if err != nil {
 		t.Fatalf("failed to create new table: %s", err)
 	}

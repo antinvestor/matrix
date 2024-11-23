@@ -29,7 +29,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
 )
 
-// NewUserDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
+// NewUserDatabase opens a new Postgres database (based on dataSourceName scheme)
 // and sets postgres connection parameters
 func NewUserDatabase(
 	ctx context.Context,
@@ -49,7 +49,7 @@ func NewUserDatabase(
 	}
 }
 
-// NewKeyDatabase opens a new Postgres or Sqlite database (base on dataSourceName) scheme)
+// NewKeyDatabase opens a new Postgres database (base on dataSourceName) scheme)
 // and sets postgres connection parameters.
 func NewKeyDatabase(conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
 	switch {

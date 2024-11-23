@@ -369,7 +369,7 @@ func TestDebounce(t *testing.T) {
 func mustCreateKeyserverDB(t *testing.T, _ test.DBType) (storage.KeyDatabase, func()) {
 	t.Helper()
 
-	connStr, clearDB, err := test.PrepareDBConnectionString(ctx)
+	connStr, clearDB, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}

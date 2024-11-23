@@ -17,15 +17,12 @@ type RoomServer struct {
 
 func (c *RoomServer) Defaults(opts DefaultOpts) {
 	c.DefaultRoomVersion = gomatrixserverlib.RoomVersionV10
-	if opts.Generate {
-		if !opts.SingleDatabase {
-			c.Database.ConnectionString = "file:roomserver.db"
-		}
-	}
+	c.Database.ConnectionString = opts.DatabaseConnectionStr
+
 }
 
 func (c *RoomServer) Verify(configErrs *ConfigErrors) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+	if c.Database.ConnectionString == "" {
 		checkNotEmpty(configErrs, "room_server.database.connection_string", string(c.Database.ConnectionString))
 	}
 

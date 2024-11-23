@@ -37,16 +37,13 @@ func (c *UserAPI) Defaults(opts DefaultOpts) {
 	c.BCryptCost = bcrypt.DefaultCost
 	c.OpenIDTokenLifetimeMS = DefaultOpenIDTokenLifetimeMS
 	c.WorkerCount = 8
-	if opts.Generate {
-		if !opts.SingleDatabase {
-			c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
-		}
-	}
+	c.AccountDatabase.ConnectionString = opts.DatabaseConnectionStr
+
 }
 
 func (c *UserAPI) Verify(configErrs *ConfigErrors) {
 	checkPositive(configErrs, "user_api.openid_token_lifetime_ms", c.OpenIDTokenLifetimeMS)
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+	if c.AccountDatabase.ConnectionString == "" {
 		checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
 	}
 }

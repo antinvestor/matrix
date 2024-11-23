@@ -12,16 +12,12 @@ type SyncAPI struct {
 
 func (c *SyncAPI) Defaults(opts DefaultOpts) {
 	c.Fulltext.Defaults(opts)
-	if opts.Generate {
-		if !opts.SingleDatabase {
-			c.Database.ConnectionString = "file:syncapi.db"
-		}
-	}
+	c.Database.ConnectionString = opts.DatabaseConnectionStr
 }
 
 func (c *SyncAPI) Verify(configErrs *ConfigErrors) {
 	c.Fulltext.Verify(configErrs)
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+	if c.Database.ConnectionString == "" {
 		checkNotEmpty(configErrs, "sync_api.database", string(c.Database.ConnectionString))
 	}
 }

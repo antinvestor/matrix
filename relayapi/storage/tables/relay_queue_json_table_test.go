@@ -57,7 +57,7 @@ func mustCreateQueueJSONTable(
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -66,11 +66,9 @@ func mustCreateQueueJSONTable(
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.RelayQueueJSON
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresRelayQueueJSONTable(db)
-		assert.NoError(t, err)
-	}
+	tab, err = postgres.NewPostgresRelayQueueJSONTable(db)
+	assert.NoError(t, err)
+
 	assert.NoError(t, err)
 
 	database = RelayQueueJSONDatabase{

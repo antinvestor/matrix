@@ -17,7 +17,7 @@ import (
 
 func mustCreateServerKeyDB(t *testing.T, dbType test.DBType) (tables.FederationServerSigningKeys, func()) {
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -28,10 +28,8 @@ func mustCreateServerKeyDB(t *testing.T, dbType test.DBType) (tables.FederationS
 		t.Fatalf("failed to open database: %s", err)
 	}
 	var tab tables.FederationServerSigningKeys
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresServerSigningKeysTable(db)
-	}
+	tab, err = postgres.NewPostgresServerSigningKeysTable(db)
+
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)
 	}

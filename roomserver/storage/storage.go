@@ -12,15 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !wasm
-// +build !wasm
-
 package storage
 
 import (
 	"context"
 	"fmt"
-
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
@@ -29,10 +25,8 @@ import (
 
 // Open opens a database connection.
 func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
-	switch {
-	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.Open(ctx, conMan, dbProperties, cache)
-	default:
-		return nil, fmt.Errorf("unexpected database type")
+	if !dbProperties.ConnectionString.IsPostgres() {
+		return nil, fmt.Errorf("unexpected database type : %v", dbProperties.ConnectionString)
 	}
+	return postgres.Open(ctx, conMan, dbProperties, cache)
 }

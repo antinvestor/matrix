@@ -87,27 +87,26 @@ type Global struct {
 }
 
 func (c *Global) Defaults(opts DefaultOpts) {
-	if opts.Generate {
-		c.ServerName = "localhost"
-		c.PrivateKeyPath = "matrix_key.pem"
-		_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
-		c.KeyID = "ed25519:auto"
-		c.TrustedIDServers = []string{
-			"matrix.org",
-			"vector.im",
-		}
+
+	c.ServerName = "localhost"
+
+	c.PrivateKeyPath = "matrix_key.pem"
+	_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
+	c.KeyID = "ed25519:auto"
+	c.TrustedIDServers = []string{
+		"matrix.org",
+		"vector.im",
 	}
+
 	c.KeyValidityPeriod = time.Hour * 24 * 7
-	if opts.SingleDatabase {
-		c.DatabaseOptions.Defaults(90)
-	}
+	c.DatabaseOptions.Defaults(opts)
 	c.JetStream.Defaults(opts)
 	c.Metrics.Defaults(opts)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
 	c.ServerNotices.Defaults(opts)
 	c.ReportStats.Defaults()
-	c.Cache.Defaults()
+	c.Cache.Defaults(opts)
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors) {
@@ -271,10 +270,9 @@ type Metrics struct {
 
 func (c *Metrics) Defaults(opts DefaultOpts) {
 	c.Enabled = false
-	if opts.Generate {
-		c.BasicAuth.Username = "metrics"
-		c.BasicAuth.Password = "metrics"
-	}
+	c.BasicAuth.Username = "metrics"
+	c.BasicAuth.Password = "metrics"
+
 }
 
 func (c *Metrics) Verify(configErrs *ConfigErrors) {
@@ -294,28 +292,26 @@ type ServerNotices struct {
 }
 
 func (c *ServerNotices) Defaults(opts DefaultOpts) {
-	if opts.Generate {
-		c.Enabled = true
-		c.LocalPart = "_server"
-		c.DisplayName = "Server Alert"
-		c.RoomName = "Server Alert"
-		c.AvatarURL = ""
-	}
+	c.Enabled = true
+	c.LocalPart = "_server"
+	c.DisplayName = "Server Alert"
+	c.RoomName = "Server Alert"
+	c.AvatarURL = ""
 }
 
 func (c *ServerNotices) Verify(errors *ConfigErrors) {}
 
 type CacheOptions struct {
 	// The connection string,
-	ConnectionString string `yaml:"connection_string"`
+	ConnectionString DataSource `yaml:"connection_string"`
 
 	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
 	MaxAge           time.Duration `yaml:"max_age"`
 	EnablePrometheus bool          `yaml:"enable_prometheus"`
 }
 
-func (c *CacheOptions) Defaults() {
-	//c.ConnectionString = "redis://user:password@localhost:6379/0?protocol=3"
+func (c *CacheOptions) Defaults(opts DefaultOpts) {
+	c.ConnectionString = opts.CacheConnectionStr
 	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
 	c.MaxAge = time.Hour
 }
@@ -378,8 +374,9 @@ type DatabaseOptions struct {
 	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
 }
 
-func (c *DatabaseOptions) Defaults(conns int) {
-	c.MaxOpenConnections = conns
+func (c *DatabaseOptions) Defaults(opts DefaultOpts) {
+	c.ConnectionString = opts.DatabaseConnectionStr
+	c.MaxOpenConnections = 90
 	c.MaxIdleConnections = 2
 	c.ConnMaxLifetimeSeconds = -1
 }

@@ -141,7 +141,10 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		t.Fatalf("failed to create a cache: %v", err)
+	}
 	natsInstance := jetstream.NATSInstance{}
 
 	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
@@ -242,7 +245,10 @@ func testSyncEventFormatPowerLevels(t *testing.T, dbType test.DBType) {
 
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		t.Fatalf("failed to create a cache: %v", err)
+	}
 	natsInstance := jetstream.NATSInstance{}
 
 	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
@@ -389,7 +395,10 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		t.Fatalf("failed to create a cache: %v", err)
+	}
 	natsInstance := jetstream.NATSInstance{}
 
 	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
@@ -484,7 +493,10 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		t.Fatalf("failed to create a cache: %v", err)
+	}
 	cfg.Global.Presence.EnableOutbound = true
 	cfg.Global.Presence.EnableInbound = true
 	natsInstance := jetstream.NATSInstance{}
@@ -605,7 +617,10 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 		natsInstance := jetstream.NATSInstance{}
 
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
@@ -876,7 +891,10 @@ func TestGetMembership(t *testing.T) {
 
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 		natsInstance := jetstream.NATSInstance{}
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
@@ -951,7 +969,10 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		t.Fatalf("failed to create a cache: %v", err)
+	}
 
 	natsInstance := jetstream.NATSInstance{}
 
@@ -1174,7 +1195,10 @@ func testContext(t *testing.T, dbType test.DBType) {
 
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		t.Fatalf("failed to create a cache: %v", err)
+	}
 
 	// Use an actual roomserver for this
 	natsInstance := jetstream.NATSInstance{}
@@ -1357,7 +1381,10 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	ctx := processCtx.Context()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		t.Fatalf("failed to create a cache: %v", err)
+	}
 
 	// Use an actual roomserver for this
 	natsInstance := jetstream.NATSInstance{}

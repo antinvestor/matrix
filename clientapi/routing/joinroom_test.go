@@ -37,7 +37,10 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		defer closeRig()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 		natsInstance := jetstream.NATSInstance{}
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil) // creates the rs.Inputer etc

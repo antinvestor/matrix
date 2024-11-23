@@ -17,7 +17,7 @@ func newRelationsTable(t *testing.T, dbType test.DBType) (tables.Relations, *sql
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -29,10 +29,8 @@ func newRelationsTable(t *testing.T, dbType test.DBType) (tables.Relations, *sql
 	}
 
 	var tab tables.Relations
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresRelationsTable(db)
-	}
+	tab, err = postgres.NewPostgresRelationsTable(db)
+
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
@@ -64,8 +62,8 @@ const relType = "m.reaction"
 func TestRelationsTable(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, _, close := newRelationsTable(t, dbType)
-		defer close()
+		tab, _, closeDb := newRelationsTable(t, dbType)
+		defer closeDb()
 
 		// Insert some relations
 		for _, child := range []string{"b", "c", "d"} {

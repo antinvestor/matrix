@@ -38,29 +38,26 @@ var DefaultMaxFileSizeBytes = FileSizeBytes(10485760)
 func (c *MediaAPI) Defaults(opts DefaultOpts) {
 	c.MaxFileSizeBytes = DefaultMaxFileSizeBytes
 	c.MaxThumbnailGenerators = 10
-	if opts.Generate {
-		c.ThumbnailSizes = []ThumbnailSize{
-			{
-				Width:        32,
-				Height:       32,
-				ResizeMethod: "crop",
-			},
-			{
-				Width:        96,
-				Height:       96,
-				ResizeMethod: "crop",
-			},
-			{
-				Width:        640,
-				Height:       480,
-				ResizeMethod: "scale",
-			},
-		}
-		if !opts.SingleDatabase {
-			c.Database.ConnectionString = "file:mediaapi.db"
-		}
-		c.BasePath = "./media_store"
+	c.ThumbnailSizes = []ThumbnailSize{
+		{
+			Width:        32,
+			Height:       32,
+			ResizeMethod: "crop",
+		},
+		{
+			Width:        96,
+			Height:       96,
+			ResizeMethod: "crop",
+		},
+		{
+			Width:        640,
+			Height:       480,
+			ResizeMethod: "scale",
+		},
 	}
+	c.Database.ConnectionString = opts.DatabaseConnectionStr
+	c.BasePath = "/tmp/media_store"
+
 }
 
 func (c *MediaAPI) Verify(configErrs *ConfigErrors) {

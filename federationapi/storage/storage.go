@@ -20,7 +20,6 @@ package storage
 import (
 	"context"
 	"fmt"
-
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -30,10 +29,8 @@ import (
 
 // NewDatabase opens a new database
 func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (Database, error) {
-	switch {
-	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(ctx, conMan, dbProperties, cache, isLocalServerName)
-	default:
+	if !dbProperties.ConnectionString.IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type")
 	}
+	return postgres.NewDatabase(ctx, conMan, dbProperties, cache, isLocalServerName)
 }

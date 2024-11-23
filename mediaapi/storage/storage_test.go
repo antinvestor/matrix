@@ -14,7 +14,7 @@ import (
 
 func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}

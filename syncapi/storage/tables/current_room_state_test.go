@@ -19,7 +19,7 @@ import (
 func newCurrentRoomStateTable(t *testing.T, dbType test.DBType) (tables.CurrentRoomState, *sql.DB, func()) {
 	t.Helper()
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -31,10 +31,8 @@ func newCurrentRoomStateTable(t *testing.T, dbType test.DBType) (tables.CurrentR
 	}
 
 	var tab tables.CurrentRoomState
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresCurrentRoomStateTable(db)
-	}
+	tab, err = postgres.NewPostgresCurrentRoomStateTable(db)
+
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}

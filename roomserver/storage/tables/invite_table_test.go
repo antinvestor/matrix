@@ -18,7 +18,7 @@ import (
 func mustCreateInviteTable(t *testing.T, dbType test.DBType) (tables.Invites, func()) {
 	t.Helper()
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -27,12 +27,10 @@ func mustCreateInviteTable(t *testing.T, dbType test.DBType) (tables.Invites, fu
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.Invites
-	switch dbType {
-	case test.DBTypePostgres:
-		err = postgres.CreateInvitesTable(db)
-		assert.NoError(t, err)
-		tab, err = postgres.PrepareInvitesTable(db)
-	}
+	err = postgres.CreateInvitesTable(db)
+	assert.NoError(t, err)
+	tab, err = postgres.PrepareInvitesTable(db)
+
 	assert.NoError(t, err)
 
 	return tab, closeDb

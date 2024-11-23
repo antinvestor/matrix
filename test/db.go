@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/setup/config"
 	"net/url"
 	"os"
 	"testing"
@@ -105,14 +106,14 @@ func generateNewDBName() (string, error) {
 	return databaseName, nil
 }
 
-// PrepareDBConnectionString Prepare a sqlite or postgres connection string for testing.
+// PrepareDatabaseDSConnection Prepare a postgres connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareDBConnectionString(ctx context.Context) (postgresUriStr string, close func(), err error) {
+func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config.DataSource, close func(), err error) {
 
 	var connectionUri *url.URL
-	postgresUriStr = os.Getenv("POSTGRES_URI")
+	postgresUriStr := os.Getenv("POSTGRES_URI")
 	if postgresUriStr == "" {
 		postgresUriStr = "postgres://matrix:s3cr3t@127.0.0.1:5432/matrix?sslmode=disable"
 	}
@@ -133,7 +134,7 @@ func PrepareDBConnectionString(ctx context.Context) (postgresUriStr string, clos
 	}
 
 	postgresUriStr = connectionUri.String()
-	return postgresUriStr, func() {
+	return config.DataSource(postgresUriStr), func() {
 		_ = clearDatabase(ctx, postgresUriStr)
 	}, nil
 }

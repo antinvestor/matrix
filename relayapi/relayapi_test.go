@@ -18,6 +18,8 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/process"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -41,7 +43,10 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		defer closeRig()
 
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		relayAPI := relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, true, caches)
@@ -51,16 +56,14 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 
 func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
-		if dbType == test.DBTypeSQLite {
-			cfg.RelayAPI.Database.ConnectionString = "file:"
-		} else {
-			cfg.RelayAPI.Database.ConnectionString = "test"
-		}
-		defer closeRig()
+
+		var cfg config.Dendrite
+		cfg.Defaults(config.DefaultOpts{})
+		processCtx := process.NewProcessContext()
+
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		assert.Panics(t, func() {
-			relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, true, nil)
+			relayapi.NewRelayInternalAPI(&cfg, cm, nil, nil, nil, nil, true, nil)
 		})
 	})
 }
@@ -117,7 +120,10 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 		defer closeRig()
 
 		routers := httputil.NewRouters()
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 
@@ -171,7 +177,10 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 		defer closeRig()
 
 		routers := httputil.NewRouters()
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 

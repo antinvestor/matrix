@@ -48,12 +48,13 @@ func (c *JetStream) Defaults(opts DefaultOpts) {
 	}
 
 	c.TopicPrefix = "Matrix"
-	if opts.Generate {
-		c.StoragePath = Path("./")
-		c.NoLog = true
-		c.DisableTLSValidation = true
-		c.Credentials = Path("")
-	}
+
+	//TODO: delete internal jetstream
+	c.StoragePath = "/tmp/jetstream"
+	c.NoLog = true
+	c.DisableTLSValidation = true
+	c.Credentials = Path("")
+
 }
 
 func (c *JetStream) Verify(configErrs *ConfigErrors) {}

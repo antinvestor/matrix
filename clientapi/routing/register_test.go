@@ -175,7 +175,7 @@ func TestEmptyCompletedFlows(t *testing.T) {
 func TestValidationOfApplicationServices(t *testing.T) {
 	// Set up application service namespaces
 	regex := "@_appservice_.*"
-	regexp, err := regexp.Compile(regex)
+	regExpression, err := regexp.Compile(regex)
 	if err != nil {
 		t.Errorf("Error compiling regex: %s", regex)
 	}
@@ -183,7 +183,7 @@ func TestValidationOfApplicationServices(t *testing.T) {
 	fakeNamespace := config.ApplicationServiceNamespace{
 		Exclusive:    true,
 		Regex:        regex,
-		RegexpObject: regexp,
+		RegexpObject: regExpression,
 	}
 
 	// Create a fake application service
@@ -200,35 +200,32 @@ func TestValidationOfApplicationServices(t *testing.T) {
 		},
 	}
 
-	// Set up a config
-	fakeConfig := &config.Dendrite{}
-	fakeConfig.Defaults(config.DefaultOpts{
-		Generate:       true,
-		SingleDatabase: true,
-	})
-	fakeConfig.Global.ServerName = "localhost"
-	fakeConfig.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService}
+	cfg, _, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	defer closeRig()
+
+	cfg.Global.ServerName = "localhost"
+	cfg.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService}
 
 	// Access token is correct, user_id omitted so we are acting as SenderLocalpart
-	asID, resp := validateApplicationService(&fakeConfig.ClientAPI, fakeSenderLocalpart, "1234")
+	asID, resp := validateApplicationService(&cfg.ClientAPI, fakeSenderLocalpart, "1234")
 	if resp != nil || asID != fakeID {
 		t.Errorf("appservice should have validated and returned correct ID: %s", resp.JSON)
 	}
 
 	// Access token is incorrect, user_id omitted so we are acting as SenderLocalpart
-	asID, resp = validateApplicationService(&fakeConfig.ClientAPI, fakeSenderLocalpart, "xxxx")
+	asID, resp = validateApplicationService(&cfg.ClientAPI, fakeSenderLocalpart, "xxxx")
 	if resp == nil || asID == fakeID {
 		t.Errorf("access_token should have been marked as invalid")
 	}
 
 	// Access token is correct, acting as valid user_id
-	asID, resp = validateApplicationService(&fakeConfig.ClientAPI, "_appservice_bob", "1234")
+	asID, resp = validateApplicationService(&cfg.ClientAPI, "_appservice_bob", "1234")
 	if resp != nil || asID != fakeID {
 		t.Errorf("access_token and user_id should've been valid: %s", resp.JSON)
 	}
 
 	// Access token is correct, acting as invalid user_id
-	asID, resp = validateApplicationService(&fakeConfig.ClientAPI, "_something_else", "1234")
+	asID, resp = validateApplicationService(&cfg.ClientAPI, "_something_else", "1234")
 	if resp == nil || asID == fakeID {
 		t.Errorf("user_id should not have been valid: @_something_else:localhost")
 	}
@@ -422,7 +419,10 @@ func Test_register(t *testing.T) {
 		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		defer closeRig()
 
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 		natsInstance := jetstream.NATSInstance{}
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -595,7 +595,10 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 		defer closeRig()
 		cfg.Global.ServerName = "server"
 
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 		natsInstance := jetstream.NATSInstance{}
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
@@ -638,7 +641,10 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		cfg.ClientAPI.RegistrationSharedSecret = sharedSecret
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)

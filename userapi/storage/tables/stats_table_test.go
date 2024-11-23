@@ -33,7 +33,7 @@ func mustMakeDBs(t *testing.T, dbType test.DBType) (
 	)
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -44,20 +44,17 @@ func mustMakeDBs(t *testing.T, dbType test.DBType) (
 		t.Fatalf("failed to open db: %s", err)
 	}
 
-	switch dbType {
-	case test.DBTypePostgres:
-		accTable, err = postgres.NewPostgresAccountsTable(db, "localhost")
-		if err != nil {
-			t.Fatalf("unable to create acc db: %v", err)
-		}
-		devTable, err = postgres.NewPostgresDevicesTable(db, "localhost")
-		if err != nil {
-			t.Fatalf("unable to open device db: %v", err)
-		}
-		statsTable, err = postgres.NewPostgresStatsTable(db, "localhost")
-		if err != nil {
-			t.Fatalf("unable to open stats db: %v", err)
-		}
+	accTable, err = postgres.NewPostgresAccountsTable(db, "localhost")
+	if err != nil {
+		t.Fatalf("unable to create acc db: %v", err)
+	}
+	devTable, err = postgres.NewPostgresDevicesTable(db, "localhost")
+	if err != nil {
+		t.Fatalf("unable to open device db: %v", err)
+	}
+	statsTable, err = postgres.NewPostgresStatsTable(db, "localhost")
+	if err != nil {
+		t.Fatalf("unable to open stats db: %v", err)
 	}
 
 	return db, accTable, devTable, statsTable, closeDb
@@ -124,10 +121,7 @@ func Test_UserStatistics(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, accDB, devDB, statsDB, close := mustMakeDBs(t, dbType)
 		defer close()
-		wantType := "SQLite"
-		if dbType == test.DBTypePostgres {
-			wantType = "Postgres"
-		}
+		wantType := "Postgres"
 
 		t.Run(fmt.Sprintf("want %s database engine", wantType), func(t *testing.T) {
 			_, gotDB, err := statsDB.UserStatistics(ctx, nil)

@@ -19,6 +19,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -123,9 +124,31 @@ func (d DataSource) IsSQLite() bool {
 }
 
 func (d DataSource) IsPostgres() bool {
-	// commented line may not always be true?
-	// return strings.HasPrefix(string(d), "postgres:")
-	return !d.IsSQLite()
+	// Check if the string starts with "postgres://"
+	if strings.HasPrefix(string(d), "postgres://") {
+		// Try parsing the URI format
+		u, err := url.Parse(string(d))
+		if err != nil || u.Scheme != "postgres" {
+			return false
+		}
+		// Validate required parts for PostgreSQL URI
+		if u.Host == "" || u.Path == "" {
+			return false
+		}
+		return true
+	}
+
+	// Check for key-value format using regex
+	keyValueRegex := regexp.MustCompile(`(?i)^(user=\S+|password=\S+|host=\S+|port=\d+|dbname=\S+|sslmode=\S+)(\s+\S+=\S+)*$`)
+	return keyValueRegex.MatchString(string(d))
+}
+
+func (d DataSource) IsRedis() bool {
+	return strings.HasPrefix(string(d), "redis://")
+}
+
+func (d DataSource) IsNats() bool {
+	return strings.HasPrefix(string(d), "nats://")
 }
 
 // A Topic in kafka.
@@ -186,10 +209,7 @@ func loadConfig(
 	readFile func(string) ([]byte, error),
 ) (*Dendrite, error) {
 	var c Dendrite
-	c.Defaults(DefaultOpts{
-		Generate:       false,
-		SingleDatabase: true,
-	})
+	c.Defaults(DefaultOpts{})
 
 	var err error
 	if err = yaml.Unmarshal(configData, &c); err != nil {
@@ -306,8 +326,9 @@ func (config *Dendrite) Derive() error {
 }
 
 type DefaultOpts struct {
-	Generate       bool
-	SingleDatabase bool
+	DatabaseConnectionStr DataSource
+	CacheConnectionStr    DataSource
+	QueueConnectionStr    DataSource
 }
 
 // SetDefaults sets default config values if they are not explicitly set.

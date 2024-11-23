@@ -21,7 +21,7 @@ func mustCreateUserRoomKeysTable(t *testing.T, dbType test.DBType) (tab tables.U
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -29,12 +29,10 @@ func mustCreateUserRoomKeysTable(t *testing.T, dbType test.DBType) (tab tables.U
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	switch dbType {
-	case test.DBTypePostgres:
-		err = postgres.CreateUserRoomKeysTable(db)
-		assert.NoError(t, err)
-		tab, err = postgres.PrepareUserRoomKeysTable(db)
-	}
+	err = postgres.CreateUserRoomKeysTable(db)
+	assert.NoError(t, err)
+	tab, err = postgres.PrepareUserRoomKeysTable(db)
+
 	assert.NoError(t, err)
 
 	return tab, db, closeDb

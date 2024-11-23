@@ -18,7 +18,7 @@ func mustCreateEventTypesTable(t *testing.T, dbType test.DBType) (tables.EventTy
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -27,12 +27,10 @@ func mustCreateEventTypesTable(t *testing.T, dbType test.DBType) (tables.EventTy
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.EventTypes
-	switch dbType {
-	case test.DBTypePostgres:
-		err = postgres.CreateEventTypesTable(db)
-		assert.NoError(t, err)
-		tab, err = postgres.PrepareEventTypesTable(db)
-	}
+	err = postgres.CreateEventTypesTable(db)
+	assert.NoError(t, err)
+	tab, err = postgres.PrepareEventTypesTable(db)
+
 	assert.NoError(t, err)
 
 	return tab, closeDb

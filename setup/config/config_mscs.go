@@ -13,11 +13,7 @@ type MSCs struct {
 }
 
 func (c *MSCs) Defaults(opts DefaultOpts) {
-	if opts.Generate {
-		if !opts.SingleDatabase {
-			c.Database.ConnectionString = "file:mscs.db"
-		}
-	}
+	c.Database.ConnectionString = opts.DatabaseConnectionStr
 }
 
 // Enabled returns true if the given msc is enabled. Should in the form 'msc12345'.
@@ -31,7 +27,7 @@ func (c *MSCs) Enabled(msc string) bool {
 }
 
 func (c *MSCs) Verify(configErrs *ConfigErrors) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+	if c.Database.ConnectionString == "" {
 		checkNotEmpty(configErrs, "mscs.database.connection_string", string(c.Database.ConnectionString))
 	}
 }

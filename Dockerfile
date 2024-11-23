@@ -16,16 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #
 FROM --platform=${BUILDPLATFORM} base AS build
 WORKDIR /src
-ARG TARGETOS
-ARG TARGETARCH
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    USERARCH=`go env GOARCH` \
-    GOARCH="$TARGETARCH" \
-    GOOS="linux" \
-    CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0") \
-    go build -v -trimpath -o /out/ ./cmd/...
+    GOOS=linux CGO_ENABLED=1 \
+    go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -v -trimpath -o /tmp/matrix/ ./cmd/...
 
 
 #
@@ -43,10 +38,10 @@ LABEL org.opencontainers.image.source="https://github.com/antinvestor/matrix"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 LABEL org.opencontainers.image.vendor="Ant Investor Ltd"
 
-COPY --from=build /out/create-account /usr/bin/create-account
-COPY --from=build /out/generate-config /usr/bin/generate-config
-COPY --from=build /out/generate-keys /usr/bin/generate-keys
-COPY --from=build /out/matrix /usr/bin/matrix
+COPY --from=build /tmp/matrix/create-account /usr/bin/create-account
+COPY --from=build /tmp/matrix/generate-config /usr/bin/generate-config
+COPY --from=build /tmp/matrix/generate-keys /usr/bin/generate-keys
+COPY --from=build /tmp/matrix/matrix /usr/bin/matrix
 
 VOLUME /etc/matrix
 WORKDIR /etc/matrix

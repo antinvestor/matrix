@@ -17,7 +17,7 @@ import (
 func mustCreateEventJSONTable(t *testing.T, dbType test.DBType) (tables.EventJSON, func()) {
 	t.Helper()
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -26,12 +26,10 @@ func mustCreateEventJSONTable(t *testing.T, dbType test.DBType) (tables.EventJSO
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.EventJSON
-	switch dbType {
-	case test.DBTypePostgres:
-		err = postgres.CreateEventJSONTable(db)
-		assert.NoError(t, err)
-		tab, err = postgres.PrepareEventJSONTable(db)
-	}
+	err = postgres.CreateEventJSONTable(db)
+	assert.NoError(t, err)
+	tab, err = postgres.PrepareEventJSONTable(db)
+
 	assert.NoError(t, err)
 
 	return tab, closeDb

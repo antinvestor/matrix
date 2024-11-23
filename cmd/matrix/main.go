@@ -149,7 +149,10 @@ func main() {
 	routers := httputil.NewRouters()
 
 	cfg.Global.Cache.EnablePrometheus = caching.EnableMetrics
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to create cache")
+	}
 
 	natsInstance := jetstream.NATSInstance{}
 	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)

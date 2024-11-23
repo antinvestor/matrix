@@ -20,7 +20,7 @@ import (
 func newMembershipsTable(t *testing.T, dbType test.DBType) (tables.Memberships, *sql.DB, func()) {
 	t.Helper()
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -32,10 +32,8 @@ func newMembershipsTable(t *testing.T, dbType test.DBType) (tables.Memberships, 
 	}
 
 	var tab tables.Memberships
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresMembershipsTable(db)
-	}
+	tab, err = postgres.NewPostgresMembershipsTable(db)
+
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}

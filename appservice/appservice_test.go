@@ -149,11 +149,11 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		}
 		as.CreateHTTPClient(cfg.AppServiceAPI.DisableTLSValidation)
 		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
-		t.Cleanup(func() {
-			ctx.ShutdownDendrite()
-			ctx.WaitForShutdown()
-		})
-		caches := caching.NewCache(&cfg.Global.Cache)
+
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 
 		// Create required internal APIs
 		natsInstance := jetstream.NATSInstance{}
@@ -245,11 +245,10 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	as.CreateHTTPClient(cfg.AppServiceAPI.DisableTLSValidation)
 	cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
 
-	t.Cleanup(func() {
-		ctx.ShutdownDendrite()
-		ctx.WaitForShutdown()
-	})
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		t.Fatalf("failed to create a cache: %v", err)
+	}
 	// Create required internal APIs
 	natsInstance := jetstream.NATSInstance{}
 	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
@@ -390,7 +389,10 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		// Create a dummy application service
 		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
 
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 		// Create required internal APIs
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
@@ -427,14 +429,19 @@ func TestOutputAppserviceEvent(t *testing.T) {
 	bob := test.NewUser(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+
 		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
 		defer closeDB()
+
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := &jetstream.NATSInstance{}
 
 		evChan := make(chan struct{})
 
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 		// Create required internal APIs
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)

@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -227,12 +229,11 @@ func TestValidateApplicationServiceRequest(t *testing.T) {
 	}
 
 	// Set up a config
-	fakeConfig := &config.Dendrite{}
-	fakeConfig.Defaults(config.DefaultOpts{
-		Generate: true,
-	})
-	fakeConfig.Global.ServerName = "localhost"
-	fakeConfig.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService, fakeApplicationServiceOverlap}
+	cfg, _, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	defer closeRig()
+
+	cfg.Global.ServerName = "localhost"
+	cfg.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService, fakeApplicationServiceOverlap}
 
 	tests := []struct {
 		name      string
@@ -301,7 +302,7 @@ func TestValidateApplicationServiceRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotASID, gotResp := ValidateApplicationServiceRequest(&fakeConfig.ClientAPI, tt.localpart, tt.asToken)
+			gotASID, gotResp := ValidateApplicationServiceRequest(&cfg.ClientAPI, tt.localpart, tt.asToken)
 			if tt.wantError && gotResp == nil {
 				t.Error("expected an error, but succeeded")
 			}

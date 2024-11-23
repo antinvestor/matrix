@@ -185,7 +185,10 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		t.Fatalf("failed to create a cache: %v", err)
+	}
 	natsInstance := jetstream.NATSInstance{}
 	cfg.FederationAPI.PreferDirectFetch = true
 	cfg.FederationAPI.KeyPerspectives = nil
@@ -458,7 +461,10 @@ func TestNotaryServer(t *testing.T) {
 		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
 		defer closeRig()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 		natsInstance := jetstream.NATSInstance{}
 		fc := &fedClient{
 			keys: map[spec.ServerName]struct {

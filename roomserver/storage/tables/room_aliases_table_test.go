@@ -15,7 +15,7 @@ import (
 func mustCreateRoomAliasesTable(t *testing.T, dbType test.DBType) (tab tables.RoomAliases, closeDb func()) {
 	t.Helper()
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -23,12 +23,10 @@ func mustCreateRoomAliasesTable(t *testing.T, dbType test.DBType) (tab tables.Ro
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	switch dbType {
-	case test.DBTypePostgres:
-		err = postgres.CreateRoomAliasesTable(db)
-		assert.NoError(t, err)
-		tab, err = postgres.PrepareRoomAliasesTable(db)
-	}
+	err = postgres.CreateRoomAliasesTable(db)
+	assert.NoError(t, err)
+	tab, err = postgres.PrepareRoomAliasesTable(db)
+
 	assert.NoError(t, err)
 
 	return tab, closeDb

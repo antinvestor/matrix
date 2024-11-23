@@ -19,7 +19,7 @@ func newTopologyTable(t *testing.T, dbType test.DBType) (tables.Topology, *sql.D
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -31,10 +31,8 @@ func newTopologyTable(t *testing.T, dbType test.DBType) (tables.Topology, *sql.D
 	}
 
 	var tab tables.Topology
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresTopologyTable(db)
-	}
+	tab, err = postgres.NewPostgresTopologyTable(db)
+
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}

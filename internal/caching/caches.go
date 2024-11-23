@@ -16,6 +16,7 @@ package caching
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -84,16 +85,15 @@ func maxAgeOfHalfHour(b time.Duration) time.Duration {
 	return b
 }
 
-func NewCache(cfg *config.CacheOptions) *Caches {
+func NewCache(cfg *config.CacheOptions) (*Caches, error) {
 
-	if cfg.ConnectionString != "" {
-
-		redisCache, err := NewRedisCache(cfg.ConnectionString, cfg.MaxAge)
-		if err == nil {
-			return redisCache
-		}
+	if cfg.ConnectionString == "" {
+		return nil, errors.New("no url to cache specified")
 	}
 
-	panic("No url to cache specified")
+	if !cfg.ConnectionString.IsRedis() {
+		return nil, errors.New("only redis is currently supported as cache")
+	}
 
+	return NewRedisCache(string(cfg.ConnectionString), cfg.MaxAge)
 }

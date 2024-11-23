@@ -15,8 +15,10 @@ import (
 func main() {
 	defaultsForCI := flag.Bool("ci", false, "Populate the configuration with sane defaults for use in CI")
 	serverName := flag.String("server", "", "The domain name of the server if not 'localhost'")
-	dbURI := flag.String("db", "", "The DB URI to use for all components (PostgreSQL only)")
-	dirPath := flag.String("dir", "./", "The folder to use for paths (like SQLite databases, media storage)")
+	databaseURI := flag.String("db_uri", "", "The DB URI to use for all components (PostgreSQL only)")
+	cacheURI := flag.String("cache_uri", "", "The Cache URI to use for all components")
+	queueURI := flag.String("queue_uri", "", "The Queue URI to use for all components")
+	dirPath := flag.String("dir", "./", "The folder to use for paths ( media storage)")
 	normalise := flag.String("normalise", "", "Normalise an existing configuration file by adding new/missing options and defaults")
 	flag.Parse()
 
@@ -26,34 +28,14 @@ func main() {
 			Version: config.Version,
 		}
 		cfg.Defaults(config.DefaultOpts{
-			Generate:       true,
-			SingleDatabase: true,
+			DatabaseConnectionStr: config.DataSource(*databaseURI),
+			CacheConnectionStr:    config.DataSource(*cacheURI),
+			QueueConnectionStr:    config.DataSource(*queueURI),
 		})
 		if *serverName != "" {
 			cfg.Global.ServerName = spec.ServerName(*serverName)
 		}
-		uri := config.DataSource(*dbURI)
-		if uri.IsSQLite() || uri == "" {
-			for name, db := range map[string]*config.DatabaseOptions{
-				"federationapi": &cfg.FederationAPI.Database,
-				"keyserver":     &cfg.KeyServer.Database,
-				"mscs":          &cfg.MSCs.Database,
-				"mediaapi":      &cfg.MediaAPI.Database,
-				"roomserver":    &cfg.RoomServer.Database,
-				"syncapi":       &cfg.SyncAPI.Database,
-				"userapi":       &cfg.UserAPI.AccountDatabase,
-				"relayapi":      &cfg.RelayAPI.Database,
-			} {
-				if uri == "" {
-					path := filepath.Join(*dirPath, fmt.Sprintf("dendrite_%s.db", name))
-					db.ConnectionString = config.DataSource(fmt.Sprintf("file:%s", path))
-				} else {
-					db.ConnectionString = uri
-				}
-			}
-		} else {
-			cfg.Global.DatabaseOptions.ConnectionString = uri
-		}
+
 		cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
 		cfg.Global.JetStream.StoragePath = config.Path(*dirPath)
 		cfg.SyncAPI.Fulltext.IndexPath = config.Path(filepath.Join(*dirPath, "searchindex"))

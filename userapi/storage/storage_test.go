@@ -37,7 +37,7 @@ var (
 )
 
 func mustCreateUserDatabase(t *testing.T, _ test.DBType) (storage.UserDatabase, func()) {
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}

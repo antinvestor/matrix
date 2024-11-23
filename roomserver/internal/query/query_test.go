@@ -162,22 +162,25 @@ func TestGetAuthChainMultiple(t *testing.T) {
 func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
 
 	ctx := context.TODO()
-	conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
 
-	cacheConnStr, closeCache, err := test.PrepareRedisConnectionString(context.TODO())
+	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(context.TODO())
 	if err != nil {
 		t.Fatalf("Could not create redis container %s", err)
 	}
 
-	caches := caching.NewCache(&config.CacheOptions{
+	caches, err := caching.NewCache(&config.CacheOptions{
 		ConnectionString: cacheConnStr,
 	})
+	if err != nil {
+		t.Fatalf("Could not create redis container %s", err)
+	}
 
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
-	db, err := storage.Open(context.Background(), cm, &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}, caches)
+	db, err := storage.Open(context.Background(), cm, &config.DatabaseOptions{ConnectionString: conStr}, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}

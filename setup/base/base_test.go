@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"html/template"
 	"net"
 	"net/http"
@@ -16,7 +18,6 @@ import (
 	"github.com/antinvestor/matrix/internal/httputil"
 	basepkg "github.com/antinvestor/matrix/setup/base"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,10 +33,10 @@ func TestLandingPage_Tcp(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	processCtx := process.NewProcessContext()
+	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	defer closeRig()
+
 	routers := httputil.NewRouters()
-	cfg := config.Dendrite{}
-	cfg.Defaults(config.DefaultOpts{Generate: true, SingleDatabase: true})
 
 	// hack: create a server and close it immediately, just to get a random port assigned
 	s := httptest.NewServer(nil)
@@ -44,7 +45,7 @@ func TestLandingPage_Tcp(t *testing.T) {
 	// start base with the listener and wait for it to be started
 	address, err := config.HTTPAddress(s.URL)
 	assert.NoError(t, err)
-	go basepkg.SetupAndServeHTTP(processCtx, &cfg, routers, address, nil, nil)
+	go basepkg.SetupAndServeHTTP(ctx, cfg, routers, address, nil, nil)
 	time.Sleep(time.Millisecond * 10)
 
 	// When hitting /, we should be redirected to /_matrix/static, which should contain the landing page
@@ -74,17 +75,17 @@ func TestLandingPage_UnixSocket(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	processCtx := process.NewProcessContext()
+	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	defer closeRig()
+
 	routers := httputil.NewRouters()
-	cfg := config.Dendrite{}
-	cfg.Defaults(config.DefaultOpts{Generate: true, SingleDatabase: true})
 
 	tempDir := t.TempDir()
 	socket := path.Join(tempDir, "socket")
 	// start base with the listener and wait for it to be started
 	address, err := config.UnixSocketAddress(socket, "755")
 	assert.NoError(t, err)
-	go basepkg.SetupAndServeHTTP(processCtx, &cfg, routers, address, nil, nil)
+	go basepkg.SetupAndServeHTTP(ctx, cfg, routers, address, nil, nil)
 	time.Sleep(time.Millisecond * 100)
 
 	client := &http.Client{

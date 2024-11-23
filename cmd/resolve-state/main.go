@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"sort"
 	"strconv"
 	"strings"
@@ -76,7 +77,10 @@ func main() {
 	}
 
 	cfg.Global.Cache.MaxAge = time.Minute * 5
-	caches := caching.NewCache(&cfg.Global.Cache)
+	caches, err := caching.NewCache(&cfg.Global.Cache)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to create cache")
+	}
 
 	fmt.Println("Opening database")
 	roomserverDB, err := storage.Open(processCtx.Context(), cm, &dbOpts, caches)

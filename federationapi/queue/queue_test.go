@@ -39,22 +39,22 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *process.ProcessContext, func()) {
+func mustCreateFederationDatabase(t *testing.T, realDatabase bool) (storage.Database, *process.ProcessContext, func()) {
 	if realDatabase {
 		// Real Database/s
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
 
 		dbOptions := cfg.Global.DatabaseOptions
-		if dbType == test.DBTypeSQLite {
-			dbOptions = cfg.FederationAPI.Database
-		}
 
 		cm := sqlutil.NewConnectionManager(processCtx, dbOptions)
-		caches := caching.NewCache(&cfg.Global.Cache)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 
 		db, err := storage.NewDatabase(processCtx.Context(), cm, &dbOptions, caches, cfg.Global.IsLocalServerName)
 		if err != nil {
-			t.Fatalf("NewDatabase failed for %v with : %s", dbType, err)
+			t.Fatalf("NewDatabase failed with : %s", err)
 		}
 		return db, processCtx, closeRig
 	} else {
@@ -107,8 +107,8 @@ func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {
 	return &gomatrixserverlib.EDU{Type: spec.MTyping}
 }
 
-func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *stubFederationClient, *OutgoingQueues, *process.ProcessContext, func()) {
-	db, processContext, close := mustCreateFederationDatabase(t, dbType, realDatabase)
+func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, realDatabase bool) (storage.Database, *stubFederationClient, *OutgoingQueues, *process.ProcessContext, func()) {
+	db, processContext, close := mustCreateFederationDatabase(t, realDatabase)
 
 	fc := &stubFederationClient{
 		shouldTxSucceed:      shouldTxSucceed,
@@ -134,7 +134,7 @@ func TestSendPDUOnSuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 	defer closeSetup()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -163,7 +163,7 @@ func TestSendEDUOnSuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 	defer closeSetup()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -192,7 +192,7 @@ func TestSendPDUOnFailStoredInDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 	defer closeSetup()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -222,9 +222,9 @@ func TestSendEDUOnFailStoredInDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -252,9 +252,10 @@ func TestSendPDUAgainDoesntInterruptBackoff(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -303,9 +304,10 @@ func TestSendEDUAgainDoesntInterruptBackoff(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -354,9 +356,10 @@ func TestSendPDUMultipleFailuresBlacklisted(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -386,9 +389,10 @@ func TestSendEDUMultipleFailuresBlacklisted(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -418,9 +422,10 @@ func TestSendPDUBlacklistedWithPriorExternalFailure(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -452,9 +457,10 @@ func TestSendEDUBlacklistedWithPriorExternalFailure(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -486,9 +492,10 @@ func TestRetryServerSendsPDUSuccessfully(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(1)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -537,9 +544,10 @@ func TestRetryServerSendsEDUSuccessfully(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(1)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -590,10 +598,11 @@ func TestSendPDUBatches(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-	// db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, true, t, dbType, true)
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
-	defer close()
+	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, dbType, true)
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -634,10 +643,11 @@ func TestSendEDUBatches(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-	// db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, true, t, dbType, true)
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
-	defer close()
+	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, dbType, true)
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -678,10 +688,11 @@ func TestSendPDUAndEDUBatches(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-	// db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, true, t, dbType, true)
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
-	defer close()
+	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, dbType, true)
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -730,9 +741,10 @@ func TestExternalFailureBackoffDoesntStartQueue(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -768,10 +780,11 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, dbType, true)
+		db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, true)
 		// NOTE : These defers aren't called if go test is killed so the dbs may not get cleaned up.
-		defer close()
+
 		defer func() {
+			closeDb()
 			pc.ShutdownDendrite()
 			<-pc.WaitForShutdown()
 		}()
@@ -834,9 +847,10 @@ func TestSendPDUMultipleFailuresAssumedOffline(t *testing.T) {
 	failuresUntilBlacklist := uint32(7)
 	failuresUntilAssumedOffline := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -867,9 +881,10 @@ func TestSendEDUMultipleFailuresAssumedOffline(t *testing.T) {
 	failuresUntilBlacklist := uint32(7)
 	failuresUntilAssumedOffline := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -900,9 +915,10 @@ func TestSendPDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	failuresUntilBlacklist := uint32(16)
 	failuresUntilAssumedOffline := uint32(1)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()
@@ -939,9 +955,10 @@ func TestSendEDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	failuresUntilBlacklist := uint32(16)
 	failuresUntilAssumedOffline := uint32(1)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, test.DBTypeSQLite, false)
-	defer close()
+	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, false)
+
 	defer func() {
+		closeDb()
 		pc.ShutdownDendrite()
 		<-pc.WaitForShutdown()
 	}()

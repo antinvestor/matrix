@@ -53,26 +53,23 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 	c.P2PFederationRetriesUntilAssumedOffline = 1
 	c.DisableTLSValidation = false
 	c.DisableHTTPKeepalives = false
-	if opts.Generate {
-		c.KeyPerspectives = KeyPerspectives{
-			{
-				ServerName: "matrix.org",
-				Keys: []KeyPerspectiveTrustKey{
-					{
-						KeyID:     "ed25519:auto",
-						PublicKey: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw",
-					},
-					{
-						KeyID:     "ed25519:a_RXGa",
-						PublicKey: "l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ",
-					},
+	c.KeyPerspectives = KeyPerspectives{
+		{
+			ServerName: "matrix.org",
+			Keys: []KeyPerspectiveTrustKey{
+				{
+					KeyID:     "ed25519:auto",
+					PublicKey: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw",
+				},
+				{
+					KeyID:     "ed25519:a_RXGa",
+					PublicKey: "l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ",
 				},
 			},
-		}
-		if !opts.SingleDatabase {
-			c.Database.ConnectionString = "file:federationapi.db"
-		}
+		},
 	}
+	c.Database.ConnectionString = opts.DatabaseConnectionStr
+
 }
 
 func (c *FederationAPI) Verify(configErrs *ConfigErrors) {
@@ -81,7 +78,7 @@ func (c *FederationAPI) Verify(configErrs *ConfigErrors) {
 	}
 }
 
-// The config for setting a proxy to use for server->server requests
+// Proxy The config for setting a proxy to use for server->server requests
 type Proxy struct {
 	// Is the proxy enabled?
 	Enabled bool `yaml:"enabled"`

@@ -34,7 +34,7 @@ func mustCreateRelayServersTable(
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -43,11 +43,9 @@ func mustCreateRelayServersTable(
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.FederationRelayServers
-	switch dbType {
-	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresRelayServersTable(db)
-		assert.NoError(t, err)
-	}
+	tab, err = postgres.NewPostgresRelayServersTable(db)
+	assert.NoError(t, err)
+
 	assert.NoError(t, err)
 
 	database = RelayServersDatabase{

@@ -16,6 +16,7 @@ package test
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/setup/config"
 
 	tcRedis "github.com/testcontainers/testcontainers-go/modules/redis"
 )
@@ -26,23 +27,23 @@ func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
 	return tcRedis.Run(ctx, RedisImage)
 }
 
-// PrepareRedisConnectionString Prepare a redis connection string for testing.
+// PrepareRedisDataSourceConnection Prepare a redis connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareRedisConnectionString(ctx context.Context) (connStr string, close func(), err error) {
+func PrepareRedisDataSourceConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
 
 	redisContainer, err := setupRedis(ctx)
 	if err != nil {
 		return "", nil, err
 	}
 
-	connStr, err = redisContainer.ConnectionString(ctx)
+	connStr, err := redisContainer.ConnectionString(ctx)
 	if err != nil {
 		return "", nil, err
 	}
 
-	return connStr, func() {
+	return config.DataSource(connStr), func() {
 		// Drop container to get a fresh instance
 		err = redisContainer.Terminate(ctx)
 		if err != nil {
@@ -65,11 +66,11 @@ func PrepareRedisConnectionString(ctx context.Context) (connStr string, close fu
 //	return nil
 //}
 //
-//// PrepareRedisConnectionString Prepare a redis connection string for testing.
+//// PrepareRedisDataSourceConnection Prepare a redis connection string for testing.
 //// Returns the connection string to use and a close function which must be called when the test finishes.
 //// Calling this function twice will return the same database, which will have data from previous tests
 //// unless close() is called.
-//func PrepareRedisConnectionString(ctx context.Context) (connStr string, close func(), err error) {
+//func PrepareRedisDataSourceConnection(ctx context.Context) (connStr string, close func(), err error) {
 //
 //	redisUriStr := os.Getenv("REDIS_URI")
 //	if redisUriStr == "" {

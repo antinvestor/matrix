@@ -17,7 +17,7 @@ func mustCreateRedactionsTable(t *testing.T, dbType test.DBType) (tab tables.Red
 	t.Helper()
 
 	ctx := context.TODO()
-	connStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -25,12 +25,10 @@ func mustCreateRedactionsTable(t *testing.T, dbType test.DBType) (tab tables.Red
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	switch dbType {
-	case test.DBTypePostgres:
-		err = postgres.CreateRedactionsTable(db)
-		assert.NoError(t, err)
-		tab, err = postgres.PrepareRedactionsTable(db)
-	}
+	err = postgres.CreateRedactionsTable(db)
+	assert.NoError(t, err)
+	tab, err = postgres.PrepareRedactionsTable(db)
+
 	assert.NoError(t, err)
 
 	return tab, closeDb

@@ -1,6 +1,7 @@
 package sqlutil_test
 
 import (
+	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
 
@@ -18,30 +19,22 @@ func TestConnectionManager(t *testing.T) {
 			processCtx := process.NewProcessContext()
 			ctx := processCtx.Context()
 
-			conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+			conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 			if err != nil {
 				t.Fatalf("failed to open database: %s", err)
 			}
 			t.Cleanup(closeDb)
 			cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 
-			dbProps := &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}
+			dbProps := &config.DatabaseOptions{ConnectionString: conStr}
 			db, writer, err := cm.Connection(dbProps)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			switch dbType {
-			case test.DBTypeSQLite:
-				_, ok := writer.(*sqlutil.ExclusiveWriter)
-				if !ok {
-					t.Fatalf("expected exclusive writer")
-				}
-			case test.DBTypePostgres:
-				_, ok := writer.(*sqlutil.DummyWriter)
-				if !ok {
-					t.Fatalf("expected dummy writer")
-				}
+			_, ok := writer.(*sqlutil.DummyWriter)
+			if !ok {
+				t.Fatalf("expected dummy writer")
 			}
 
 			// reuse existing connection
@@ -80,7 +73,7 @@ func TestConnectionManager(t *testing.T) {
 			processCtx := process.NewProcessContext()
 			ctx := processCtx.Context()
 
-			conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
+			conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 			if err != nil {
 				t.Fatalf("failed to open database: %s", err)
 			}
@@ -118,26 +111,17 @@ func TestConnectionManager(t *testing.T) {
 	t.Run("shutdown", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 
-			processCtx := process.NewProcessContext()
-			ctx := processCtx.Context()
+			cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+			defer closeRig()
 
-			conStr, closeDb, err := test.PrepareDBConnectionString(ctx)
-			if err != nil {
-				t.Fatalf("failed to open database: %s", err)
-			}
-			t.Cleanup(closeDb)
+			cm := sqlutil.NewConnectionManager(ctx,
+				config.DatabaseOptions{ConnectionString: cfg.Global.DatabaseOptions.ConnectionString})
 
-			cm := sqlutil.NewConnectionManager(processCtx,
-				config.DatabaseOptions{ConnectionString: config.DataSource(conStr)})
-
-			dbProps := &config.DatabaseOptions{}
-			_, _, err = cm.Connection(dbProps)
+			_, _, err := cm.Connection(&cfg.Global.DatabaseOptions)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			processCtx.ShutdownDendrite()
-			processCtx.WaitForComponentsToFinish()
 		})
 	})
 

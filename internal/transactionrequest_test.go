@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -183,12 +184,10 @@ func TestProcessTransactionRequestPDUInvalidSignature(t *testing.T) {
 	}
 }
 
-func createTransactionWithEDU(ctx *process.ProcessContext, edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext, *config.Dendrite) {
-	cfg := &config.Dendrite{}
-	cfg.Defaults(config.DefaultOpts{
-		Generate:       true,
-		SingleDatabase: true,
-	})
+func createTransactionWithEDU(t *testing.T, edus []gomatrixserverlib.EDU) (*process.ProcessContext, *config.Dendrite, TxnReq, nats.JetStreamContext, func()) {
+
+	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+
 	cfg.Global.JetStream.InMemory = true
 	natsInstance := &jetstream.NATSInstance{}
 	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
@@ -205,7 +204,7 @@ func createTransactionWithEDU(ctx *process.ProcessContext, edus []gomatrixserver
 	}
 	keyRing := &test.NopJSONVerifier{}
 	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, producer, true, []json.RawMessage{}, edus, "kaer.morhen", "", "ourserver")
-	return txn, js, cfg
+	return ctx, cfg, txn, js, closeRig
 }
 
 func TestProcessTransactionRequestEDUTyping(t *testing.T) {
@@ -225,9 +224,9 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 	badEDU.Content = spec.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	ctx := process.NewProcessContext()
-	defer ctx.ShutdownDendrite()
-	txn, js, cfg := createTransactionWithEDU(ctx, edus)
+	ctx, cfg, txn, js, closeFn := createTransactionWithEDU(t, edus)
+	defer closeFn()
+
 	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -291,9 +290,9 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 	badEDU.Content = spec.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	ctx := process.NewProcessContext()
-	defer ctx.ShutdownDendrite()
-	txn, js, cfg := createTransactionWithEDU(ctx, edus)
+	ctx, cfg, txn, js, closeFn := createTransactionWithEDU(t, edus)
+	defer closeFn()
+
 	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -368,9 +367,9 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 	badEDU.Content = spec.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	ctx := process.NewProcessContext()
-	defer ctx.ShutdownDendrite()
-	txn, js, cfg := createTransactionWithEDU(ctx, edus)
+	ctx, cfg, txn, js, closeFn := createTransactionWithEDU(t, edus)
+	defer closeFn()
+
 	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -465,9 +464,9 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 	}
 	edus := []gomatrixserverlib.EDU{badEDU, badUser, edu}
 
-	ctx := process.NewProcessContext()
-	defer ctx.ShutdownDendrite()
-	txn, js, cfg := createTransactionWithEDU(ctx, edus)
+	ctx, cfg, txn, js, closeFn := createTransactionWithEDU(t, edus)
+	defer closeFn()
+
 	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -509,9 +508,9 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 	badEDU.Content = spec.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	ctx := process.NewProcessContext()
-	defer ctx.ShutdownDendrite()
-	txn, js, cfg := createTransactionWithEDU(ctx, edus)
+	ctx, cfg, txn, js, closeFn := createTransactionWithEDU(t, edus)
+	defer closeFn()
+
 	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -566,9 +565,9 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 	badEDU.Content = spec.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	ctx := process.NewProcessContext()
-	defer ctx.ShutdownDendrite()
-	txn, js, cfg := createTransactionWithEDU(ctx, edus)
+	ctx, cfg, txn, js, closeFn := createTransactionWithEDU(t, edus)
+	defer closeFn()
+
 	received := atomic.Bool{}
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -608,9 +607,9 @@ func TestProcessTransactionRequestEDUUnhandled(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 
-	ctx := process.NewProcessContext()
-	defer ctx.ShutdownDendrite()
-	txn, _, _ := createTransactionWithEDU(ctx, []gomatrixserverlib.EDU{edu})
+	ctx, _, txn, _, closeFn := createTransactionWithEDU(t, []gomatrixserverlib.EDU{edu})
+	defer closeFn()
+
 	txnRes, jsonRes := txn.ProcessTransaction(ctx.Context())
 
 	assert.Nil(t, jsonRes)
