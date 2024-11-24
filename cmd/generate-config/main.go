@@ -37,7 +37,6 @@ func main() {
 		}
 
 		cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
-		cfg.Global.JetStream.StoragePath = config.Path(*dirPath)
 		cfg.SyncAPI.Fulltext.IndexPath = config.Path(filepath.Join(*dirPath, "searchindex"))
 		cfg.Logging = []config.LogrusHook{
 			{
@@ -60,8 +59,6 @@ func main() {
 			cfg.Logging[0].Level = "trace"
 			cfg.Logging[0].Type = "std"
 			cfg.UserAPI.BCryptCost = bcrypt.MinCost
-			cfg.Global.JetStream.InMemory = true
-			cfg.Global.JetStream.StoragePath = config.Path(*dirPath)
 			cfg.ClientAPI.RegistrationDisabled = false
 			cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 			cfg.ClientAPI.RegistrationSharedSecret = "complement"

@@ -19,23 +19,22 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/sirupsen/logrus"
 	"github.com/testcontainers/testcontainers-go"
-
-	tcRedis "github.com/testcontainers/testcontainers-go/modules/redis"
+	tcNats "github.com/testcontainers/testcontainers-go/modules/nats"
 )
 
-const RedisImage = "redis:7"
+const NatsImage = "nats:2.10"
 
-func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
-	return tcRedis.Run(ctx, RedisImage)
+func setupNats(ctx context.Context) (*tcNats.NATSContainer, error) {
+	return tcNats.Run(ctx, NatsImage)
 }
 
-// PrepareRedisDataSourceConnection Prepare a redis connection string for testing.
+// PrepareNatsDataSourceConnection Prepare a nats connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
-// Calling this function twice will return the same database, which will have data from previous tests
+// Calling this function twice will return the same connection, which will have data from previous tests
 // unless close() is called.
-func PrepareRedisDataSourceConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
+func PrepareNatsDataSourceConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
 
-	container, err := setupRedis(ctx)
+	container, err := setupNats(ctx)
 	if err != nil {
 		return "", nil, err
 	}
@@ -46,10 +45,12 @@ func PrepareRedisDataSourceConnection(ctx context.Context) (dsConnection config.
 	}
 
 	return config.DataSource(connStr), func() {
+
 		err = testcontainers.TerminateContainer(container)
 		if err != nil {
 			logrus.WithError(err).Error("failed to terminate container")
 		}
+
 	}, nil
 }
 

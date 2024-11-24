@@ -66,41 +66,21 @@ func TestMain(m *testing.M) {
 		processCtx := process.NewProcessContext()
 		ctx := processCtx.Context()
 
-		dbConnStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
+		defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx)
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("Could not create default connections %s", err))
 		}
-		defer closeDb()
-		if err != nil {
-			panic(err)
-		}
-
-		cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
-		defer closeCache()
-		if err != nil {
-			panic(err)
-		}
+		defer closeDSConns()
 
 		for _, s := range servers {
 
 			natsInstance := jetstream.NATSInstance{}
 
-			var jetstreamDir string
-			// Create a temporary directory for JetStream.
-			jetstreamDir, err = os.MkdirTemp("/tmp/", "jetstream*")
-			if err != nil {
-				panic(err)
-			}
-			defer os.RemoveAll(jetstreamDir)
-
 			// Draw up just enough Dendrite config for the server key
 			// API to work.
 
 			cfg := &config.Dendrite{}
-			cfg.Defaults(config.DefaultOpts{
-				DatabaseConnectionStr: dbConnStr,
-				CacheConnectionStr:    cacheConnStr,
-			})
+			cfg.Defaults(defaultOpts)
 			cfg.Global.ServerName = spec.ServerName(s.name)
 
 			// Generate a new key.
@@ -109,9 +89,7 @@ func TestMain(m *testing.M) {
 				panic("can't generate identity key: " + err.Error())
 			}
 
-			cfg.Global.JetStream.InMemory = true
 			cfg.Global.JetStream.TopicPrefix = string(s.name[:1])
-			cfg.Global.JetStream.StoragePath = config.Path(jetstreamDir)
 			cfg.Global.KeyID = serverKeyID
 			cfg.Global.KeyValidityPeriod = s.validity
 			cfg.FederationAPI.KeyPerspectives = nil
@@ -119,7 +97,7 @@ func TestMain(m *testing.M) {
 			s.config = &cfg.FederationAPI
 
 			s.cache, err = caching.NewCache(&config.CacheOptions{
-				ConnectionString: cacheConnStr,
+				ConnectionString: cfg.Global.Cache.ConnectionString,
 			})
 
 			// Create a transport which redirects federation requests to

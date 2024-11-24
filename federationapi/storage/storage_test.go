@@ -38,7 +38,7 @@ func mustCreateFederationDatabase(t *testing.T, _ test.DBType) (storage.Database
 
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
 	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, caches, func(server spec.ServerName) bool { return server == "localhost" })
 	if err != nil {
 		t.Fatalf("NewDatabase returned %s", err)

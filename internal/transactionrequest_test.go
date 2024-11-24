@@ -188,7 +188,6 @@ func createTransactionWithEDU(t *testing.T, edus []gomatrixserverlib.EDU) (*proc
 
 	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
 
-	cfg.Global.JetStream.InMemory = true
 	natsInstance := &jetstream.NATSInstance{}
 	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 	producer := &producers.SyncAPIProducer{

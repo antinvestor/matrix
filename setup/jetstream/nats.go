@@ -1,31 +1,22 @@
 package jetstream
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
-	"reflect"
-	"strings"
-	"sync"
-	"time"
-
-	"github.com/getsentry/sentry-go"
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/process"
+	"github.com/getsentry/sentry-go"
+	"github.com/sirupsen/logrus"
+	"reflect"
+	"strings"
 
-	natsserver "github.com/nats-io/nats-server/v2/server"
 	natsclient "github.com/nats-io/nats.go"
 )
 
 type NATSInstance struct {
-	*natsserver.Server
 	nc *natsclient.Conn
 	js natsclient.JetStreamContext
 }
-
-var natsLock sync.Mutex
 
 func DeleteAllStreams(js natsclient.JetStreamContext, cfg *config.JetStream) {
 	for _, stream := range streams { // streams are defined in streams.go
@@ -35,75 +26,25 @@ func DeleteAllStreams(js natsclient.JetStreamContext, cfg *config.JetStream) {
 }
 
 func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
-	natsLock.Lock()
-	defer natsLock.Unlock()
 	// check if we need an in-process NATS Server
-	if len(cfg.Addresses) != 0 {
-		// reuse existing connections
-		if s.nc != nil {
-			return s.js, s.nc
-		}
-		s.js, s.nc = setupNATS(process, cfg, nil)
-		return s.js, s.nc
-	}
-	if s.Server == nil {
-		var err error
-		opts := &natsserver.Options{
-			ServerName:      "monolith",
-			DontListen:      true,
-			JetStream:       true,
-			StoreDir:        string(cfg.StoragePath),
-			NoSystemAccount: true,
-			MaxPayload:      16 * 1024 * 1024,
-			NoSigs:          true,
-			NoLog:           cfg.NoLog,
-			SyncAlways:      true,
-		}
-		s.Server, err = natsserver.NewServer(opts)
-		if err != nil {
-			panic(err)
-		}
-		if !cfg.NoLog {
-			s.SetLogger(NewLogAdapter(), opts.Debug, opts.Trace)
-		}
-		go func() {
-			process.ComponentStarted()
-			s.Start()
-		}()
-		go func() {
-			<-process.WaitForShutdown()
-			s.Shutdown()
-			s.WaitForShutdown()
-			process.ComponentFinished()
-		}()
-	}
-	if !s.ReadyForConnections(time.Second * 60) {
-		logrus.Fatalln("NATS did not start in time")
+	if len(cfg.Addresses) == 0 {
+		logrus.Fatalln("No Jetstream addresses specified")
 	}
 	// reuse existing connections
 	if s.nc != nil {
 		return s.js, s.nc
 	}
-	nc, err := natsclient.Connect("", natsclient.InProcessServer(s))
-	if err != nil {
-		logrus.Fatalln("Failed to create NATS client")
-	}
-	js, _ := setupNATS(process, cfg, nc)
-	s.js = js
-	s.nc = nc
-	return js, nc
+	s.js, s.nc = setupNATS(process, cfg, nil)
+	return s.js, s.nc
+
 }
 
 // nolint:gocyclo
 func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {
 	if nc == nil {
 		var err error
-		opts := []natsclient.Option{}
-		if cfg.DisableTLSValidation {
-			opts = append(opts, natsclient.Secure(&tls.Config{
-				InsecureSkipVerify: true,
-			}))
-		}
+		var opts []natsclient.Option
+
 		if string(cfg.Credentials) != "" {
 			opts = append(opts, natsclient.UserCredentials(string(cfg.Credentials)))
 		}
@@ -166,11 +107,6 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 			}
 		}
 		if info == nil {
-			// If we're trying to keep everything in memory (e.g. unit tests)
-			// then overwrite the storage policy.
-			if cfg.InMemory {
-				stream.Storage = natsclient.MemoryStorage
-			}
 
 			// Namespace the streams without modifying the original streams
 			// array, otherwise we end up with namespaces on namespaces.

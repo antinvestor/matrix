@@ -330,7 +330,6 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
 	cfg.Global.ServerName = spec.ServerName("localhost")
 	cfg.Global.PrivateKey = privKey
-	cfg.Global.JetStream.InMemory = true
 	keyRing := &test.NopJSONVerifier{}
 	natsInstance := jetstream.NATSInstance{}
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.

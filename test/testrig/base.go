@@ -32,22 +32,13 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 
 	processContext := process.NewProcessContext()
 	ctx := processContext.Context()
-	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
+	defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx)
 	if err != nil {
-		t.Fatalf("Could not create redis container %s", err)
-	}
-
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
+		t.Fatalf("Could not create default connections %s", err)
 	}
 
 	var cfg config.Dendrite
-	cfg.Defaults(config.DefaultOpts{
-		DatabaseConnectionStr: connStr,
-		CacheConnectionStr:    cacheConnStr,
-	})
-	cfg.Global.JetStream.InMemory = true
+	cfg.Defaults(defaultOpts)
 	cfg.FederationAPI.KeyPerspectives = nil
 
 	cfg.Global.Cache.MaxAge = time.Minute * 5
@@ -66,7 +57,6 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 	return &cfg, processContext, func() {
 		processContext.ShutdownDendrite()
 		processContext.WaitForShutdown()
-		closeDb()
-		closeCache()
+		closeDSConns()
 	}
 }

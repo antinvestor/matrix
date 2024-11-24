@@ -70,7 +70,22 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      nats:
+        image: nats:latest
+        ports:
+          - 4222:4222
+        options: >-
+          --name=nats-server
+          -v ${GITHUB_WORKSPACE}/nats.conf:/etc/nats/nats.conf
+          --config /etc/nats/nats.conf
     steps:
+      - name: Set up NATS configuration
+        run: |
+          cat <<EOF > nats.conf
+          jetstream: {
+            store_dir: "/data/jetstream"
+          }
+          EOF
       - uses: actions/checkout@v4
       - name: Install libolm and dependencies
         run: sudo apt-get install libolm-dev libolm3
@@ -85,7 +100,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run unit tests
         env:
-          REDIS_URI: redis://localhost:6379/0
+          QUEUE_URI: nats://localhost:4222
+          CACHE_URI: redis://localhost:6379/0
           POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
@@ -165,7 +181,22 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      nats:
+        image: nats:latest
+        ports:
+          - 4222:4222
+        options: >-
+          --name=nats-server
+          -v ${GITHUB_WORKSPACE}/nats.conf:/etc/nats/nats.conf
+          --config /etc/nats/nats.conf
     steps:
+      - name: Set up NATS configuration
+        run: |
+          cat <<EOF > nats.conf
+          jetstream: {
+            store_dir: "/data/jetstream"
+          }
+          EOF
       - name: Run actions/checkout@v4 for matrix
         uses: actions/checkout@v4
         with:
@@ -215,7 +246,8 @@ jobs:
           go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         env:
-          REDIS_URI: redis://localhost:6379/0
+          QUEUE_URI: nats://localhost:4222
+          CACHE_URI: redis://localhost:6379/0
           POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_

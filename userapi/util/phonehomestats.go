@@ -97,9 +97,6 @@ func (p *phoneHomeStats) collect() {
 
 	// configuration information
 	p.stats["federation_disabled"] = p.cfg.Global.DisableFederation
-	natsEmbedded := len(p.cfg.Global.JetStream.Addresses) == 0
-	p.stats["nats_embedded"] = natsEmbedded
-	p.stats["nats_in_memory"] = p.cfg.Global.JetStream.InMemory && natsEmbedded
 
 	if len(p.cfg.Logging) > 0 {
 		p.stats["log_level"] = p.cfg.Logging[0].Level
