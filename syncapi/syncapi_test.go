@@ -120,12 +120,12 @@ func (s *syncUserAPI) PerformLastSeenUpdate(ctx context.Context, req *userapi.Pe
 }
 
 func TestSyncAPIAccessTokens(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		testSyncAccessTokens(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		testSyncAccessTokens(t, testOpts)
 	})
 }
 
-func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
+func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
@@ -136,7 +136,7 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 	defer closeRig()
 
 	routers := httputil.NewRouters()
@@ -217,12 +217,12 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 }
 
 func TestSyncAPIEventFormatPowerLevels(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		testSyncEventFormatPowerLevels(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		testSyncEventFormatPowerLevels(t, testOpts)
 	})
 }
 
-func testSyncEventFormatPowerLevels(t *testing.T, dbType test.DBType) {
+func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption) {
 	user := test.NewUser(t)
 	setRoomVersion := func(t *testing.T, r *test.Room) { r.Version = gomatrixserverlib.RoomVersionPseudoIDs }
 	room := test.NewRoom(t, user, setRoomVersion)
@@ -240,7 +240,7 @@ func testSyncEventFormatPowerLevels(t *testing.T, dbType test.DBType) {
 		},
 	}, test.WithStateKey(""))
 
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 	defer closeRig()
 
 	routers := httputil.NewRouters()
@@ -373,12 +373,12 @@ func testSyncEventFormatPowerLevels(t *testing.T, dbType test.DBType) {
 // Tests what happens when we create a room and then /sync before all events from /createRoom have
 // been sent to the syncapi
 func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		testSyncAPICreateRoomSyncEarly(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		testSyncAPICreateRoomSyncEarly(t, testOpts)
 	})
 }
 
-func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
+func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption) {
 	t.Skip("Skipped, possibly fixed")
 	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
@@ -390,7 +390,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 	defer closeRig()
 
 	routers := httputil.NewRouters()
@@ -473,12 +473,12 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 // Test that if we hit /sync we get back presence: online, regardless of whether messages get delivered
 // via NATS. Regression test for a flakey test "User sees their own presence in a sync"
 func TestSyncAPIUpdatePresenceImmediately(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		testSyncAPIUpdatePresenceImmediately(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		testSyncAPIUpdatePresenceImmediately(t, testOpts)
 	})
 }
 
-func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
+func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.DependancyOption) {
 	user := test.NewUser(t)
 	alice := userapi.Device{
 		ID:          "ALICEID",
@@ -488,7 +488,7 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 	defer closeRig()
 
 	routers := httputil.NewRouters()
@@ -534,12 +534,12 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 
 // This is mainly what Sytest is doing in "test_history_visibility"
 func TestMessageHistoryVisibility(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		testHistoryVisibility(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		testHistoryVisibility(t, testOpts)
 	})
 }
 
-func testHistoryVisibility(t *testing.T, dbType test.DBType) {
+func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 	type result struct {
 		seeWithoutJoin bool
 		seeBeforeJoin  bool
@@ -611,7 +611,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 			userType = "real user"
 		}
 
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
@@ -884,9 +884,9 @@ func TestGetMembership(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		routers := httputil.NewRouters()
@@ -954,7 +954,7 @@ func TestSendToDevice(t *testing.T) {
 	test.WithAllDatabases(t, testSendToDevice)
 }
 
-func testSendToDevice(t *testing.T, dbType test.DBType) {
+func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 	user := test.NewUser(t)
 	alice := userapi.Device{
 		ID:          "ALICEID",
@@ -964,7 +964,7 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 	defer closeRig()
 
 	routers := httputil.NewRouters()
@@ -1100,7 +1100,7 @@ func TestContext(t *testing.T) {
 	test.WithAllDatabases(t, testContext)
 }
 
-func testContext(t *testing.T, dbType test.DBType) {
+func testContext(t *testing.T, testOpts test.DependancyOption) {
 
 	tests := []struct {
 		name             string
@@ -1190,7 +1190,7 @@ func testContext(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 	defer closeRig()
 
 	routers := httputil.NewRouters()
@@ -1335,8 +1335,8 @@ func TestUpdateRelations(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		t.Cleanup(closeRig)
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -1374,7 +1374,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	routers := httputil.NewRouters()
 
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 	defer closeRig()
 
 	cfg.SyncAPI.Fulltext.Enabled = true

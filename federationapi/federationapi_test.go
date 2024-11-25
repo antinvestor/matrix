@@ -177,13 +177,13 @@ func (f *fedClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Tra
 // Regression test to make sure that /send_join is updating the destination hosts synchronously and
 // isn't relying on the roomserver.
 func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		testFederationAPIJoinThenKeyUpdate(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		testFederationAPIJoinThenKeyUpdate(t, testOpts)
 	})
 }
 
-func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOption) {
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
@@ -322,7 +322,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 		},
 	}
 
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 	defer closeRig()
 	routers := httputil.NewRouters()
 
@@ -456,8 +456,8 @@ func TestNotaryServer(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches, err := caching.NewCache(&cfg.Global.Cache)

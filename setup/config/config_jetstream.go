@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -44,8 +45,18 @@ func (c *JetStream) Defaults(opts DefaultOpts) {
 	}
 
 	c.TopicPrefix = "Matrix"
+	if opts.QueuePrefix != "" {
+		c.TopicPrefix = opts.QueuePrefix
+	}
+
 	c.Credentials = ""
 
 }
 
-func (c *JetStream) Verify(configErrs *ConfigErrors) {}
+func (c *JetStream) Verify(configErrs *ConfigErrors) {
+	databaseUriStr := os.Getenv("QUEUE_URI")
+	if databaseUriStr != "" {
+		c.Addresses = strings.Split(databaseUriStr, ",")
+	}
+
+}

@@ -17,7 +17,7 @@ import (
 	ed255192 "golang.org/x/crypto/ed25519"
 )
 
-func mustCreateUserRoomKeysTable(t *testing.T, dbType test.DBType) (tab tables.UserRoomKeys, db *sql.DB, closeDb func()) {
+func mustCreateUserRoomKeysTable(t *testing.T, testOpts test.DependancyOption) (tab tables.UserRoomKeys, db *sql.DB, closeDb func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -39,8 +39,8 @@ func mustCreateUserRoomKeysTable(t *testing.T, dbType test.DBType) (tab tables.U
 }
 
 func TestUserRoomKeysTable(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, db, closeDb := mustCreateUserRoomKeysTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, db, closeDb := mustCreateUserRoomKeysTable(t, testOpts)
 		defer closeDb()
 		userNID := types.EventStateKeyNID(1)
 		roomNID := types.RoomNID(1)

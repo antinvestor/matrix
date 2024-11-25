@@ -201,13 +201,13 @@ func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 		}
 
 		// Create an absolute path from a potentially relative path
-		absPath, err := filepath.Abs(configPath)
+		abstractPath, err := filepath.Abs(configPath)
 		if err != nil {
 			return err
 		}
 
 		// Read the application service's config file
-		configData, err := os.ReadFile(absPath)
+		configData, err := os.ReadFile(abstractPath)
 		if err != nil {
 			return err
 		}

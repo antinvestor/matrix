@@ -16,7 +16,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
+func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
 	ctx := context.TODO()
 	conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
@@ -50,8 +50,8 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 	bob := test.NewUser(t)
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat))
 	_ = bob
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateDatabase(t, testOpts)
 		defer closeDb()
 
 		// store all events

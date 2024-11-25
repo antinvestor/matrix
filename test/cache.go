@@ -16,80 +16,79 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/sirupsen/logrus"
-	"github.com/testcontainers/testcontainers-go"
-
-	tcRedis "github.com/testcontainers/testcontainers-go/modules/redis"
+	"github.com/redis/go-redis/v9"
+	"math/rand/v2"
+	"net/url"
+	"os"
 )
 
-const RedisImage = "redis:7"
+//const RedisImage = "redis:7"
+//
+//func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
+//	return tcRedis.Run(ctx, RedisImage)
+//}
+//
+//// testContainerRedisDataSource Prepare a redis connection string for testing.
+//// Returns the connection string to use and a close function which must be called when the test finishes.
+//// Calling this function twice will return the same database, which will have data from previous tests
+//// unless close() is called.
+//func testContainerRedisDataSource(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
+//
+//	container, err := setupRedis(ctx)
+//	if err != nil {
+//		return "", nil, err
+//	}
+//
+//	connStr, err := container.ConnectionString(ctx)
+//	if err != nil {
+//		return "", nil, err
+//	}
+//
+//	return config.DataSource(connStr), func() {
+//		err = testcontainers.TerminateContainer(container)
+//		if err != nil {
+//			logrus.WithError(err).Error("failed to terminate container")
+//		}
+//	}, nil
+//}
+//
+//var dbCounter int64
 
-func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
-	return tcRedis.Run(ctx, RedisImage)
+func clearCache(ctx context.Context, redisUriStr string) error {
+
+	opts, err := redis.ParseURL(redisUriStr)
+	if err != nil {
+		return err
+	}
+
+	client := redis.NewClient(opts)
+	return client.FlushDB(ctx).Err()
 }
 
 // PrepareRedisDataSourceConnection Prepare a redis connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareRedisDataSourceConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
+func PrepareRedisDataSourceConnection(ctx context.Context) (connStr config.DataSource, close func(), err error) {
 
-	container, err := setupRedis(ctx)
-	if err != nil {
-		return "", nil, err
+	redisUriStr := os.Getenv("TESTING_CACHE_URI")
+	if redisUriStr == "" {
+		redisUriStr = "redis://matrix:s3cr3t@127.0.0.1:6379"
 	}
 
-	connStr, err := container.ConnectionString(ctx)
+	parsedUri, err := url.Parse(redisUriStr)
 	if err != nil {
-		return "", nil, err
+		return "", func() {}, err
 	}
 
-	return config.DataSource(connStr), func() {
-		err = testcontainers.TerminateContainer(container)
-		if err != nil {
-			logrus.WithError(err).Error("failed to terminate container")
-		}
+	newDb := rand.IntN(10000)
+
+	parsedUri.Path = fmt.Sprintf("/%d", newDb)
+	redisUriStr = parsedUri.String()
+
+	return config.DataSource(redisUriStr), func() {
+		_ = clearCache(ctx, redisUriStr)
 	}, nil
 }
-
-//var dbCounter int64
-//
-//func clearCache(ctx context.Context, redisUriStr string) error {
-//
-//	opts, err := redis.ParseURL(redisUriStr)
-//	if err != nil {
-//		return err
-//	}
-//
-//	client := redis.NewClient(opts)
-//	return client.FlushDB(ctx).Err()
-//	return nil
-//}
-//
-//// PrepareRedisDataSourceConnection Prepare a redis connection string for testing.
-//// Returns the connection string to use and a close function which must be called when the test finishes.
-//// Calling this function twice will return the same database, which will have data from previous tests
-//// unless close() is called.
-//func PrepareRedisDataSourceConnection(ctx context.Context) (connStr string, close func(), err error) {
-//
-//	redisUriStr := os.Getenv("REDIS_URI")
-//	if redisUriStr == "" {
-//		redisUriStr = "redis://matrix:s3cr3t@localhost:6379/0"
-//	}
-//
-//	parsedRedisUri, err := url.Parse(redisUriStr)
-//	if err != nil {
-//		return "", func() {}, err
-//	}
-//
-//	newDb := atomic.AddInt64(&dbCounter, 1)
-//
-//	parsedRedisUri.Path = fmt.Sprintf("/%d", newDb)
-//	redisUriStr = parsedRedisUri.String()
-//
-//	return redisUriStr, func() {
-//		_ = clearCache(ctx, redisUriStr)
-//	}, nil
-//}
-//

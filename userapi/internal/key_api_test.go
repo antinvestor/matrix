@@ -13,7 +13,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage"
 )
 
-func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.KeyDatabase, func()) {
+func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.KeyDatabase, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -138,8 +138,8 @@ func Test_QueryDeviceMessages(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDB := mustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDB := mustCreateDatabase(t, testOpts)
 		defer closeDB()
 		if err := db.StoreLocalDeviceKeys(ctx, deviceMessages); err != nil {
 			t.Fatalf("failed to store local devicesKeys")

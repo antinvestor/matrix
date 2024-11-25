@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventStateKeysTable(t *testing.T, dbType test.DBType) (tables.EventStateKeys, func()) {
+func mustCreateEventStateKeysTable(t *testing.T, testOpts test.DependancyOption) (tables.EventStateKeys, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -38,8 +38,8 @@ func mustCreateEventStateKeysTable(t *testing.T, dbType test.DBType) (tables.Eve
 }
 
 func Test_EventStateKeysTable(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreateEventStateKeysTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, close := mustCreateEventStateKeysTable(t, testOpts)
 		defer close()
 		ctx := context.Background()
 		var stateKeyNID, gotEventStateKey types.EventStateKeyNID

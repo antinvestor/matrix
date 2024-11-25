@@ -51,8 +51,8 @@ func (f *FakeQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.Room
 }
 
 func TestUsers(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -194,8 +194,8 @@ func Test_QueryLeftUsers(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -252,8 +252,8 @@ func TestPurgeRoom(t *testing.T) {
 
 	ctx := context.Background()
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		natsInstance := jetstream.NATSInstance{}
 		defer closeRig()
 		routers := httputil.NewRouters()
@@ -542,8 +542,8 @@ func TestRedaction(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -736,8 +736,8 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		natsInstance := jetstream.NATSInstance{}
 		defer closeRig()
 
@@ -1063,8 +1063,8 @@ func TestUpgrade(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		natsInstance := jetstream.NATSInstance{}
 		defer closeRig()
 
@@ -1118,9 +1118,9 @@ func TestStateReset(t *testing.T) {
 	charlie := test.NewUser(t)
 	ctx := context.Background()
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		// Prepare APIs
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -1227,8 +1227,8 @@ func TestNewServerACLs(t *testing.T) {
 
 	roomWithoutACL := test.NewRoom(t, alice)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -1266,7 +1266,7 @@ func TestRoomConsumerRecreation(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	// As this is DB unrelated, just use SQLite
-	cfg, processCtx, closeDB := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, processCtx, closeDB := testrig.CreateConfig(t, test.DependancyOption{})
 	defer closeDB()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	natsInstance := &jetstream.NATSInstance{}
@@ -1323,8 +1323,8 @@ func TestRoomsWithACLs(t *testing.T) {
 		"allow": []string{"*"},
 	}, test.WithStateKey(""))
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)

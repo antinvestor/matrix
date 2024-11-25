@@ -68,11 +68,11 @@ func (d *dummyProducer) PublishMsg(msg *nats.Msg, opts ...nats.PubOpt) (*nats.Pu
 	return &nats.PubAck{}, nil
 }
 
-func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType, publisher producers.JetStreamPublisher) (api.UserInternalAPI, storage.UserDatabase, func()) {
+func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, testOpts test.DependancyOption, publisher producers.JetStreamPublisher) (api.UserInternalAPI, storage.UserDatabase, func()) {
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
-	cfg, ctx, closeRig := testrig.CreateConfig(t, dbType)
+	cfg, ctx, closeRig := testrig.CreateConfig(t, testOpts)
 	sName := serverName
 	if opts.serverName != "" {
 		sName = spec.ServerName(opts.serverName)
@@ -156,8 +156,8 @@ func TestQueryProfile(t *testing.T) {
 		}
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
 		defer close()
 		_, err := accountDB.CreateAccount(context.TODO(), "alice", serverName, "foobar", "", api.AccountTypeUser)
 		if err != nil {
@@ -179,8 +179,8 @@ func TestQueryProfile(t *testing.T) {
 // for https://github.com/antinvestor/matrix/issues/2780).
 func TestPasswordlessLoginFails(t *testing.T) {
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
 		defer close()
 		_, err := accountDB.CreateAccount(ctx, "auser", serverName, "", "", api.AccountTypeAppService)
 		if err != nil {
@@ -205,8 +205,8 @@ func TestLoginToken(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("tokenLoginFlow", func(t *testing.T) {
-		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-			userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
+		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+			userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
 			defer close()
 			_, err := accountDB.CreateAccount(ctx, "auser", serverName, "apassword", "", api.AccountTypeUser)
 			if err != nil {
@@ -255,8 +255,8 @@ func TestLoginToken(t *testing.T) {
 	})
 
 	t.Run("expiredTokenIsNotReturned", func(t *testing.T) {
-		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, dbType, nil)
+		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, testOpts, nil)
 			defer close()
 
 			creq := api.PerformLoginTokenCreationRequest{
@@ -280,8 +280,8 @@ func TestLoginToken(t *testing.T) {
 	})
 
 	t.Run("deleteWorks", func(t *testing.T) {
-		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
+		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
 			defer close()
 
 			creq := api.PerformLoginTokenCreationRequest{
@@ -311,8 +311,8 @@ func TestLoginToken(t *testing.T) {
 	})
 
 	t.Run("deleteUnknownIsNoOp", func(t *testing.T) {
-		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
+		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
 			defer close()
 			dreq := api.PerformLoginTokenDeletionRequest{Token: "non-existent token"}
 			var dresp api.PerformLoginTokenDeletionResponse
@@ -329,8 +329,8 @@ func TestQueryAccountByLocalpart(t *testing.T) {
 	localpart, userServername, _ := gomatrixserverlib.SplitID('@', alice.ID)
 
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		intAPI, db, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType, nil)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		intAPI, db, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
 		defer close()
 
 		createdAcc, err := db.CreateAccount(ctx, localpart, userServername, "", "", alice.AccountType)
@@ -408,8 +408,8 @@ func TestAccountData(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, dbType, nil)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, nil)
 		defer close()
 
 		for _, tc := range testCases {
@@ -524,8 +524,8 @@ func TestDevices(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, dbType, nil)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, nil)
 		defer close()
 
 		for _, tc := range creationTests {
@@ -629,9 +629,9 @@ func TestDevices(t *testing.T) {
 // Tests that the session ID of a device is not reused when reusing the same device ID.
 func TestDeviceIDReuse(t *testing.T) {
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		publisher := &dummyProducer{t: t}
-		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, dbType, publisher)
+		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, publisher)
 		defer close()
 
 		res := api.PerformDeviceCreationResponse{}

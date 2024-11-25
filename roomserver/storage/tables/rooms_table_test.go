@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRoomsTable(t *testing.T, dbType test.DBType) (tab tables.Rooms, close func()) {
+func mustCreateRoomsTable(t *testing.T, testOpts test.DependancyOption) (tab tables.Rooms, close func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -39,8 +39,8 @@ func TestRoomsTable(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreateRoomsTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, close := mustCreateRoomsTable(t, testOpts)
 		defer close()
 
 		wantRoomNID, err := tab.InsertRoomNID(ctx, nil, room.ID, room.Version)

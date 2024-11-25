@@ -159,7 +159,7 @@ func TestGetAuthChainMultiple(t *testing.T) {
 	}
 }
 
-func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
+func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
 
 	ctx := context.TODO()
 	conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
@@ -191,8 +191,8 @@ func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) 
 }
 
 func TestCurrentEventIsNil(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateDatabase(t, testOpts)
 		defer closeDb()
 		querier := Queryer{
 			DB: db,

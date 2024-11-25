@@ -15,7 +15,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreatePublishedTable(t *testing.T, dbType test.DBType) (tab tables.Published, close func()) {
+func mustCreatePublishedTable(t *testing.T, testOpts test.DependancyOption) (tab tables.Published, close func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -40,8 +40,8 @@ func TestPublishedTable(t *testing.T) {
 	ctx := context.Background()
 	alice := test.NewUser(t)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreatePublishedTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, close := mustCreatePublishedTable(t, testOpts)
 		defer close()
 
 		// Publish some rooms

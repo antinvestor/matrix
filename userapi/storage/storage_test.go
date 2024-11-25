@@ -36,7 +36,7 @@ var (
 	ctx              = context.Background()
 )
 
-func mustCreateUserDatabase(t *testing.T, _ test.DBType) (storage.UserDatabase, func()) {
+func mustCreateUserDatabase(t *testing.T, _ test.DependancyOption) (storage.UserDatabase, func()) {
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -53,8 +53,8 @@ func mustCreateUserDatabase(t *testing.T, _ test.DBType) (storage.UserDatabase, 
 
 // Tests storing and getting account data
 func Test_AccountData(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateUserDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 		alice := test.NewUser(t)
 		localpart, domain, err := gomatrixserverlib.SplitID('@', alice.ID)
@@ -84,8 +84,8 @@ func Test_AccountData(t *testing.T) {
 
 // Tests the creation of accounts
 func Test_Accounts(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateUserDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 		alice := test.NewUser(t)
 		aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
@@ -164,8 +164,8 @@ func Test_Devices(t *testing.T) {
 	deviceID := util.RandomString(8)
 	accessToken := util.RandomString(16)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateUserDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 
 		deviceWithID, err := db.CreateDevice(ctx, localpart, domain, &deviceID, accessToken, nil, "", "")
@@ -244,8 +244,8 @@ func Test_KeyBackup(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateUserDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 
 		wantAuthData := json.RawMessage("my auth data")
@@ -321,8 +321,8 @@ func Test_KeyBackup(t *testing.T) {
 
 func Test_LoginToken(t *testing.T) {
 	alice := test.NewUser(t)
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateUserDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 
 		// create a new token
@@ -353,8 +353,8 @@ func Test_OpenID(t *testing.T) {
 	alice := test.NewUser(t)
 	token := util.RandomString(24)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateUserDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 
 		expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + openIDLifetimeMS
@@ -374,8 +374,8 @@ func Test_Profile(t *testing.T) {
 	aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateUserDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 
 		// create account, which also creates a profile
@@ -423,8 +423,8 @@ func Test_Pusher(t *testing.T) {
 	aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateUserDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 
 		appID := util.RandomString(8)
@@ -474,8 +474,8 @@ func Test_ThreePID(t *testing.T) {
 	aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateUserDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 		threePID := util.RandomString(8)
 		medium := util.RandomString(8)
@@ -513,8 +513,8 @@ func Test_Notification(t *testing.T) {
 	assert.NoError(t, err)
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateUserDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 		// generate some dummy notifications
 		for i := 0; i < 10; i++ {
@@ -579,8 +579,8 @@ func Test_Notification(t *testing.T) {
 	})
 }
 
-func mustCreateKeyDatabase(t *testing.T, dbType test.DBType) (storage.KeyDatabase, func()) {
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+func mustCreateKeyDatabase(t *testing.T, testOpts test.DependancyOption) (storage.KeyDatabase, func()) {
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	db, err := storage.NewKeyDatabase(cm, &cfg.KeyServer.Database)
 	if err != nil {
@@ -598,8 +598,8 @@ func MustNotError(t *testing.T, err error) {
 }
 
 func TestKeyChanges(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, clean := mustCreateKeyDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, clean := mustCreateKeyDatabase(t, testOpts)
 		defer clean()
 		_, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
@@ -621,8 +621,8 @@ func TestKeyChanges(t *testing.T) {
 }
 
 func TestKeyChangesNoDupes(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, clean := mustCreateKeyDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, clean := mustCreateKeyDatabase(t, testOpts)
 		defer clean()
 		deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
@@ -647,8 +647,8 @@ func TestKeyChangesNoDupes(t *testing.T) {
 }
 
 func TestKeyChangesUpperLimit(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, clean := mustCreateKeyDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, clean := mustCreateKeyDatabase(t, testOpts)
 		defer clean()
 		deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
@@ -676,8 +676,8 @@ var deviceArray = []string{"AAA", "another_device"}
 // and that they are returned correctly when querying for device keys.
 func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 	var err error
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, clean := mustCreateKeyDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, clean := mustCreateKeyDatabase(t, testOpts)
 		defer clean()
 		alice := "@alice:TestDeviceKeysStreamIDGeneration"
 		bob := "@bob:TestDeviceKeysStreamIDGeneration"
@@ -762,8 +762,8 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 }
 
 func TestOneTimeKeys(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, clean := mustCreateKeyDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, clean := mustCreateKeyDatabase(t, testOpts)
 		defer clean()
 		userID := "@alice:localhost"
 		deviceID := "alice_device"

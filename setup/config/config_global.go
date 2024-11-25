@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -122,6 +123,7 @@ func (c *Global) Verify(configErrs *ConfigErrors) {
 		v.Verify(configErrs)
 	}
 
+	c.DatabaseOptions.Verify(configErrs)
 	c.JetStream.Verify(configErrs)
 	c.Metrics.Verify(configErrs)
 	c.Sentry.Verify(configErrs)
@@ -318,6 +320,15 @@ func (c *CacheOptions) Defaults(opts DefaultOpts) {
 
 func (c *CacheOptions) Verify(errors *ConfigErrors) {
 	checkPositive(errors, "max_size_estimated", int64(c.EstimatedMaxSize))
+
+	cacheUriStr := os.Getenv("CACHE_URI")
+	if cacheUriStr != "" {
+		dsUri := DataSource(cacheUriStr)
+		if dsUri.IsRedis() {
+			c.ConnectionString = dsUri
+		}
+	}
+
 }
 
 // ReportStats configures opt-in phone-home statistics reporting.
@@ -381,20 +392,30 @@ func (c *DatabaseOptions) Defaults(opts DefaultOpts) {
 	c.ConnMaxLifetimeSeconds = -1
 }
 
-func (c *DatabaseOptions) Verify(configErrs *ConfigErrors) {}
+func (c *DatabaseOptions) Verify(configErrs *ConfigErrors) {
+
+	databaseUriStr := os.Getenv("DATABASE_URI")
+	if databaseUriStr != "" {
+
+		dsUri := DataSource(databaseUriStr)
+		if dsUri.IsPostgres() {
+			c.ConnectionString = dsUri
+		}
+	}
+}
 
 // MaxIdleConns returns maximum idle connections to the DB
-func (c DatabaseOptions) MaxIdleConns() int {
+func (c *DatabaseOptions) MaxIdleConns() int {
 	return c.MaxIdleConnections
 }
 
 // MaxOpenConns returns maximum open connections to the DB
-func (c DatabaseOptions) MaxOpenConns() int {
+func (c *DatabaseOptions) MaxOpenConns() int {
 	return c.MaxOpenConnections
 }
 
 // ConnMaxLifetime returns maximum amount of time a connection may be reused
-func (c DatabaseOptions) ConnMaxLifetime() time.Duration {
+func (c *DatabaseOptions) ConnMaxLifetime() time.Duration {
 	return time.Duration(c.ConnMaxLifetimeSeconds) * time.Second
 }
 

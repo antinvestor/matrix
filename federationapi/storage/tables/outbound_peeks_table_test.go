@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateOutboundpeeksTable(t *testing.T, dbType test.DBType) (tables.FederationOutboundPeeks, func()) {
+func mustCreateOutboundpeeksTable(t *testing.T, testOpts test.DependancyOption) (tables.FederationOutboundPeeks, func()) {
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
@@ -41,8 +41,8 @@ func TestOutboundPeeksTable(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, closeDB := mustCreateOutboundpeeksTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, closeDB := mustCreateOutboundpeeksTable(t, testOpts)
 		defer closeDB()
 
 		// Insert a peek

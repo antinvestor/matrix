@@ -25,7 +25,7 @@ import (
 
 var ctx = context.Background()
 
-func MustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
+func MustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -61,10 +61,10 @@ func MustWriteEvents(t *testing.T, db storage.Database, events []*rstypes.Header
 }
 
 func TestWriteEvents(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
-		db, close := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, testOpts)
 		defer close()
 		MustWriteEvents(t, db, r.Events())
 	})
@@ -83,8 +83,8 @@ func WithSnapshot(t *testing.T, db storage.Database, f func(snapshot storage.Dat
 
 // These tests assert basic functionality of RecentEvents for PDUs
 func TestRecentEventsPDU(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := MustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := MustCreateDatabase(t, testOpts)
 		defer close()
 		alice := test.NewUser(t)
 		// dummy room to make sure SQL queries are filtering on room ID
@@ -197,8 +197,8 @@ func TestRecentEventsPDU(t *testing.T) {
 
 // The purpose of this test is to ensure that backfill does indeed go backwards, using a topology token
 func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := MustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := MustCreateDatabase(t, testOpts)
 		defer close()
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
@@ -231,8 +231,8 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 // The purpose of this test is to ensure that backfilling returns no start/end if a given filter removes
 // all events.
 func TestGetEventsInRangeWithTopologyTokenNoEventsForFilter(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := MustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := MustCreateDatabase(t, testOpts)
 		defer close()
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
@@ -317,8 +317,8 @@ func TestStreamToTopologicalPosition(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := MustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := MustCreateDatabase(t, testOpts)
 		defer close()
 
 		txn, err := db.NewDatabaseTransaction(ctx)
@@ -554,8 +554,8 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 	deviceID := "one"
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := MustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := MustCreateDatabase(t, testOpts)
 		defer close()
 		// At this point there should be no messages. We haven't sent anything
 		// yet.
@@ -938,8 +938,8 @@ func TestRoomSummary(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := MustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := MustCreateDatabase(t, testOpts)
 		defer close()
 
 		for _, tc := range testCases {
@@ -976,9 +976,9 @@ func TestRecentEvents(t *testing.T) {
 		room2.ID: room2,
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		filter := synctypes.DefaultRoomEventFilter()
-		db, close := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, testOpts)
 		t.Cleanup(close)
 
 		MustWriteEvents(t, db, room1.Events())
@@ -1035,8 +1035,8 @@ func TestRedaction(t *testing.T) {
 
 	redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hi"})
 	redactionEvent := room.CreateEvent(t, alice, spec.MRoomRedaction, map[string]string{"redacts": redactedEvent.EventID()})
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := MustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := MustCreateDatabase(t, testOpts)
 		t.Cleanup(close)
 		MustWriteEvents(t, db, room.Events())
 

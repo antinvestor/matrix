@@ -366,7 +366,7 @@ func TestDebounce(t *testing.T) {
 	}
 }
 
-func mustCreateKeyserverDB(t *testing.T, _ test.DBType) (storage.KeyDatabase, func()) {
+func mustCreateKeyserverDB(t *testing.T, _ test.DependancyOption) (storage.KeyDatabase, func()) {
 	t.Helper()
 
 	connStr, clearDB, err := test.PrepareDatabaseDSConnection(ctx)
@@ -400,8 +400,8 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 	// Bob is not joined to any of our rooms
 	rsAPI := &mockKeyserverRoomserverAPI{leftUsers: []string{bob.ID}}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, clearDB := mustCreateKeyserverDB(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, clearDB := mustCreateKeyserverDB(t, testOpts)
 		defer clearDB()
 
 		// This should not get deleted

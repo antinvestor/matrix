@@ -207,8 +207,8 @@ func TestSearch(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 
 		// create requisites

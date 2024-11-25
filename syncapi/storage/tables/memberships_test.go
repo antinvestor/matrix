@@ -17,7 +17,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func newMembershipsTable(t *testing.T, dbType test.DBType) (tables.Memberships, *sql.DB, func()) {
+func newMembershipsTable(t *testing.T, testOpts test.DependancyOption) (tables.Memberships, *sql.DB, func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
@@ -71,8 +71,8 @@ func TestMembershipsTable(t *testing.T) {
 		userEvents = append(userEvents, ev)
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		table, _, close := newMembershipsTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		table, _, close := newMembershipsTable(t, testOpts)
 		defer close()
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)

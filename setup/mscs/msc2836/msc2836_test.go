@@ -560,7 +560,7 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
 	t.Helper()
 
-	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 	t.Cleanup(closeRig)
 
 	cfg.Global.ServerName = "localhost"

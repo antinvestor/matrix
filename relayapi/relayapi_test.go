@@ -39,8 +39,8 @@ import (
 )
 
 func TestCreateNewRelayInternalAPI(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -55,7 +55,7 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 }
 
 func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
 		var cfg config.Dendrite
 		cfg.Defaults(config.DefaultOpts{})
@@ -69,8 +69,8 @@ func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 }
 
 func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, _, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, _, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 		routers := httputil.NewRouters()
 		assert.Panics(t, func() {
@@ -115,8 +115,8 @@ func createSendRelayTxnHTTPRequest(serverName spec.ServerName, txnID string, use
 }
 
 func TestCreateRelayPublicRoutes(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		routers := httputil.NewRouters()
@@ -172,8 +172,8 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 }
 
 func TestDisableRelayPublicRoutes(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		routers := httputil.NewRouters()

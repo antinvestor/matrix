@@ -13,10 +13,10 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 )
 
-func newSyncDB(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func newSyncDB(t *testing.T, testOpts test.DependancyOption) (storage.Database, func()) {
 	t.Helper()
 
-	cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+	cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	syncDB, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
 	if err != nil {
@@ -27,8 +27,8 @@ func newSyncDB(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 }
 
 func TestFilterTable(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, closeDB := newSyncDB(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, closeDB := newSyncDB(t, testOpts)
 		defer closeDB()
 
 		// initially create a filter
@@ -68,8 +68,8 @@ func TestFilterTable(t *testing.T) {
 func TestIgnores(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		syncDB, closeDB := newSyncDB(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		syncDB, closeDB := newSyncDB(t, testOpts)
 		defer closeDB()
 
 		tab, err := syncDB.NewDatabaseTransaction(context.Background())

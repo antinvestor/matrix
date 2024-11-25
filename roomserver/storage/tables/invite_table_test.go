@@ -15,7 +15,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateInviteTable(t *testing.T, dbType test.DBType) (tables.Invites, func()) {
+func mustCreateInviteTable(t *testing.T, testOpts test.DependancyOption) (tables.Invites, func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
@@ -38,8 +38,8 @@ func mustCreateInviteTable(t *testing.T, dbType test.DBType) (tables.Invites, fu
 
 func TestInviteTable(t *testing.T) {
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreateInviteTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, close := mustCreateInviteTable(t, testOpts)
 		defer close()
 		eventID1 := util.RandomString(16)
 		roomNID := types.RoomNID(1)

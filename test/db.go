@@ -29,10 +29,15 @@ import (
 	"github.com/lib/pq"
 )
 
-type DBType int
+type DependancyOption struct {
+	db    string
+	cache string
+	queue string
+}
 
-var DBTypeSQLite DBType = 1
-var DBTypePostgres DBType = 2
+func (opt *DependancyOption) Database() string {
+	return "postgres"
+}
 
 // ensureDatabaseExists checks if a specific database exists and creates it if it does not.
 func ensureDatabaseExists(_ context.Context, postgresUri *url.URL, newDbName string) (*url.URL, error) {
@@ -113,7 +118,7 @@ func generateNewDBName() (string, error) {
 func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config.DataSource, close func(), err error) {
 
 	var connectionUri *url.URL
-	postgresUriStr := os.Getenv("POSTGRES_URI")
+	postgresUriStr := os.Getenv("TESTING_DATABASE_URI")
 	if postgresUriStr == "" {
 		postgresUriStr = "postgres://matrix:s3cr3t@127.0.0.1:5432/matrix?sslmode=disable"
 	}
@@ -139,13 +144,13 @@ func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config
 	}, nil
 }
 
-// WithAllDatabases Creates subtests with each known DBType
-func WithAllDatabases(t *testing.T, testFn func(t *testing.T, db DBType)) {
-	dbs := map[string]DBType{
-		"postgres": DBTypePostgres,
+// WithAllDatabases Creates subtests with each known DependancyOption
+func WithAllDatabases(t *testing.T, testFn func(t *testing.T, db DependancyOption)) {
+	dbs := map[string]DependancyOption{
+		"postgres": DependancyOption{},
 	}
-	for dbName, dbType := range dbs {
-		dbt := dbType
+	for dbName, testOpts := range dbs {
+		dbt := testOpts
 		t.Run(dbName, func(tt *testing.T) {
 			tt.Parallel()
 			testFn(tt, dbt)

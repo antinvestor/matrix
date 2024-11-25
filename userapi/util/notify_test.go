@@ -46,7 +46,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 	appID := util.RandomString(8)
 	pushKey := util.RandomString(8)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		receivedRequest := make(chan bool, 1)
 		// create a test server which responds to our /notify call
 		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

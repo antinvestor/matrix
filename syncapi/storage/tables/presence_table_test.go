@@ -17,7 +17,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func mustPresenceTable(t *testing.T, dbType test.DBType) (tables.Presence, func()) {
+func mustPresenceTable(t *testing.T, testOpts test.DependancyOption) (tables.Presence, func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
@@ -49,8 +49,8 @@ func TestPresence(t *testing.T) {
 	timestamp := spec.AsTimestamp(time.Now())
 
 	var txn *sql.Tx
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, closeDB := mustPresenceTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, closeDB := mustPresenceTable(t, testOpts)
 		defer closeDB()
 
 		// Insert some presences

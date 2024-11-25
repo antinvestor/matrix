@@ -34,20 +34,33 @@ services:
       "--user", "matrix", "on", ">s3cr3t", "~*", "+@all"
     ]
 
-  matrix:
-    hostname: matrix
-    build: .
-    ports:
-      - 8008:8008
-      - 8448:8448
-    depends_on:
-      datastore:
-        condition: service_healthy
+
+  queue:
+    hostname: queue
+    image: nats:2.10
+    restart: always
     networks:
       - internal
-    restart: unless-stopped
-    volumes:
-      - ./runtime/config:/etc/matrix
+    ports:
+      - "4222:4222"
+    command: [
+      "--js",
+    ]
+
+#  matrix:
+#    hostname: matrix
+#    build: .
+#    ports:
+#      - 8008:8008
+#      - 8448:8448
+#    depends_on:
+#      datastore:
+#        condition: service_healthy
+#    networks:
+#      - internal
+#    restart: unless-stopped
+#    volumes:
+#      - ./runtime/config:/etc/matrix
 
 networks:
   internal:

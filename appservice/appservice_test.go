@@ -130,8 +130,8 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		})
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, ctx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, ctx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		// Create a dummy application service
@@ -226,7 +226,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	srv.Start()
 	defer srv.Close()
 
-	cfg, ctx, tearDown := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, ctx, tearDown := testrig.CreateConfig(t, test.DependancyOption{})
 	defer tearDown()
 
 	// Create a dummy application service
@@ -346,8 +346,8 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		"membership": "invite",
 	}, test.WithStateKey(bob.ID))
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := &jetstream.NATSInstance{}
@@ -428,9 +428,9 @@ func TestOutputAppserviceEvent(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)

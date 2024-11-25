@@ -186,7 +186,7 @@ func TestProcessTransactionRequestPDUInvalidSignature(t *testing.T) {
 
 func createTransactionWithEDU(t *testing.T, edus []gomatrixserverlib.EDU) (*process.ProcessContext, *config.Dendrite, TxnReq, nats.JetStreamContext, func()) {
 
-	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 
 	natsInstance := &jetstream.NATSInstance{}
 	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)

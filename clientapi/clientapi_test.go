@@ -58,7 +58,7 @@ func TestGetPutDevices(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		testCases := []struct {
 			name           string
 			requestUser    *test.User
@@ -117,7 +117,7 @@ func TestGetPutDevices(t *testing.T) {
 			},
 		}
 
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -169,8 +169,8 @@ func TestDeleteDevice(t *testing.T) {
 	alice := test.NewUser(t)
 	localpart, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 
 		natsInstance := jetstream.NATSInstance{}
@@ -277,8 +277,8 @@ func TestDeleteDevices(t *testing.T) {
 	alice := test.NewUser(t)
 	localpart, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 
 		natsInstance := jetstream.NATSInstance{}
@@ -447,8 +447,8 @@ func TestSetDisplayname(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -562,8 +562,8 @@ func TestSetAvatarURL(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -642,8 +642,8 @@ func TestTyping(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 		natsInstance := jetstream.NATSInstance{}
 
@@ -728,8 +728,8 @@ func TestMembership(t *testing.T) {
 	bob := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
@@ -971,8 +971,8 @@ func TestCapabilities(t *testing.T) {
 	err := json.NewEncoder(expectedBuf).Encode(expectedMap)
 	assert.NoError(t, err)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
@@ -1024,7 +1024,7 @@ func TestTurnserver(t *testing.T) {
 	alice := test.NewUser(t)
 	ctx := context.Background()
 
-	cfg, processCtx, close := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, processCtx, close := testrig.CreateConfig(t, test.DependancyOption{})
 	cfg.ClientAPI.RateLimiting.Enabled = false
 	defer close()
 	natsInstance := jetstream.NATSInstance{}
@@ -1124,8 +1124,8 @@ func Test3PID(t *testing.T) {
 	alice := test.NewUser(t)
 	ctx := context.Background()
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
@@ -1307,8 +1307,8 @@ func TestPushRules(t *testing.T) {
 	ruleID2 := "myrule2"
 	ruleID3 := "myrule3"
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
@@ -1698,8 +1698,8 @@ func TestKeys(t *testing.T) {
 	alice := test.NewUser(t)
 
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
@@ -2175,8 +2175,8 @@ func TestKeyBackup(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
@@ -2280,9 +2280,9 @@ func TestGetMembership(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		routers := httputil.NewRouters()
@@ -2348,9 +2348,9 @@ func TestCreateRoomInvite(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -2424,8 +2424,8 @@ func TestReportEvent(t *testing.T) {
 	}, test.WithStateKey(charlie.ID))
 	eventToReport := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		routers := httputil.NewRouters()

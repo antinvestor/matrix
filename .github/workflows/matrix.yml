@@ -102,7 +102,7 @@ jobs:
         env:
           QUEUE_URI: nats://localhost:4222
           CACHE_URI: redis://localhost:6379/0
-          POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
+          DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
           go test -json -v ./... 2>&1 | gotestfmt -hide all
@@ -181,22 +181,11 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      nats:
+      jetstream:
         image: nats:latest
         ports:
           - 4222:4222
-        options: >-
-          --name=nats-server
-          -v ${GITHUB_WORKSPACE}/nats.conf:/etc/nats/nats.conf
-          --config /etc/nats/nats.conf
     steps:
-      - name: Set up NATS configuration
-        run: |
-          cat <<EOF > nats.conf
-          jetstream: {
-            store_dir: "/data/jetstream"
-          }
-          EOF
       - name: Run actions/checkout@v4 for matrix
         uses: actions/checkout@v4
         with:
@@ -248,7 +237,7 @@ jobs:
         env:
           QUEUE_URI: nats://localhost:4222
           CACHE_URI: redis://localhost:6379/0
-          POSTGRES_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
+          DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
         working-directory: complement

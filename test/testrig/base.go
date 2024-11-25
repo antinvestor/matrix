@@ -24,11 +24,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.ProcessContext, func()) {
-
-	if dbType != test.DBTypePostgres {
-		t.Fatalf("unknown db type: %v", dbType)
-	}
+func CreateConfig(t *testing.T, testOpts test.DependancyOption) (*config.Dendrite, *process.ProcessContext, func()) {
 
 	processContext := process.NewProcessContext()
 	ctx := processContext.Context()
@@ -51,7 +47,7 @@ func CreateConfig(t *testing.T, dbType test.DBType) (*config.Dendrite, *process.
 	cfg.Global.ServerName = "test"
 	// use a distinct prefix else concurrent postgres runs will clash since NATS will use
 	// the file system event with InMemory=true :(
-	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
+	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%s_", testOpts.Database())
 	cfg.SyncAPI.Fulltext.InMemory = true
 
 	return &cfg, processContext, func() {

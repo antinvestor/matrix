@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventTypesTable(t *testing.T, dbType test.DBType) (tables.EventTypes, func()) {
+func mustCreateEventTypesTable(t *testing.T, testOpts test.DependancyOption) (tables.EventTypes, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -37,8 +37,8 @@ func mustCreateEventTypesTable(t *testing.T, dbType test.DBType) (tables.EventTy
 }
 
 func Test_EventTypesTable(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreateEventTypesTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, close := mustCreateEventTypesTable(t, testOpts)
 		defer close()
 		ctx := context.Background()
 		var eventTypeNID, gotEventTypeNID types.EventTypeNID

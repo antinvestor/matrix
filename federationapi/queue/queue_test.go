@@ -42,7 +42,7 @@ import (
 func mustCreateFederationDatabase(t *testing.T, realDatabase bool) (storage.Database, *process.ProcessContext, func()) {
 	if realDatabase {
 		// Real Database/s
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 
 		dbOptions := cfg.Global.DatabaseOptions
 
@@ -597,8 +597,8 @@ func TestSendPDUBatches(t *testing.T) {
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
 
-	// test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, dbType, true)
+	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
 	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	defer func() {
@@ -642,8 +642,8 @@ func TestSendEDUBatches(t *testing.T) {
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
 
-	// test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, dbType, true)
+	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
 	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	defer func() {
@@ -687,8 +687,8 @@ func TestSendPDUAndEDUBatches(t *testing.T) {
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
 
-	// test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, dbType, true)
+	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
 	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	defer func() {
@@ -779,7 +779,7 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 	failuresUntilBlacklist := uint32(1)
 	destination := spec.ServerName("remotehost")
 	destinations := map[spec.ServerName]struct{}{destination: {}}
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, true)
 		// NOTE : These defers aren't called if go test is killed so the dbs may not get cleaned up.
 

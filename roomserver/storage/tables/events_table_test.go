@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventsTable(t *testing.T, dbType test.DBType) (tables.Events, func()) {
+func mustCreateEventsTable(t *testing.T, testOpts test.DependancyOption) (tables.Events, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -40,8 +40,8 @@ func Test_EventsTable(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, closeDb := mustCreateEventsTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, closeDb := mustCreateEventsTable(t, testOpts)
 		defer closeDb()
 		// create some dummy data
 		eventIDs := make([]string, 0, len(room.Events()))
@@ -149,11 +149,11 @@ func Test_EventsTable(t *testing.T) {
 
 func TestRoomsWithACL(t *testing.T) {
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		eventStateKeys, closeEventStateKeys := mustCreateEventTypesTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		eventStateKeys, closeEventStateKeys := mustCreateEventTypesTable(t, testOpts)
 		defer closeEventStateKeys()
 
-		eventsTable, closeEventsTable := mustCreateEventsTable(t, dbType)
+		eventsTable, closeEventsTable := mustCreateEventsTable(t, testOpts)
 		defer closeEventsTable()
 
 		ctx := context.Background()

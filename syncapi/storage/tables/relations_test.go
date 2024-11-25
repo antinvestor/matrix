@@ -13,7 +13,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func newRelationsTable(t *testing.T, dbType test.DBType) (tables.Relations, *sql.DB, func()) {
+func newRelationsTable(t *testing.T, testOpts test.DependancyOption) (tables.Relations, *sql.DB, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -61,8 +61,8 @@ const relType = "m.reaction"
 
 func TestRelationsTable(t *testing.T) {
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, _, closeDb := newRelationsTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, _, closeDb := newRelationsTable(t, testOpts)
 		defer closeDb()
 
 		// Insert some relations

@@ -14,7 +14,7 @@ import (
 func TestConnectionManager(t *testing.T) {
 
 	t.Run("component defined connection string", func(t *testing.T) {
-		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
 			processCtx := process.NewProcessContext()
 			ctx := processCtx.Context()
@@ -48,27 +48,11 @@ func TestConnectionManager(t *testing.T) {
 			if !reflect.DeepEqual(writer, writer2) {
 				t.Fatalf("expected database writer to be reused")
 			}
-
-			// This test does not work with Postgres, because we can't just simply append
-			// "x" or replace the database to use.
-			if dbType == test.DBTypePostgres {
-				return
-			}
-
-			// Test different connection string
-			dbProps = &config.DatabaseOptions{ConnectionString: config.DataSource(conStr + "x")}
-			db3, _, err := cm.Connection(dbProps)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if reflect.DeepEqual(db, db3) {
-				t.Fatalf("expected different database connection")
-			}
 		})
 	})
 
 	t.Run("global connection pool", func(t *testing.T) {
-		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
 			processCtx := process.NewProcessContext()
 			ctx := processCtx.Context()
@@ -86,8 +70,8 @@ func TestConnectionManager(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			switch dbType {
-			case test.DBTypePostgres:
+			switch testOpts {
+			case test.DependancyOption{}:
 				_, ok := writer.(*sqlutil.DummyWriter)
 				if !ok {
 					t.Fatalf("expected dummy writer")
@@ -109,9 +93,9 @@ func TestConnectionManager(t *testing.T) {
 	})
 
 	t.Run("shutdown", func(t *testing.T) {
-		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-			cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+			cfg, ctx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 			defer closeRig()
 
 			cm := sqlutil.NewConnectionManager(ctx,

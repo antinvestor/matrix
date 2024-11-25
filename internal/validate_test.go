@@ -229,7 +229,7 @@ func TestValidateApplicationServiceRequest(t *testing.T) {
 	}
 
 	// Set up a config
-	cfg, _, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, _, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 	defer closeRig()
 
 	cfg.Global.ServerName = "localhost"

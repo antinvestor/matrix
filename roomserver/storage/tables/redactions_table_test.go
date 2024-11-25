@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRedactionsTable(t *testing.T, dbType test.DBType) (tab tables.Redactions, closeDb func()) {
+func mustCreateRedactionsTable(t *testing.T, testOpts test.DependancyOption) (tab tables.Redactions, closeDb func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -37,8 +37,8 @@ func mustCreateRedactionsTable(t *testing.T, dbType test.DBType) (tab tables.Red
 func TestRedactionsTable(t *testing.T) {
 	ctx := context.Background()
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreateRedactionsTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, close := mustCreateRedactionsTable(t, testOpts)
 		defer close()
 
 		// insert and verify some redactions

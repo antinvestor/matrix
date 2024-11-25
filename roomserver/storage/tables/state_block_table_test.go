@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateStateBlockTable(t *testing.T, dbType test.DBType) (tab tables.StateBlock, close func()) {
+func mustCreateStateBlockTable(t *testing.T, testOpts test.DependancyOption) (tab tables.StateBlock, close func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -36,8 +36,8 @@ func mustCreateStateBlockTable(t *testing.T, dbType test.DBType) (tab tables.Sta
 
 func TestStateBlockTable(t *testing.T) {
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreateStateBlockTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, close := mustCreateStateBlockTable(t, testOpts)
 		defer close()
 
 		// generate some dummy data

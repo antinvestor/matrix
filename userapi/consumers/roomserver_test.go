@@ -27,7 +27,7 @@ import (
 	userAPITypes "github.com/antinvestor/matrix/userapi/types"
 )
 
-func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.UserDatabase, func()) {
+func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.UserDatabase, func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
@@ -62,8 +62,8 @@ func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, _ spec
 func Test_evaluatePushRules(t *testing.T) {
 	ctx := context.Background()
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateDatabase(t, testOpts)
 		defer closeDb()
 		consumer := OutputRoomEventConsumer{db: db, rsAPI: &FakeUserRoomserverAPI{}}
 
@@ -154,8 +154,8 @@ func TestLocalRoomMembers(t *testing.T) {
 	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]string{"membership": spec.Join}, test.WithStateKey(bob.ID))
 	room.CreateAndInsert(t, charlie, spec.MRoomMember, map[string]string{"membership": spec.Join}, test.WithStateKey(charlie.ID))
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
@@ -261,8 +261,8 @@ func TestMessageStats(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateDatabase(t, testOpts)
 		defer closeDb()
 
 		for _, tt := range tests {
@@ -304,7 +304,7 @@ func TestMessageStats(t *testing.T) {
 func BenchmarkLocalRoomMembers(b *testing.B) {
 	t := &testing.T{}
 
-	cfg, processCtx, closeDb := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, processCtx, closeDb := testrig.CreateConfig(t, test.DependancyOption{})
 	defer closeDb()
 	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 	natsInstance := &jetstream.NATSInstance{}

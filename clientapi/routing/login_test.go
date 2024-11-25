@@ -32,8 +32,8 @@ func TestLogin(t *testing.T) {
 	vhUser := &test.User{ID: "@vhuser:vh1"}
 
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		cfg.ClientAPI.RateLimiting.Enabled = false

@@ -52,7 +52,7 @@ type RelayQueueJSONDatabase struct {
 
 func mustCreateQueueJSONTable(
 	t *testing.T,
-	dbType test.DBType,
+	testOpts test.DependancyOption,
 ) (database RelayQueueJSONDatabase, closeDb func()) {
 	t.Helper()
 
@@ -81,8 +81,8 @@ func mustCreateQueueJSONTable(
 
 func TestShoudInsertTransaction(t *testing.T) {
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateQueueJSONTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := mustCreateQueueJSONTable(t, testOpts)
 		defer close()
 
 		transaction := mustCreateTransaction()
@@ -100,8 +100,8 @@ func TestShoudInsertTransaction(t *testing.T) {
 
 func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateQueueJSONTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := mustCreateQueueJSONTable(t, testOpts)
 		defer close()
 
 		transaction := mustCreateTransaction()
@@ -135,8 +135,8 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 
 func TestShouldDeleteTransaction(t *testing.T) {
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateQueueJSONTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := mustCreateQueueJSONTable(t, testOpts)
 		defer close()
 
 		transaction := mustCreateTransaction()

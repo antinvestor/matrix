@@ -12,7 +12,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
+func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
@@ -28,8 +28,8 @@ func mustCreateDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) 
 	return db, closeDb
 }
 func TestMediaRepository(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := mustCreateDatabase(t, testOpts)
 		defer close()
 		ctx := context.Background()
 		t.Run("can insert media & query media", func(t *testing.T) {
@@ -66,8 +66,8 @@ func TestMediaRepository(t *testing.T) {
 }
 
 func TestThumbnailsStorage(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := mustCreateDatabase(t, testOpts)
 		defer close()
 		ctx := context.Background()
 		t.Run("can insert thumbnails & query media", func(t *testing.T) {

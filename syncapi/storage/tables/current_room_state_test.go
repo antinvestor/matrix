@@ -16,7 +16,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func newCurrentRoomStateTable(t *testing.T, dbType test.DBType) (tables.CurrentRoomState, *sql.DB, func()) {
+func newCurrentRoomStateTable(t *testing.T, testOpts test.DependancyOption) (tables.CurrentRoomState, *sql.DB, func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
@@ -43,8 +43,8 @@ func TestCurrentRoomStateTable(t *testing.T) {
 	ctx := context.Background()
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, db, close := newCurrentRoomStateTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, db, close := newCurrentRoomStateTable(t, testOpts)
 		defer close()
 		events := room.CurrentState()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {

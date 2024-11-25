@@ -33,7 +33,7 @@ func TestLandingPage_Tcp(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 	defer closeRig()
 
 	routers := httputil.NewRouters()
@@ -75,7 +75,7 @@ func TestLandingPage_UnixSocket(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 	defer closeRig()
 
 	routers := httputil.NewRouters()

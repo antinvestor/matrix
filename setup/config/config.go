@@ -234,7 +234,7 @@ func loadConfig(
 			v.PrivateKey = c.Global.PrivateKey
 			continue
 		}
-		privateKeyPath := absPath(basePath, v.PrivateKeyPath)
+		privateKeyPath = absPath(basePath, v.PrivateKeyPath)
 		if v.KeyID, v.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
 			return nil, fmt.Errorf("failed to load private_key for virtualhost %s: %w", v.ServerName, err)
 		}
@@ -299,7 +299,7 @@ func LoadMatrixKey(privateKeyPath string, readFile func(string) ([]byte, error))
 // Derive generates data that is derived from various values provided in
 // the config file.
 func (config *Dendrite) Derive() error {
-	// Determine registrations flows based off config values
+	// Determine registration flows based off config values
 
 	config.Derived.Registration.Params = make(map[string]interface{})
 
@@ -329,6 +329,7 @@ type DefaultOpts struct {
 	DatabaseConnectionStr DataSource
 	CacheConnectionStr    DataSource
 	QueueConnectionStr    DataSource
+	QueuePrefix           string
 }
 
 // SetDefaults sets default config values if they are not explicitly set.

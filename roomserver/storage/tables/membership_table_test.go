@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateMembershipTable(t *testing.T, dbType test.DBType) (tab tables.Membership, stateKeyTab tables.EventStateKeys, close func()) {
+func mustCreateMembershipTable(t *testing.T, testOpts test.DependancyOption) (tab tables.Membership, stateKeyTab tables.EventStateKeys, close func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -41,8 +41,8 @@ func mustCreateMembershipTable(t *testing.T, dbType test.DBType) (tab tables.Mem
 
 func TestMembershipTable(t *testing.T) {
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, stateKeyTab, close := mustCreateMembershipTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, stateKeyTab, close := mustCreateMembershipTable(t, testOpts)
 		defer close()
 		_ = close
 

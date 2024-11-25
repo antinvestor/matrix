@@ -81,7 +81,7 @@ func Test_migrations_Up(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
 		processCtx := process.NewProcessContext()
 		ctx := processCtx.Context()
@@ -117,7 +117,7 @@ func Test_migrations_Up(t *testing.T) {
 }
 
 func Test_insertMigration(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
 		processCtx := process.NewProcessContext()
 		ctx := processCtx.Context()

@@ -19,7 +19,7 @@ import (
 	ed255192 "golang.org/x/crypto/ed25519"
 )
 
-func mustCreateRoomserverDatabase(t *testing.T, dbType test.DBType) (*shared.Database, func()) {
+func mustCreateRoomserverDatabase(t *testing.T, testOpts test.DependancyOption) (*shared.Database, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -91,8 +91,8 @@ func Test_GetLeftUsers(t *testing.T) {
 	charlie := test.NewUser(t)
 
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateRoomserverDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := mustCreateRoomserverDatabase(t, testOpts)
 		defer close()
 
 		// Create dummy entries
@@ -128,8 +128,8 @@ func TestUserRoomKeys(t *testing.T) {
 	roomID, err := spec.NewRoomID(room.ID)
 	assert.NoError(t, err)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateRoomserverDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := mustCreateRoomserverDatabase(t, testOpts)
 		defer close()
 
 		// create a room NID so we can query the room
@@ -208,8 +208,8 @@ func TestAssignRoomNID(t *testing.T) {
 	roomID, err := spec.NewRoomID(room.ID)
 	assert.NoError(t, err)
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateRoomserverDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, close := mustCreateRoomserverDatabase(t, testOpts)
 		defer close()
 
 		nid, err := db.AssignRoomNID(ctx, *roomID, room.Version)

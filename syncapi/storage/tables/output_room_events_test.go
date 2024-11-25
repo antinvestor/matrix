@@ -17,7 +17,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, *sql.DB, func()) {
+func newOutputRoomEventsTable(t *testing.T, testOpts test.DependancyOption) (tables.Events, *sql.DB, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -45,8 +45,8 @@ func TestOutputRoomEventsTable(t *testing.T) {
 	ctx := context.Background()
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, db, closeDb := newOutputRoomEventsTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, db, closeDb := newOutputRoomEventsTable(t, testOpts)
 		defer closeDb()
 		events := room.Events()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
@@ -120,8 +120,8 @@ func TestReindex(t *testing.T) {
 		"type":    "m.text",
 	})
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, db, close := newOutputRoomEventsTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, db, close := newOutputRoomEventsTable(t, testOpts)
 		defer close()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			for _, ev := range room.Events() {

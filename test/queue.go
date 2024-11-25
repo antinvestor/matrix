@@ -54,43 +54,30 @@ func PrepareNatsDataSourceConnection(ctx context.Context) (dsConnection config.D
 	}, nil
 }
 
-//var dbCounter int64
+//func clearQueue(ctx context.Context, natsUriStr string) error {
 //
-//func clearCache(ctx context.Context, redisUriStr string) error {
-//
-//	opts, err := redis.ParseURL(redisUriStr)
-//	if err != nil {
-//		return err
-//	}
-//
-//	client := redis.NewClient(opts)
-//	return client.FlushDB(ctx).Err()
 //	return nil
 //}
 //
-//// PrepareRedisDataSourceConnection Prepare a redis connection string for testing.
+//// PrepareNatsDataSourceConnection Prepare a nats connection string for testing.
 //// Returns the connection string to use and a close function which must be called when the test finishes.
 //// Calling this function twice will return the same database, which will have data from previous tests
 //// unless close() is called.
-//func PrepareRedisDataSourceConnection(ctx context.Context) (connStr string, close func(), err error) {
+//func PrepareNatsDataSourceConnection(ctx context.Context) (connStr config.DataSource, close func(), err error) {
 //
-//	redisUriStr := os.Getenv("REDIS_URI")
-//	if redisUriStr == "" {
-//		redisUriStr = "redis://matrix:s3cr3t@localhost:6379/0"
+//	natsUriStr := os.Getenv("TESTING_QUEUE_URI")
+//	if natsUriStr == "" {
+//		natsUriStr = "nats://127.0.0.1:4222"
 //	}
 //
-//	parsedRedisUri, err := url.Parse(redisUriStr)
+//	parsedNatsUri, err := url.Parse(natsUriStr)
 //	if err != nil {
 //		return "", func() {}, err
 //	}
 //
-//	newDb := atomic.AddInt64(&dbCounter, 1)
+//	natsUriStr = parsedNatsUri.String()
 //
-//	parsedRedisUri.Path = fmt.Sprintf("/%d", newDb)
-//	redisUriStr = parsedRedisUri.String()
-//
-//	return redisUriStr, func() {
-//		_ = clearCache(ctx, redisUriStr)
+//	return config.DataSource(natsUriStr), func() {
+//		_ = clearQueue(ctx, natsUriStr)
 //	}, nil
 //}
-//

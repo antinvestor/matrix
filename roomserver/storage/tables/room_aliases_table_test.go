@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRoomAliasesTable(t *testing.T, dbType test.DBType) (tab tables.RoomAliases, closeDb func()) {
+func mustCreateRoomAliasesTable(t *testing.T, testOpts test.DependancyOption) (tab tables.RoomAliases, closeDb func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
@@ -37,8 +37,8 @@ func TestRoomAliasesTable(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreateRoomAliasesTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, close := mustCreateRoomAliasesTable(t, testOpts)
 		defer close()
 		alias, alias2, alias3 := "#alias:localhost", "#alias2:localhost", "#alias3:localhost"
 		// insert aliases

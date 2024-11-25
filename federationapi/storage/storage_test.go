@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateFederationDatabase(t *testing.T, _ test.DBType) (storage.Database, func()) {
+func mustCreateFederationDatabase(t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
 
 	ctx := context.TODO()
 	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
@@ -56,8 +56,8 @@ func TestExpireEDUs(t *testing.T) {
 
 	ctx := context.Background()
 	destinations := map[spec.ServerName]struct{}{"localhost": {}}
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDb := mustCreateFederationDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDb := mustCreateFederationDatabase(t, testOpts)
 		defer closeDb()
 		// insert some data
 		for i := 0; i < 100; i++ {
@@ -107,8 +107,8 @@ func TestOutboundPeeking(t *testing.T) {
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 	ctx := context.Background()
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDB := mustCreateFederationDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDB := mustCreateFederationDatabase(t, testOpts)
 		defer closeDB()
 		peekID := util.RandomString(8)
 		var renewalInterval int64 = 1000
@@ -189,8 +189,8 @@ func TestInboundPeeking(t *testing.T) {
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 	ctx := context.Background()
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDB := mustCreateFederationDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDB := mustCreateFederationDatabase(t, testOpts)
 		defer closeDB()
 		peekID := util.RandomString(8)
 		var renewalInterval int64 = 1000
@@ -269,8 +269,8 @@ func TestServersAssumedOffline(t *testing.T) {
 	server1 := spec.ServerName("server1")
 	server2 := spec.ServerName("server2")
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDB := mustCreateFederationDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDB := mustCreateFederationDatabase(t, testOpts)
 		defer closeDB()
 
 		// Set server1 & server2 as assumed offline.
@@ -326,8 +326,8 @@ func TestRelayServersStored(t *testing.T) {
 	relayServer1 := spec.ServerName("relayserver1")
 	relayServer2 := spec.ServerName("relayserver2")
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, closeDB := mustCreateFederationDatabase(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, closeDB := mustCreateFederationDatabase(t, testOpts)
 		defer closeDB()
 
 		err := db.P2PAddRelayServersForServer(context.Background(), server, []spec.ServerName{relayServer1})

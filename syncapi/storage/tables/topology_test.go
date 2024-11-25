@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTopologyTable(t *testing.T, dbType test.DBType) (tables.Topology, *sql.DB, func()) {
+func newTopologyTable(t *testing.T, testOpts test.DependancyOption) (tables.Topology, *sql.DB, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -43,8 +43,8 @@ func TestTopologyTable(t *testing.T) {
 	ctx := context.Background()
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, db, closeDb := newTopologyTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, db, closeDb := newTopologyTable(t, testOpts)
 		defer closeDb()
 		events := room.Events()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {

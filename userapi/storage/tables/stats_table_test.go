@@ -20,7 +20,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/types"
 )
 
-func mustMakeDBs(t *testing.T, dbType test.DBType) (
+func mustMakeDBs(t *testing.T, testOpts test.DependancyOption) (
 	*sql.DB, tables.AccountsTable, tables.DevicesTable, tables.StatsTable, func(),
 ) {
 	t.Helper()
@@ -118,8 +118,8 @@ func mustUserUpdateRegistered(
 func Test_UserStatistics(t *testing.T) {
 
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, accDB, devDB, statsDB, close := mustMakeDBs(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		db, accDB, devDB, statsDB, close := mustMakeDBs(t, testOpts)
 		defer close()
 		wantType := "Postgres"
 

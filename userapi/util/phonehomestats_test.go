@@ -17,8 +17,8 @@ import (
 )
 
 func TestCollect(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		db, err := storage.NewUserDatabase(processCtx.Context(), cm, &cfg.UserAPI.AccountDatabase, "localhost", bcrypt.MinCost, 1000, 1000, "")
@@ -51,7 +51,7 @@ func TestCollect(t *testing.T) {
 				t.Errorf("unexpected version: %q, expected %q", version, internal.VersionString())
 			}
 			switch {
-			case dbType == test.DBTypePostgres && dbEngine != "Postgres":
+			case testOpts == test.DependancyOption{} && dbEngine != "Postgres":
 				t.Errorf("unexpected database_engine: %s", dbEngine)
 			}
 			close(receivedRequest)

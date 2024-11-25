@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateStateSnapshotTable(t *testing.T, dbType test.DBType) (tab tables.StateSnapshot, close func()) {
+func mustCreateStateSnapshotTable(t *testing.T, testOpts test.DependancyOption) (tab tables.StateSnapshot, close func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -47,8 +47,8 @@ func mustCreateStateSnapshotTable(t *testing.T, dbType test.DBType) (tab tables.
 
 func TestStateSnapshotTable(t *testing.T) {
 	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, closeDb := mustCreateStateSnapshotTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, closeDb := mustCreateStateSnapshotTable(t, testOpts)
 		defer closeDb()
 
 		// generate some dummy data

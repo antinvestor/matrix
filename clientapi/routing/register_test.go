@@ -200,7 +200,7 @@ func TestValidationOfApplicationServices(t *testing.T) {
 		},
 	}
 
-	cfg, _, closeRig := testrig.CreateConfig(t, test.DBTypePostgres)
+	cfg, _, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 	defer closeRig()
 
 	cfg.Global.ServerName = "localhost"
@@ -415,8 +415,8 @@ func Test_register(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -590,8 +590,8 @@ func Test_register(t *testing.T) {
 }
 
 func TestRegisterUserWithDisplayName(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 		cfg.Global.ServerName = "server"
 
@@ -632,8 +632,8 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 }
 
 func TestRegisterAdminUsingSharedSecret(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
 		natsInstance := jetstream.NATSInstance{}
 		cfg.Global.ServerName = "server"

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateServerKeyDB(t *testing.T, dbType test.DBType) (tables.FederationServerSigningKeys, func()) {
+func mustCreateServerKeyDB(t *testing.T, testOpts test.DependancyOption) (tables.FederationServerSigningKeys, func()) {
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
@@ -37,9 +37,9 @@ func mustCreateServerKeyDB(t *testing.T, dbType test.DBType) (tables.FederationS
 }
 
 func TestServerKeysTable(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, cancel := context.WithCancel(context.Background())
-		tab, closeKeyDb := mustCreateServerKeyDB(t, dbType)
+		tab, closeKeyDb := mustCreateServerKeyDB(t, testOpts)
 		t.Cleanup(func() {
 			closeKeyDb()
 			cancel()

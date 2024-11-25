@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreatePreviousEventsTable(t *testing.T, dbType test.DBType) (tab tables.PreviousEvents, closeDb func()) {
+func mustCreatePreviousEventsTable(t *testing.T, testOpts test.DependancyOption) (tab tables.PreviousEvents, closeDb func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -38,8 +38,8 @@ func TestPreviousEventsTable(t *testing.T) {
 	ctx := context.Background()
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreatePreviousEventsTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, close := mustCreatePreviousEventsTable(t, testOpts)
 		defer close()
 
 		for _, x := range room.Events() {

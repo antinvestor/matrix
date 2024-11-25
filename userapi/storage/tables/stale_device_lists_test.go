@@ -14,7 +14,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
 
-func mustCreateTable(t *testing.T, dbType test.DBType) (tab tables.StaleDeviceLists, closeDb func()) {
+func mustCreateTable(t *testing.T, testOpts test.DependancyOption) (tab tables.StaleDeviceLists, closeDb func()) {
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
@@ -40,8 +40,8 @@ func TestStaleDeviceLists(t *testing.T) {
 	charlie := "@charlie:localhost"
 	ctx := context.Background()
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, closeDB := mustCreateTable(t, dbType)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		tab, closeDB := mustCreateTable(t, testOpts)
 		defer closeDB()
 
 		if err := tab.InsertStaleDeviceList(ctx, alice.ID, true); err != nil {
