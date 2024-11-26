@@ -59,8 +59,6 @@ func testContainerRedisDataSource(ctx context.Context) (dsConnection config.Data
 	}, nil
 }
 
-var dbCounter int64
-
 func clearCache(ctx context.Context, redisUriStr string) error {
 
 	opts, err := redis.ParseURL(redisUriStr)
