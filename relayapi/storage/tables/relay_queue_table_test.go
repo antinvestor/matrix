@@ -39,7 +39,7 @@ type RelayQueueDatabase struct {
 
 func mustCreateQueueTable(
 	t *testing.T,
-	testOpts test.DependancyOption,
+	_ test.DependancyOption,
 ) (database RelayQueueDatabase, close func()) {
 	t.Helper()
 

@@ -85,9 +85,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run unit tests
         env:
-          QUEUE_URI: nats://localhost:4222
-          CACHE_URI: redis://localhost:6379/0
-          DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
+          TESTING_QUEUE_URI: nats://localhost:4222
+          TESTING_CACHE_URI: redis://localhost:6379/0
+          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
           go test -json -v ./... 2>&1 | gotestfmt -hide all
@@ -216,9 +216,9 @@ jobs:
           go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
         shell: bash
         env:
-          QUEUE_URI: nats://localhost:4222
-          CACHE_URI: redis://localhost:6379/0
-          DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
+          TESTING_QUEUE_URI: nats://localhost:4222
+          TESTING_CACHE_URI: redis://localhost:6379/0
+          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
         working-directory: complement

@@ -99,6 +99,9 @@ func TestMain(m *testing.M) {
 			s.cache, err = caching.NewCache(&config.CacheOptions{
 				ConnectionString: cfg.Global.Cache.ConnectionString,
 			})
+			if err != nil {
+				panic("can't create cache : " + err.Error())
+			}
 
 			// Create a transport which redirects federation requests to
 			// the mock round tripper. Since we're not *really* listening for

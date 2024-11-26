@@ -14,7 +14,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
 
-func mustCreateTable(t *testing.T, testOpts test.DependancyOption) (tab tables.StaleDeviceLists, closeDb func()) {
+func mustCreateTable(t *testing.T, _ test.DependancyOption) (tab tables.StaleDeviceLists, closeDb func()) {
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {

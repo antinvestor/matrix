@@ -15,7 +15,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateInviteTable(t *testing.T, testOpts test.DependancyOption) (tables.Invites, func()) {
+func mustCreateInviteTable(t *testing.T, _ test.DependancyOption) (tables.Invites, func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)

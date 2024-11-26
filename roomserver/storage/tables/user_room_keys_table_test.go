@@ -17,7 +17,7 @@ import (
 	ed255192 "golang.org/x/crypto/ed25519"
 )
 
-func mustCreateUserRoomKeysTable(t *testing.T, testOpts test.DependancyOption) (tab tables.UserRoomKeys, db *sql.DB, closeDb func()) {
+func mustCreateUserRoomKeysTable(t *testing.T, _ test.DependancyOption) (tab tables.UserRoomKeys, db *sql.DB, closeDb func()) {
 	t.Helper()
 
 	ctx := context.TODO()

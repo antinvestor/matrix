@@ -51,7 +51,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		for _, u := range []*test.User{alice, bob, charlie} {
 			localpart, serverName, _ := gomatrixserverlib.SplitID('@', u.ID)
 			userRes := &uapi.PerformAccountCreationResponse{}
-			if err := userAPI.PerformAccountCreation(ctx, &uapi.PerformAccountCreationRequest{
+			if err = userAPI.PerformAccountCreation(ctx, &uapi.PerformAccountCreationRequest{
 				AccountType: u.AccountType,
 				Localpart:   localpart,
 				ServerName:  serverName,

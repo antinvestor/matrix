@@ -1025,7 +1025,7 @@ type FakeQuerier struct {
 	api.QuerySenderIDAPI
 }
 
-func (f *FakeQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+func (f *FakeQuerier) QueryUserIDForSender(_ context.Context, _ spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 	return spec.NewUserID(string(senderID), true)
 }
 

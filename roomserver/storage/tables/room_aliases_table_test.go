@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRoomAliasesTable(t *testing.T, testOpts test.DependancyOption) (tab tables.RoomAliases, closeDb func()) {
+func mustCreateRoomAliasesTable(t *testing.T, _ test.DependancyOption) (tab tables.RoomAliases, closeDb func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)

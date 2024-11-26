@@ -25,38 +25,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-//const RedisImage = "redis:7"
-//
-//func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
-//	return tcRedis.Run(ctx, RedisImage)
-//}
-//
-//// testContainerRedisDataSource Prepare a redis connection string for testing.
-//// Returns the connection string to use and a close function which must be called when the test finishes.
-//// Calling this function twice will return the same database, which will have data from previous tests
-//// unless close() is called.
-//func testContainerRedisDataSource(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
-//
-//	container, err := setupRedis(ctx)
-//	if err != nil {
-//		return "", nil, err
-//	}
-//
-//	connStr, err := container.ConnectionString(ctx)
-//	if err != nil {
-//		return "", nil, err
-//	}
-//
-//	return config.DataSource(connStr), func() {
-//		err = testcontainers.TerminateContainer(container)
-//		if err != nil {
-//			logrus.WithError(err).Error("failed to terminate container")
-//		}
-//	}, nil
-//}
-//
-//var dbCounter int64
-
 func clearCache(ctx context.Context, redisUriStr string) error {
 
 	opts, err := redis.ParseURL(redisUriStr)

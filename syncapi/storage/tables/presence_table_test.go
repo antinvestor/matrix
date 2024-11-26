@@ -17,7 +17,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func mustPresenceTable(t *testing.T, testOpts test.DependancyOption) (tables.Presence, func()) {
+func mustPresenceTable(t *testing.T, _ test.DependancyOption) (tables.Presence, func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)

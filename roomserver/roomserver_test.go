@@ -1339,7 +1339,7 @@ func TestRoomsWithACLs(t *testing.T) {
 
 		for _, room := range []*test.Room{noACLRoom, aclRoom} {
 			// Create the rooms
-			err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false)
+			err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false)
 			assert.NoError(t, err)
 		}
 

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateInboundpeeksTable(t *testing.T, testOpts test.DependancyOption) (tables.FederationInboundPeeks, func()) {
+func mustCreateInboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.FederationInboundPeeks, func()) {
 	ctx := context.TODO()
 
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)

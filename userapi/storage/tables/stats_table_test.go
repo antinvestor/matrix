@@ -20,7 +20,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/types"
 )
 
-func mustMakeDBs(t *testing.T, testOpts test.DependancyOption) (
+func mustMakeDBs(t *testing.T, _ test.DependancyOption) (
 	*sql.DB, tables.AccountsTable, tables.DevicesTable, tables.StatsTable, func(),
 ) {
 	t.Helper()
