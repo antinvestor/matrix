@@ -373,8 +373,8 @@ func mustCreateKeyserverDB(t *testing.T, _ test.DependancyOption) (storage.KeyDa
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
-	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
-	db, err := storage.NewKeyDatabase(cm, &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)})
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
+	db, err := storage.NewKeyDatabase(cm, &config.DatabaseOptions{ConnectionString: connStr})
 	if err != nil {
 		t.Fatal(err)
 	}

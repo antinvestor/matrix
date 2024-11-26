@@ -25,7 +25,7 @@ func TestConnectionManager(t *testing.T) {
 				t.Fatalf("failed to open database: %s", err)
 			}
 			t.Cleanup(closeDb)
-			cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+			cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: conStr})
 
 			dbProps := &config.DatabaseOptions{ConnectionString: conStr}
 			db, writer, err := cm.Connection(dbProps)
@@ -65,7 +65,7 @@ func TestConnectionManager(t *testing.T) {
 			t.Cleanup(closeDb)
 			cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: conStr})
 
-			dbProps := &config.DatabaseOptions{}
+			dbProps := &config.DatabaseOptions{ConnectionString: conStr}
 			db, writer, err := cm.Connection(dbProps)
 			if err != nil {
 				t.Fatal(err)

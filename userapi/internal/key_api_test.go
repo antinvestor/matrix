@@ -21,9 +21,9 @@ func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.KeyDatab
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
-	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
 	db, err := storage.NewKeyDatabase(cm, &config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	})
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)

@@ -21,7 +21,7 @@ func mustCreateTable(t *testing.T, _ test.DependancyOption) (tab tables.StaleDev
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, nil)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)

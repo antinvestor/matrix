@@ -179,7 +179,7 @@ func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database
 		t.Fatalf("Could not create redis container %s", err)
 	}
 
-	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: conStr})
 	db, err := storage.Open(context.Background(), cm, &config.DatabaseOptions{ConnectionString: conStr}, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)

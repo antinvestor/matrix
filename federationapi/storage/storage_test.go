@@ -36,7 +36,7 @@ func mustCreateFederationDatabase(t *testing.T, _ test.DependancyOption) (storag
 		t.Fatalf("failed to open database: %s", err)
 	}
 
-	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
+	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
 	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString: connStr,
 	}, caches, func(server spec.ServerName) bool { return server == "localhost" })

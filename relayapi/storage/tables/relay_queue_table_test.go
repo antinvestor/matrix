@@ -49,7 +49,7 @@ func mustCreateQueueTable(
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.RelayQueue

@@ -23,7 +23,7 @@ func mustCreateInboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
