@@ -62,9 +62,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       redis:
-        image: redis/redis-stack:latest
-        env:
-          REDIS_ARGS: "--databases 10000 --requirepass s3cr3t --user matrix on >s3cr3t ~* +@all"
+        image: redis:latest
         ports:
           - 6379:6379
         options: >-
@@ -72,6 +70,9 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+          --databases 10000 
+          --requirepass s3cr3t 
+          --user matrix on >s3cr3t ~* +@all"
     steps:
       - uses: actions/checkout@v4
       - name: Install libolm and dependencies
