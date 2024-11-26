@@ -62,6 +62,7 @@ func TestUserInteractiveChallenge(t *testing.T) {
 	_, errRes := uia.Verify(ctx, []byte(`{}`), device)
 	if errRes == nil {
 		t.Fatalf("Verify succeeded with {} but expected failure")
+		return
 	}
 	if errRes.Code != 401 {
 		t.Errorf("Expected HTTP 401, got %d", errRes.Code)
