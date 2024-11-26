@@ -72,7 +72,7 @@ type stubFederationClient struct {
 	txRelayCount         atomic.Uint32
 }
 
-func (f *stubFederationClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res fclient.RespSend, err error) {
+func (f *stubFederationClient) SendTransaction(_ context.Context, _ gomatrixserverlib.Transaction) (res fclient.RespSend, err error) {
 	var result error
 	if !f.shouldTxSucceed {
 		result = fmt.Errorf("transaction failed")
@@ -82,7 +82,7 @@ func (f *stubFederationClient) SendTransaction(ctx context.Context, t gomatrixse
 	return fclient.RespSend{}, result
 }
 
-func (f *stubFederationClient) P2PSendTransactionToRelay(ctx context.Context, u spec.UserID, t gomatrixserverlib.Transaction, forwardingServer spec.ServerName) (res fclient.EmptyResp, err error) {
+func (f *stubFederationClient) P2PSendTransactionToRelay(_ context.Context, _ spec.UserID, _ gomatrixserverlib.Transaction, _ spec.ServerName) (res fclient.EmptyResp, err error) {
 	var result error
 	if !f.shouldTxRelaySucceed {
 		result = fmt.Errorf("relay transaction failed")
@@ -127,7 +127,7 @@ func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32
 	}
 	queues := NewOutgoingQueues(db, processContext, false, "localhost", fc, &stats, signingInfo)
 
-	return db, fc, queues, processContext, close
+	return db, fc, queues, processContext, closeFn
 }
 
 func TestSendPDUOnSuccessRemovedFromDB(t *testing.T) {

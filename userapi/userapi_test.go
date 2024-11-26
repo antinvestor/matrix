@@ -55,7 +55,7 @@ type dummyProducer struct {
 	t         *testing.T
 }
 
-func (d *dummyProducer) PublishMsg(msg *nats.Msg, opts ...nats.PubOpt) (*nats.PubAck, error) {
+func (d *dummyProducer) PublishMsg(msg *nats.Msg, _ ...nats.PubOpt) (*nats.PubAck, error) {
 	count, loaded := d.callCount.LoadOrStore(msg.Subject, 1)
 	if loaded {
 		c, ok := count.(int)
@@ -157,7 +157,7 @@ func TestQueryProfile(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		userAPI, accountdb, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+		userAPI, accountDB, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
 		defer closeDb()
 		_, err := accountDB.CreateAccount(context.TODO(), "alice", serverName, "foobar", "", api.AccountTypeUser)
 		if err != nil {
@@ -180,7 +180,7 @@ func TestQueryProfile(t *testing.T) {
 func TestPasswordlessLoginFails(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		userAPI, accountdb, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+		userAPI, accountDB, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
 		defer closeDb()
 		_, err := accountDB.CreateAccount(ctx, "auser", serverName, "", "", api.AccountTypeAppService)
 		if err != nil {
@@ -206,7 +206,7 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("tokenLoginFlow", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-			userAPI, accountdb, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+			userAPI, accountDB, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
 			defer closeDb()
 			_, err := accountDB.CreateAccount(ctx, "auser", serverName, "apassword", "", api.AccountTypeUser)
 			if err != nil {

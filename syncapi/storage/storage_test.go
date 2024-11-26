@@ -1037,7 +1037,7 @@ func TestRedaction(t *testing.T) {
 	redactionEvent := room.CreateEvent(t, alice, spec.MRoomRedaction, map[string]string{"redacts": redactedEvent.EventID()})
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		db, closeDb := MustCreateDatabase(t, testOpts)
-		t.Cleanup(close)
+		t.Cleanup(closeDb)
 		MustWriteEvents(t, db, room.Events())
 
 		err := db.RedactEvent(context.Background(), redactedEvent.EventID(), redactionEvent, &FakeQuerier{})
