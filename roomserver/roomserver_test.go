@@ -312,15 +312,18 @@ func TestPurgeRoom(t *testing.T) {
 		roomInfo, err := db.RoomInfo(ctx, room.ID)
 		if err != nil {
 			t.Fatal(err)
+			return
 		}
 		if roomInfo == nil {
 			t.Fatalf("room does not exist")
+			return
 		}
 
 		//
 		roomInfo2, err := db.RoomInfoByNID(ctx, roomInfo.RoomNID)
 		if err != nil {
 			t.Fatal(err)
+			return
 		}
 		if !reflect.DeepEqual(roomInfo, roomInfo2) {
 			t.Fatalf("expected roomInfos to be the same, but they aren't")
@@ -379,10 +382,12 @@ func TestPurgeRoom(t *testing.T) {
 		}
 		if roomInfo != nil {
 			t.Fatalf("room should not exist after purging: %+v", roomInfo)
+			return
 		}
 		roomInfo2, err = db.RoomInfoByNID(ctx, existingRoomInfo.RoomNID)
 		if err == nil {
 			t.Fatalf("expected room to not exist, but it does: %#v", roomInfo2)
+			return
 		}
 
 		// validation below
@@ -391,16 +396,19 @@ func TestPurgeRoom(t *testing.T) {
 		_, inviteEventIDs, _, err = db.GetInvitesForUser(ctx, existingRoomInfo.RoomNID, bobNID)
 		if err != nil {
 			t.Fatal(err)
+			return
 		}
 
 		if inviteCount := len(inviteEventIDs); inviteCount > 0 {
 			t.Fatalf("expected there to be only %d invite events, got %d", wantInviteCount, inviteCount)
+			return
 		}
 
 		// aliases should be deleted
 		aliases, err := db.GetAliasesForRoomID(ctx, room.ID)
 		if err != nil {
 			t.Fatal(err)
+			return
 		}
 		if aliasCount := len(aliases); aliasCount > 0 {
 			t.Fatalf("expected there to be only %d invite events, got %d", 0, aliasCount)
