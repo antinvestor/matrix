@@ -86,7 +86,6 @@ jobs:
       - name: Run unit tests
         env:
           TESTING_QUEUE_URI: nats://localhost:4222
-          TESTING_CACHE_URI: redis://localhost:6379/0
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
@@ -217,7 +216,6 @@ jobs:
         shell: bash
         env:
           TESTING_QUEUE_URI: nats://localhost:4222
-          TESTING_CACHE_URI: redis://localhost:6379/0
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
