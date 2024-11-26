@@ -2,7 +2,6 @@ package routing
 
 import (
 	"bytes"
-	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -31,10 +30,11 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 	bob := test.NewUser(t)
 	charlie := test.NewUser(t, test.WithAccountType(uapi.AccountTypeGuest))
 
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
+
+		ctx := processCtx.Context()
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
