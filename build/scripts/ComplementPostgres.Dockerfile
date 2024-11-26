@@ -31,7 +31,7 @@ EXPOSE 8008 8448
 # At runtime, replace the SERVER_NAME with what we are told
 CMD ./generate-keys --keysize 1024 --server $SERVER_NAME \
     --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key && \
-    ./generate-config -server $SERVER_NAME --ci --db "postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable" > matrix.yaml && \
+    ./generate-config -server $SERVER_NAME --ci --database_uri "postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable" > matrix.yaml && \
     # Bump max_open_conns up here in the global database config
     sed -i 's/max_open_conns:.*$/max_open_conns: 1990/g' matrix.yaml && \
     cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \

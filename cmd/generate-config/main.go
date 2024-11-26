@@ -15,7 +15,7 @@ import (
 func main() {
 	defaultsForCI := flag.Bool("ci", false, "Populate the configuration with sane defaults for use in CI")
 	serverName := flag.String("server", "", "The domain name of the server if not 'localhost'")
-	databaseURI := flag.String("db_uri", "", "The DB URI to use for all components (PostgreSQL only)")
+	databaseURI := flag.String("database_uri", "", "The DB URI to use for all components (PostgreSQL only)")
 	cacheURI := flag.String("cache_uri", "", "The Cache URI to use for all components")
 	queueURI := flag.String("queue_uri", "", "The Queue URI to use for all components")
 	dirPath := flag.String("dir", "./", "The folder to use for paths ( media storage)")

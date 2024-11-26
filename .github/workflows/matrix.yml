@@ -44,35 +44,6 @@ jobs:
     timeout-minutes: 20
     name: Unit tests
     runs-on: ubuntu-latest
-    # Service containers to run with `container-job`
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: postgres:17
-        env:
-          POSTGRES_USER: matrix
-          POSTGRES_PASSWORD: s3cr3t
-          POSTGRES_DB: matrix
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:latest
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli -u redis://localhost:6379 ping | grep PONG"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          --databases 10000 
-          --requirepass s3cr3t 
-          --user matrix on >s3cr3t ~* +@all"
     steps:
       - uses: actions/checkout@v4
       - name: Install libolm and dependencies
@@ -86,14 +57,21 @@ jobs:
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Start containers
+        run: docker compose up -d
+
       - name: Run unit tests
         env:
           TESTING_QUEUE_URI: nats://localhost:4222
-          TESTING_CACHE_URI: redis://localhost:6379/0
+          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379/0
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
           go test -json -v ./... 2>&1 | gotestfmt -hide all
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down
 
   # build Dendrite for linux with different architectures and go versions
   build:
@@ -142,36 +120,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-    # Service containers to run with `container-job`
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: postgres:17
-        env:
-          POSTGRES_USER: matrix
-          POSTGRES_PASSWORD: s3cr3t
-          POSTGRES_DB: matrix
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:latest
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli -u redis://localhost:6379 ping | grep PONG"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          --databases 10000 
-          --requirepass s3cr3t 
-          --user matrix on >s3cr3t ~* +@all"
     steps:
       - name: Run actions/checkout@v4 for matrix
         uses: actions/checkout@v4
@@ -215,6 +163,8 @@ jobs:
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Start containers
+        run: docker compose up -d
       # Run Complement
       - name: Run Complement Tests
         run: |
@@ -223,11 +173,15 @@ jobs:
         shell: bash
         env:
           TESTING_QUEUE_URI: nats://localhost:4222
-          TESTING_CACHE_URI: redis://localhost:6379/0
+          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379/0
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
         working-directory: complement
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down
 
   integration-tests-done:
     name: Integration tests passed

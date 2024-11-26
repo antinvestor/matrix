@@ -19,7 +19,7 @@ services:
 
   cache:
     hostname: cache
-    image: redis/redis-stack:latest
+    image: redis:latest
     restart: always
     networks:
       - internal
