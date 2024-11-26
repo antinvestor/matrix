@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventsTable(t *testing.T, testOpts test.DependancyOption) (tables.Events, func()) {
+func mustCreateEventsTable(t *testing.T, _ test.DependancyOption) (tables.Events, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -23,7 +23,7 @@ func mustCreateEventsTable(t *testing.T, testOpts test.DependancyOption) (tables
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.Events

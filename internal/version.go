@@ -33,7 +33,7 @@ func init() {
 	if VersionTag != "" {
 		version += "-" + VersionTag
 	}
-	parts := []string{}
+	var parts []string
 	if build != "" {
 		parts = append(parts, build)
 	}

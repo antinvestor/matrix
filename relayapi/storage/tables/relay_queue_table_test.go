@@ -69,8 +69,8 @@ func mustCreateQueueTable(
 func TestShoudInsertQueueTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateQueueTable(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateQueueTable(t, testOpts)
+		defer closeDb()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
 		serverName := spec.ServerName("domain")
@@ -85,8 +85,8 @@ func TestShoudInsertQueueTransaction(t *testing.T) {
 func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateQueueTable(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateQueueTable(t, testOpts)
+		defer closeDb()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
 		serverName := spec.ServerName("domain")
@@ -110,8 +110,8 @@ func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateQueueTable(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateQueueTable(t, testOpts)
+		defer closeDb()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
 		serverName := spec.ServerName("domain")
@@ -151,8 +151,8 @@ func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 func TestShouldDeleteQueueTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateQueueTable(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateQueueTable(t, testOpts)
+		defer closeDb()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
 		serverName := spec.ServerName("domain")
@@ -182,8 +182,8 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateQueueTable(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateQueueTable(t, testOpts)
+		defer closeDb()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
 		serverName := spec.ServerName("domain")

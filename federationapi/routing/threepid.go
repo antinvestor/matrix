@@ -184,7 +184,7 @@ func ExchangeThirdPartyInvite(
 
 	// Auth and build the event from what the remote server sent us
 	event, err := buildMembershipEvent(httpReq.Context(), &proto, rsAPI, cfg)
-	if err == errNotInRoom {
+	if errors.Is(err, errNotInRoom) {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("Unknown room " + roomID),
@@ -304,7 +304,7 @@ func createInviteFrom3PIDInvite(
 	}
 
 	event, err := buildMembershipEvent(ctx, proto, rsAPI, cfg)
-	if err == errNotInRoom {
+	if errors.Is(err, errNotInRoom) {
 		return nil, sendToRemoteServer(ctx, inv, federation, cfg, *proto)
 	}
 	if err != nil {

@@ -3,12 +3,13 @@ package jetstream
 import (
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/process"
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
-	"reflect"
-	"strings"
 
 	natsclient "github.com/nats-io/nats.go"
 )

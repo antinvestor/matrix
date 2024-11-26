@@ -34,7 +34,7 @@ func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database
 		t.Fatalf("failed to create a cache: %v", err)
 	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
-	db, err := storage.Open(ctx, cm, &config.DatabaseOptions{ConnectionString: config.DataSource(conStr)}, caches)
+	db, err := storage.Open(ctx, cm, &config.DatabaseOptions{ConnectionString: conStr}, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}

@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !wasm && !windows
-// +build !wasm,!windows
-
 package util
 
 import (
@@ -40,7 +37,7 @@ func getMemoryStats(p *phoneHomeStats) error {
 		p.stats["cpu_average"] = 0
 	} else {
 		// conversion to int64 required for GOARCH=386
-		p.stats["cpu_average"] = int64(usedCPUTime) / (newData.timestamp - oldUsage.timestamp) * 100
+		p.stats["cpu_average"] = usedCPUTime / (newData.timestamp - oldUsage.timestamp) * 100
 	}
 	p.stats["memory_rss"] = newUsage.Maxrss
 	return nil

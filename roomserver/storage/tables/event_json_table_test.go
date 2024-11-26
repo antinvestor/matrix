@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventJSONTable(t *testing.T, testOpts test.DependancyOption) (tables.EventJSON, func()) {
+func mustCreateEventJSONTable(t *testing.T, _ test.DependancyOption) (tables.EventJSON, func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
@@ -22,7 +22,7 @@ func mustCreateEventJSONTable(t *testing.T, testOpts test.DependancyOption) (tab
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.EventJSON
@@ -37,8 +37,8 @@ func mustCreateEventJSONTable(t *testing.T, testOpts test.DependancyOption) (tab
 
 func Test_EventJSONTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, close := mustCreateEventJSONTable(t, testOpts)
-		defer close()
+		tab, closeDb := mustCreateEventJSONTable(t, testOpts)
+		defer closeDb()
 
 		// create some dummy data
 		for i := 0; i < 10; i++ {

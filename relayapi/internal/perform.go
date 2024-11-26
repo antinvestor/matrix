@@ -79,7 +79,7 @@ func (r *RelayInternalAPI) PerformStoreTransaction(
 	userID spec.UserID,
 ) error {
 	logrus.Warnf("Storing transaction for %v", userID)
-	receipt, err := r.db.StoreTransaction(ctx, transaction)
+	receiptTx, err := r.db.StoreTransaction(ctx, transaction)
 	if err != nil {
 		logrus.Errorf("db.StoreTransaction: %s", err.Error())
 		return err
@@ -90,7 +90,7 @@ func (r *RelayInternalAPI) PerformStoreTransaction(
 			userID: {},
 		},
 		transaction.TransactionID,
-		receipt)
+		receiptTx)
 
 	return err
 }
@@ -115,17 +115,17 @@ func (r *RelayInternalAPI) QueryTransactions(
 		}
 	}
 
-	transaction, receipt, err := r.db.GetTransaction(ctx, userID)
+	transaction, receiptTx, err := r.db.GetTransaction(ctx, userID)
 	if err != nil {
 		logrus.Errorf("db.GetTransaction: %s", err.Error())
 		return api.QueryRelayTransactionsResponse{}, err
 	}
 
 	response := api.QueryRelayTransactionsResponse{}
-	if transaction != nil && receipt != nil {
+	if transaction != nil && receiptTx != nil {
 		logrus.Infof("Obtained transaction (%v) for %s", transaction.TransactionID, userID.String())
 		response.Transaction = *transaction
-		response.EntryID = receipt.GetNID()
+		response.EntryID = receiptTx.GetNID()
 		response.EntriesQueued = true
 	} else {
 		logrus.Infof("No more entries in the queue for %s", userID.String())

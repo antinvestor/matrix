@@ -75,7 +75,7 @@ func NewRoomserverAPI(
 
 	serverACLs := acls.NewServerACLs(roomserverDB)
 	producer := &producers.RoomEventProducer{
-		Topic:     string(dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent)),
+		Topic:     dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		JetStream: js,
 		ACLs:      serverACLs,
 	}

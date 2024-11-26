@@ -18,11 +18,12 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/process"
 
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/httputil"

@@ -129,10 +129,6 @@ type ExecProvider interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
-// SQLite3MaxVariables is the default maximum number of host parameters in a single SQL statement
-// SQLlite can handle. See https://www.sqlite.org/limits.html for more information.
-const SQLite3MaxVariables = 999
-
 // RunLimitedVariablesQuery split up a query with more variables than the used database can handle in multiple queries.
 func RunLimitedVariablesQuery(ctx context.Context, query string, qp QueryProvider, variables []interface{}, limit uint, rowHandler func(*sql.Rows) error) error {
 	var start int
@@ -184,7 +180,7 @@ type StatementList []struct {
 func (s StatementList) Prepare(db *sql.DB) (err error) {
 	for _, statement := range s {
 		if *statement.Statement, err = db.Prepare(statement.SQL); err != nil {
-			err = fmt.Errorf("Error %q while preparing statement: %s", err, statement.SQL)
+			err = fmt.Errorf("error %q while preparing statement: %s", err, statement.SQL)
 			return
 		}
 	}

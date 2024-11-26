@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"reflect"
@@ -14,7 +15,8 @@ import (
 )
 
 func errorResponse(ctx context.Context, err error, msg string, args ...interface{}) util.JSONResponse {
-	if eerr, ok := err.(spec.MatrixError); ok {
+	var eerr spec.MatrixError
+	if errors.As(err, &eerr) {
 		var status int
 		switch eerr.ErrCode {
 		case spec.ErrorInvalidParam:

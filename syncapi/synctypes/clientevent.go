@@ -249,7 +249,7 @@ func updateCreateEvent(content spec.RawJSON, userIDForSender spec.UserIDForSende
 				return nil, err
 			}
 
-			newContent, err = sjson.SetRawBytes([]byte(content), "creator", newCreatorBytes)
+			newContent, err = sjson.SetRawBytes(content, "creator", newCreatorBytes)
 			if err != nil {
 				err = fmt.Errorf("Failed to set new creator for ClientEvent: %w", err)
 				return nil, err

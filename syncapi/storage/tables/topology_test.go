@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTopologyTable(t *testing.T, testOpts test.DependancyOption) (tables.Topology, *sql.DB, func()) {
+func newTopologyTable(t *testing.T, _ test.DependancyOption) (tables.Topology, *sql.DB, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -24,7 +24,7 @@ func newTopologyTable(t *testing.T, testOpts test.DependancyOption) (tables.Topo
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		t.Fatalf("failed to open db: %s", err)

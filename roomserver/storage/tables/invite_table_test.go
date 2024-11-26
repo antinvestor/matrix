@@ -39,8 +39,8 @@ func mustCreateInviteTable(t *testing.T, testOpts test.DependancyOption) (tables
 func TestInviteTable(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, close := mustCreateInviteTable(t, testOpts)
-		defer close()
+		tab, closeFn := mustCreateInviteTable(t, testOpts)
+		defer closeFn()
 		eventID1 := util.RandomString(16)
 		roomNID := types.RoomNID(1)
 		targetUserNID, senderUserNID := types.EventStateKeyNID(1), types.EventStateKeyNID(2)

@@ -92,8 +92,8 @@ func Test_GetLeftUsers(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateRoomserverDatabase(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateRoomserverDatabase(t, testOpts)
+		defer closeDb()
 
 		// Create dummy entries
 		for _, user := range []*test.User{alice, bob, charlie} {
@@ -129,8 +129,8 @@ func TestUserRoomKeys(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateRoomserverDatabase(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateRoomserverDatabase(t, testOpts)
+		defer closeDb()
 
 		// create a room NID so we can query the room
 		_, err = db.RoomsTable.InsertRoomNID(ctx, nil, roomID.String(), gomatrixserverlib.RoomVersionV10)
@@ -209,8 +209,8 @@ func TestAssignRoomNID(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateRoomserverDatabase(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateRoomserverDatabase(t, testOpts)
+		defer closeDb()
 
 		nid, err := db.AssignRoomNID(ctx, *roomID, room.Version)
 		assert.NoError(t, err)

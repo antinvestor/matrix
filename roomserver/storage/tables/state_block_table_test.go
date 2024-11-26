@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateStateBlockTable(t *testing.T, testOpts test.DependancyOption) (tab tables.StateBlock, close func()) {
+func mustCreateStateBlockTable(t *testing.T, _ test.DependancyOption) (tab tables.StateBlock, close func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -22,7 +22,7 @@ func mustCreateStateBlockTable(t *testing.T, testOpts test.DependancyOption) (ta
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	err = postgres.CreateStateBlockTable(db)
@@ -37,8 +37,8 @@ func mustCreateStateBlockTable(t *testing.T, testOpts test.DependancyOption) (ta
 func TestStateBlockTable(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, close := mustCreateStateBlockTable(t, testOpts)
-		defer close()
+		tab, closeFn := mustCreateStateBlockTable(t, testOpts)
+		defer closeFn()
 
 		// generate some dummy data
 		var entries types.StateEntries

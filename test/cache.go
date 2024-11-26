@@ -17,11 +17,12 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/redis/go-redis/v9"
 	"math/rand/v2"
 	"net/url"
 	"os"
+
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/redis/go-redis/v9"
 )
 
 //const RedisImage = "redis:7"

@@ -2,9 +2,10 @@ package test
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/setup/config"
 	"math/rand"
 	"time"
+
+	"github.com/antinvestor/matrix/setup/config"
 )
 
 func randomString(length int) string {

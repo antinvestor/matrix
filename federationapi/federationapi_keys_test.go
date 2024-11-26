@@ -81,7 +81,7 @@ func TestMain(m *testing.M) {
 
 			cfg := &config.Dendrite{}
 			cfg.Defaults(defaultOpts)
-			cfg.Global.ServerName = spec.ServerName(s.name)
+			cfg.Global.ServerName = s.name
 
 			// Generate a new key.
 			_, cfg.Global.PrivateKey, err = ed25519.GenerateKey(nil)

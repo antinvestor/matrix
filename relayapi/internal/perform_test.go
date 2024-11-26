@@ -76,7 +76,7 @@ func TestPerformRelayServerSync(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
-	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, spec.ServerName("relay"))
+	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, "relay")
 	assert.NoError(t, err)
 }
 
@@ -96,7 +96,7 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
-	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, spec.ServerName("relay"))
+	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, "relay")
 	assert.Error(t, err)
 }
 
@@ -116,7 +116,7 @@ func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
-	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, spec.ServerName("relay"))
+	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, "relay")
 	assert.NoError(t, err)
 	assert.Equal(t, uint(3), fedClient.queryCount)
 }

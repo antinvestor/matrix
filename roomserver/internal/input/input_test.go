@@ -33,8 +33,8 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		rsAPI.SetFederationAPI(nil, nil)
 
 		deadline, _ := t.Deadline()
-		if max := time.Now().Add(time.Second * 3); deadline.Before(max) {
-			deadline = max
+		if maxVal := time.Now().Add(time.Second * 3); deadline.Before(maxVal) {
+			deadline = maxVal
 		}
 		ctx, cancel := context.WithDeadline(processCtx.Context(), deadline)
 		defer cancel()

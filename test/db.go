@@ -21,22 +21,33 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/antinvestor/matrix/setup/config"
 	"net/url"
 	"os"
 	"testing"
+
+	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/lib/pq"
 )
 
 type DependancyOption struct {
+	name  string
 	db    string
 	cache string
 	queue string
 }
 
+func (opt *DependancyOption) Name() string {
+	return "default"
+}
 func (opt *DependancyOption) Database() string {
 	return "postgres"
+}
+func (opt *DependancyOption) Cache() string {
+	return "redis"
+}
+func (opt *DependancyOption) Queue() string {
+	return "nats"
 }
 
 // ensureDatabaseExists checks if a specific database exists and creates it if it does not.
@@ -146,14 +157,18 @@ func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config
 
 // WithAllDatabases Creates subtests with each known DependancyOption
 func WithAllDatabases(t *testing.T, testFn func(t *testing.T, db DependancyOption)) {
-	dbs := map[string]DependancyOption{
-		"postgres": DependancyOption{},
+	options := []DependancyOption{
+		{
+			name:  "Default",
+			db:    "postgres",
+			cache: "redis",
+			queue: "nats",
+		},
 	}
-	for dbName, testOpts := range dbs {
-		dbt := testOpts
-		t.Run(dbName, func(tt *testing.T) {
+	for _, opt := range options {
+		t.Run(opt.Name(), func(tt *testing.T) {
 			tt.Parallel()
-			testFn(tt, dbt)
+			testFn(tt, opt)
 		})
 	}
 }

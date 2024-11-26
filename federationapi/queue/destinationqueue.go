@@ -223,11 +223,11 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 			if len(pdus) == maxPDUsInMemory {
 				overflowed = true
 			}
-			for receipt, pdu := range pdus {
-				if _, ok := gotPDUs[receipt.String()]; ok {
+			for pduReceipt, pdu := range pdus {
+				if _, ok := gotPDUs[pduReceipt.String()]; ok {
 					continue
 				}
-				oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{receipt, pdu})
+				oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{pduReceipt, pdu})
 				retrieved = true
 				if len(oq.pendingPDUs) == maxPDUsInMemory {
 					break
@@ -244,11 +244,11 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 			if len(edus) == maxEDUsInMemory {
 				overflowed = true
 			}
-			for receipt, edu := range edus {
-				if _, ok := gotEDUs[receipt.String()]; ok {
+			for eduReceipt, edu := range edus {
+				if _, ok := gotEDUs[eduReceipt.String()]; ok {
 					continue
 				}
-				oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{receipt, edu})
+				oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{eduReceipt, edu})
 				retrieved = true
 				if len(oq.pendingEDUs) == maxEDUsInMemory {
 					break

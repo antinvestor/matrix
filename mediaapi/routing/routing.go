@@ -256,7 +256,7 @@ func makeDownloadAPI(
 		handlerFunc = promhttp.InstrumentHandlerCounter(counterVec, http.HandlerFunc(httpHandler))
 		handlerFunc = promhttp.InstrumentHandlerResponseSize(sizeVec2, handlerFunc).ServeHTTP
 	} else {
-		handlerFunc = http.HandlerFunc(httpHandler)
+		handlerFunc = httpHandler
 	}
 	return handlerFunc
 }

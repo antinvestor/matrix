@@ -17,7 +17,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func newMembershipsTable(t *testing.T, testOpts test.DependancyOption) (tables.Memberships, *sql.DB, func()) {
+func newMembershipsTable(t *testing.T, _ test.DependancyOption) (tables.Memberships, *sql.DB, func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
@@ -25,7 +25,7 @@ func newMembershipsTable(t *testing.T, testOpts test.DependancyOption) (tables.M
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		t.Fatalf("failed to open db: %s", err)
@@ -72,8 +72,8 @@ func TestMembershipsTable(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		table, _, close := newMembershipsTable(t, testOpts)
-		defer close()
+		table, _, closeDb := newMembershipsTable(t, testOpts)
+		defer closeDb()
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()

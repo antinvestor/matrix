@@ -80,7 +80,7 @@ func (s *OutputNotificationDataConsumer) Start() error {
 // be incorrectly calculated.
 func (s *OutputNotificationDataConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
-	userID := string(msg.Header.Get(jetstream.UserID))
+	userID := msg.Header.Get(jetstream.UserID)
 
 	// Parse out the event JSON
 	var data eventutil.NotificationData

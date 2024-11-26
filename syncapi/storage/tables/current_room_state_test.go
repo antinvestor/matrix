@@ -16,7 +16,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func newCurrentRoomStateTable(t *testing.T, testOpts test.DependancyOption) (tables.CurrentRoomState, *sql.DB, func()) {
+func newCurrentRoomStateTable(t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, *sql.DB, func()) {
 	t.Helper()
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
@@ -24,7 +24,7 @@ func newCurrentRoomStateTable(t *testing.T, testOpts test.DependancyOption) (tab
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		t.Fatalf("failed to open db: %s", err)
@@ -44,8 +44,8 @@ func TestCurrentRoomStateTable(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, close := newCurrentRoomStateTable(t, testOpts)
-		defer close()
+		tab, db, closeDb := newCurrentRoomStateTable(t, testOpts)
+		defer closeDb()
 		events := room.CurrentState()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			for i, ev := range events {

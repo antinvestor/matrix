@@ -56,13 +56,13 @@ func ValidatePassword(password string) error {
 
 // PasswordResponse returns a util.JSONResponse for a given error, if any.
 func PasswordResponse(err error) *util.JSONResponse {
-	switch err {
-	case ErrPasswordWeak:
+	switch {
+	case errors.Is(err, ErrPasswordWeak):
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.WeakPassword(ErrPasswordWeak.Error()),
 		}
-	case ErrPasswordTooLong:
+	case errors.Is(err, ErrPasswordTooLong):
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(ErrPasswordTooLong.Error()),
@@ -86,13 +86,13 @@ func ValidateUsername(localpart string, domain spec.ServerName) error {
 
 // UsernameResponse returns a util.JSONResponse for the given error, if any.
 func UsernameResponse(err error) *util.JSONResponse {
-	switch err {
-	case ErrUsernameTooLong:
+	switch {
+	case errors.Is(err, ErrUsernameTooLong):
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(err.Error()),
 		}
-	case ErrUsernameInvalid, ErrUsernameUnderscore:
+	case errors.Is(err, ErrUsernameInvalid), errors.Is(err, ErrUsernameUnderscore):
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidUsername(err.Error()),

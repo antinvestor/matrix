@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -94,8 +95,9 @@ func RoomAliasToID(
 	} else {
 		resp, err = federation.LookupRoomAlias(httpReq.Context(), domain, cfg.Matrix.ServerName, roomAlias)
 		if err != nil {
-			switch x := err.(type) {
-			case gomatrix.HTTPError:
+			var x gomatrix.HTTPError
+			switch {
+			case errors.As(err, &x):
 				if x.Code == http.StatusNotFound {
 					return util.JSONResponse{
 						Code: http.StatusNotFound,
@@ -149,8 +151,9 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 	discoveredRooms, inaccessibleRooms, _, err := rsAPI.QueryNextRoomHierarchyPage(httpReq.Context(), walker, -1)
 
 	if err != nil {
-		switch err.(type) {
-		case roomserverAPI.ErrRoomUnknownOrNotAllowed:
+		var errRoomUnknownOrNotAllowed roomserverAPI.ErrRoomUnknownOrNotAllowed
+		switch {
+		case errors.As(err, &errRoomUnknownOrNotAllowed):
 			util.GetLogger(httpReq.Context()).WithError(err).Debugln("room unknown/forbidden when handling SS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusNotFound,

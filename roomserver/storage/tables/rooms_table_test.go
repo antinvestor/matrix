@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRoomsTable(t *testing.T, testOpts test.DependancyOption) (tab tables.Rooms, close func()) {
+func mustCreateRoomsTable(t *testing.T, _ test.DependancyOption) (tab tables.Rooms, close func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -23,7 +23,7 @@ func mustCreateRoomsTable(t *testing.T, testOpts test.DependancyOption) (tab tab
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	err = postgres.CreateRoomsTable(db)
@@ -40,8 +40,8 @@ func TestRoomsTable(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, close := mustCreateRoomsTable(t, testOpts)
-		defer close()
+		tab, closeFn := mustCreateRoomsTable(t, testOpts)
+		defer closeFn()
 
 		wantRoomNID, err := tab.InsertRoomNID(ctx, nil, room.ID, room.Version)
 		assert.NoError(t, err)

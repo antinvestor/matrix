@@ -1,9 +1,10 @@
 package sqlutil_test
 
 import (
-	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -62,7 +63,7 @@ func TestConnectionManager(t *testing.T) {
 				t.Fatalf("failed to open database: %s", err)
 			}
 			t.Cleanup(closeDb)
-			cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: config.DataSource(conStr)})
+			cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: conStr})
 
 			dbProps := &config.DatabaseOptions{}
 			db, writer, err := cm.Connection(dbProps)

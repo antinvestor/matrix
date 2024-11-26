@@ -52,7 +52,7 @@ type RelayQueueJSONDatabase struct {
 
 func mustCreateQueueJSONTable(
 	t *testing.T,
-	testOpts test.DependancyOption,
+	_ test.DependancyOption,
 ) (database RelayQueueJSONDatabase, closeDb func()) {
 	t.Helper()
 
@@ -62,7 +62,7 @@ func mustCreateQueueJSONTable(
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.RelayQueueJSON
@@ -82,8 +82,8 @@ func mustCreateQueueJSONTable(
 func TestShoudInsertTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateQueueJSONTable(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateQueueJSONTable(t, testOpts)
+		defer closeDb()
 
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)
@@ -101,8 +101,8 @@ func TestShoudInsertTransaction(t *testing.T) {
 func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateQueueJSONTable(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateQueueJSONTable(t, testOpts)
+		defer closeDb()
 
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)
@@ -127,7 +127,10 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 		assert.Equal(t, 1, len(storedJSON))
 
 		var storedTx gomatrixserverlib.Transaction
-		json.Unmarshal(storedJSON[1], &storedTx)
+		err = json.Unmarshal(storedJSON[1], &storedTx)
+		if err != nil {
+			t.Fatalf("Invalid transaction: %s", err.Error())
+		}
 
 		assert.Equal(t, transaction, storedTx)
 	})
@@ -136,8 +139,8 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 func TestShouldDeleteTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, close := mustCreateQueueJSONTable(t, testOpts)
-		defer close()
+		db, closeDb := mustCreateQueueJSONTable(t, testOpts)
+		defer closeDb()
 
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)

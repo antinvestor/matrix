@@ -108,7 +108,7 @@ func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {
 }
 
 func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, realDatabase bool) (storage.Database, *stubFederationClient, *OutgoingQueues, *process.ProcessContext, func()) {
-	db, processContext, close := mustCreateFederationDatabase(t, realDatabase)
+	db, processContext, closeFn := mustCreateFederationDatabase(t, realDatabase)
 
 	fc := &stubFederationClient{
 		shouldTxSucceed:      shouldTxSucceed,

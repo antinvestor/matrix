@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRedactionsTable(t *testing.T, testOpts test.DependancyOption) (tab tables.Redactions, closeDb func()) {
+func mustCreateRedactionsTable(t *testing.T, _ test.DependancyOption) (tab tables.Redactions, closeDb func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -22,7 +22,7 @@ func mustCreateRedactionsTable(t *testing.T, testOpts test.DependancyOption) (ta
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	err = postgres.CreateRedactionsTable(db)
@@ -38,8 +38,8 @@ func TestRedactionsTable(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, close := mustCreateRedactionsTable(t, testOpts)
-		defer close()
+		tab, closeFn := mustCreateRedactionsTable(t, testOpts)
+		defer closeFn()
 
 		// insert and verify some redactions
 		for i := 0; i < 10; i++ {

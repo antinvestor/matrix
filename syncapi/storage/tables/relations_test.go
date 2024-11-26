@@ -13,7 +13,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func newRelationsTable(t *testing.T, testOpts test.DependancyOption) (tables.Relations, *sql.DB, func()) {
+func newRelationsTable(t *testing.T, _ test.DependancyOption) (tables.Relations, *sql.DB, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -22,7 +22,7 @@ func newRelationsTable(t *testing.T, testOpts test.DependancyOption) (tables.Rel
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		t.Fatalf("failed to open db: %s", err)
@@ -72,12 +72,12 @@ func TestRelationsTable(t *testing.T) {
 			}
 		}
 
-		// Check the max position, we've inserted three things so it
+		// Check the maxVal position, we've inserted three things so it
 		// should be 3
-		if max, err := tab.SelectMaxRelationID(ctx, nil); err != nil {
+		if maxVal, err := tab.SelectMaxRelationID(ctx, nil); err != nil {
 			t.Fatal(err)
-		} else if max != 3 {
-			t.Fatalf("max position should have been 3 but got %d", max)
+		} else if maxVal != 3 {
+			t.Fatalf("maxVal position should have been 3 but got %d", maxVal)
 		}
 
 		// Query some ranges for "a"
@@ -140,12 +140,11 @@ func TestRelationsTable(t *testing.T) {
 			}
 		}
 
-		// Check the max position, we've inserted four things so it
-		// should now be 7
-		if max, err := tab.SelectMaxRelationID(ctx, nil); err != nil {
+		// Check the maxVal position, we've inserted four things so it should now be 7
+		if maxVal, err := tab.SelectMaxRelationID(ctx, nil); err != nil {
 			t.Fatal(err)
-		} else if max != 7 {
-			t.Fatalf("max position should have been 3 but got %d", max)
+		} else if maxVal != 7 {
+			t.Fatalf("maxVal position should have been 3 but got %d", maxVal)
 		}
 
 		// Query last set of ranges for "a"

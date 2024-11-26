@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"embed"
-	"github.com/antinvestor/matrix/test"
-	"github.com/antinvestor/matrix/test/testrig"
 	"html/template"
 	"net"
 	"net/http"
@@ -13,6 +11,9 @@ import (
 	"path"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/httputil"

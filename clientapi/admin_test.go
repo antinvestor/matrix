@@ -1357,7 +1357,7 @@ func TestAdminQueryEventReports(t *testing.T) {
 				if len(resp.EventReports) != wantCount {
 					t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
 				}
-				if resp.Total != int64(wantTotal) {
+				if resp.Total != wantTotal {
 					t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
 				}
 

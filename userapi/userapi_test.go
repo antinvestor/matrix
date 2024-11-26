@@ -157,8 +157,8 @@ func TestQueryProfile(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-		defer close()
+		userAPI, accountdb, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+		defer closeDb()
 		_, err := accountDB.CreateAccount(context.TODO(), "alice", serverName, "foobar", "", api.AccountTypeUser)
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
@@ -180,8 +180,8 @@ func TestQueryProfile(t *testing.T) {
 func TestPasswordlessLoginFails(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-		defer close()
+		userAPI, accountdb, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+		defer closeDb()
 		_, err := accountDB.CreateAccount(ctx, "auser", serverName, "", "", api.AccountTypeAppService)
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
@@ -206,8 +206,8 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("tokenLoginFlow", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-			userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-			defer close()
+			userAPI, accountdb, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+			defer closeDb()
 			_, err := accountDB.CreateAccount(ctx, "auser", serverName, "apassword", "", api.AccountTypeUser)
 			if err != nil {
 				t.Fatalf("failed to make account: %s", err)
@@ -256,8 +256,8 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("expiredTokenIsNotReturned", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, testOpts, nil)
-			defer close()
+			userAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, testOpts, nil)
+			defer closeFn()
 
 			creq := api.PerformLoginTokenCreationRequest{
 				Data: api.LoginTokenData{UserID: "@auser:example.com"},
@@ -281,8 +281,8 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("deleteWorks", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-			defer close()
+			userAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+			defer closeFn()
 
 			creq := api.PerformLoginTokenCreationRequest{
 				Data: api.LoginTokenData{UserID: "@auser:example.com"},
@@ -312,8 +312,8 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("deleteUnknownIsNoOp", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-			defer close()
+			userAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+			defer closeFn()
 			dreq := api.PerformLoginTokenDeletionRequest{Token: "non-existent token"}
 			var dresp api.PerformLoginTokenDeletionResponse
 			if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
@@ -330,8 +330,8 @@ func TestQueryAccountByLocalpart(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		intAPI, db, close := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-		defer close()
+		intAPI, db, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+		defer closeDb()
 
 		createdAcc, err := db.CreateAccount(ctx, localpart, userServername, "", "", alice.AccountType)
 		if err != nil {
@@ -409,8 +409,8 @@ func TestAccountData(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, nil)
-		defer close()
+		intAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, nil)
+		defer closeFn()
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -525,8 +525,8 @@ func TestDevices(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, nil)
-		defer close()
+		intAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, nil)
+		defer closeFn()
 
 		for _, tc := range creationTests {
 			t.Run(tc.name, func(t *testing.T) {
@@ -631,8 +631,8 @@ func TestDeviceIDReuse(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		publisher := &dummyProducer{t: t}
-		intAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, publisher)
-		defer close()
+		intAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, publisher)
+		defer closeFn()
 
 		res := api.PerformDeviceCreationResponse{}
 		// create a first device

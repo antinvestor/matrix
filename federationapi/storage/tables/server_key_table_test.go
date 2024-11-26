@@ -15,14 +15,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateServerKeyDB(t *testing.T, testOpts test.DependancyOption) (tables.FederationServerSigningKeys, func()) {
+func mustCreateServerKeyDB(t *testing.T, _ test.DependancyOption) (tables.FederationServerSigningKeys, func()) {
 	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)

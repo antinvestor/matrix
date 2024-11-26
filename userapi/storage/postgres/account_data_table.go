@@ -141,6 +141,6 @@ func (s *accountDataStatements) SelectAccountDataByType(
 		}
 		return
 	}
-	data = json.RawMessage(bytes)
+	data = bytes
 	return
 }

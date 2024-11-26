@@ -17,7 +17,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
-func newOutputRoomEventsTable(t *testing.T, testOpts test.DependancyOption) (tables.Events, *sql.DB, func()) {
+func newOutputRoomEventsTable(t *testing.T, _ test.DependancyOption) (tables.Events, *sql.DB, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -26,7 +26,7 @@ func newOutputRoomEventsTable(t *testing.T, testOpts test.DependancyOption) (tab
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		t.Fatalf("failed to open db: %s", err)
@@ -121,8 +121,8 @@ func TestReindex(t *testing.T) {
 	})
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, close := newOutputRoomEventsTable(t, testOpts)
-		defer close()
+		tab, db, closeDb := newOutputRoomEventsTable(t, testOpts)
+		defer closeDb()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			for _, ev := range room.Events() {
 				_, err := tab.InsertEvent(ctx, txn, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)

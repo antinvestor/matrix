@@ -7,14 +7,15 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/antinvestor/matrix/test"
-	"github.com/antinvestor/matrix/test/testrig"
 	"io"
 	"net/http"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/gorilla/mux"

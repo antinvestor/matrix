@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreatePreviousEventsTable(t *testing.T, testOpts test.DependancyOption) (tab tables.PreviousEvents, closeDb func()) {
+func mustCreatePreviousEventsTable(t *testing.T, _ test.DependancyOption) (tab tables.PreviousEvents, closeDb func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -22,7 +22,7 @@ func mustCreatePreviousEventsTable(t *testing.T, testOpts test.DependancyOption)
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	err = postgres.CreatePrevEventsTable(db)
@@ -39,8 +39,8 @@ func TestPreviousEventsTable(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, close := mustCreatePreviousEventsTable(t, testOpts)
-		defer close()
+		tab, closeFn := mustCreatePreviousEventsTable(t, testOpts)
+		defer closeFn()
 
 		for _, x := range room.Events() {
 			for _, eventID := range x.PrevEventIDs() {

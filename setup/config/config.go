@@ -333,63 +333,64 @@ type DefaultOpts struct {
 }
 
 // SetDefaults sets default config values if they are not explicitly set.
-func (c *Dendrite) Defaults(opts DefaultOpts) {
-	c.Version = Version
+func (config *Dendrite) Defaults(opts DefaultOpts) {
+	config.Version = Version
 
-	c.Global.Defaults(opts)
-	c.ClientAPI.Defaults(opts)
-	c.FederationAPI.Defaults(opts)
-	c.KeyServer.Defaults(opts)
-	c.MediaAPI.Defaults(opts)
-	c.RoomServer.Defaults(opts)
-	c.SyncAPI.Defaults(opts)
-	c.UserAPI.Defaults(opts)
-	c.AppServiceAPI.Defaults(opts)
-	c.RelayAPI.Defaults(opts)
-	c.MSCs.Defaults(opts)
-	c.Wiring()
+	config.Global.Defaults(opts)
+	config.ClientAPI.Defaults(opts)
+	config.FederationAPI.Defaults(opts)
+	config.KeyServer.Defaults(opts)
+	config.MediaAPI.Defaults(opts)
+	config.RoomServer.Defaults(opts)
+	config.SyncAPI.Defaults(opts)
+	config.UserAPI.Defaults(opts)
+	config.AppServiceAPI.Defaults(opts)
+	config.RelayAPI.Defaults(opts)
+	config.MSCs.Defaults(opts)
+	config.Wiring()
 }
 
-func (c *Dendrite) Verify(configErrs *ConfigErrors) {
+func (config *Dendrite) Verify(configErrs *ConfigErrors) {
 	type verifiable interface {
 		Verify(configErrs *ConfigErrors)
 	}
 	for _, c := range []verifiable{
-		&c.Global, &c.ClientAPI, &c.FederationAPI,
-		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
-		&c.SyncAPI, &c.UserAPI,
-		&c.AppServiceAPI, &c.RelayAPI, &c.MSCs,
+		&config.Global, &config.ClientAPI, &config.FederationAPI,
+		&config.KeyServer, &config.MediaAPI, &config.RoomServer,
+		&config.SyncAPI, &config.UserAPI,
+		&config.AppServiceAPI, &config.RelayAPI, &config.MSCs,
 	} {
 		c.Verify(configErrs)
 	}
 }
 
-func (c *Dendrite) Wiring() {
-	c.Global.JetStream.Matrix = &c.Global
-	c.ClientAPI.Matrix = &c.Global
-	c.FederationAPI.Matrix = &c.Global
-	c.KeyServer.Matrix = &c.Global
-	c.MediaAPI.Matrix = &c.Global
-	c.RoomServer.Matrix = &c.Global
-	c.SyncAPI.Matrix = &c.Global
-	c.UserAPI.Matrix = &c.Global
-	c.AppServiceAPI.Matrix = &c.Global
-	c.RelayAPI.Matrix = &c.Global
-	c.MSCs.Matrix = &c.Global
+func (config *Dendrite) Wiring() {
+	config.Global.JetStream.Matrix = &config.Global
+	config.ClientAPI.Matrix = &config.Global
+	config.FederationAPI.Matrix = &config.Global
+	config.KeyServer.Matrix = &config.Global
+	config.MediaAPI.Matrix = &config.Global
+	config.RoomServer.Matrix = &config.Global
+	config.SyncAPI.Matrix = &config.Global
+	config.UserAPI.Matrix = &config.Global
+	config.AppServiceAPI.Matrix = &config.Global
+	config.RelayAPI.Matrix = &config.Global
+	config.MSCs.Matrix = &config.Global
 
-	c.ClientAPI.Derived = &c.Derived
-	c.AppServiceAPI.Derived = &c.Derived
-	c.ClientAPI.MSCs = &c.MSCs
+	config.ClientAPI.Derived = &config.Derived
+	config.AppServiceAPI.Derived = &config.Derived
+	config.ClientAPI.MSCs = &config.MSCs
 }
 
 // Error returns a string detailing how many errors were contained within a
 // configErrors type.
-func (errs ConfigErrors) Error() string {
-	if len(errs) == 1 {
-		return errs[0]
+func (errs *ConfigErrors) Error() string {
+	e := *errs
+	if len(e) == 1 {
+		return e[0]
 	}
 	return fmt.Sprintf(
-		"%s (and %d other problems)", errs[0], len(errs)-1,
+		"%s (and %d other problems)", e[0], len(e)-1,
 	)
 }
 
@@ -439,7 +440,7 @@ func (config *Dendrite) check() error { // monolithic
 				"or changed recently!",
 			config.Version, Version,
 		))
-		return configErrs
+		return &configErrs
 	}
 
 	config.checkLogging(&configErrs)
@@ -451,7 +452,7 @@ func (config *Dendrite) check() error { // monolithic
 	// error(nil) == nil
 	// error(configErrors(nil)) != nil
 	if configErrs != nil {
-		return configErrs
+		return &configErrs
 	}
 	return nil
 }

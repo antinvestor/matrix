@@ -1,13 +1,14 @@
 package internal
 
 import (
-	"github.com/antinvestor/matrix/test"
-	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/spec"

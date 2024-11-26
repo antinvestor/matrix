@@ -283,7 +283,7 @@ func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
 // responses.
 // Handles OPTIONS requests directly.
 func WrapHandlerInCORS(h http.Handler) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
@@ -297,5 +297,5 @@ func WrapHandlerInCORS(h http.Handler) http.HandlerFunc {
 		} else {
 			h.ServeHTTP(w, r)
 		}
-	})
+	}
 }

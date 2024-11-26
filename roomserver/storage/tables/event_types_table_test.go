@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventTypesTable(t *testing.T, testOpts test.DependancyOption) (tables.EventTypes, func()) {
+func mustCreateEventTypesTable(t *testing.T, _ test.DependancyOption) (tables.EventTypes, func()) {
 	t.Helper()
 
 	ctx := context.TODO()
@@ -23,7 +23,7 @@ func mustCreateEventTypesTable(t *testing.T, testOpts test.DependancyOption) (ta
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(connStr),
+		ConnectionString: connStr,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.EventTypes
@@ -38,8 +38,8 @@ func mustCreateEventTypesTable(t *testing.T, testOpts test.DependancyOption) (ta
 
 func Test_EventTypesTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, close := mustCreateEventTypesTable(t, testOpts)
-		defer close()
+		tab, closeDb := mustCreateEventTypesTable(t, testOpts)
+		defer closeDb()
 		ctx := context.Background()
 		var eventTypeNID, gotEventTypeNID types.EventTypeNID
 		var err error

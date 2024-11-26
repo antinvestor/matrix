@@ -231,12 +231,12 @@ func (a *AppServiceQueryAPI) Locations(
 			params.Set("access_token", as.HSToken)
 		}
 
-		url := as.RequestUrl() + path
+		requestUrl := as.RequestUrl() + path
 		if req.Protocol != "" {
-			url += "/" + req.Protocol
+			requestUrl += "/" + req.Protocol
 		}
 
-		if err := requestDo[[]api.ASLocationResponse](&as, url+"?"+params.Encode(), &asLocations); err != nil {
+		if err := requestDo[[]api.ASLocationResponse](&as, requestUrl+"?"+params.Encode(), &asLocations); err != nil {
 			log.WithError(err).WithField("application_service", as.ID).Error("unable to get 'locations' from application service")
 			continue
 		}
@@ -272,12 +272,12 @@ func (a *AppServiceQueryAPI) User(
 			params.Set("access_token", as.HSToken)
 		}
 
-		url := as.RequestUrl() + path
+		requestUrl := as.RequestUrl() + path
 		if req.Protocol != "" {
-			url += "/" + req.Protocol
+			requestUrl += "/" + req.Protocol
 		}
 
-		if err := requestDo[[]api.ASUserResponse](&as, url+"?"+params.Encode(), &asUsers); err != nil {
+		if err := requestDo[[]api.ASUserResponse](&as, requestUrl+"?"+params.Encode(), &asUsers); err != nil {
 			log.WithError(err).WithField("application_service", as.ID).Error("unable to get 'user' from application service")
 			continue
 		}

@@ -213,7 +213,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 		t.Fatalf("Invalid room ID: %q", roomID)
 	}
 
-	rsapi := &fedRoomserverAPI{
+	fedRSApi := &fedRoomserverAPI{
 		inputRoomEvents: func(ctx context.Context, req *rsapi.InputRoomEventsRequest, res *rsapi.InputRoomEventsResponse) {
 			if req.Asynchronous {
 				t.Errorf("InputRoomEvents from PerformJoin MUST be synchronous")
@@ -243,7 +243,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 			},
 		},
 	}
-	fsapi := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, fc, rsapi, caches, nil, false)
+	fsapi := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, fc, fedRSApi, caches, nil, false)
 
 	var resp api.PerformJoinResponse
 	fsapi.PerformJoin(context.Background(), &api.PerformJoinRequest{

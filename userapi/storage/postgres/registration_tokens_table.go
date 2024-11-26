@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/clientapi/api"
-	internal "github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"golang.org/x/exp/constraints"

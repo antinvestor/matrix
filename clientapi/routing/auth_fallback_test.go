@@ -2,13 +2,14 @@ package routing
 
 import (
 	"fmt"
-	"github.com/antinvestor/matrix/test"
-	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/setup/config"

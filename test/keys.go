@@ -152,7 +152,7 @@ func NewTLSKeyWithAuthority(serverName, tlsKeyPath, tlsCertPath, authorityKeyPat
 	if err != nil {
 		return err
 	}
-	block, _ := pem.Decode([]byte(dat))
+	block, _ := pem.Decode(dat)
 	if block == nil || block.Type != "RSA PRIVATE KEY" {
 		return errors.New("authority .key is not a valid pem encoded rsa private key")
 	}
@@ -166,7 +166,7 @@ func NewTLSKeyWithAuthority(serverName, tlsKeyPath, tlsCertPath, authorityKeyPat
 	if err != nil {
 		return err
 	}
-	block, _ = pem.Decode([]byte(dat))
+	block, _ = pem.Decode(dat)
 	if block == nil || block.Type != "CERTIFICATE" {
 		return errors.New("authority .crt is not a valid pem encoded x509 cert")
 	}

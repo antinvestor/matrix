@@ -119,8 +119,8 @@ func Test_UserStatistics(t *testing.T) {
 
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, accDB, devDB, statsDB, close := mustMakeDBs(t, testOpts)
-		defer close()
+		db, accDB, devDB, statsdb, closeDb := mustMakeDBs(t, testOpts)
+		defer closeDb()
 		wantType := "Postgres"
 
 		t.Run(fmt.Sprintf("want %s database engine", wantType), func(t *testing.T) {

@@ -173,7 +173,7 @@ func createRoom(
 
 	roomVersion := rsAPI.DefaultRoomVersion()
 	if createRequest.RoomVersion != "" {
-		candidateVersion := gomatrixserverlib.RoomVersion(createRequest.RoomVersion)
+		candidateVersion := createRequest.RoomVersion
 		_, roomVersionError := roomserverVersion.SupportedRoomVersion(candidateVersion)
 		if roomVersionError != nil {
 			return util.JSONResponse{

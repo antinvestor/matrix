@@ -42,8 +42,8 @@ func mustCreateMembershipTable(t *testing.T, testOpts test.DependancyOption) (ta
 func TestMembershipTable(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, stateKeyTab, close := mustCreateMembershipTable(t, testOpts)
-		defer close()
+		tab, stateKeyTab, closeFn := mustCreateMembershipTable(t, testOpts)
+		defer closeFn()
 		_ = close
 
 		userNIDs := make([]types.EventStateKeyNID, 0, 10)

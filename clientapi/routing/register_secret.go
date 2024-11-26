@@ -8,13 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/patrickmn/go-cache"
 	"io"
 	"strings"
 	"time"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/matrix-org/util"
-	cache "github.com/patrickmn/go-cache"
 )
 
 type SharedSecretRegistrationRequest struct {

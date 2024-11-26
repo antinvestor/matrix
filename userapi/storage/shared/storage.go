@@ -239,7 +239,7 @@ func (d *Database) createAccount(
 	if err != nil {
 		return nil, fmt.Errorf("json.Marshal: %w", err)
 	}
-	if err = d.AccountDatas.InsertAccountData(ctx, txn, localpart, serverName, "", "m.push_rules", json.RawMessage(prbs)); err != nil {
+	if err = d.AccountDatas.InsertAccountData(ctx, txn, localpart, serverName, "", "m.push_rules", prbs); err != nil {
 		return nil, fmt.Errorf("d.AccountDatas.InsertAccountData: %w", err)
 	}
 	return account, nil

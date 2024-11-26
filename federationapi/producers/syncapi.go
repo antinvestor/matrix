@@ -68,7 +68,7 @@ func (p *SyncAPIProducer) SendToDevice(
 	ctx context.Context, sender, userID, deviceID, eventType string,
 	message json.RawMessage,
 ) error {
-	devices := []string{}
+	var devices []string
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return err
