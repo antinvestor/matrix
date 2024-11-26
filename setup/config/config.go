@@ -384,13 +384,12 @@ func (config *Dendrite) Wiring() {
 
 // Error returns a string detailing how many errors were contained within a
 // configErrors type.
-func (errs *ConfigErrors) Error() string {
-	e := *errs
-	if len(e) == 1 {
-		return e[0]
+func (errs ConfigErrors) Error() string {
+	if len(errs) == 1 {
+		return errs[0]
 	}
 	return fmt.Sprintf(
-		"%s (and %d other problems)", e[0], len(e)-1,
+		"%s (and %d other problems)", errs[0], len(errs)-1,
 	)
 }
 

@@ -979,7 +979,7 @@ func TestRecentEvents(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		filter := synctypes.DefaultRoomEventFilter()
 		db, closeDb := MustCreateDatabase(t, testOpts)
-		t.Cleanup(close)
+		t.Cleanup(closeDb)
 
 		MustWriteEvents(t, db, room1.Events())
 		MustWriteEvents(t, db, room2.Events())
