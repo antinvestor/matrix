@@ -431,7 +431,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
 		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
-		defer closeDB()
+		t.Cleanup(closeDB)
 
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		natsInstance := &jetstream.NATSInstance{}
