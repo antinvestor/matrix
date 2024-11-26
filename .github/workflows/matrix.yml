@@ -161,8 +161,6 @@ jobs:
 
       redis:
         image: redis:latest
-        env:
-          REDIS_ARGS: "redis-server --databases 10000 --requirepass s3cr3t --user matrix on >s3cr3t ~* +@all"
         ports:
           - 6379:6379
         options: >-
@@ -170,7 +168,9 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        command: "redis-server --databases 10000 --requirepass s3cr3t --user matrix on >s3cr3t ~* +@all"
+          --databases 10000 
+          --requirepass s3cr3t 
+          --user matrix on >s3cr3t ~* +@all"
     steps:
       - name: Run actions/checkout@v4 for matrix
         uses: actions/checkout@v4
