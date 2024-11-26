@@ -8,10 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/patrickmn/go-cache"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/patrickmn/go-cache"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/matrix-org/util"
