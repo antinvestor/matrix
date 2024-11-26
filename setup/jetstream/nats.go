@@ -35,13 +35,17 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 	if s.nc != nil {
 		return s.js, s.nc
 	}
-	s.js, s.nc = setupNATS(process, cfg, nil)
+	var err error
+	s.js, s.nc, err = setupNATS(process, cfg, nil)
+	if err != nil {
+		logrus.WithError(err).Fatalf("Could not setup nats at : %s", cfg.Addresses)
+	}
 	return s.js, s.nc
 
 }
 
 // nolint:gocyclo
-func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {
+func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn, error) {
 	if nc == nil {
 		var err error
 		var opts []natsclient.Option
@@ -51,15 +55,13 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 		}
 		nc, err = natsclient.Connect(strings.Join(cfg.Addresses, ","), opts...)
 		if err != nil {
-			logrus.WithError(err).Panic("Unable to connect to NATS")
-			return nil, nil
+			return nil, nil, err
 		}
 	}
 
 	s, err := nc.JetStream()
 	if err != nil {
-		logrus.WithError(err).Panic("Unable to get JetStream context")
-		return nil, nil
+		return nil, nil, err
 	}
 
 	for _, stream := range streams { // streams are defined in streams.go
@@ -177,5 +179,5 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 		}
 	}
 
-	return s, nc
+	return s, nc, nil
 }
