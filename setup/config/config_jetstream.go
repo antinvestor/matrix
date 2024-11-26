@@ -45,10 +45,6 @@ func (c *JetStream) Defaults(opts DefaultOpts) {
 	}
 
 	c.TopicPrefix = "Matrix"
-	if opts.QueuePrefix != "" {
-		c.TopicPrefix = opts.QueuePrefix
-	}
-
 	c.Credentials = ""
 
 }

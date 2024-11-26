@@ -329,7 +329,6 @@ type DefaultOpts struct {
 	DatabaseConnectionStr DataSource
 	CacheConnectionStr    DataSource
 	QueueConnectionStr    DataSource
-	QueuePrefix           string
 }
 
 // SetDefaults sets default config values if they are not explicitly set.

@@ -201,9 +201,11 @@ func Test_SendEvent_PseudoIDStateKeys(t *testing.T) {
 		stateKey := ev.Event.StateKey()
 		if stateKey == nil {
 			t.Fatalf("submitted InputRoomEvent has nil state key, when it should be %v", senderUserID)
+			return
 		}
 		if *stateKey != senderUserID {
 			t.Fatalf("expected submitted InputRoomEvent to have user ID state key\nfound: %v\nexpected: %v", *stateKey, senderUserID)
+			return
 		}
 	})
 

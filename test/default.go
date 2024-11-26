@@ -2,21 +2,8 @@ package test
 
 import (
 	"context"
-	"math/rand"
-	"time"
-
 	"github.com/antinvestor/matrix/setup/config"
 )
-
-func randomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	result := make([]byte, length)
-	for i := range result {
-		result[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(result)
-}
 
 func PrepareDefaultDSConnections(ctx context.Context) (config.DefaultOpts, func(), error) {
 
@@ -41,7 +28,6 @@ func PrepareDefaultDSConnections(ctx context.Context) (config.DefaultOpts, func(
 	return config.DefaultOpts{
 			DatabaseConnectionStr: dbConnStr,
 			QueueConnectionStr:    queueConnStr,
-			QueuePrefix:           randomString(12),
 			CacheConnectionStr:    cacheConnStr,
 		}, func() {
 			closeCache()
