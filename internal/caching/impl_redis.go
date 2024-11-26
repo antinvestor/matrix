@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -75,11 +76,14 @@ func (c *RedisCachePartition[K, V]) Set(ctx context.Context, key K, value V) err
 func (c *RedisCachePartition[K, V]) Get(ctx context.Context, key K) (V, bool) {
 	bkey := fmt.Sprintf("%c%v", c.Prefix, key)
 	result, err := c.client.Get(ctx, bkey).Result()
-	if errors.Is(err, redis.Nil) {
+	if err != nil {
+
+		if !errors.Is(err, redis.Nil) {
+			logrus.WithError(err).Error("Failed to get value")
+		}
+
 		var empty V
 		return empty, false
-	} else if err != nil {
-		panic(err) // handle as needed
 	}
 	var value V
 	if err := json.Unmarshal([]byte(result), &value); err != nil {

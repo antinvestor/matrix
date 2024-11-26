@@ -21,43 +21,39 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/sirupsen/logrus"
-	"github.com/testcontainers/testcontainers-go"
-
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/redis/go-redis/v9"
-	tcRedis "github.com/testcontainers/testcontainers-go/modules/redis"
 )
 
-const RedisImage = "redis:7"
-
-func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
-	return tcRedis.Run(ctx, RedisImage)
-}
-
-// testContainerRedisDataSource Prepare a redis connection string for testing.
-// Returns the connection string to use and a close function which must be called when the test finishes.
-// Calling this function twice will return the same database, which will have data from previous tests
-// unless close() is called.
-func testContainerRedisDataSource(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
-
-	container, err := setupRedis(ctx)
-	if err != nil {
-		return "", nil, err
-	}
-
-	connStr, err := container.ConnectionString(ctx)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return config.DataSource(connStr), func() {
-		err = testcontainers.TerminateContainer(container)
-		if err != nil {
-			logrus.WithError(err).Error("failed to terminate container")
-		}
-	}, nil
-}
+//const RedisImage = "redis:7"
+//
+//func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
+//	return tcRedis.Run(ctx, RedisImage)
+//}
+//
+//// testContainerRedisDataSource Prepare a redis connection string for testing.
+//// Returns the connection string to use and a close function which must be called when the test finishes.
+//// Calling this function twice will return the same database, which will have data from previous tests
+//// unless close() is called.
+//func testContainerRedisDataSource(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
+//
+//	container, err := setupRedis(ctx)
+//	if err != nil {
+//		return "", nil, err
+//	}
+//
+//	connStr, err := container.ConnectionString(ctx)
+//	if err != nil {
+//		return "", nil, err
+//	}
+//
+//	return config.DataSource(connStr), func() {
+//		err = testcontainers.TerminateContainer(container)
+//		if err != nil {
+//			logrus.WithError(err).Error("failed to terminate container")
+//		}
+//	}, nil
+//}
 
 func clearCache(ctx context.Context, redisUriStr string) error {
 
@@ -78,7 +74,7 @@ func PrepareRedisDataSourceConnection(ctx context.Context) (connStr config.DataS
 
 	redisUriStr := os.Getenv("TESTING_CACHE_URI")
 	if redisUriStr == "" {
-		return testContainerRedisDataSource(ctx)
+		redisUriStr = "redis://matrix:s3cr3t@127.0.0.1:6379"
 	}
 
 	parsedUri, err := url.Parse(redisUriStr)

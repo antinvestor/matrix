@@ -19,14 +19,14 @@ services:
 
   cache:
     hostname: cache
-    image: redis:7
+    image: redis/redis-stack:latest
     restart: always
     networks:
       - internal
     ports:
       - "6379:6379"
     environment:
-      REDIS_PASSWORD: "s3cr3t"
+      REDIS_ARGS: "--databases 10000 --requirepass s3cr3t --user matrix on >s3cr3t ~* +@all"
     command: [
       "redis-server",
       "--databases", "10000",

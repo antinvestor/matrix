@@ -62,7 +62,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       redis:
-        image: redis:latest
+        image: redis/redis-stack:latest
+        env:
+          REDIS_ARGS: "--databases 10000 --requirepass s3cr3t --user matrix on >s3cr3t ~* +@all"
         ports:
           - 6379:6379
         options: >-
@@ -86,6 +88,7 @@ jobs:
       - name: Run unit tests
         env:
           TESTING_QUEUE_URI: nats://localhost:4222
+          TESTING_CACHE_URI: redis://localhost:6379/0
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
@@ -157,7 +160,9 @@ jobs:
           --health-retries 5
 
       redis:
-        image: redis:latest
+        image: redis/redis-stack:latest
+        env:
+          REDIS_ARGS: "--databases 10000 --requirepass s3cr3t --user matrix on >s3cr3t ~* +@all"
         ports:
           - 6379:6379
         options: >-
@@ -216,6 +221,7 @@ jobs:
         shell: bash
         env:
           TESTING_QUEUE_URI: nats://localhost:4222
+          TESTING_CACHE_URI: redis://localhost:6379/0
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
