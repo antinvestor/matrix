@@ -45,7 +45,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 }
 
 // nolint:gocyclo
-func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn, error) {
+func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn, error) {
 	if nc == nil {
 		var err error
 		var opts []natsclient.Option
