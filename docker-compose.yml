@@ -9,7 +9,7 @@ services:
       POSTGRES_DATABASE: matrix
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U matrix" ]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
     networks:
@@ -33,6 +33,11 @@ services:
       "--requirepass", "s3cr3t",
       "--user", "matrix", "on", ">s3cr3t", "~*", "+@all"
     ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-u", "redis://:s3cr3t@localhost:6379", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 
   queue:
@@ -43,24 +48,206 @@ services:
       - internal
     ports:
       - "4222:4222"
-    command: [
-      "--js",
-    ]
+    command: [ "--js" ]
 
-#  matrix:
-#    hostname: matrix
-#    build: .
-#    ports:
-#      - 8008:8008
-#      - 8448:8448
-#    depends_on:
-#      datastore:
-#        condition: service_healthy
-#    networks:
-#      - internal
-#    restart: unless-stopped
-#    volumes:
-#      - ./runtime/config:/etc/matrix
+
+  matrix:
+    hostname: matrix
+    build: .
+    ports:
+      - "8008:8008"
+      - "8448:8448"
+    depends_on:
+      datastore:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      queue:
+        condition: service_started
+    networks:
+      - internal
+    restart: unless-stopped
+    environment:
+      DATABASE_URI: postgres://matrix:s3cr3t@datastore/matrix?sslmode=disable
+      CACHE_URI: redis://matrix:s3cr3t@cache:6379/0?protocol=3
+      QUEUE_URI: nats://queue:4222
+    command: [ "--config", "/etc/matrix/config.yaml" ]
+    configs:
+      - source: matrix_key
+        target: /etc/matrix/key.pem
+      - source: matrix_config
+        target: /etc/matrix/config.yaml
+
+configs:
+  matrix_key:
+    name: key.pem
+    content: |
+      -----BEGIN MATRIX PRIVATE KEY-----
+      Key-ID: ed25519:iZSpbr
+
+      iZSpbrColI8H52Ix6qr/8gmcXQAcZoN9xXdwplTbq3I=
+      -----END MATRIX PRIVATE KEY-----
+  matrix_config:
+    name: config.yaml
+    content: |
+      # The version of the configuration file.
+      version: 2
+      
+      # Global Matrix configuration. This configuration applies to all components.
+      global:
+        # The domain name of this homeserver.
+        server_name: matrix.antinvestor.com
+        private_key: /etc/matrix/key.pem
+      
+        key_validity_period: 168h0m0s
+      
+        database:
+          max_open_conns: 90
+          max_idle_conns: 5
+          conn_max_lifetime: -1
+      
+        cache:
+          max_age: 1h
+      
+        # The server name to delegate server-server communications to, with optional port
+        # e.g. localhost:443
+        well_known_server_name: ""
+      
+        # The base URL to delegate client-server communications to e.g. https://localhost
+        well_known_client_name: ""
+      
+        jetstream:
+          addresses:
+          # - localhost:4222
+      
+          # The prefix to use for stream names for this homeserver - really only useful
+          # if you are running more than one Dendrite server on the same NATS deployment.
+          topic_prefix: Dendrite
+      
+      
+      # Configuration for the Client API.
+      client_api:
+        registration_disabled: true
+        guests_disabled: true
+        enable_registration_captcha: false
+      
+        login_sso:
+          callback_url: "https://matrix.antinvestor.com/_matrix/v3/login/sso/callback"
+          default_provider: auth0
+          providers:
+            - id: auth0
+              name: "Auth0 Test Provider"
+              discovery_url: "https://dev-k5lry2vvfpplshdn.eu.auth0.com/.well-known/openid-configuration"
+              client_id: ersbEAybgJe0HWMBuR9Adw63oUVoboIf
+              client_secret: MGP_j3QKywtjNpwsD9pVa7gauB8KQMFdJKZDTB7uBRpvcMER5h4MZ8XzTJuG659g
+              jwt_login:
+                audience: matrix_service
+      
+        # TURN server information that this homeserver should send to clients.
+        turn:
+          turn_user_lifetime: "5m"
+          turn_uris:
+          #  - turn:turn.server.org?transport=udp
+          #  - turn:turn.server.org?transport=tcp
+          turn_shared_secret: ""
+          # If your TURN server requires static credentials, then you will need to enter
+          # them here instead of supplying a shared secret. Note that these credentials
+          # will be visible to clients!
+          # turn_username: ""
+          # turn_password: ""
+      
+      
+      # Configuration for the Federation API.
+      federation_api:
+        send_max_retries: 16
+      
+        disable_tls_validation: false
+        disable_http_keepalives: false
+        key_perspectives:
+          - server_name: matrix.org
+            keys:
+              - key_id: ed25519:auto
+                public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
+              - key_id: ed25519:a_RXGa
+                public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
+      
+        # This option will control whether Dendrite will prefer to look up keys directly
+        # or whether it should try perspective servers first, using direct fetches as a
+        # last resort.
+        prefer_direct_fetch: false
+      
+      # Configuration for the Media API.
+      media_api:
+        # Storage path for uploaded media. May be relative or absolute.
+        base_path: /tmp/media_store
+      
+        # The maximum allowed file size (in bytes) for media uploads to this homeserver
+        # (0 = unlimited). If using a reverse proxy, ensure it allows requests at least
+        #this large (e.g. the client_max_body_size setting in nginx).
+        max_file_size_bytes: 10485760
+      
+        # Whether to dynamically generate thumbnails if needed.
+        dynamic_thumbnails: false
+      
+        # The maximum number of simultaneous thumbnail generators to run.
+        max_thumbnail_generators: 10
+      
+        # A list of thumbnail sizes to be generated for media content.
+        thumbnail_sizes:
+          - width: 32
+            height: 32
+            method: crop
+          - width: 96
+            height: 96
+            method: crop
+          - width: 640
+            height: 480
+            method: scale
+      
+      # Configuration for enabling experimental MSCs on this homeserver.
+      mscs:
+        mscs:
+        #  - msc2836  # (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
+      
+      # Configuration for the Sync API.
+      sync_api:
+        # This option controls which HTTP header to inspect to find the real remote IP
+        # address of the client. This is likely required if Dendrite is running behind
+        # a reverse proxy server.
+        # real_ip_header: X-Real-IP
+      
+        # Configuration for the full-text search engine.
+        search:
+          # Whether or not search is enabled.
+          enabled: false
+      
+          # The path where the search index will be created in.
+          index_path: "/tmp/searchindex"
+      
+          # The language most likely to be used on the server - used when indexing, to
+          # ensure the returned results match expectations. A full list of possible languages
+          # can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
+          language: "en"
+      
+      # Configuration for the User API.
+      user_api:
+        bcrypt_cost: 10
+      
+      tracing:
+        enabled: false
+        jaeger:
+          serviceName: ""
+          disabled: false
+          rpc_metrics: false
+          tags: [ ]
+          sampler: null
+          reporter: null
+          headers: null
+          baggage_restrictions: null
+          throttler: null
+      logging:
+        - type: std
+          level: info
 
 networks:
   internal:

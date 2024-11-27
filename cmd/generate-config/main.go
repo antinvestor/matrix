@@ -30,7 +30,7 @@ func main() {
 		cfg.Defaults(config.DefaultOpts{
 			DatabaseConnectionStr: config.DataSource(*databaseURI),
 			CacheConnectionStr:    config.DataSource(*cacheURI),
-			QueueConnectionStr:    config.DataSource(*queueURI),
+			QueueConnectionStr:    *queueURI,
 		})
 		if *serverName != "" {
 			cfg.Global.ServerName = spec.ServerName(*serverName)

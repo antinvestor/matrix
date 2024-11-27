@@ -162,6 +162,8 @@ type IdentityProvider struct {
 	ClientID     string `yaml:"client_id"`
 	ClientSecret string `yaml:"client_secret"`
 	DiscoveryURL string `yaml:"discovery_url"`
+
+	JWTLogin JWTLogin `yaml:"jwt_login"`
 }
 
 func (idp *IdentityProvider) WithDefaults() IdentityProvider {
@@ -182,6 +184,10 @@ func (idp *IdentityProvider) verifyNormalized(configErrs *ConfigErrors) {
 	checkNotEmpty(configErrs, "client_api.sso.providers.client_id", idp.ClientID)
 	checkNotEmpty(configErrs, "client_api.sso.providers.client_secret", idp.ClientSecret)
 	checkNotEmpty(configErrs, "client_api.sso.providers.discovery_url", idp.DiscoveryURL)
+}
+
+type JWTLogin struct {
+	Audience string `yaml:"audience"`
 }
 
 type TURN struct {

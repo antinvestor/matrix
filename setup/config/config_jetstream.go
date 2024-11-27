@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 )
@@ -30,29 +29,37 @@ func (c *JetStream) Durable(name string) string {
 	return c.Prefixed(name)
 }
 
-func (c *JetStream) Defaults(opts DefaultOpts) {
-	c.Addresses = []string{}
+func (c *JetStream) LoadEnv() {
+	queueUriStr := os.Getenv("QUEUE_URI")
+	if queueUriStr != "" {
 
-	natsUriStr := opts.QueueConnectionStr
-	if natsUriStr != "" {
-		natsUriStrs := strings.Split(string(natsUriStr), ",")
-		for _, natsUri := range natsUriStrs {
-			_, err := url.Parse(natsUri)
-			if err == nil {
+		connectionUris := strings.Split(queueUriStr, ",")
+		for _, natsUri := range connectionUris {
+			dataSourceUri := DataSource(natsUri)
+			if dataSourceUri.IsNats() {
 				c.Addresses = append(c.Addresses, natsUri)
 			}
 		}
 	}
 
+}
+
+func (c *JetStream) Defaults(opts DefaultOpts) {
+
 	c.TopicPrefix = "Matrix"
 	c.Credentials = ""
+
+	connectionUriStr := opts.QueueConnectionStr
+	connectionUris := strings.Split(connectionUriStr, ",")
+	for _, natsUri := range connectionUris {
+		dataSourceUri := DataSource(natsUri)
+		if dataSourceUri.IsNats() {
+			c.Addresses = append(c.Addresses, natsUri)
+		}
+	}
 
 }
 
 func (c *JetStream) Verify(configErrs *ConfigErrors) {
-	databaseUriStr := os.Getenv("QUEUE_URI")
-	if databaseUriStr != "" {
-		c.Addresses = strings.Split(databaseUriStr, ",")
-	}
-
+	checkNotEmpty(configErrs, "global.jetstream.addresses", strings.Join(c.Addresses, ","))
 }

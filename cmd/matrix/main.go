@@ -125,7 +125,7 @@ func main() {
 			Environment:      cfg.Global.Sentry.Environment,
 			Debug:            true,
 			ServerName:       string(cfg.Global.ServerName),
-			Release:          "dendrite@" + internal.VersionString(),
+			Release:          "matrix@" + internal.VersionString(),
 			AttachStacktrace: true,
 		})
 		if err != nil {

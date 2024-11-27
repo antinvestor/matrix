@@ -17,7 +17,6 @@ package test
 import (
 	"context"
 
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/sirupsen/logrus"
 	"github.com/testcontainers/testcontainers-go"
 	tcNats "github.com/testcontainers/testcontainers-go/modules/nats"
@@ -33,7 +32,7 @@ func setupNats(ctx context.Context) (*tcNats.NATSContainer, error) {
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same connection, which will have data from previous tests
 // unless close() is called.
-func PrepareNatsDataSourceConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
+func PrepareNatsDataSourceConnection(ctx context.Context) (dsConnection string, close func(), err error) {
 
 	container, err := setupNats(ctx)
 	if err != nil {
@@ -45,7 +44,7 @@ func PrepareNatsDataSourceConnection(ctx context.Context) (dsConnection config.D
 		return "", nil, err
 	}
 
-	return config.DataSource(connStr), func() {
+	return connStr, func() {
 
 		err = testcontainers.TerminateContainer(container)
 		if err != nil {

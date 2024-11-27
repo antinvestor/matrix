@@ -110,6 +110,12 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	c.Cache.Defaults(opts)
 }
 
+func (c *Global) LoadEnv() {
+	c.DatabaseOptions.LoadEnv()
+	c.JetStream.LoadEnv()
+	c.Cache.LoadEnv()
+}
+
 func (c *Global) Verify(configErrs *ConfigErrors) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
@@ -312,15 +318,7 @@ type CacheOptions struct {
 	EnablePrometheus bool          `yaml:"enable_prometheus"`
 }
 
-func (c *CacheOptions) Defaults(opts DefaultOpts) {
-	c.ConnectionString = opts.CacheConnectionStr
-	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
-	c.MaxAge = time.Hour
-}
-
-func (c *CacheOptions) Verify(errors *ConfigErrors) {
-	checkPositive(errors, "max_size_estimated", int64(c.EstimatedMaxSize))
-
+func (c *CacheOptions) LoadEnv() {
 	cacheUriStr := os.Getenv("CACHE_URI")
 	if cacheUriStr != "" {
 		dsUri := DataSource(cacheUriStr)
@@ -328,7 +326,23 @@ func (c *CacheOptions) Verify(errors *ConfigErrors) {
 			c.ConnectionString = dsUri
 		}
 	}
+}
 
+func (c *CacheOptions) Defaults(opts DefaultOpts) {
+	connectionUriStr := string(opts.CacheConnectionStr)
+	if connectionUriStr != "" {
+		c.ConnectionString = DataSource(connectionUriStr)
+	}
+
+	c.ConnectionString = opts.CacheConnectionStr
+	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
+	c.MaxAge = time.Hour
+}
+
+func (c *CacheOptions) Verify(configErrs *ConfigErrors) {
+	checkPositive(configErrs, "max_size_estimated", int64(c.EstimatedMaxSize))
+
+	checkNotEmpty(configErrs, "global.cache.connection_string", string(c.ConnectionString))
 }
 
 // ReportStats configures opt-in phone-home statistics reporting.
@@ -385,8 +399,23 @@ type DatabaseOptions struct {
 	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
 }
 
+func (c *DatabaseOptions) LoadEnv() {
+	databaseUriStr := os.Getenv("DATABASE_URI")
+	if databaseUriStr != "" {
+		dsUri := DataSource(databaseUriStr)
+		if dsUri.IsPostgres() {
+			c.ConnectionString = dsUri
+		}
+	}
+}
+
 func (c *DatabaseOptions) Defaults(opts DefaultOpts) {
-	c.ConnectionString = opts.DatabaseConnectionStr
+
+	databaseUriStr := string(opts.DatabaseConnectionStr)
+	if databaseUriStr != "" {
+		c.ConnectionString = DataSource(databaseUriStr)
+	}
+
 	c.MaxOpenConnections = 90
 	c.MaxIdleConnections = 2
 	c.ConnMaxLifetimeSeconds = -1
@@ -394,14 +423,12 @@ func (c *DatabaseOptions) Defaults(opts DefaultOpts) {
 
 func (c *DatabaseOptions) Verify(configErrs *ConfigErrors) {
 
-	databaseUriStr := os.Getenv("DATABASE_URI")
-	if databaseUriStr != "" {
-
-		dsUri := DataSource(databaseUriStr)
-		if dsUri.IsPostgres() {
-			c.ConnectionString = dsUri
-		}
+	if c.ConnectionString != "" {
+		return
 	}
+
+	checkNotEmpty(configErrs, "global.database.connection_string", string(c.ConnectionString))
+
 }
 
 // MaxIdleConns returns maximum idle connections to the DB

@@ -278,6 +278,8 @@ func loadConfig(
 
 	c.MediaAPI.AbsBasePath = Path(absPath(basePath, c.MediaAPI.BasePath))
 
+	c.LoadEnv()
+
 	// Generate data from config options
 	err = c.Derive()
 	if err != nil {
@@ -325,10 +327,14 @@ func (config *Dendrite) Derive() error {
 	return nil
 }
 
+func (config *Dendrite) LoadEnv() {
+	config.Global.LoadEnv()
+}
+
 type DefaultOpts struct {
 	DatabaseConnectionStr DataSource
 	CacheConnectionStr    DataSource
-	QueueConnectionStr    DataSource
+	QueueConnectionStr    string
 }
 
 // SetDefaults sets default config values if they are not explicitly set.
@@ -367,14 +373,28 @@ func (config *Dendrite) Wiring() {
 	config.Global.JetStream.Matrix = &config.Global
 	config.ClientAPI.Matrix = &config.Global
 	config.FederationAPI.Matrix = &config.Global
+	config.FederationAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+
 	config.KeyServer.Matrix = &config.Global
+	config.KeyServer.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+
 	config.MediaAPI.Matrix = &config.Global
+	config.MediaAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+
 	config.RoomServer.Matrix = &config.Global
+	config.RoomServer.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+
 	config.SyncAPI.Matrix = &config.Global
+	config.SyncAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+
 	config.UserAPI.Matrix = &config.Global
+	config.UserAPI.AccountDatabase.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 	config.AppServiceAPI.Matrix = &config.Global
 	config.RelayAPI.Matrix = &config.Global
+	config.RelayAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+
 	config.MSCs.Matrix = &config.Global
+	config.MSCs.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
 	config.ClientAPI.Derived = &config.Derived
 	config.AppServiceAPI.Derived = &config.Derived

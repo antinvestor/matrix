@@ -29,7 +29,7 @@ func DeleteAllStreams(js natsclient.JetStreamContext, cfg *config.JetStream) {
 func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) == 0 {
-		logrus.Fatalln("No Jetstream addresses specified")
+		logrus.Fatalf("No Jetstream addresses specified")
 	}
 	// reuse existing connections
 	if s.nc != nil {

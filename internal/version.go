@@ -9,7 +9,7 @@ import (
 // the final version string
 var version string
 
-// -ldflags "-X github.com/antinvestor/matrix/internal.branch=master"
+// -ldflags "-X github.com/antinvestor/matrix/internal.branch=main"
 var branch string
 
 // -ldflags "-X github.com/antinvestor/matrix/internal.build=alpha"
@@ -17,8 +17,8 @@ var build string
 
 const (
 	VersionMajor = 0
-	VersionMinor = 1
-	VersionPatch = 1
+	VersionMinor = 2
+	VersionPatch = 7
 	VersionTag   = "" // example: "rc1"
 
 	gitRevLen = 7 // 7 matches the displayed characters on github.com

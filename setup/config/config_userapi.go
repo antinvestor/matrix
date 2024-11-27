@@ -27,8 +27,6 @@ type UserAPI struct {
 	// The number of workers to start for the DeviceListUpdater. Defaults to 8.
 	// This only needs updating if the "InputDeviceListUpdate" stream keeps growing indefinitely.
 	WorkerCount int `yaml:"worker_count"`
-
-	JWTLogin JWTLogin `yaml:"jwt_login"`
 }
 
 const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
@@ -46,10 +44,4 @@ func (c *UserAPI) Verify(configErrs *ConfigErrors) {
 	if c.AccountDatabase.ConnectionString == "" {
 		checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
 	}
-}
-
-type JWTLogin struct {
-	Issuer                string `yaml:"issuer"`
-	Audience              string `yaml:"audience"`
-	Oauth2WellKnownJwkUri string `yaml:"oauth2_well_known_jwk_uri"`
 }
