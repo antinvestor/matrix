@@ -64,9 +64,10 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 		return nil, nil, err
 	}
 
+	var info *natsclient.StreamInfo
 	for _, stream := range streams { // streams are defined in streams.go
 		name := cfg.Prefixed(stream.Name)
-		info, err := s.StreamInfo(name)
+		info, err = s.StreamInfo(name)
 		if err != nil && !errors.Is(err, natsclient.ErrStreamNotFound) {
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
@@ -122,35 +123,12 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 					"subjects": namespaced.Subjects,
 				})
 
-				// If the stream was supposed to be in-memory to begin with
-				// then an error here is fatal so we'll give up.
-				if namespaced.Storage == natsclient.MemoryStorage {
-					logger.WithError(err).Fatal("Unable to add in-memory stream")
-				}
-
 				// The stream was supposed to be on disk. Let's try starting
 				// Dendrite with the stream in-memory instead. That'll mean that
 				// we can't recover anything that was queued on the disk but we
 				// will still be able to start and run hopefully in the meantime.
-				logger.WithError(err).Error("Unable to add stream")
-				sentry.CaptureException(fmt.Errorf("Unable to add stream %q: %w", namespaced.Name, err))
-
-				namespaced.Storage = natsclient.MemoryStorage
-				if _, err = s.AddStream(&namespaced); err != nil {
-					// We tried to add the stream in-memory instead but something
-					// went wrong. That's an unrecoverable situation so we will
-					// give up at this point.
-					logger.WithError(err).Fatal("Unable to add in-memory stream")
-				}
-
-				if stream.Storage != namespaced.Storage {
-					// We've managed to add the stream in memory.  What's on the
-					// disk will be left alone, but our ability to recover from a
-					// future crash will be limited. Yell about it.
-					err := fmt.Errorf("Stream %q is running in-memory; this may be due to data corruption in the JetStream storage directory", namespaced.Name)
-					sentry.CaptureException(err)
-					process.Degraded(err)
-				}
+				sentry.CaptureException(fmt.Errorf("unable to add stream %q: %w", namespaced.Name, err))
+				logger.WithError(err).Fatal("Unable to add stream")
 			}
 		}
 	}

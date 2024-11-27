@@ -63,8 +63,8 @@ global:
     - localhost:2181
     topic_prefix: Dendrite
     use_naffka: true
-    naffka_database:
-      connection_string: file:naffka.db
+  database:
+      connection_string: postgres://user:password@localhost/matrix?sslmode=disable
       max_open_conns: 100
       max_idle_conns: 2
       conn_max_lifetime: -1
