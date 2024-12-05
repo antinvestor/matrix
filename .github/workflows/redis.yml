@@ -32,7 +32,6 @@ jobs:
       - name: Build and Pushing Image to Github Container Registry
         uses: docker/build-push-action@v6
         with:
-          context: ./build/image
           file: Redis.Dockerfile
           push: true
           tags: antinvestor/redis:latest
