@@ -1,19 +1,17 @@
 # Based on https://github.com/docker/build-push-action
 
-name: "Test Images Release"
+name: "Build redis image"
 
 on:
-
   workflow_dispatch: # A build was manually requested
 
 jobs:
-  monolith:
-    name: Test dependancy images
+  redis:
+    name: Redis image build
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-      security-events: write # To upload Trivy sarif files
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,11 +29,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Push to Github Container Registry
       - name: Build and Pushing Image to Github Container Registry
         uses: docker/build-push-action@v6
         with:
-          context: ./build/scripts
-          file: {context}/Redis.Dockerfile
+          context: ./build/image
+          file: Redis.Dockerfile
           push: true
           tags: antinvestor/redis:latest
