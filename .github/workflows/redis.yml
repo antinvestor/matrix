@@ -34,4 +34,4 @@ jobs:
         with:
           file: Redis.Dockerfile
           push: true
-          tags: antinvestor/redis:latest
+          tags: ghcr.io/antinvestor/redis:latest
