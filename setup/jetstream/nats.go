@@ -21,7 +21,7 @@ type NATSInstance struct {
 
 func DeleteAllStreams(js natsclient.JetStreamContext, cfg *config.JetStream) {
 	for _, stream := range streams { // streams are defined in streams.go
-		name := cfg.Prefixed(stream.Name)
+		name := cfg.CleanStreamName(stream.Name)
 		_ = js.DeleteStream(name)
 	}
 }
@@ -66,20 +66,21 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 
 	var info *natsclient.StreamInfo
 	for _, stream := range streams { // streams are defined in streams.go
-		name := cfg.Prefixed(stream.Name)
-		info, err = s.StreamInfo(name)
+		streamName := cfg.CleanStreamName(stream.Name)
+		info, err = s.StreamInfo(streamName)
 		if err != nil && !errors.Is(err, natsclient.ErrStreamNotFound) {
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
 		subjects := stream.Subjects
 		if len(subjects) == 0 {
 			// By default we want each stream to listen for the subjects
-			// that are either an exact match for the stream name, or where
-			// the first part of the subject is the stream name. ">" is a
+			// that are either an exact match for the stream streamName, or where
+			// the first part of the subject is the stream streamName. ">" is a
 			// wildcard in NATS for one or more subject tokens. In the case
 			// that the stream is called "Foo", this will match any message
 			// with the subject "Foo", "Foo.Bar" or "Foo.Bar.Baz" etc.
-			subjects = []string{name, name + ".>"}
+			defaultSubject := cfg.Prefixed(stream.Name)
+			subjects = []string{defaultSubject, defaultSubject + ".>"}
 		}
 		if info != nil {
 			// If the stream config doesn't match what we expect, try to update
@@ -100,11 +101,11 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 				// Try updating the stream first, as many things can be updated
 				// non-destructively.
 				if info, err = s.UpdateStream(stream); err != nil {
-					logrus.WithError(err).Warnf("Unable to update stream %q, recreating...", name)
+					logrus.WithError(err).WithField("streamName", streamName).Warnf("Unable to update stream, recreating...")
 					// We failed to update the stream, this is a last attempt to get
 					// things working but may result in data loss.
-					if err = s.DeleteStream(name); err != nil {
-						logrus.WithError(err).Fatalf("Unable to delete stream %q", name)
+					if err = s.DeleteStream(streamName); err != nil {
+						logrus.WithError(err).WithField("streamName", streamName).Fatalf("Unable to delete stream")
 					}
 					info = nil
 				}
@@ -115,7 +116,7 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 			// Namespace the streams without modifying the original streams
 			// array, otherwise we end up with namespaces on namespaces.
 			namespaced := *stream
-			namespaced.Name = name
+			namespaced.Name = streamName
 			namespaced.Subjects = subjects
 			if _, err = s.AddStream(&namespaced); err != nil {
 				logger := logrus.WithError(err).WithFields(logrus.Fields{
@@ -144,9 +145,9 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 		OutputStreamEvent:       {"UserAPISyncAPIStreamEventConsumer"},
 		OutputReadUpdate:        {"UserAPISyncAPIReadUpdateConsumer"},
 	} {
-		streamName := cfg.Matrix.JetStream.Prefixed(stream)
+		streamName := cfg.Matrix.JetStream.CleanStreamName(stream)
 		for _, consumer := range consumers {
-			consumerName := cfg.Matrix.JetStream.Prefixed(consumer) + "Pull"
+			consumerName := cfg.Matrix.JetStream.CleanStreamName(consumer) + "Pull"
 			consumerInfo, err := s.ConsumerInfo(streamName, consumerName)
 			if err != nil || consumerInfo == nil {
 				continue

@@ -21,6 +21,11 @@ type JetStream struct {
 	Credentials Path `yaml:"credentials_path"`
 }
 
+func (c *JetStream) CleanStreamName(name string) string {
+	streamName := c.Prefixed(name)
+	return strings.ReplaceAll(streamName, ".", "_")
+}
+
 func (c *JetStream) Prefixed(name string) string {
 	return fmt.Sprintf("%s%s", c.TopicPrefix, name)
 }
