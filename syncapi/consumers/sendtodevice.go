@@ -75,7 +75,7 @@ func NewOutputSendToDeviceEventConsumer(
 
 // Start consuming send-to-device events.
 func (s *OutputSendToDeviceEventConsumer) Start() error {
-	return jetstream.JetStreamConsumer(
+	return jetstream.Consumer(
 		s.ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)

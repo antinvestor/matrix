@@ -4,24 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
 
-// JetStreamConsumer starts a durable consumer on the given subject with the
+// Consumer starts a durable consumer on the given subject with the
 // given durable name. The function will be called when one or more messages
 // is available, up to the maximum batch size specified. If the batch is set to
 // 1 then messages will be delivered one at a time. If the function is called,
 // the messages array is guaranteed to be at least 1 in size. Any provided NATS
 // options will be passed through to the pull subscriber creation. The consumer
 // will continue to run until the context expires, at which point it will stop.
-func JetStreamConsumer(
+func Consumer(
 	ctx context.Context, js nats.JetStreamContext, subj, durable string, batch int,
 	f func(ctx context.Context, msgs []*nats.Msg) bool,
 	opts ...nats.SubOpt,
 ) error {
+
+	durable = strings.ReplaceAll(durable, ".", "")
+
 	defer func() {
 		// If there are existing consumers from before they were pull
 		// consumers, we need to clean up the old push consumers. However,

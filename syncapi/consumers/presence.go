@@ -130,7 +130,7 @@ func (s *PresenceConsumer) Start() error {
 	if !s.cfg.Matrix.Presence.EnableInbound && !s.cfg.Matrix.Presence.EnableOutbound {
 		return nil
 	}
-	return jetstream.JetStreamConsumer(
+	return jetstream.Consumer(
 		s.ctx, s.jetstream, s.presenceTopic, s.durable, 1, s.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)

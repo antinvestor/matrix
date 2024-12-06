@@ -72,7 +72,7 @@ func NewOutputKeyChangeEventConsumer(
 
 // Start consuming from the key server
 func (s *OutputKeyChangeEventConsumer) Start() error {
-	return jetstream.JetStreamConsumer(
+	return jetstream.Consumer(
 		s.ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)

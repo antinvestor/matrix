@@ -62,7 +62,7 @@ func NewOutputTypingConsumer(
 
 // Start consuming from the clientapi
 func (t *OutputTypingConsumer) Start() error {
-	return jetstream.JetStreamConsumer(
+	return jetstream.Consumer(
 		t.ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)

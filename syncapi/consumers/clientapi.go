@@ -146,7 +146,7 @@ func (s *OutputClientDataConsumer) Start() error {
 	if err != nil {
 		return err
 	}
-	return jetstream.JetStreamConsumer(
+	return jetstream.Consumer(
 		s.ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)

@@ -74,7 +74,7 @@ func (t *OutputPresenceConsumer) Start() error {
 	if !t.outboundPresenceEnabled {
 		return nil
 	}
-	return jetstream.JetStreamConsumer(
+	return jetstream.Consumer(
 		t.ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)

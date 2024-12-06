@@ -80,7 +80,7 @@ func NewOutputRoomEventConsumer(
 }
 
 func (s *OutputRoomEventConsumer) Start() error {
-	if err := jetstream.JetStreamConsumer(
+	if err := jetstream.Consumer(
 		s.ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	); err != nil {

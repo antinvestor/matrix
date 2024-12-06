@@ -243,7 +243,7 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 		received.Store(true)
 		return true
 	}
-	err = jetstream.JetStreamConsumer(
+	err = jetstream.Consumer(
 		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
 		cfg.Global.JetStream.Durable("TestTypingConsumer"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
@@ -309,7 +309,7 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 		received.Store(true)
 		return true
 	}
-	err = jetstream.JetStreamConsumer(
+	err = jetstream.Consumer(
 		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		cfg.Global.JetStream.Durable("TestToDevice"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
@@ -386,7 +386,7 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 		received.Store(true)
 		return true
 	}
-	err = jetstream.JetStreamConsumer(
+	err = jetstream.Consumer(
 		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
 		cfg.Global.JetStream.Durable("TestDeviceListUpdate"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
@@ -478,7 +478,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 		received.Store(true)
 		return true
 	}
-	err = jetstream.JetStreamConsumer(
+	err = jetstream.Consumer(
 		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 		cfg.Global.JetStream.Durable("TestReceipt"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
@@ -525,7 +525,7 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 		received.Store(true)
 		return true
 	}
-	err = jetstream.JetStreamConsumer(
+	err = jetstream.Consumer(
 		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
 		cfg.Global.JetStream.Durable("TestSigningKeyUpdate"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
@@ -580,7 +580,7 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 		received.Store(true)
 		return true
 	}
-	err = jetstream.JetStreamConsumer(
+	err = jetstream.Consumer(
 		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		cfg.Global.JetStream.Durable("TestPresence"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),

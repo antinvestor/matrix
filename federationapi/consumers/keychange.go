@@ -69,7 +69,7 @@ func NewKeyChangeConsumer(
 
 // Start consuming from key servers
 func (t *KeyChangeConsumer) Start() error {
-	return jetstream.JetStreamConsumer(
+	return jetstream.Consumer(
 		t.ctx, t.jetstream, t.topic, t.durable, 1,
 		t.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)

@@ -85,7 +85,7 @@ func (s *OutputRoomEventConsumer) Start() error {
 			ApplicationService: &appsvc,
 		}
 		token := jetstream.Tokenise(as.ID)
-		if err := jetstream.JetStreamConsumer(
+		if err := jetstream.Consumer(
 			s.ctx, s.jetstream, s.topic,
 			s.cfg.Matrix.JetStream.Durable("Appservice_"+token),
 			50, // maximum number of events to send in a single transaction

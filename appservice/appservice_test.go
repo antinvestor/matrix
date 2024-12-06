@@ -533,7 +533,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		jsCtx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 
 		token := jetstream.Tokenise(as.ID)
-		if err := jetstream.JetStreamConsumer(
+		if err := jetstream.Consumer(
 			processCtx.Context(), jsCtx, cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
 			cfg.Global.JetStream.Durable("Appservice_"+token),
 			50, // maximum number of events to send in a single transaction
