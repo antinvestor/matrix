@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-
 	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -23,8 +21,6 @@ func Consumer(
 	f func(ctx context.Context, msgs []*nats.Msg) bool,
 	opts ...nats.SubOpt,
 ) error {
-
-	durable = strings.ReplaceAll(durable, ".", "")
 
 	defer func() {
 		// If there are existing consumers from before they were pull

@@ -21,7 +21,7 @@ type NATSInstance struct {
 
 func DeleteAllStreams(js natsclient.JetStreamContext, cfg *config.JetStream) {
 	for _, stream := range streams { // streams are defined in streams.go
-		name := cfg.CleanStreamName(stream.Name)
+		name := cfg.Prefixed(stream.Name)
 		_ = js.DeleteStream(name)
 	}
 }
@@ -66,7 +66,7 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 
 	var info *natsclient.StreamInfo
 	for _, stream := range streams { // streams are defined in streams.go
-		streamName := cfg.CleanStreamName(stream.Name)
+		streamName := cfg.Prefixed(stream.Name)
 		info, err = s.StreamInfo(streamName)
 		if err != nil && !errors.Is(err, natsclient.ErrStreamNotFound) {
 			logrus.WithError(err).Fatal("Unable to get stream info")
@@ -145,9 +145,9 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 		OutputStreamEvent:       {"UserAPISyncAPIStreamEventConsumer"},
 		OutputReadUpdate:        {"UserAPISyncAPIReadUpdateConsumer"},
 	} {
-		streamName := cfg.Matrix.JetStream.CleanStreamName(stream)
+		streamName := cfg.Matrix.JetStream.Prefixed(stream)
 		for _, consumer := range consumers {
-			consumerName := cfg.Matrix.JetStream.CleanStreamName(consumer) + "Pull"
+			consumerName := cfg.Matrix.JetStream.Prefixed(consumer) + "Pull"
 			consumerInfo, err := s.ConsumerInfo(streamName, consumerName)
 			if err != nil || consumerInfo == nil {
 				continue
