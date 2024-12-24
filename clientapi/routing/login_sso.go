@@ -85,7 +85,7 @@ func SSORedirect(
 	}
 
 	callbackURL = callbackURL.ResolveReference(&url.URL{
-		RawQuery: url.Values{"provider": []string{idpID}}.Encode(),
+		RawQuery: url.Values{"partition_id": []string{idpID}}.Encode(),
 	})
 	nonce := formatNonce(redirectURL)
 	u, err := auth.AuthorizationURL(ctx, idpID, callbackURL.String(), nonce)
@@ -105,7 +105,7 @@ func SSORedirect(
 		Value:    nonce,
 		Path:     path.Dir(callbackURL.Path),
 		Expires:  time.Now().Add(10 * time.Minute),
-		Secure:   callbackURL.Scheme != "http",
+		Secure:   callbackURL.Scheme == "https",
 		SameSite: http.SameSiteNoneMode,
 	}
 	if !cookie.Secure {
@@ -163,7 +163,7 @@ func SSOCallback(
 	ctx := req.Context()
 
 	query := req.URL.Query()
-	idpID := query.Get("provider")
+	idpID := query.Get("partition_id")
 	if idpID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -196,7 +196,7 @@ func SSOCallback(
 	}
 
 	callbackURL = callbackURL.ResolveReference(&url.URL{
-		RawQuery: url.Values{"provider": []string{idpID}}.Encode(),
+		RawQuery: url.Values{"partition_id": []string{idpID}}.Encode(),
 	})
 	result, err := auth.ProcessCallback(ctx, idpID, callbackURL.String(), nonce.Value, query)
 	if err != nil {

@@ -189,7 +189,7 @@ func TestSSOCallback(t *testing.T) {
 				URL: &url.URL{
 					Path: "/_matrix/v4/login/sso/callback",
 					RawQuery: url.Values{
-						"provider": []string{"aprovider"},
+						"partition_id": []string{"aprovider"},
 					}.Encode(),
 				},
 				Header: http.Header{
@@ -221,7 +221,7 @@ func TestSSOCallback(t *testing.T) {
 				URL: &url.URL{
 					Path: "/_matrix/v4/login/sso/callback",
 					RawQuery: url.Values{
-						"provider": []string{"aprovider"},
+						"partition_id": []string{"aprovider"},
 					}.Encode(),
 				},
 				Header: http.Header{
@@ -254,7 +254,7 @@ func TestSSOCallback(t *testing.T) {
 				URL: &url.URL{
 					Path: "/_matrix/v4/login/sso/callback",
 					RawQuery: url.Values{
-						"provider": []string{"aprovider"},
+						"partition_id": []string{"aprovider"},
 					}.Encode(),
 				},
 				Header: http.Header{
@@ -286,7 +286,7 @@ func TestSSOCallback(t *testing.T) {
 				URL: &url.URL{
 					Path: "/_matrix/v4/login/sso/callback",
 					RawQuery: url.Values{
-						"provider": []string{"aprovider"},
+						"partition_id": []string{"aprovider"},
 					}.Encode(),
 				},
 				Header: http.Header{
@@ -344,7 +344,7 @@ func TestSSOCallbackError(t *testing.T) {
 		URL: &url.URL{
 			Path: "/_matrix/v4/login/sso/callback",
 			RawQuery: url.Values{
-				"provider": []string{"aprovider"},
+				"partition_id": []string{"aprovider"},
 			}.Encode(),
 		},
 		Header: http.Header{
@@ -396,7 +396,7 @@ func TestSSOCallbackError(t *testing.T) {
 				URL: &url.URL{
 					Path: "/_matrix/v4/login/sso/callback",
 					RawQuery: url.Values{
-						"provider": []string{"aprovider"},
+						"partition_id": []string{"aprovider"},
 					}.Encode(),
 				},
 			},
@@ -409,7 +409,7 @@ func TestSSOCallbackError(t *testing.T) {
 				URL: &url.URL{
 					Path: "/_matrix/v4/login/sso/callback",
 					RawQuery: url.Values{
-						"provider": []string{"aprovider"},
+						"partition_id": []string{"aprovider"},
 					}.Encode(),
 				},
 				Header: http.Header{
