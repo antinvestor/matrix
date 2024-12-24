@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
