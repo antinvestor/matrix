@@ -68,7 +68,7 @@ func newSSOIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oidc
 		cfg: cfg,
 		hc:  hc,
 
-		scopes:              []string{"openid", "profile", "email"},
+		scopes:              []string{"openid", "profile", "offline", "contact"},
 		responseMimeType:    "application/json",
 		subPath:             "sub",
 		displayNamePath:     "name",
