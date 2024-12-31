@@ -68,13 +68,13 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	// We pull out a larger number than the filter asks for, since we're filtering out events later
 	presences, err := snapshot.PresenceAfter(ctx, from, synctypes.EventFilter{Limit: 1000})
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.PresenceAfter failed")
+		req.Log.With(slog.Any("error", err)).Error("p.DB.PresenceAfter failed")
 		return from
 	}
 
 	getPresenceForUsers, err := p.getNeededUsersFromRequest(ctx, req, presences)
 	if err != nil {
-		req.Log.WithError(err).Error("getNeededUsersFromRequest failed")
+		req.Log.With(slog.Any("error", err)).Error("getNeededUsersFromRequest failed")
 		return from
 	}
 
@@ -85,7 +85,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 
 	dbPresences, err := snapshot.GetPresences(ctx, getPresenceForUsers)
 	if err != nil {
-		req.Log.WithError(err).Error("unable to query presence for user")
+		req.Log.With(slog.Any("error", err)).Error("unable to query presence for user")
 		_ = snapshot.Rollback()
 		return from
 	}

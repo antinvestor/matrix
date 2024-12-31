@@ -45,7 +45,7 @@ func NewFederationInternalAPI(
 ) *FederationInternalAPI {
 	serverKeyDB, err := cache.NewKeyDatabase(db, caches)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to set up caching wrapper for server key database")
+		logrus.With(slog.Any("error", err)).Panicf("failed to set up caching wrapper for server key database")
 	}
 
 	if keyRing == nil {
@@ -83,7 +83,7 @@ func NewFederationInternalAPI(
 			for _, key := range ps.Keys {
 				rawkey, err := b64e.DecodeString(key.PublicKey)
 				if err != nil {
-					logrus.WithError(err).WithFields(logrus.Fields{
+					logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
 						"server_name": ps.ServerName,
 						"public_key":  key.PublicKey,
 					}).Warn("Couldn't parse perspective key")

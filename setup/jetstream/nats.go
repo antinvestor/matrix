@@ -38,7 +38,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 	var err error
 	s.js, s.nc, err = setupNATS(process, cfg, nil)
 	if err != nil {
-		logrus.WithError(err).Fatalf("Could not setup nats at : %s", cfg.Addresses)
+		logrus.With(slog.Any("error", err)).Fatalf("Could not setup nats at : %s", cfg.Addresses)
 	}
 	return s.js, s.nc
 
@@ -69,7 +69,7 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 		streamName := cfg.Prefixed(stream.Name)
 		info, err = s.StreamInfo(streamName)
 		if err != nil && !errors.Is(err, natsclient.ErrStreamNotFound) {
-			logrus.WithError(err).Fatal("Unable to get stream info")
+			logrus.With(slog.Any("error", err)).Fatal("Unable to get stream info")
 		}
 		subjects := stream.Subjects
 		if len(subjects) == 0 {
@@ -101,11 +101,11 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 				// Try updating the stream first, as many things can be updated
 				// non-destructively.
 				if info, err = s.UpdateStream(stream); err != nil {
-					logrus.WithError(err).WithField("streamName", streamName).Warnf("Unable to update stream, recreating...")
+					logrus.With(slog.Any("error", err)).With("streamName", streamName).Warn("Unable to update stream, recreating...")
 					// We failed to update the stream, this is a last attempt to get
 					// things working but may result in data loss.
 					if err = s.DeleteStream(streamName); err != nil {
-						logrus.WithError(err).WithField("streamName", streamName).Fatalf("Unable to delete stream")
+						logrus.With(slog.Any("error", err)).With("streamName", streamName).Fatalf("Unable to delete stream")
 					}
 					info = nil
 				}
@@ -119,7 +119,7 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 			namespaced.Name = streamName
 			namespaced.Subjects = subjects
 			if _, err = s.AddStream(&namespaced); err != nil {
-				logger := logrus.WithError(err).WithFields(logrus.Fields{
+				logger := logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
 					"stream":   namespaced.Name,
 					"subjects": namespaced.Subjects,
 				})
@@ -129,7 +129,7 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 				// we can't recover anything that was queued on the disk but we
 				// will still be able to start and run hopefully in the meantime.
 				sentry.CaptureException(fmt.Errorf("unable to add stream %q: %w", namespaced.Name, err))
-				logger.WithError(err).Fatal("Unable to add stream")
+				logger.With(slog.Any("error", err)).Fatal("Unable to add stream")
 			}
 		}
 	}
@@ -153,7 +153,7 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 				continue
 			}
 			if err = s.DeleteConsumer(streamName, consumerName); err != nil {
-				logrus.WithError(err).Errorf("Unable to clean up old consumer %q for stream %q", consumer, stream)
+				logrus.With(slog.Any("error", err)).Error("Unable to clean up old consumer %q for stream %q", consumer, stream)
 			}
 		}
 	}

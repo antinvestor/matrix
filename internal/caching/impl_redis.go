@@ -80,7 +80,7 @@ func (c *RedisCachePartition[K, V]) Get(ctx context.Context, key K) (V, bool) {
 	if err != nil {
 
 		if !errors.Is(err, redis.Nil) {
-			logrus.WithError(err).Error("Failed to get value")
+			logrus.With(slog.Any("error", err)).Error("Failed to get value")
 		}
 
 		var empty V

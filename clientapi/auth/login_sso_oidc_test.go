@@ -35,7 +35,7 @@ func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
 	}
 
 	if want := "http://oidc.example.com/authorize?client_id=aclientid&redirect_uri=https%3A%2F%2Fmatrix.example.com%2Fcontinue&response_type=code&scope=openid+profile+email&state=anonce"; got != want {
-		t.Errorf("AuthorizationURL: got %q, want %q", got, want)
+		t.Error("AuthorizationURL: got %q, want %q", got, want)
 	}
 }
 
@@ -101,7 +101,7 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(got, tst.Want) {
-				t.Errorf("ProcessCallback: got %+v, want %+v", got, tst.Want)
+				t.Error("ProcessCallback: got %+v, want %+v", got, tst.Want)
 			}
 		})
 	}
@@ -133,7 +133,7 @@ func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
 	}
 
 	if want := "https://oauth2.example.com/authorize?client_id=aclientid&redirect_uri=https%3A%2F%2Fmatrix.example.com%2Fcontinue&response_type=code&scope=&state=anonce"; got != want {
-		t.Errorf("AuthorizationURL: got %q, want %q", got, want)
+		t.Error("AuthorizationURL: got %q, want %q", got, want)
 	}
 }
 
@@ -211,7 +211,7 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(got, tst.Want) {
-				t.Errorf("ProcessCallback: got %+v, want %+v", got, tst.Want)
+				t.Error("ProcessCallback: got %+v, want %+v", got, tst.Want)
 			}
 		})
 	}
@@ -256,7 +256,7 @@ func TestOAuth2IdentityProviderGetAccessToken(t *testing.T) {
 	}
 
 	if want := "atoken"; got != want {
-		t.Errorf("getAccessToken: got %q, want %q", got, want)
+		t.Error("getAccessToken: got %q, want %q", got, want)
 	}
 
 	wantReq := url.Values{
@@ -267,7 +267,7 @@ func TestOAuth2IdentityProviderGetAccessToken(t *testing.T) {
 		"redirect_uri":  []string{callbackURL},
 	}
 	if !reflect.DeepEqual(gotReq, wantReq) {
-		t.Errorf("getAccessToken request: got %+v, want %+v", gotReq, wantReq)
+		t.Error("getAccessToken request: got %+v, want %+v", gotReq, wantReq)
 	}
 }
 
@@ -307,13 +307,13 @@ func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
 	}
 
 	if want := "asub"; gotSub != want {
-		t.Errorf("getUserInfo subject: got %q, want %q", gotSub, want)
+		t.Error("getUserInfo subject: got %q, want %q", gotSub, want)
 	}
 	if want := "aname"; gotName != want {
-		t.Errorf("getUserInfo displayName: got %q, want %q", gotName, want)
+		t.Error("getUserInfo displayName: got %q, want %q", gotName, want)
 	}
 	if want := "auser"; gotSuggestedUser != want {
-		t.Errorf("getUserInfo suggestedUser: got %q, want %q", gotSuggestedUser, want)
+		t.Error("getUserInfo suggestedUser: got %q, want %q", gotSuggestedUser, want)
 	}
 
 	gotHeader.Del("Accept-Encoding")
@@ -323,6 +323,6 @@ func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
 		"Authorization": []string{"Bearer atoken"},
 	}
 	if !reflect.DeepEqual(gotHeader, wantHeader) {
-		t.Errorf("getUserInfo header: got %+v, want %+v", gotHeader, wantHeader)
+		t.Error("getUserInfo header: got %+v, want %+v", gotHeader, wantHeader)
 	}
 }

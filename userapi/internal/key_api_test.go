@@ -151,11 +151,11 @@ func Test_QueryDeviceMessages(t *testing.T) {
 					KeyDatabase: db,
 				}
 				if err := a.QueryDeviceMessages(ctx, tt.args.req, tt.args.res); (err != nil) != tt.wantErr {
-					t.Errorf("QueryDeviceMessages() error = %v, wantErr %v", err, tt.wantErr)
+					t.Error("QueryDeviceMessages() error = %v, wantErr %v", err, tt.wantErr)
 				}
 				got := tt.args.res
 				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("QueryDeviceMessages(): got:\n%+v, want:\n%+v", got, tt.want)
+					t.Error("QueryDeviceMessages(): got:\n%+v, want:\n%+v", got, tt.want)
 				}
 			})
 		}

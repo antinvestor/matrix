@@ -53,7 +53,7 @@ func (b *ProcessContext) Degraded(err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if _, ok := b.degraded[err.Error()]; !ok {
-		logrus.WithError(err).Warn("Dendrite has entered a degraded state")
+		logrus.With(slog.Any("error", err)).Warn("Dendrite has entered a degraded state")
 		sentry.CaptureException(err)
 		b.degraded[err.Error()] = struct{}{}
 	}

@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // DefaultCleanupPeriod represents the default time duration after which cacheCleanService runs.

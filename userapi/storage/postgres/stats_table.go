@@ -236,9 +236,9 @@ func NewPostgresStatsTable(db *sql.DB, serverName spec.ServerName) (tables.Stats
 func (s *statsStatements) startTimers() {
 	var updateStatsFunc func()
 	updateStatsFunc = func() {
-		logrus.Infof("Executing UpdateUserDailyVisits")
+		logrus.Info("Executing UpdateUserDailyVisits")
 		if err := s.UpdateUserDailyVisits(context.Background(), nil, time.Now(), s.lastUpdate); err != nil {
-			logrus.WithError(err).Error("failed to update daily user visits")
+			logrus.With(slog.Any("error", err)).Error("failed to update daily user visits")
 		}
 		time.AfterFunc(time.Hour*3, updateStatsFunc)
 	}

@@ -57,7 +57,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 				ServerName:  serverName,
 				Password:    "someRandomPassword",
 			}, userRes); err != nil {
-				t.Errorf("failed to create account: %s", err)
+				t.Error("failed to create account: %s", err)
 			}
 
 		}

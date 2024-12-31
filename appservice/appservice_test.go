@@ -22,8 +22,8 @@ import (
 	"github.com/antinvestor/matrix/syncapi"
 	uapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
+	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 
@@ -271,10 +271,10 @@ func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID stri
 	if err := asAPI.UserIDExists(ctx, &api.UserIDExistsRequest{
 		UserID: userID,
 	}, userResp); err != nil {
-		t.Errorf("failed to get userID: %s", err)
+		t.Error("failed to get userID: %s", err)
 	}
 	if userResp.UserIDExists != wantExists {
-		t.Errorf("unexpected result for UserIDExists(%s): %v, expected %v", userID, userResp.UserIDExists, wantExists)
+		t.Error("unexpected result for UserIDExists(%s): %v, expected %v", userID, userResp.UserIDExists, wantExists)
 	}
 }
 
@@ -285,10 +285,10 @@ func testAliasExists(t *testing.T, asAPI api.AppServiceInternalAPI, alias string
 	if err := asAPI.RoomAliasExists(ctx, &api.RoomAliasExistsRequest{
 		Alias: alias,
 	}, aliasResp); err != nil {
-		t.Errorf("failed to get alias: %s", err)
+		t.Error("failed to get alias: %s", err)
 	}
 	if aliasResp.AliasExists != wantExists {
-		t.Errorf("unexpected result for RoomAliasExists(%s): %v, expected %v", alias, aliasResp.AliasExists, wantExists)
+		t.Error("unexpected result for RoomAliasExists(%s): %v, expected %v", alias, aliasResp.AliasExists, wantExists)
 	}
 }
 
@@ -299,10 +299,10 @@ func testLocations(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, 
 	if err := asAPI.Locations(ctx, &api.LocationRequest{
 		Protocol: proto,
 	}, locationResp); err != nil {
-		t.Errorf("failed to get locations: %s", err)
+		t.Error("failed to get locations: %s", err)
 	}
 	if !reflect.DeepEqual(locationResp.Locations, wantResult) {
-		t.Errorf("unexpected result for Locations(%s): %+v, expected %+v", proto, locationResp.Locations, wantResult)
+		t.Error("unexpected result for Locations(%s): %+v, expected %+v", proto, locationResp.Locations, wantResult)
 	}
 }
 
@@ -313,10 +313,10 @@ func testUser(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantR
 	if err := asAPI.User(ctx, &api.UserRequest{
 		Protocol: proto,
 	}, userResp); err != nil {
-		t.Errorf("failed to get user: %s", err)
+		t.Error("failed to get user: %s", err)
 	}
 	if !reflect.DeepEqual(userResp.Users, wantResult) {
-		t.Errorf("unexpected result for User(%s): %+v, expected %+v", proto, userResp.Users, wantResult)
+		t.Error("unexpected result for User(%s): %+v, expected %+v", proto, userResp.Users, wantResult)
 	}
 }
 
@@ -327,10 +327,10 @@ func testProtocol(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, w
 	if err := asAPI.Protocols(ctx, &api.ProtocolRequest{
 		Protocol: proto,
 	}, protoResp); err != nil {
-		t.Errorf("failed to get Protocols: %s", err)
+		t.Error("failed to get Protocols: %s", err)
 	}
 	if !reflect.DeepEqual(protoResp.Protocols, wantResult) {
-		t.Errorf("unexpected result for Protocols(%s): %+v, expected %+v", proto, protoResp.Protocols[proto], wantResult)
+		t.Error("unexpected result for Protocols(%s): %+v, expected %+v", proto, protoResp.Protocols[proto], wantResult)
 	}
 }
 
@@ -499,10 +499,10 @@ func TestOutputAppserviceEvent(t *testing.T) {
 
 						// Both Alice and Bob should be joined. If not, we have a race condition
 						if !gjson.GetBytes(rec.Body.Bytes(), "joined."+alice.ID).Exists() {
-							t.Errorf("Alice is not joined to the room") // in theory should not happen
+							t.Error("Alice is not joined to the room") // in theory should not happen
 						}
 						if !gjson.GetBytes(rec.Body.Bytes(), "joined."+bob.ID).Exists() {
-							t.Errorf("Bob is not joined to the room")
+							t.Error("Bob is not joined to the room")
 						}
 						evChan <- struct{}{}
 					default:
@@ -565,7 +565,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		select {
 		// Pretty generous timeout duration...
 		case <-time.After(time.Second * 10): // wait for the AS to process the events
-			t.Errorf("Timed out waiting for join event")
+			t.Error("Timed out waiting for join event")
 		case <-evChan:
 		}
 		close(evChan)
@@ -590,7 +590,7 @@ func createAccessTokens(t *testing.T, accessTokens map[*test.User]userDevice, us
 			ServerName:  serverName,
 			Password:    password,
 		}, userRes); err != nil {
-			t.Errorf("failed to create account: %s", err)
+			t.Error("failed to create account: %s", err)
 		}
 		req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
 			"type": authtypes.LoginTypePassword,

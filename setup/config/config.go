@@ -536,5 +536,5 @@ func (l logrusLogger) Error(msg string) {
 }
 
 func (l logrusLogger) Infof(msg string, args ...interface{}) {
-	l.l.Infof(msg, args...)
+	l.l.Info(msg, args...)
 }

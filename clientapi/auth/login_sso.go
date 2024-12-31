@@ -56,25 +56,25 @@ func NewAuthenticator(cfg *config.LoginSSO) *Authenticator {
 	return a
 }
 
-func (auth *Authenticator) AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce string) (string, error) {
+func (auth *Authenticator) AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce, codeVerifier string) (string, error) {
 	p := auth.providers[providerID]
 	if p == nil {
 		return "", fmt.Errorf("unknown identity provider: %s", providerID)
 	}
-	return p.AuthorizationURL(ctx, callbackURL, nonce)
+	return p.AuthorizationURL(ctx, callbackURL, nonce, codeVerifier)
 }
 
-func (auth *Authenticator) ProcessCallback(ctx context.Context, providerID, callbackURL, nonce string, query url.Values) (*CallbackResult, error) {
-	p := auth.providers[providerID]
+func (auth *Authenticator) ProcessCallback(ctx context.Context, partitionID, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error) {
+	p := auth.providers[partitionID]
 	if p == nil {
-		return nil, fmt.Errorf("unknown identity provider: %s", providerID)
+		return nil, fmt.Errorf("unknown partition provider: %s", partitionID)
 	}
-	return p.ProcessCallback(ctx, callbackURL, nonce, query)
+	return p.ProcessCallback(ctx, callbackURL, nonce, codeVerifier, query)
 }
 
 type ssoIdentityProvider interface {
-	AuthorizationURL(ctx context.Context, callbackURL, nonce string) (string, error)
-	ProcessCallback(ctx context.Context, callbackURL, nonce string, query url.Values) (*CallbackResult, error)
+	AuthorizationURL(ctx context.Context, callbackURL, nonce, codeVerifier string) (string, error)
+	ProcessCallback(ctx context.Context, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error)
 }
 
 type CallbackResult struct {

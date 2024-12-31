@@ -63,7 +63,7 @@ func NewRelayInternalAPI(
 ) api.RelayInternalAPI {
 	relayDB, err := storage.NewDatabase(cm, &dendriteCfg.RelayAPI.Database, caches, dendriteCfg.Global.IsLocalServerName)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to relay db")
+		logrus.With(slog.Any("error", err)).Panic("failed to connect to relay db")
 	}
 
 	return internal.NewRelayInternalAPI(

@@ -44,7 +44,7 @@ func TestAnyIdentifierJSON(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(got.Identifier, tst.Want) {
-				t.Errorf("got %+v, want %+v", got.Identifier, tst.Want)
+				t.Error("got %+v, want %+v", got.Identifier, tst.Want)
 			}
 		})
 
@@ -68,7 +68,7 @@ func TestAnyIdentifierJSON(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(got.Identifier, tst.Want) {
-				t.Errorf("got %+v, want %+v", got.Identifier, tst.Want)
+				t.Error("got %+v, want %+v", got.Identifier, tst.Want)
 			}
 		})
 	}

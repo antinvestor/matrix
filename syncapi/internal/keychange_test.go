@@ -8,7 +8,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
@@ -146,15 +146,15 @@ type wantCatchup struct {
 func assertCatchup(t *testing.T, hasNew bool, syncResponse *types.Response, want wantCatchup) {
 	t.Helper()
 	if hasNew != want.hasNew {
-		t.Errorf("got hasNew=%v want %v", hasNew, want.hasNew)
+		t.Error("got hasNew=%v want %v", hasNew, want.hasNew)
 	}
 	sort.Strings(syncResponse.DeviceLists.Left)
 	if !reflect.DeepEqual(syncResponse.DeviceLists.Left, want.left) {
-		t.Errorf("device_lists.left got %v want %v", syncResponse.DeviceLists.Left, want.left)
+		t.Error("device_lists.left got %v want %v", syncResponse.DeviceLists.Left, want.left)
 	}
 	sort.Strings(syncResponse.DeviceLists.Changed)
 	if !reflect.DeepEqual(syncResponse.DeviceLists.Changed, want.changed) {
-		t.Errorf("device_lists.changed got %v want %v", syncResponse.DeviceLists.Changed, want.changed)
+		t.Error("device_lists.changed got %v want %v", syncResponse.DeviceLists.Changed, want.changed)
 	}
 }
 

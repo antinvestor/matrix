@@ -85,7 +85,7 @@ func (s *PresenceConsumer) Start() error {
 		if err != nil {
 			m.Header.Set("error", err.Error())
 			if err = msg.RespondMsg(m); err != nil {
-				logrus.WithError(err).Error("Unable to respond to messages")
+				logrus.With(slog.Any("error", err)).Error("Unable to respond to messages")
 			}
 			return
 		}
@@ -101,7 +101,7 @@ func (s *PresenceConsumer) Start() error {
 		if err = s.deviceAPI.QueryDevices(s.ctx, &api.QueryDevicesRequest{UserID: userID}, &deviceRes); err != nil {
 			m.Header.Set("error", err.Error())
 			if err = msg.RespondMsg(m); err != nil {
-				logrus.WithError(err).Error("Unable to respond to messages")
+				logrus.With(slog.Any("error", err)).Error("Unable to respond to messages")
 			}
 			return
 		}
@@ -120,7 +120,7 @@ func (s *PresenceConsumer) Start() error {
 		m.Header.Set("last_active_ts", strconv.Itoa(int(presence.LastActiveTS)))
 
 		if err = msg.RespondMsg(m); err != nil {
-			logrus.WithError(err).Error("Unable to respond to messages")
+			logrus.With(slog.Any("error", err)).Error("Unable to respond to messages")
 			return
 		}
 	})
@@ -168,7 +168,7 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool
 func (s *PresenceConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts spec.Timestamp, fromSync bool) {
 	pos, err := s.db.UpdatePresence(ctx, userID, presence, statusMsg, ts, fromSync)
 	if err != nil {
-		logrus.WithError(err).WithField("user", userID).WithField("presence", presence).Warn("failed to updated presence for user")
+		logrus.With(slog.Any("error", err)).With("user", userID).With("presence", presence).Warn("failed to updated presence for user")
 		return
 	}
 	s.stream.Advance(pos)

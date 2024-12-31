@@ -35,7 +35,7 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 	"maunium.net/go/mautrix"
@@ -385,7 +385,7 @@ func createAccessTokens(t *testing.T, accessTokens map[*test.User]userDevice, us
 			ServerName:  serverName,
 			Password:    password,
 		}, userRes); err != nil {
-			t.Errorf("failed to create account: %s", err)
+			t.Error("failed to create account: %s", err)
 		}
 		req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
 			"type": authtypes.LoginTypePassword,

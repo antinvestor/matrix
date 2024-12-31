@@ -22,7 +22,7 @@ import (
 
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -146,7 +146,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 			return fmt.Errorf("tx.QueryContext: %w", err)
 		}
 
-		logrus.Warnf("Rewriting snapshots %d-%d of %d...", batchoffset, batchoffset+batchsize, snapshotcount)
+		logrus.Warn("Rewriting snapshots %d-%d of %d...", batchoffset, batchoffset+batchsize, snapshotcount)
 		var snapshots []stateBlockData
 
 		var badCreateSnapshots []stateBlockData
@@ -275,15 +275,15 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 			`SELECT room_id, state_snapshot_nid, last_event_sent_nid FROM roomserver_rooms WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid,
 		).Scan(&debugRoomID, &debugSnapNID, &debugLastEventNID)
 		if err != nil {
-			logrus.Errorf("cannot extract debug info: %v", err)
+			logrus.Error("cannot extract debug info: %v", err)
 		} else {
-			logrus.Errorf(
+			logrus.Error(
 				"Affected row: room_id=%v snapshot=%v last_sent=%v",
 				debugRoomID, debugSnapNID, debugLastEventNID,
 			)
-			logrus.Errorf("To fix this manually, run this query first then retry the migration: "+
+			logrus.Error("To fix this manually, run this query first then retry the migration: "+
 				"UPDATE roomserver_rooms SET state_snapshot_nid=0 WHERE room_id='%v'", debugRoomID)
-			logrus.Errorf("Running this UPDATE will cause the room in question to become unavailable on this server. Leave and re-join the room afterwards.")
+			logrus.Error("Running this UPDATE will cause the room in question to become unavailable on this server. Leave and re-join the room afterwards.")
 		}
 		return fmt.Errorf("%d rooms exist in roomserver_rooms which have not been converted to a new state_snapshot_nid; this is a bug, please report", count)
 	}

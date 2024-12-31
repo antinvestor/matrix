@@ -20,7 +20,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
 )
 
@@ -72,7 +72,7 @@ func GetUserDevices(
 		var key fclient.RespUserDeviceKeys
 		err := json.Unmarshal(dev.DeviceKeys.KeyJSON, &key)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Warnf("malformed device key: %s", string(dev.DeviceKeys.KeyJSON))
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Warn("malformed device key: %s", string(dev.DeviceKeys.KeyJSON))
 			continue
 		}
 

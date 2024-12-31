@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"golang.org/x/exp/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -29,7 +30,7 @@ import (
 
 	"github.com/antinvestor/matrix/setup/config"
 	uapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // SSORedirect implements /login/sso/redirect
@@ -77,7 +78,7 @@ func SSORedirect(
 
 	callbackURL, err := buildCallbackURLFromOther(cfg, req, "/login/sso/redirect")
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed to build callback URL")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
@@ -88,19 +89,22 @@ func SSORedirect(
 		RawQuery: url.Values{"partition_id": []string{idpID}}.Encode(),
 	})
 	nonce := formatNonce(redirectURL)
-	u, err := auth.AuthorizationURL(ctx, idpID, callbackURL.String(), nonce)
+
+	codeVerifier := genCodeVerifier()
+
+	u, err := auth.AuthorizationURL(ctx, idpID, callbackURL.String(), nonce, codeVerifier)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to get LoginSSO authorization URL")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed to get LoginSSO authorization URL")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
 		}
 	}
 
-	util.GetLogger(ctx).Infof("LoginSSO redirect to %s.", u)
+	util.GetLogger(ctx).Info("LoginSSO redirect to %s.", u)
 
 	resp := util.RedirectResponse(u)
-	cookie := &http.Cookie{
+	nonceCookie := &http.Cookie{
 		Name:     "sso_nonce",
 		Value:    nonce,
 		Path:     path.Dir(callbackURL.Path),
@@ -108,12 +112,27 @@ func SSORedirect(
 		Secure:   callbackURL.Scheme == "https",
 		SameSite: http.SameSiteNoneMode,
 	}
-	if !cookie.Secure {
+	if !nonceCookie.Secure {
 		// SameSite=None requires Secure, so we might as well remove
 		// it. See https://blog.chromium.org/2019/10/developers-get-ready-for-new.html.
-		cookie.SameSite = http.SameSiteDefaultMode
+		nonceCookie.SameSite = http.SameSiteDefaultMode
 	}
-	resp.Headers["Set-Cookie"] = cookie.String()
+
+	codeVerifierCookie := &http.Cookie{
+		Name:     "sso_code_verifier",
+		Value:    codeVerifier,
+		Path:     path.Dir(callbackURL.Path),
+		Expires:  time.Now().Add(10 * time.Minute),
+		Secure:   callbackURL.Scheme == "https",
+		SameSite: http.SameSiteNoneMode,
+	}
+	if !codeVerifierCookie.Secure {
+		// SameSite=None requires Secure, so we might as well remove
+		// it. See https://blog.chromium.org/2019/10/developers-get-ready-for-new.html.
+		codeVerifierCookie.SameSite = http.SameSiteDefaultMode
+	}
+
+	resp.Headers["Set-Cookie"] = []*http.Cookie{nonceCookie, codeVerifierCookie}
 	return resp
 }
 
@@ -186,9 +205,17 @@ func SSOCallback(
 		}
 	}
 
+	codeVerifier, err := req.Cookie("sso_code_verifier")
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.MissingParam("no code verifier cookie: " + err.Error()),
+		}
+	}
+
 	callbackURL, err := buildCallbackURLFromOther(cfg, req, "/login/sso/callback")
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed to build callback URL")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
@@ -198,15 +225,15 @@ func SSOCallback(
 	callbackURL = callbackURL.ResolveReference(&url.URL{
 		RawQuery: url.Values{"partition_id": []string{idpID}}.Encode(),
 	})
-	result, err := auth.ProcessCallback(ctx, idpID, callbackURL.String(), nonce.Value, query)
+	result, err := auth.ProcessCallback(ctx, idpID, callbackURL.String(), nonce.Value, codeVerifier.Value, query)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to process callback")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed to process callback")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
 		}
 	}
-	util.GetLogger(ctx).WithField("result", result).Info("LoginSSO callback done")
+	util.GetLogger(ctx).With("result", result).Info("LoginSSO callback done")
 
 	if result.Identifier.Subject == "" || result.Identifier.Issuer == "" {
 		// Not authenticated yet.
@@ -215,7 +242,7 @@ func SSOCallback(
 
 	account, err := verifyUserExits(ctx, serverName, userAPI, result.Identifier)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Error("failed to find user")
+		util.GetLogger(ctx).With(slog.Any("error", err)).With("ssoIdentifier", result.Identifier).Error("failed to find user")
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: spec.Forbidden("ID not associated with a local account"),
@@ -224,29 +251,34 @@ func SSOCallback(
 
 	token, err := createLoginToken(ctx, userAPI, account.UserID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("PerformLoginTokenCreation failed")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("PerformLoginTokenCreation failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	util.GetLogger(ctx).WithField("account", account).WithField("ssoIdentifier", result.Identifier).Info("LoginSSO created token")
+	util.GetLogger(ctx).With("account", account).With("ssoIdentifier", result.Identifier).Info("LoginSSO created token")
 
 	rquery := finalRedirectURL.Query()
 	rquery.Set("loginToken", token.Token)
 	resp := util.RedirectResponse(finalRedirectURL.ResolveReference(&url.URL{RawQuery: rquery.Encode()}).String())
-	resp.Headers["Set-Cookie"] = (&http.Cookie{
+	resp.Headers["Set-Cookie"] = []*http.Cookie{{
 		Name:   "sso_nonce",
 		Value:  "",
 		MaxAge: -1,
 		Secure: true,
-	}).String()
+	}, {
+		Name:   "sso_code_verifier",
+		Value:  "",
+		MaxAge: -1,
+		Secure: true,
+	}}
 	return resp
 }
 
 type ssoAuthenticator interface {
-	AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce string) (string, error)
-	ProcessCallback(ctx context.Context, providerID, callbackURL, nonce string, query url.Values) (*auth.CallbackResult, error)
+	AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce, codeVerifier string) (string, error)
+	ProcessCallback(ctx context.Context, providerID, callbackURL, nonce, codeVerifier string, query url.Values) (*auth.CallbackResult, error)
 }
 
 type userAPIForSSO interface {
@@ -258,6 +290,10 @@ type userAPIForSSO interface {
 // formatNonce creates a random nonce that also contains the URL.
 func formatNonce(redirectURL string) string {
 	return util.RandomString(16) + "." + base64.RawURLEncoding.EncodeToString([]byte(redirectURL))
+}
+
+func genCodeVerifier() string {
+	return util.RandomString(128)
 }
 
 // parseNonce extracts the embedded URL from the nonce. The nonce

@@ -17,7 +17,7 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -50,7 +50,7 @@ func GetEvent(
 		"room_id":  rawRoomID,
 	})
 	if err != nil {
-		logger.WithError(err).Error("GetEvent: syncDB.NewDatabaseTransaction failed")
+		logger.With(slog.Any("error", err)).Error("GetEvent: syncDB.NewDatabaseTransaction failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -68,7 +68,7 @@ func GetEvent(
 
 	events, err := db.Events(ctx, []string{eventID})
 	if err != nil {
-		logger.WithError(err).Error("GetEvent: syncDB.Events failed")
+		logger.With(slog.Any("error", err)).Error("GetEvent: syncDB.Events failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -77,7 +77,7 @@ func GetEvent(
 
 	// The requested event does not exist in our database
 	if len(events) == 0 {
-		logger.Debugf("GetEvent: requested event doesn't exist locally")
+		logger.Debug("GetEvent: requested event doesn't exist locally")
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("The event was not found or you do not have permission to read this event"),
@@ -92,7 +92,7 @@ func GetEvent(
 
 	userID, err := spec.NewUserID(rawUserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("invalid device.UserID")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("invalid device.UserID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -102,7 +102,7 @@ func GetEvent(
 	// Apply history visibility to determine if the user is allowed to view the event
 	events, err = internal.ApplyHistoryVisibilityFilter(ctx, db, rsAPI, events, nil, *userID, "event")
 	if err != nil {
-		logger.WithError(err).Error("GetEvent: internal.ApplyHistoryVisibilityFilter failed")
+		logger.With(slog.Any("error", err)).Error("GetEvent: internal.ApplyHistoryVisibilityFilter failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -112,7 +112,7 @@ func GetEvent(
 	// We only ever expect there to be one event
 	if len(events) != 1 {
 		// 0 events -> not allowed to view event; > 1 events -> something that shouldn't happen
-		logger.WithField("event_count", len(events)).Debug("GetEvent: can't return the requested event")
+		logger.With("event_count", len(events)).Debug("GetEvent: can't return the requested event")
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("The event was not found or you do not have permission to read this event"),
@@ -123,7 +123,7 @@ func GetEvent(
 		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).With("senderID", events[0].SenderID()).With("roomID", *roomID).Error("Failed converting to ClientEvent")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),

@@ -10,7 +10,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 )
 

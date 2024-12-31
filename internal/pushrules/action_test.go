@@ -30,7 +30,7 @@ func TestActionJSON(t *testing.T) {
 				t.Fatalf("Unmarshal failed: %v", err)
 			}
 			if diff := cmp.Diff(tst.Want, got); diff != "" {
-				t.Errorf("+got -want:\n%s", diff)
+				t.Error("+got -want:\n%s", diff)
 			}
 		})
 	}

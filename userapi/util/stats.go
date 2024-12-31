@@ -25,7 +25,7 @@ func getMemoryStats(p *phoneHomeStats) error {
 	oldUsage := p.prevData
 	newUsage := syscall.Rusage{}
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &newUsage); err != nil {
-		logrus.WithError(err).Error("unable to get usage")
+		logrus.With(slog.Any("error", err)).Error("unable to get usage")
 		return err
 	}
 	newData := timestampToRUUsage{timestamp: time.Now().Unix(), usage: newUsage}

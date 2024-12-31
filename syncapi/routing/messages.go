@@ -24,7 +24,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal/caching"
@@ -80,7 +80,7 @@ func OnIncomingMessagesRequest(
 
 	deviceUserID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("device.UserID invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -177,7 +177,7 @@ func OnIncomingMessagesRequest(
 			fromStream = &streamToken
 			from, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
 			if err != nil {
-				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
+				logrus.With(slog.Any("error", err)).Error("Failed to get topological position for streaming token %v", streamToken)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -202,7 +202,7 @@ func OnIncomingMessagesRequest(
 			} else {
 				to, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
 				if err != nil {
-					logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
+					logrus.With(slog.Any("error", err)).Error("Failed to get topological position for streaming token %v", streamToken)
 					return util.JSONResponse{
 						Code: http.StatusInternalServerError,
 						JSON: spec.InternalServerError{},
@@ -265,7 +265,7 @@ func OnIncomingMessagesRequest(
 
 	clientEvents, start, end, err := mReq.retrieveEvents(req.Context(), rsAPI)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("mreq.retrieveEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -296,7 +296,7 @@ func OnIncomingMessagesRequest(
 	if filter.LazyLoadMembers {
 		membershipEvents, err := applyLazyLoadMembers(req.Context(), device, snapshot, roomID, clientEvents, lazyLoadCache)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("failed to apply lazy loading")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("failed to apply lazy loading")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -358,7 +358,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 		"start":     r.from,
 		"end":       r.to,
 		"backwards": r.backwardOrdering,
-	}).Infof("Fetched %d events locally", len(streamEvents))
+	}).Info("Fetched %d events locally", len(streamEvents))
 
 	// There can be two reasons for streamEvents to be empty: either we've
 	// reached the oldest event in the room (or the most recent one, depending
@@ -576,7 +576,7 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	if err != nil {
 		return nil, fmt.Errorf("PerformBackfill failed: %w", err)
 	}
-	util.GetLogger(r.ctx).WithField("new_events", len(res.Events)).Info("Storing new events from backfill")
+	util.GetLogger(r.ctx).With("new_events", len(res.Events)).Info("Storing new events from backfill")
 
 	// TODO: we should only be inserting events into the database from the roomserver's kafka output stream.
 	// Currently, this can race with live events for the room and cause problems. It's also just a bit unclear

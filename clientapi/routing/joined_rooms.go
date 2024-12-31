@@ -17,7 +17,7 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/roomserver/api"
 	userapi "github.com/antinvestor/matrix/userapi/api"
@@ -35,7 +35,7 @@ func GetJoinedRooms(
 ) util.JSONResponse {
 	deviceUserID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("Invalid device user ID")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("Invalid device user ID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -44,7 +44,7 @@ func GetJoinedRooms(
 
 	rooms, err := rsAPI.QueryRoomsForUser(req.Context(), *deviceUserID, "join")
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("QueryRoomsForUser failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),

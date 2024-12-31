@@ -21,7 +21,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/api"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-rooms-roomid-joined-members
@@ -102,7 +102,7 @@ func GetJoinedMembers(
 		JoinedOnly: true,
 		RoomID:     validRoomID.String(),
 	}, &membershipsForRoomResp); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("rsAPI.QueryEventsByID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -114,7 +114,7 @@ func GetJoinedMembers(
 	for _, ev := range membershipsForRoomResp.JoinEvents {
 		var content databaseJoinedMember
 		if err := json.Unmarshal(ev.Content, &content); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("failed to unmarshal event content")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -123,7 +123,7 @@ func GetJoinedMembers(
 
 		userID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, spec.SenderID(ev.Sender))
 		if err != nil || userID == nil {
-			util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryUserIDForSender failed")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("rsAPI.QueryUserIDForSender failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

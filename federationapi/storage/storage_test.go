@@ -13,7 +13,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 )
 

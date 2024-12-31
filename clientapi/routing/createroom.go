@@ -31,7 +31,7 @@ import (
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -143,7 +143,7 @@ func createRoom(
 ) util.JSONResponse {
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("invalid userID")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("invalid userID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -162,7 +162,7 @@ func createRoom(
 	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID, err := spec.NewRoomID(fmt.Sprintf("!%s:%s", util.RandomString(16), userID.Domain()))
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("invalid roomID")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("invalid roomID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -192,7 +192,7 @@ func createRoom(
 
 	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID.String(), asAPI, profileAPI)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("appserviceAPI.RetrieveUserProfile failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

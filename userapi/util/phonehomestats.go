@@ -92,7 +92,7 @@ func (p *phoneHomeStats) collect() {
 	// cpu and memory usage information
 	err := getMemoryStats(p)
 	if err != nil {
-		logrus.WithError(err).Warn("unable to get memory/cpu stats, using defaults")
+		logrus.With(slog.Any("error", err)).Warn("unable to get memory/cpu stats, using defaults")
 	}
 
 	// configuration information
@@ -110,7 +110,7 @@ func (p *phoneHomeStats) collect() {
 
 	messageStats, activeRooms, activeE2EERooms, err := p.db.DailyRoomsMessages(ctx, p.serverName)
 	if err != nil {
-		logrus.WithError(err).Warn("unable to query message stats, using default values")
+		logrus.With(slog.Any("error", err)).Warn("unable to query message stats, using default values")
 	}
 	p.stats["daily_messages"] = messageStats.Messages
 	p.stats["daily_sent_messages"] = messageStats.SentMessages
@@ -122,7 +122,7 @@ func (p *phoneHomeStats) collect() {
 	// user stats and DB engine
 	userStats, db, err := p.db.UserStatistics(ctx)
 	if err != nil {
-		logrus.WithError(err).Warn("unable to query userstats, using default values")
+		logrus.With(slog.Any("error", err)).Warn("unable to query userstats, using default values")
 	}
 	p.stats["database_engine"] = db.Engine
 	p.stats["database_server_version"] = db.Version
@@ -142,22 +142,22 @@ func (p *phoneHomeStats) collect() {
 
 	output := bytes.Buffer{}
 	if err = json.NewEncoder(&output).Encode(p.stats); err != nil {
-		logrus.WithError(err).Error("Unable to encode phone-home statistics")
+		logrus.With(slog.Any("error", err)).Error("Unable to encode phone-home statistics")
 		return
 	}
 
-	logrus.Infof("Reporting stats to %s: %s", p.cfg.Global.ReportStats.Endpoint, output.String())
+	logrus.Info("Reporting stats to %s: %s", p.cfg.Global.ReportStats.Endpoint, output.String())
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
 	if err != nil {
-		logrus.WithError(err).Error("Unable to create phone-home statistics request")
+		logrus.With(slog.Any("error", err)).Error("Unable to create phone-home statistics request")
 		return
 	}
 	request.Header.Set("User-Agent", "Dendrite/"+internal.VersionString())
 
 	_, err = p.client.Do(request)
 	if err != nil {
-		logrus.WithError(err).Error("Unable to send phone-home statistics")
+		logrus.With(slog.Any("error", err)).Error("Unable to send phone-home statistics")
 		return
 	}
 }

@@ -82,7 +82,7 @@ func (s *OutputKeyChangeEventConsumer) onMessage(ctx context.Context, msgs []*na
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	var m api.DeviceMessage
 	if err := json.Unmarshal(msg.Data, &m); err != nil {
-		logrus.WithError(err).Errorf("failed to read device message from key change topic")
+		logrus.With(slog.Any("error", err)).Error("failed to read device message from key change topic")
 		return true
 	}
 	if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {
@@ -112,7 +112,7 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, d
 		LocalOnly: true,
 	}, &queryRes)
 	if err != nil {
-		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
+		logrus.With(slog.Any("error", err)).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
 		sentry.CaptureException(err)
 		return true
 	}
@@ -137,7 +137,7 @@ func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage
 		LocalOnly: true,
 	}, &queryRes)
 	if err != nil {
-		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
+		logrus.With(slog.Any("error", err)).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
 		sentry.CaptureException(err)
 		return true
 	}

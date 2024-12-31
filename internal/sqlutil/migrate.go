@@ -97,7 +97,7 @@ func (m *Migrator) Up(ctx context.Context) error {
 			if _, ok := executedMigrations[migration.Version]; ok {
 				continue
 			}
-			logrus.Debugf("Executing database migration '%s'", migration.Version)
+			logrus.Debug("Executing database migration '%s'", migration.Version)
 
 			if err = migration.Up(ctx, txn); err != nil {
 				return fmt.Errorf("unable to execute migration '%s': %w", migration.Version, err)

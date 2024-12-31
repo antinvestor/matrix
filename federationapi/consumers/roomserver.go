@@ -105,7 +105,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
+		log.With(slog.Any("error", err)).Error("roomserver output log: message parse failure")
 		return true
 	}
 
@@ -133,15 +133,15 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		}
 
 	case api.OutputTypePurgeRoom:
-		log.WithField("room_id", output.PurgeRoom.RoomID).Warn("Purging room from federation API")
+		log.With("room_id", output.PurgeRoom.RoomID).Warn("Purging room from federation API")
 		if err := s.db.PurgeRoom(ctx, output.PurgeRoom.RoomID); err != nil {
-			logrus.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from federation API")
+			logrus.With("room_id", output.PurgeRoom.RoomID).With(slog.Any("error", err)).Error("Failed to purge room from federation API")
 		} else {
-			logrus.WithField("room_id", output.PurgeRoom.RoomID).Warn("Room purged from federation API")
+			logrus.With("room_id", output.PurgeRoom.RoomID).Warn("Room purged from federation API")
 		}
 
 	default:
-		log.WithField("type", output.Type).Debug(
+		log.With("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
 	}
@@ -265,7 +265,7 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 		RoomID:     roomID,
 	}, &queryRes)
 	if err != nil {
-		log.WithError(err).Error("failed to calculate joined rooms for user")
+		log.With(slog.Any("error", err)).Error("failed to calculate joined rooms for user")
 		return
 	}
 
@@ -278,7 +278,7 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 		var presence *nats.Msg
 		presence, err = s.natsClient.RequestMsg(msg, time.Second*10)
 		if err != nil {
-			log.WithError(err).Errorf("unable to get presence")
+			log.With(slog.Any("error", err)).Error("unable to get presence")
 			continue
 		}
 
@@ -313,11 +313,11 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 		Origin: string(s.cfg.Matrix.ServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
-		log.WithError(err).Error("failed to marshal EDU JSON")
+		log.With(slog.Any("error", err)).Error("failed to marshal EDU JSON")
 		return
 	}
 	if err := s.queues.SendEDU(edu, s.cfg.Matrix.ServerName, joined); err != nil {
-		log.WithError(err).Error("failed to send EDU")
+		log.With(slog.Any("error", err)).Error("failed to send EDU")
 	}
 }
 

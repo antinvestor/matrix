@@ -155,7 +155,7 @@ func SetupAndServeHTTP(
 	if err := tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
 		"Version": internal.VersionString(),
 	}); err != nil {
-		logrus.WithError(err).Fatal("failed to execute landing page template")
+		logrus.With(slog.Any("error", err)).Fatal("failed to execute landing page template")
 	}
 
 	routers.Static.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -203,57 +203,57 @@ func SetupAndServeHTTP(
 	if externalHTTPAddr.Enabled() {
 		go func() {
 			var externalShutdown atomic.Bool // RegisterOnShutdown can be called more than once
-			logrus.Infof("Starting external listener on %s", externalServ.Addr)
+			logrus.Info("Starting external listener on %s", externalServ.Addr)
 			processContext.ComponentStarted()
 			externalServ.RegisterOnShutdown(func() {
 				if externalShutdown.CompareAndSwap(false, true) {
 					processContext.ComponentFinished()
-					logrus.Infof("Stopped external HTTP listener")
+					logrus.Info("Stopped external HTTP listener")
 				}
 			})
 			if certFile != nil && keyFile != nil {
 				if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
 					if err != http.ErrServerClosed {
-						logrus.WithError(err).Fatal("failed to serve HTTPS")
+						logrus.With(slog.Any("error", err)).Fatal("failed to serve HTTPS")
 					}
 				}
 			} else {
 				if externalHTTPAddr.IsUnixSocket() {
 					err := os.Remove(externalHTTPAddr.Address)
 					if err != nil && !errors.Is(err, fs.ErrNotExist) {
-						logrus.WithError(err).Fatal("failed to remove existing unix socket")
+						logrus.With(slog.Any("error", err)).Fatal("failed to remove existing unix socket")
 					}
 					listener, err := net.Listen(externalHTTPAddr.Network(), externalHTTPAddr.Address)
 					if err != nil {
-						logrus.WithError(err).Fatal("failed to serve unix socket")
+						logrus.With(slog.Any("error", err)).Fatal("failed to serve unix socket")
 					}
 					err = os.Chmod(externalHTTPAddr.Address, externalHTTPAddr.UnixSocketPermission)
 					if err != nil {
-						logrus.WithError(err).Fatal("failed to set unix socket permissions")
+						logrus.With(slog.Any("error", err)).Fatal("failed to set unix socket permissions")
 					}
 					if err := externalServ.Serve(listener); err != nil {
 						if err != http.ErrServerClosed {
-							logrus.WithError(err).Fatal("failed to serve unix socket")
+							logrus.With(slog.Any("error", err)).Fatal("failed to serve unix socket")
 						}
 					}
 				} else {
 					if err := externalServ.ListenAndServe(); err != nil {
 						if err != http.ErrServerClosed {
-							logrus.WithError(err).Fatal("failed to serve HTTP")
+							logrus.With(slog.Any("error", err)).Fatal("failed to serve HTTP")
 						}
 					}
 				}
 			}
-			logrus.Infof("Stopped external listener on %s", externalServ.Addr)
+			logrus.Info("Stopped external listener on %s", externalServ.Addr)
 		}()
 	}
 
 	minwinsvc.SetOnExit(processContext.ShutdownDendrite)
 	<-processContext.WaitForShutdown()
 
-	logrus.Infof("Stopping HTTP listeners")
+	logrus.Info("Stopping HTTP listeners")
 	_ = externalServ.Shutdown(context.Background())
-	logrus.Infof("Stopped HTTP listeners")
+	logrus.Info("Stopped HTTP listeners")
 }
 
 func WaitForShutdown(processCtx *process.ProcessContext) {
@@ -265,10 +265,10 @@ func WaitForShutdown(processCtx *process.ProcessContext) {
 	}
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
 
-	logrus.Warnf("Shutdown signal received")
+	logrus.Warn("Shutdown signal received")
 
 	processCtx.ShutdownDendrite()
 	processCtx.WaitForComponentsToFinish()
 
-	logrus.Warnf("Dendrite is exiting now")
+	logrus.Warn("Dendrite is exiting now")
 }

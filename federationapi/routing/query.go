@@ -27,7 +27,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -63,7 +63,7 @@ func RoomAliasToID(
 		}
 		queryRes := &roomserverAPI.GetRoomIDForAliasResponse{}
 		if err = rsAPI.GetRoomIDForAlias(httpReq.Context(), queryReq, queryRes); err != nil {
-			util.GetLogger(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
+			util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("aliasAPI.GetRoomIDForAlias failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -74,7 +74,7 @@ func RoomAliasToID(
 			serverQueryReq := federationAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: queryRes.RoomID}
 			var serverQueryRes federationAPI.QueryJoinedHostServerNamesInRoomResponse
 			if err = senderAPI.QueryJoinedHostServerNamesInRoom(httpReq.Context(), &serverQueryReq, &serverQueryRes); err != nil {
-				util.GetLogger(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
+				util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -107,7 +107,7 @@ func RoomAliasToID(
 			}
 			// TODO: Return 502 if the remote server errored.
 			// TODO: Return 504 if the remote server timed out.
-			util.GetLogger(httpReq.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
+			util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("federation.LookupRoomAlias failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -154,13 +154,13 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 		var errRoomUnknownOrNotAllowed roomserverAPI.ErrRoomUnknownOrNotAllowed
 		switch {
 		case errors.As(err, &errRoomUnknownOrNotAllowed):
-			util.GetLogger(httpReq.Context()).WithError(err).Debugln("room unknown/forbidden when handling SS room hierarchy request")
+			util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Debugln("room unknown/forbidden when handling SS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound("room is unknown/forbidden"),
 			}
 		default:
-			log.WithError(err).Errorf("failed to fetch next page of room hierarchy (SS API)")
+			log.With(slog.Any("error", err)).Error("failed to fetch next page of room hierarchy (SS API)")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),

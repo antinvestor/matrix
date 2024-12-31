@@ -86,7 +86,7 @@ func (s *OutputNotificationDataConsumer) onMessage(ctx context.Context, msgs []*
 	var data eventutil.NotificationData
 	if err := json.Unmarshal(msg.Data, &data); err != nil {
 		sentry.CaptureException(err)
-		log.WithField("user_id", userID).WithError(err).Error("user API consumer: message parse failure")
+		log.With("user_id", userID).With(slog.Any("error", err)).Error("user API consumer: message parse failure")
 		return true
 	}
 
@@ -96,7 +96,7 @@ func (s *OutputNotificationDataConsumer) onMessage(ctx context.Context, msgs []*
 		log.WithFields(log.Fields{
 			"user_id": userID,
 			"room_id": data.RoomID,
-		}).WithError(err).Error("Could not save notification counts")
+		}).With(slog.Any("error", err)).Error("Could not save notification counts")
 		return false
 	}
 

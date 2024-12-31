@@ -53,7 +53,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 
 	lastPos, receipts, err := snapshot.RoomReceiptsAfter(ctx, joinedRooms, from)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.RoomReceiptsAfter failed")
+		req.Log.With(slog.Any("error", err)).Error("p.DB.RoomReceiptsAfter failed")
 		return from
 	}
 
@@ -103,7 +103,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		}
 		ev.Content, err = json.Marshal(content)
 		if err != nil {
-			req.Log.WithError(err).Error("json.Marshal failed")
+			req.Log.With(slog.Any("error", err)).Error("json.Marshal failed")
 			return from
 		}
 

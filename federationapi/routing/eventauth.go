@@ -20,7 +20,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // GetEventAuth returns event auth for the roomID and eventID

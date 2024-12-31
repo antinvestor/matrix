@@ -20,7 +20,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 type adminWhoisResponse struct {
@@ -60,7 +60,7 @@ func GetAdminWhois(
 		UserID: userID,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("GetAdminWhois failed to query user devices")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("GetAdminWhois failed to query user devices")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

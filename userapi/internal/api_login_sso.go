@@ -20,7 +20,7 @@ import (
 	"errors"
 
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 func (a *UserInternalAPI) PerformEnsureSSOAccountExists(ctx context.Context, req *api.QuerySSOAccountRequest, res *api.QuerySSOAccountResponse) error {
@@ -36,7 +36,7 @@ func (a *UserInternalAPI) PerformEnsureSSOAccountExists(ctx context.Context, req
 			return err
 		}
 
-		util.GetLogger(ctx).WithField("request", req).Info("No account exists with the profile id")
+		util.GetLogger(ctx).With("request", req).Info("No account exists with the profile id")
 
 		var accRes api.PerformAccountCreationResponse
 		err = a.PerformAccountCreation(ctx, &api.PerformAccountCreationRequest{

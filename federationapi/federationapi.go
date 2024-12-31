@@ -106,7 +106,7 @@ func NewInternalAPI(
 
 	federationDB, err := storage.NewDatabase(processContext.Context(), cm, &cfg.Database, caches, dendriteCfg.Global.IsLocalServerName)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to federation sender db")
+		logrus.With(slog.Any("error", err)).Panic("failed to connect to federation sender db")
 	}
 
 	if resetBlacklist {
@@ -131,45 +131,45 @@ func NewInternalAPI(
 		federationDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start room server consumer")
+		logrus.With(slog.Any("error", err)).Panic("failed to start room server consumer")
 	}
 	tsConsumer := consumers.NewOutputSendToDeviceConsumer(
 		processContext, cfg, js, queues, federationDB,
 	)
 	if err = tsConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start send-to-device consumer")
+		logrus.With(slog.Any("error", err)).Panic("failed to start send-to-device consumer")
 	}
 	receiptConsumer := consumers.NewOutputReceiptConsumer(
 		processContext, cfg, js, queues, federationDB,
 	)
 	if err = receiptConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start receipt consumer")
+		logrus.With(slog.Any("error", err)).Panic("failed to start receipt consumer")
 	}
 	typingConsumer := consumers.NewOutputTypingConsumer(
 		processContext, cfg, js, queues, federationDB,
 	)
 	if err = typingConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start typing consumer")
+		logrus.With(slog.Any("error", err)).Panic("failed to start typing consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
 		processContext, &dendriteCfg.KeyServer, js, queues, federationDB, rsAPI,
 	)
 	if err = keyConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start key server consumer")
+		logrus.With(slog.Any("error", err)).Panic("failed to start key server consumer")
 	}
 
 	presenceConsumer := consumers.NewOutputPresenceConsumer(
 		processContext, cfg, js, queues, federationDB, rsAPI,
 	)
 	if err = presenceConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start presence consumer")
+		logrus.With(slog.Any("error", err)).Panic("failed to start presence consumer")
 	}
 
 	var cleanExpiredEDUs func()
 	cleanExpiredEDUs = func() {
-		logrus.Infof("Cleaning expired EDUs")
+		logrus.Info("Cleaning expired EDUs")
 		if err := federationDB.DeleteExpiredEDUs(processContext.Context()); err != nil {
-			logrus.WithError(err).Error("Failed to clean expired EDUs")
+			logrus.With(slog.Any("error", err)).Error("Failed to clean expired EDUs")
 		}
 		time.AfterFunc(time.Hour, cleanExpiredEDUs)
 	}

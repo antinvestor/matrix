@@ -15,7 +15,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/bcrypt"
 
@@ -755,7 +755,7 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 		}
 		for _, m := range msgs {
 			if m.StreamID != wantStreamIDs[m.DeviceID] {
-				t.Errorf("DeviceKeysForUser: wrong returned stream ID for key, got %d want %d", m.StreamID, wantStreamIDs[m.DeviceID])
+				t.Error("DeviceKeysForUser: wrong returned stream ID for key, got %d want %d", m.StreamID, wantStreamIDs[m.DeviceID])
 			}
 		}
 	})

@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/userapi/api"

@@ -38,7 +38,7 @@ func AddPublicRoutes(
 ) {
 	mediaDB, err := storage.NewMediaAPIDatasource(cm, &cfg.MediaAPI.Database)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to media db")
+		logrus.With(slog.Any("error", err)).Panicf("failed to connect to media db")
 	}
 
 	routing.Setup(

@@ -16,7 +16,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"
@@ -52,7 +52,7 @@ func SendToDevice(
 			if err := syncProducer.SendToDevice(
 				req.Context(), device.UserID, userID, deviceID, eventType, message,
 			); err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
+				util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("eduProducer.SendToDevice failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},

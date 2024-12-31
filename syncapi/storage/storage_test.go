@@ -179,15 +179,15 @@ func TestRecentEventsPDU(t *testing.T) {
 				streamEvents := gotEvents[r.ID]
 				limited = streamEvents.Limited
 				if limited != tc.WantLimited {
-					st.Errorf("got limited=%v want %v", limited, tc.WantLimited)
+					st.Error("got limited=%v want %v", limited, tc.WantLimited)
 				}
 				if len(streamEvents.Events) != len(tc.WantEvents) {
-					st.Errorf("got %d events, want %d", len(gotEvents), len(tc.WantEvents))
+					st.Error("got %d events, want %d", len(gotEvents), len(tc.WantEvents))
 				}
 
 				for j := range streamEvents.Events {
 					if !reflect.DeepEqual(streamEvents.Events[j].JSON(), tc.WantEvents[j].JSON()) {
-						st.Errorf("event %d got %s want %s", j, string(streamEvents.Events[j].JSON()), string(tc.WantEvents[j].JSON()))
+						st.Error("event %d got %s want %s", j, string(streamEvents.Events[j].JSON()), string(tc.WantEvents[j].JSON()))
 					}
 				}
 			})
@@ -747,33 +747,33 @@ func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatr
 		g := gots[i]
 		w := wants[i]
 		if g.EventID != w.EventID() {
-			t.Errorf("%s event[%d] event_id mismatch: got %s want %s", msg, i, g.EventID, w.EventID())
+			t.Error("%s event[%d] event_id mismatch: got %s want %s", msg, i, g.EventID, w.EventID())
 		}
 		if g.Sender != w.Sender() {
-			t.Errorf("%s event[%d] sender mismatch: got %s want %s", msg, i, g.Sender, w.Sender())
+			t.Error("%s event[%d] sender mismatch: got %s want %s", msg, i, g.Sender, w.Sender())
 		}
 		if checkRoomID && g.RoomID != w.RoomID() {
-			t.Errorf("%s event[%d] room_id mismatch: got %s want %s", msg, i, g.RoomID, w.RoomID())
+			t.Error("%s event[%d] room_id mismatch: got %s want %s", msg, i, g.RoomID, w.RoomID())
 		}
 		if g.Type != w.Type() {
-			t.Errorf("%s event[%d] event type mismatch: got %s want %s", msg, i, g.Type, w.Type())
+			t.Error("%s event[%d] event type mismatch: got %s want %s", msg, i, g.Type, w.Type())
 		}
 		if g.OriginServerTS != w.OriginServerTS() {
-			t.Errorf("%s event[%d] origin_server_ts mismatch: got %v want %v", msg, i, g.OriginServerTS, w.OriginServerTS())
+			t.Error("%s event[%d] origin_server_ts mismatch: got %v want %v", msg, i, g.OriginServerTS, w.OriginServerTS())
 		}
 		if string(g.Content) != string(w.Content()) {
-			t.Errorf("%s event[%d] content mismatch: got %s want %s", msg, i, string(g.Content), string(w.Content()))
+			t.Error("%s event[%d] content mismatch: got %s want %s", msg, i, string(g.Content), string(w.Content()))
 		}
 		if string(g.Unsigned) != string(w.Unsigned()) {
-			t.Errorf("%s event[%d] unsigned mismatch: got %s want %s", msg, i, string(g.Unsigned), string(w.Unsigned()))
+			t.Error("%s event[%d] unsigned mismatch: got %s want %s", msg, i, string(g.Unsigned), string(w.Unsigned()))
 		}
 		if (g.StateKey == nil && w.StateKey() != nil) || (g.StateKey != nil && w.StateKey() == nil) {
-			t.Errorf("%s event[%d] state_key [not] missing: got %v want %v", msg, i, g.StateKey, w.StateKey())
+			t.Error("%s event[%d] state_key [not] missing: got %v want %v", msg, i, g.StateKey, w.StateKey())
 			continue
 		}
 		if g.StateKey != nil {
 			if !w.StateKeyEquals(*g.StateKey) {
-				t.Errorf("%s event[%d] state_key mismatch: got %s want %s", msg, i, *g.StateKey, *w.StateKey())
+				t.Error("%s event[%d] state_key mismatch: got %s want %s", msg, i, *g.StateKey, *w.StateKey())
 			}
 		}
 	}

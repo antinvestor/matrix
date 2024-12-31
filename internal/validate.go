@@ -24,7 +24,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 const (

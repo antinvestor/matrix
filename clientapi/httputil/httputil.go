@@ -21,7 +21,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // UnmarshalJSONRequest into the given interface pointer. Returns an error JSON response if
@@ -31,7 +31,7 @@ func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONRespon
 	// https://matrix.org/docs/spec/client_server/r0.6.1#api-standards
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("io.ReadAll failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("io.ReadAll failed")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

@@ -41,7 +41,7 @@ func NewInternalAPI(
 ) api.RoomserverInternalAPI {
 	roomserverDB, err := storage.Open(processContext.Context(), cm, &cfg.RoomServer.Database, caches)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to room server db")
+		logrus.With(slog.Any("error", err)).Panicf("failed to connect to room server db")
 	}
 
 	js, nc := natsInstance.Prepare(processContext, &cfg.Global.JetStream)

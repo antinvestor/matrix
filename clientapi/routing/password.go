@@ -11,7 +11,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -89,7 +89,7 @@ func Password(
 	// Get the local part.
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -104,7 +104,7 @@ func Password(
 	}
 	passwordRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), passwordReq, passwordRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("PerformPasswordUpdate failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("PerformPasswordUpdate failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -128,7 +128,7 @@ func Password(
 		}
 		logoutRes := &api.PerformDeviceDeletionResponse{}
 		if err := userAPI.PerformDeviceDeletion(req.Context(), logoutReq, logoutRes); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("PerformDeviceDeletion failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -141,7 +141,7 @@ func Password(
 			SessionID:  device.SessionID,
 		}
 		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("PerformPusherDeletion failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

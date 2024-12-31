@@ -40,7 +40,7 @@ func TestLoadConfigRelative(t *testing.T) {
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			logrus.Errorf("Configuration error: %s", err)
+			logrus.Error("Configuration error: %s", err)
 		}
 		t.Error("configuration verification failed")
 	}
@@ -223,7 +223,7 @@ func TestReadKey(t *testing.T) {
 	}
 	wantKeyID := testKeyID
 	if wantKeyID != string(keyID) {
-		t.Errorf("wanted key ID to be %q, got %q", wantKeyID, keyID)
+		t.Error("wanted key ID to be %q, got %q", wantKeyID, keyID)
 	}
 }
 
@@ -328,11 +328,11 @@ func Test_SigningIdentityFor(t *testing.T) {
 			}
 			got, err := c.SigningIdentityFor(tt.serverName)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("SigningIdentityFor() error = %v, wantErr %v", err, tt.wantErr)
+				t.Error("SigningIdentityFor() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("SigningIdentityFor() got = %v, want %v", got, tt.want)
+				t.Error("SigningIdentityFor() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -12,7 +12,7 @@ import (
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 func Test_validatePassword(t *testing.T) {
@@ -43,11 +43,11 @@ func Test_validatePassword(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gotErr := ValidatePassword(tt.password)
 			if !reflect.DeepEqual(gotErr, tt.wantError) {
-				t.Errorf("validatePassword() = %v, wantError %v", gotErr, tt.wantError)
+				t.Error("validatePassword() = %v, wantError %v", gotErr, tt.wantError)
 			}
 
 			if got := PasswordResponse(gotErr); !reflect.DeepEqual(got, tt.wantJSON) {
-				t.Errorf("validatePassword() = %v, wantJSON %v", got, tt.wantJSON)
+				t.Error("validatePassword() = %v, wantJSON %v", got, tt.wantJSON)
 			}
 		})
 	}
@@ -167,10 +167,10 @@ func Test_validateUsername(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gotErr := ValidateUsername(tt.localpart, tt.domain)
 			if !reflect.DeepEqual(gotErr, tt.wantErr) {
-				t.Errorf("ValidateUsername() = %v, wantErr %v", gotErr, tt.wantErr)
+				t.Error("ValidateUsername() = %v, wantErr %v", gotErr, tt.wantErr)
 			}
 			if gotJSON := UsernameResponse(gotErr); !reflect.DeepEqual(gotJSON, tt.wantJSON) {
-				t.Errorf("UsernameResponse() = %v, wantJSON %v", gotJSON, tt.wantJSON)
+				t.Error("UsernameResponse() = %v, wantJSON %v", gotJSON, tt.wantJSON)
 			}
 
 			// Application services are allowed usernames starting with an underscore
@@ -179,10 +179,10 @@ func Test_validateUsername(t *testing.T) {
 			}
 			gotErr = ValidateApplicationServiceUsername(tt.localpart, tt.domain)
 			if !reflect.DeepEqual(gotErr, tt.wantErr) {
-				t.Errorf("ValidateUsername() = %v, wantErr %v", gotErr, tt.wantErr)
+				t.Error("ValidateUsername() = %v, wantErr %v", gotErr, tt.wantErr)
 			}
 			if gotJSON := UsernameResponse(gotErr); !reflect.DeepEqual(gotJSON, tt.wantJSON) {
-				t.Errorf("UsernameResponse() = %v, wantJSON %v", gotJSON, tt.wantJSON)
+				t.Error("UsernameResponse() = %v, wantJSON %v", gotJSON, tt.wantJSON)
 			}
 		})
 	}
@@ -308,10 +308,10 @@ func TestValidateApplicationServiceRequest(t *testing.T) {
 				t.Error("expected an error, but succeeded")
 			}
 			if !tt.wantError && gotResp != nil {
-				t.Errorf("expected success, but returned error: %v", *gotResp)
+				t.Error("expected success, but returned error: %v", *gotResp)
 			}
 			if gotASID != tt.wantASID {
-				t.Errorf("returned '%s', but expected '%s'", gotASID, tt.wantASID)
+				t.Error("returned '%s', but expected '%s'", gotASID, tt.wantASID)
 			}
 		})
 	}

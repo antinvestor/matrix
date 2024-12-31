@@ -146,7 +146,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 		info, err := w.r.JetStream.ConsumerInfo(streamName, consumer)
 		if err != nil && !errors.Is(err, nats.ErrConsumerNotFound) {
 			// log and return, we will retry anyway
-			logger.WithError(err).Errorf("failed to get consumer info")
+			logger.With(slog.Any("error", err)).Error("failed to get consumer info")
 			return
 		}
 
@@ -176,9 +176,9 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 				// Try updating the consumer first
 				if _, err = w.r.JetStream.UpdateConsumer(streamName, consumerConfig); err != nil {
 					// We failed to update the consumer, recreate it
-					logger.WithError(err).Warn("Unable to update consumer, recreating...")
+					logger.With(slog.Any("error", err)).Warn("Unable to update consumer, recreating...")
 					if err = w.r.JetStream.DeleteConsumer(streamName, consumer); err != nil {
-						logger.WithError(err).Fatal("Unable to delete consumer")
+						logger.With(slog.Any("error", err)).Fatal("Unable to delete consumer")
 						return
 					}
 					// Set info to nil, so it can be recreated with the correct config.
@@ -193,7 +193,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 				r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent),
 				consumerConfig,
 			); err != nil {
-				logger.WithError(err).Errorf("Failed to create consumer for room %q", w.roomID)
+				logger.With(slog.Any("error", err)).Error("Failed to create consumer for room %q", w.roomID)
 				return
 			}
 		}
@@ -210,7 +210,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 			nats.InactiveThreshold(inactiveThreshold),
 		)
 		if err != nil {
-			logger.WithError(err).Errorf("Failed to subscribe to stream for room %q", w.roomID)
+			logger.With(slog.Any("error", err)).Error("Failed to subscribe to stream for room %q", w.roomID)
 			return
 		}
 
@@ -253,7 +253,7 @@ func (r *Inputer) Start() error {
 		case consumer.Config.InactiveThreshold != inactiveThreshold:
 			consumer.Config.InactiveThreshold = inactiveThreshold
 			if _, cerr := r.JetStream.UpdateConsumer(stream, &consumer.Config); cerr != nil {
-				logrus.WithError(cerr).Warnf("Failed to update inactive threshold on consumer %q", consumer.Name)
+				logrus.WithError(cerr).Warn("Failed to update inactive threshold on consumer %q", consumer.Name)
 			}
 		}
 	}
@@ -289,7 +289,7 @@ func (w *worker) _next() {
 		// down the subscriber to free up resources. It'll get started
 		// again if new activity happens.
 		if err = w.subscription.Unsubscribe(); err != nil {
-			logrus.WithError(err).Errorf("Failed to unsubscribe to stream for room %q", w.roomID)
+			logrus.With(slog.Any("error", err)).Error("Failed to unsubscribe to stream for room %q", w.roomID)
 		}
 		w.Lock()
 		w.subscription = nil
@@ -301,9 +301,9 @@ func (w *worker) _next() {
 		// from the queue. In which case, we'll shut down the subscriber
 		// and wait to be notified about new room activity again. Maybe
 		// the problem will be corrected by then.
-		logrus.WithError(err).Errorf("Failed to get next stream message for room %q", w.roomID)
+		logrus.With(slog.Any("error", err)).Error("Failed to get next stream message for room %q", w.roomID)
 		if err = w.subscription.Unsubscribe(); err != nil {
-			logrus.WithError(err).Errorf("Failed to unsubscribe to stream for room %q", w.roomID)
+			logrus.With(slog.Any("error", err)).Error("Failed to unsubscribe to stream for room %q", w.roomID)
 		}
 		w.Lock()
 		w.subscription = nil
@@ -342,7 +342,7 @@ func (w *worker) _next() {
 		switch err.(type) {
 		case types.RejectedError:
 			// Don't send events that were rejected to Sentry
-			logrus.WithError(err).WithFields(logrus.Fields{
+			logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
 				"room_id":  w.roomID,
 				"event_id": inputRoomEvent.Event.EventID(),
 				"type":     inputRoomEvent.Event.Type(),
@@ -351,7 +351,7 @@ func (w *worker) _next() {
 			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 				w.sentryHub.CaptureException(err)
 			}
-			logrus.WithError(err).WithFields(logrus.Fields{
+			logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
 				"room_id":  w.roomID,
 				"event_id": inputRoomEvent.Event.EventID(),
 				"type":     inputRoomEvent.Event.Type(),
@@ -376,7 +376,7 @@ func (w *worker) _next() {
 	// that everything was OK.
 	if replyTo := msg.Header.Get("sync"); replyTo != "" {
 		if err = w.r.NATSClient.Publish(replyTo, []byte(errString)); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
+			logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
 				"room_id":  w.roomID,
 				"event_id": inputRoomEvent.Event.EventID(),
 				"type":     inputRoomEvent.Event.Type(),
@@ -429,7 +429,7 @@ func (r *Inputer) queueInputRoomEvents(
 			return nil, fmt.Errorf("json.Marshal: %w", err)
 		}
 		if _, err = r.JetStream.PublishMsg(msg, nats.Context(ctx)); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
+			logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
 				"room_id":  roomID,
 				"event_id": e.Event.EventID(),
 				"subj":     subj,

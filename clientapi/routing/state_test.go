@@ -13,7 +13,7 @@ import (
 	uapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"gotest.tools/v3/assert"
 )
 

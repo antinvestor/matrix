@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -76,11 +76,11 @@ func MakeAuthAPI(
 		logger := util.GetLogger(req.Context())
 		device, err := auth.VerifyUserFromRequest(req, userAPI)
 		if err != nil {
-			logger.Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
+			logger.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
 			return *err
 		}
 		// add the user ID to the logger
-		logger = logger.WithField("user_id", device.UserID)
+		logger = logger.With("user_id", device.UserID)
 		req = req.WithContext(util.ContextWithLogger(req.Context(), logger))
 		// add the user to Sentry, if enabled
 		hub := sentry.GetHubFromContext(req.Context())
@@ -165,7 +165,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 				resp := rec.Result()
 				dump, err := httputil.DumpResponse(resp, true)
 				if err != nil {
-					logger.Debugf("Failed to dump outgoing response: %s", err)
+					logger.Debug("Failed to dump outgoing response: %s", err)
 				} else {
 					strSlice := strings.Split(string(dump), "\n")
 					for _, s := range strSlice {
@@ -187,7 +187,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 			// Log incoming request
 			dump, err := httputil.DumpRequest(req, true)
 			if err != nil {
-				logger.Debugf("Failed to dump incoming request: %s", err)
+				logger.Debug("Failed to dump incoming request: %s", err)
 			} else {
 				strSlice := strings.Split(string(dump), "\n")
 				for _, s := range strSlice {
@@ -232,7 +232,7 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 			if jsonErr != nil {
 				w.WriteHeader(jsonErr.Code)
 				if err := json.NewEncoder(w).Encode(jsonErr.JSON); err != nil {
-					logger.WithError(err).Error("failed to encode JSON response")
+					logger.With(slog.Any("error", err)).Error("failed to encode JSON response")
 				}
 				return
 			}

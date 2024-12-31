@@ -21,7 +21,7 @@ import (
 	keytypes "github.com/antinvestor/matrix/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -258,7 +258,7 @@ func filterSharedUsers(
 	}
 	sharedUsers, err := db.SharedUsers(ctx, userID, usersWithChangedKeys)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("db.SharedUsers failed: %s", err)
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("db.SharedUsers failed: %s", err)
 		// default to all users so we do needless queries rather than miss some important device update
 		return sharedUsersMap
 	}

@@ -34,7 +34,7 @@ import (
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -87,7 +87,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI, dev *usera
 			UploadName:    types.Filename(url.PathEscape(req.FormValue("filename"))),
 			UserID:        types.MatrixUserID(dev.UserID),
 		},
-		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Matrix.ServerName),
+		Logger: util.GetLogger(req.Context()).With("Origin", cfg.Matrix.ServerName),
 	}
 
 	if resErr := r.Validate(cfg.MaxFileSizeBytes); resErr != nil {
@@ -152,7 +152,7 @@ func (r *uploadRequest) doUpload(
 		if cfg.MaxFileSizeBytes+1 <= 0 {
 			r.Logger.WithFields(log.Fields{
 				"MaxFileSizeBytes": cfg.MaxFileSizeBytes,
-			}).Warnf("Configured MaxFileSizeBytes overflows int64, defaulting to %d bytes", config.DefaultMaxFileSizeBytes)
+			}).Warn("Configured MaxFileSizeBytes overflows int64, defaulting to %d bytes", config.DefaultMaxFileSizeBytes)
 			cfg.MaxFileSizeBytes = config.DefaultMaxFileSizeBytes
 		}
 		reqReader = io.LimitReader(reqReader, int64(cfg.MaxFileSizeBytes)+1)
@@ -160,7 +160,7 @@ func (r *uploadRequest) doUpload(
 
 	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reqReader, cfg.AbsBasePath)
 	if err != nil {
-		r.Logger.WithError(err).WithFields(log.Fields{
+		r.Logger.With(slog.Any("error", err)).WithFields(log.Fields{
 			"MaxFileSizeBytes": cfg.MaxFileSizeBytes,
 		}).Warn("Error while transferring file")
 		return &util.JSONResponse{
@@ -183,7 +183,7 @@ func (r *uploadRequest) doUpload(
 	)
 	if err != nil {
 		fileutils.RemoveDir(tmpDir, r.Logger)
-		r.Logger.WithError(err).Error("Error querying the database by hash.")
+		r.Logger.With(slog.Any("error", err)).Error("Error querying the database by hash.")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -220,7 +220,7 @@ func (r *uploadRequest) doUpload(
 		r.MediaMetadata.MediaID, err = r.generateMediaID(ctx, db)
 		if err != nil {
 			fileutils.RemoveDir(tmpDir, r.Logger)
-			r.Logger.WithError(err).Error("Failed to generate media ID for new upload")
+			r.Logger.With(slog.Any("error", err)).Error("Failed to generate media ID for new upload")
 			return &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -228,7 +228,7 @@ func (r *uploadRequest) doUpload(
 		}
 	}
 
-	r.Logger = r.Logger.WithField("media_id", r.MediaMetadata.MediaID)
+	r.Logger = r.Logger.With("media_id", r.MediaMetadata.MediaID)
 	r.Logger.WithFields(log.Fields{
 		"Base64Hash":    r.MediaMetadata.Base64Hash,
 		"UploadName":    r.MediaMetadata.UploadName,
@@ -293,18 +293,18 @@ func (r *uploadRequest) storeFileAndMetadata(
 ) *util.JSONResponse {
 	finalPath, duplicate, err := fileutils.MoveFileWithHashCheck(tmpDir, r.MediaMetadata, absBasePath, r.Logger)
 	if err != nil {
-		r.Logger.WithError(err).Error("Failed to move file.")
+		r.Logger.With(slog.Any("error", err)).Error("Failed to move file.")
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("Failed to upload"),
 		}
 	}
 	if duplicate {
-		r.Logger.WithField("dst", finalPath).Info("File was stored previously - discarding duplicate")
+		r.Logger.With("dst", finalPath).Info("File was stored previously - discarding duplicate")
 	}
 
 	if err = db.StoreMediaMetadata(ctx, r.MediaMetadata); err != nil {
-		r.Logger.WithError(err).Warn("Failed to store metadata")
+		r.Logger.With(slog.Any("error", err)).Warn("Failed to store metadata")
 		// If the file is a duplicate (has the same hash as an existing file) then
 		// there is valid metadata in the database for that file. As such we only
 		// remove the file if it is not a duplicate.
@@ -320,7 +320,7 @@ func (r *uploadRequest) storeFileAndMetadata(
 	go func() {
 		file, err := os.Open(string(finalPath))
 		if err != nil {
-			r.Logger.WithError(err).Error("unable to open file")
+			r.Logger.With(slog.Any("error", err)).Error("unable to open file")
 			return
 		}
 		defer file.Close() // nolint: errcheck
@@ -328,13 +328,13 @@ func (r *uploadRequest) storeFileAndMetadata(
 		buf := make([]byte, 512)
 		_, err = file.Read(buf)
 		if err != nil {
-			r.Logger.WithError(err).Error("unable to read file")
+			r.Logger.With(slog.Any("error", err)).Error("unable to read file")
 			return
 		}
 		// Check if we need to generate thumbnails
 		fileType := http.DetectContentType(buf)
 		if !strings.HasPrefix(fileType, "image") {
-			r.Logger.WithField("contentType", fileType).Debugf("uploaded file is not an image or can not be thumbnailed, not generating thumbnails")
+			r.Logger.With("contentType", fileType).Debug("uploaded file is not an image or can not be thumbnailed, not generating thumbnails")
 			return
 		}
 
@@ -343,7 +343,7 @@ func (r *uploadRequest) storeFileAndMetadata(
 			activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger,
 		)
 		if err != nil {
-			r.Logger.WithError(err).Warn("Error generating thumbnails")
+			r.Logger.With(slog.Any("error", err)).Warn("Error generating thumbnails")
 		}
 		if busy {
 			r.Logger.Warn("Maximum number of active thumbnail generators reached. Skipping pre-generation.")

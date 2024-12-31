@@ -30,7 +30,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 type QueryState struct {
@@ -251,7 +251,7 @@ func (r *Inviter) PerformInvite(
 	inputRes := &api.InputRoomEventsResponse{}
 	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
 	if err := inputRes.Err(); err != nil {
-		util.GetLogger(ctx).WithField("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
+		util.GetLogger(ctx).With("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
 		return api.ErrNotAllowed{Err: err}
 	}
 

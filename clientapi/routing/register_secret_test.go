@@ -28,7 +28,7 @@ func TestSharedSecretRegister(t *testing.T) {
 		t.Fatalf("failed to check for valid mac: %s", err)
 	}
 	if !valid {
-		t.Errorf("mac login failed, wanted success")
+		t.Error("mac login failed, wanted success")
 	}
 
 	// modify the mac so it fails
@@ -38,6 +38,6 @@ func TestSharedSecretRegister(t *testing.T) {
 		t.Fatalf("failed to check for valid mac: %s", err)
 	}
 	if valid {
-		t.Errorf("mac login succeeded, wanted failure")
+		t.Error("mac login succeeded, wanted failure")
 	}
 }

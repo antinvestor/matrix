@@ -59,18 +59,18 @@ func main() {
 	if *unixSocket == "" {
 		http, err := config.HTTPAddress("http://" + *httpBindAddr)
 		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse http address")
+			logrus.With(slog.Any("error", err)).Fatalf("Failed to parse http address")
 		}
 		httpAddr = http
 		https, err := config.HTTPAddress("https://" + *httpsBindAddr)
 		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse https address")
+			logrus.With(slog.Any("error", err)).Fatalf("Failed to parse https address")
 		}
 		httpsAddr = https
 	} else {
 		socket, err := config.UnixSocketAddress(*unixSocket, *unixSocketPermission)
 		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse unix socket")
+			logrus.With(slog.Any("error", err)).Fatalf("Failed to parse unix socket")
 		}
 		httpAddr = socket
 	}
@@ -79,7 +79,7 @@ func main() {
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			logrus.Errorf("Configuration error: %s", err)
+			logrus.Error("Configuration error: %s", err)
 		}
 		logrus.Fatalf("Failed to start due to configuration errors")
 	}
@@ -91,7 +91,7 @@ func main() {
 
 	basepkg.PlatformSanityChecks()
 
-	logrus.Infof("Matrix version %s", internal.VersionString())
+	logrus.Info("Matrix version %s", internal.VersionString())
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
 		logrus.Warn("Open registration is enabled")
 	}
@@ -103,7 +103,7 @@ func main() {
 			cfg.Global.DNSCache.CacheSize,
 			cfg.Global.DNSCache.CacheLifetime,
 		)
-		logrus.Infof(
+		logrus.Info(
 			"DNS cache enabled (size %d, lifetime %s)",
 			cfg.Global.DNSCache.CacheSize,
 			cfg.Global.DNSCache.CacheLifetime,
@@ -113,7 +113,7 @@ func main() {
 	// setup tracing
 	closer, err := cfg.SetupTracing()
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start opentracing")
+		logrus.With(slog.Any("error", err)).Panicf("failed to start opentracing")
 	}
 	defer closer.Close() // nolint: errcheck
 
@@ -129,13 +129,13 @@ func main() {
 			AttachStacktrace: true,
 		})
 		if err != nil {
-			logrus.WithError(err).Panic("failed to start Sentry")
+			logrus.With(slog.Any("error", err)).Panic("failed to start Sentry")
 		}
 		go func() {
 			processCtx.ComponentStarted()
 			<-processCtx.WaitForShutdown()
 			if !sentry.Flush(time.Second * 5) {
-				logrus.Warnf("failed to flush all Sentry events!")
+				logrus.Warn("failed to flush all Sentry events!")
 			}
 			processCtx.ComponentFinished()
 		}()
@@ -151,7 +151,7 @@ func main() {
 	cfg.Global.Cache.EnablePrometheus = caching.EnableMetrics
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to create cache")
+		logrus.With(slog.Any("error", err)).Panicf("failed to create cache")
 	}
 
 	natsInstance := jetstream.NATSInstance{}
@@ -190,7 +190,7 @@ func main() {
 
 	if len(cfg.MSCs.MSCs) > 0 {
 		if err := mscs.Enable(cfg, cm, routers, &monolith, caches); err != nil {
-			logrus.WithError(err).Fatalf("Failed to enable MSCs")
+			logrus.With(slog.Any("error", err)).Fatalf("Failed to enable MSCs")
 		}
 	}
 

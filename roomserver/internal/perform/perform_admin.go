@@ -205,13 +205,13 @@ func (r *Admin) PerformAdminPurgeRoom(
 		return err
 	}
 
-	logrus.WithField("room_id", roomID).Warn("Purging room from roomserver")
+	logrus.With("room_id", roomID).Warn("Purging room from roomserver")
 	if err := r.DB.PurgeRoom(ctx, roomID); err != nil {
-		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
+		logrus.With("room_id", roomID).With(slog.Any("error", err)).Warn("Failed to purge room from roomserver")
 		return err
 	}
 
-	logrus.WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
+	logrus.With("room_id", roomID).Warn("Room purged from roomserver, informing other components")
 
 	return r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
 		{

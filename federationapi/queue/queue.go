@@ -111,14 +111,14 @@ func NewOutgoingQueues(
 				serverNames[serverName] = struct{}{}
 			}
 		} else {
-			log.WithError(err).Error("Failed to get PDU server names for destination queue hydration")
+			log.With(slog.Any("error", err)).Error("Failed to get PDU server names for destination queue hydration")
 		}
 		if names, err := db.GetPendingEDUServerNames(process.Context()); err == nil {
 			for _, serverName := range names {
 				serverNames[serverName] = struct{}{}
 			}
 		} else {
-			log.WithError(err).Error("Failed to get EDU server names for destination queue hydration")
+			log.With(slog.Any("error", err)).Error("Failed to get EDU server names for destination queue hydration")
 		}
 		offset, step := time.Second*5, time.Second
 		if maxVal := len(serverNames); maxVal > 120 {
@@ -214,7 +214,7 @@ func (oqs *OutgoingQueues) SendEvent(
 
 	log.WithFields(log.Fields{
 		"destinations": len(destmap), "event": ev.EventID(),
-	}).Infof("Sending event")
+	}).Info("Sending event")
 
 	headeredJSON, err := json.Marshal(ev)
 	if err != nil {
@@ -243,7 +243,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		destmap,
 		nid, // NIDs from federationapi_queue_json table
 	); err != nil {
-		logrus.WithError(err).Errorf("failed to associate PDUs %q with destinations", nid)
+		logrus.With(slog.Any("error", err)).Error("failed to associate PDUs %q with destinations", nid)
 		return err
 	}
 
@@ -325,7 +325,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		e.Type,
 		nil, // this will use the default expireEDUTypes map
 	); err != nil {
-		logrus.WithError(err).Errorf("failed to associate EDU with destinations")
+		logrus.With(slog.Any("error", err)).Error("failed to associate EDU with destinations")
 		return err
 	}
 

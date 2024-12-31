@@ -27,7 +27,7 @@ import (
 
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -101,7 +101,7 @@ func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata
 func RemoveDir(dir types.Path, logger *log.Entry) {
 	dirErr := os.RemoveAll(string(dir))
 	if dirErr != nil {
-		logger.WithError(dirErr).WithField("dir", dir).Warn("failed to remove directory")
+		logger.WithError(dirErr).With("dir", dir).Warn("failed to remove directory")
 	}
 }
 

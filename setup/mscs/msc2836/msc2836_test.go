@@ -461,7 +461,7 @@ func assertContains(t *testing.T, result *msc2836.EventRelationshipResponse, wan
 	}
 	for i := range gotEventIDs {
 		if gotEventIDs[i] != wantEventIDs[i] {
-			t.Errorf("wrong item in position %d - got %s want %s", i, gotEventIDs[i], wantEventIDs[i])
+			t.Error("wrong item in position %d - got %s want %s", i, gotEventIDs[i], wantEventIDs[i])
 		}
 	}
 }
@@ -487,7 +487,7 @@ func assertUnsignedChildren(t *testing.T, ev synctypes.ClientEvent, relType stri
 	}
 	gotCount := unsigned.Children[relType]
 	if gotCount != wantCount {
-		t.Errorf("Got %d count, want %d count for rel_type %s", gotCount, wantCount, relType)
+		t.Error("Got %d count, want %d count for rel_type %s", gotCount, wantCount, relType)
 	}
 	// work out the hash
 	sort.Strings(childrenEventIDs)
@@ -499,7 +499,7 @@ func assertUnsignedChildren(t *testing.T, ev synctypes.ClientEvent, relType stri
 	hashValBytes := sha256.Sum256([]byte(b.String()))
 	wantHash := base64.RawStdEncoding.EncodeToString(hashValBytes[:])
 	if wantHash != unsigned.Hash {
-		t.Errorf("Got unsigned hash %s want hash %s", unsigned.Hash, wantHash)
+		t.Error("Got unsigned hash %s want hash %s", unsigned.Hash, wantHash)
 	}
 }
 

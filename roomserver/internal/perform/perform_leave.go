@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
@@ -64,7 +64,7 @@ func (r *Leaver) PerformLeave(
 	if strings.HasPrefix(req.RoomID, "!") {
 		output, err := r.performLeaveRoomByID(context.Background(), req, res)
 		if err != nil {
-			logger.WithError(err).Error("Failed to leave room")
+			logger.With(slog.Any("error", err)).Error("Failed to leave room")
 		} else {
 			logger.Info("User left room successfully")
 		}
@@ -242,27 +242,27 @@ func (r *Leaver) performFederatedRejectInvite(
 	if err := r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
 		// failures in PerformLeave should NEVER stop us from telling other components like the
 		// sync API that the invite was withdrawn. Otherwise we can end up with stuck invites.
-		util.GetLogger(ctx).WithError(err).Errorf("failed to PerformLeave, still retiring invite event")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("failed to PerformLeave, still retiring invite event")
 	}
 
 	info, err := r.DB.RoomInfo(ctx, req.RoomID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("failed to get RoomInfo, still retiring invite event")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("failed to get RoomInfo, still retiring invite event")
 	}
 
 	updater, err := r.DB.MembershipUpdater(ctx, req.RoomID, string(leaver), true, info.RoomVersion)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("failed to get MembershipUpdater, still retiring invite event")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("failed to get MembershipUpdater, still retiring invite event")
 	}
 	if updater != nil {
 		if err = updater.Delete(); err != nil {
-			util.GetLogger(ctx).WithError(err).Errorf("failed to delete membership, still retiring invite event")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("failed to delete membership, still retiring invite event")
 			if err = updater.Rollback(); err != nil {
-				util.GetLogger(ctx).WithError(err).Errorf("failed to rollback deleting membership, still retiring invite event")
+				util.GetLogger(ctx).With(slog.Any("error", err)).Error("failed to rollback deleting membership, still retiring invite event")
 			}
 		} else {
 			if err = updater.Commit(); err != nil {
-				util.GetLogger(ctx).WithError(err).Errorf("failed to commit deleting membership, still retiring invite event")
+				util.GetLogger(ctx).With(slog.Any("error", err)).Error("failed to commit deleting membership, still retiring invite event")
 			}
 		}
 	}

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -130,7 +130,7 @@ func Test_UserStatistics(t *testing.T) {
 			}
 
 			if wantType != gotDB.Engine { // can't use DeepEqual, as the Version might differ
-				t.Errorf("UserStatistics() got DB engine = %+v, want %s", gotDB.Engine, wantType)
+				t.Error("UserStatistics() got DB engine = %+v, want %s", gotDB.Engine, wantType)
 			}
 		})
 
@@ -166,7 +166,7 @@ func Test_UserStatistics(t *testing.T) {
 				MonthlyUsers:    6,
 			}
 			if !reflect.DeepEqual(gotStats, wantStats) {
-				t.Errorf("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
+				t.Error("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
 			}
 		})
 
@@ -198,7 +198,7 @@ func Test_UserStatistics(t *testing.T) {
 				MonthlyUsers:    4,
 			}
 			if !reflect.DeepEqual(gotStats, wantStats) {
-				t.Errorf("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
+				t.Error("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
 			}
 		})
 
@@ -246,7 +246,7 @@ func Test_UserStatistics(t *testing.T) {
 				MonthlyUsers:    5,
 			}
 			if !reflect.DeepEqual(gotStats, wantStats) {
-				t.Errorf("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
+				t.Error("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
 			}
 		})
 
@@ -297,7 +297,7 @@ func Test_UserStatistics(t *testing.T) {
 				MonthlyUsers:    5,
 			}
 			if !reflect.DeepEqual(gotStats, wantStats) {
-				t.Errorf("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
+				t.Error("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
 			}
 		})
 	})

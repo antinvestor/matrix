@@ -74,7 +74,7 @@ func testGetTypingUsers(t *testing.T, tCache *EDUCache) {
 	for _, tt := range tests {
 		gotUsers := tCache.GetTypingUsers(tt.roomID)
 		if !test.UnsortedStringSliceEqual(gotUsers, tt.wantUsers) {
-			t.Errorf("TypingCache.GetTypingUsers(%s) = %v, want %v", tt.roomID, gotUsers, tt.wantUsers)
+			t.Error("TypingCache.GetTypingUsers(%s) = %v, want %v", tt.roomID, gotUsers, tt.wantUsers)
 		}
 	}
 }
@@ -97,7 +97,7 @@ func testRemoveUser(t *testing.T, tCache *EDUCache) {
 		tCache.RemoveUser(tt.userIDs[length-1], tt.roomID)
 		expLeftUsers := tt.userIDs[:length-1]
 		if leftUsers := tCache.GetTypingUsers(tt.roomID); !test.UnsortedStringSliceEqual(leftUsers, expLeftUsers) {
-			t.Errorf("Response after removal is unexpected. Want = %s, got = %s", leftUsers, expLeftUsers)
+			t.Error("Response after removal is unexpected. Want = %s, got = %s", leftUsers, expLeftUsers)
 		}
 	}
 }

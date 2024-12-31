@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // ErrUserExists is returned if a username already exists in the database.
@@ -137,7 +137,7 @@ func RunLimitedVariablesQuery(ctx context.Context, query string, qp QueryProvide
 		nextQuery := strings.Replace(query, "($1)", QueryVariadic(n), 1)
 		rows, err := qp.QueryContext(ctx, nextQuery, variables[start:start+n]...)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("QueryContext returned an error")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("QueryContext returned an error")
 			return err
 		}
 		err = rowHandler(rows)
@@ -146,7 +146,7 @@ func RunLimitedVariablesQuery(ctx context.Context, query string, qp QueryProvide
 			return err
 		}
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("RunLimitedVariablesQuery: rowHandler returned error")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("RunLimitedVariablesQuery: rowHandler returned error")
 			return err
 		}
 		start = start + n
@@ -162,7 +162,7 @@ func RunLimitedVariablesExec(ctx context.Context, query string, qp ExecProvider,
 		nextQuery := strings.Replace(query, "($1)", QueryVariadic(n), 1)
 		_, err := qp.ExecContext(ctx, nextQuery, variables[start:start+n]...)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("ExecContext returned an error")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("ExecContext returned an error")
 			return err
 		}
 		start = start + n

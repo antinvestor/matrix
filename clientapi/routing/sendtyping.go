@@ -15,7 +15,7 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"
@@ -65,7 +65,7 @@ func SendTyping(
 	}
 
 	if err := syncProducer.SendTyping(req.Context(), userID, roomID, r.Typing, r.Timeout); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("eduProducer.Send failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("eduProducer.Send failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

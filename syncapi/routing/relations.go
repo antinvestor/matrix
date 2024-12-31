@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -55,7 +55,7 @@ func Relations(
 
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("device.UserID invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -95,7 +95,7 @@ func Relations(
 
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		logrus.WithError(err).Error("Failed to get snapshot for relations")
+		logrus.With(slog.Any("error", err)).Error("Failed to get snapshot for relations")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -134,7 +134,7 @@ func Relations(
 			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 		})
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).With("senderID", events[0].SenderID()).With("roomID", *roomID).Error("Failed converting to ClientEvent")
 			continue
 		}
 		res.Chunk = append(

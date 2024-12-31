@@ -24,7 +24,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 type loginResponse struct {
@@ -80,7 +80,7 @@ func completeAuth(
 ) util.JSONResponse {
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("auth.GenerateAccessToken failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -89,7 +89,7 @@ func completeAuth(
 
 	localpart, serverName, err := userutil.ParseUsernameParam(login.Username(), cfg)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("auth.ParseUsernameParam failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

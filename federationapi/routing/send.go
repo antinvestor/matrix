@@ -17,13 +17,14 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"golang.org/x/exp/slog"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/federationapi/producers"
 	"github.com/antinvestor/matrix/internal"
@@ -130,11 +131,16 @@ func Send(
 		txnID,
 		cfg.Matrix.ServerName)
 
-	util.GetLogger(httpReq.Context()).Debugf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, request.Origin(), len(t.PDUs), len(t.EDUs))
+	util.GetLogger(httpReq.Context()).With(
+		slog.Any("transaction id", txnID),
+		slog.Any("origin", request.Origin()),
+		slog.Any("PDUs len", len(t.PDUs)),
+		slog.Any("EDUs len", len(t.EDUs)),
+	).Debug("Received transaction")
 
 	resp, jsonErr := t.ProcessTransaction(httpReq.Context())
 	if jsonErr != nil {
-		util.GetLogger(httpReq.Context()).WithField("jsonErr", jsonErr).Error("t.processTransaction failed")
+		util.GetLogger(httpReq.Context()).With("jsonErr", jsonErr).Error("t.processTransaction failed")
 		return *jsonErr
 	}
 

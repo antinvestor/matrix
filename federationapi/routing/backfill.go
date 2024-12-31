@@ -27,7 +27,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // Backfill implements the /backfill federation endpoint.
@@ -88,7 +88,7 @@ func Backfill(
 		VirtualHost: request.Destination(),
 	}
 	if req.Limit, err = strconv.Atoi(limit); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
+		util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("strconv.Atoi failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam(fmt.Sprintf("limit %q is invalid format", limit)),
@@ -103,7 +103,7 @@ func Backfill(
 
 	// Query the Roomserver.
 	if err = rsAPI.PerformBackfill(httpReq.Context(), &req, &res); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
+		util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("query.PerformBackfill failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

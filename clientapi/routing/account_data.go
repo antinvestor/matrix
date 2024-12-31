@@ -27,7 +27,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // GetAccountData implements GET /user/{userId}/[rooms/{roomid}/]account_data/{type}
@@ -49,7 +49,7 @@ func GetAccountData(
 	}
 	dataRes := api.QueryAccountDataResponse{}
 	if err := userAPI.QueryAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccountData failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("userAPI.QueryAccountData failed")
 		return util.ErrorResponse(fmt.Errorf("userAPI.QueryAccountData: %w", err))
 	}
 
@@ -103,7 +103,7 @@ func SaveAccountData(
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("io.ReadAll failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("io.ReadAll failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -125,7 +125,7 @@ func SaveAccountData(
 	}
 	dataRes := api.InputAccountDataResponse{}
 	if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("userAPI.InputAccountData failed")
 		return util.ErrorResponse(err)
 	}
 
@@ -182,7 +182,7 @@ func SaveReadMarker(
 		}
 		dataRes := api.InputAccountDataResponse{}
 		if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("userAPI.InputAccountData failed")
 			return util.ErrorResponse(err)
 		}
 	}

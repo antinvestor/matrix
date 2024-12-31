@@ -97,19 +97,19 @@ func Test_migrations_Up(t *testing.T) {
 
 				db, err := sql.Open("postgres", string(conStr))
 				if err != nil {
-					t.Errorf("unable to open database: %v", err)
+					t.Error("unable to open database: %v", err)
 				}
 				m := sqlutil.NewMigrator(db)
 				m.AddMigrations(tt.migrations...)
 				if err = m.Up(ctx); (err != nil) != tt.wantErr {
-					t.Errorf("Up() error = %v, wantErr %v", err, tt.wantErr)
+					t.Error("Up() error = %v, wantErr %v", err, tt.wantErr)
 				}
 				result, err := m.ExecutedMigrations(ctx)
 				if err != nil {
-					t.Errorf("unable to get executed migrations: %v", err)
+					t.Error("unable to get executed migrations: %v", err)
 				}
 				if !tt.wantErr && !reflect.DeepEqual(result, tt.wantResult) {
-					t.Errorf("expected: %+v, got %v", tt.wantResult, result)
+					t.Error("expected: %+v, got %v", tt.wantResult, result)
 				}
 			})
 		}
@@ -130,7 +130,7 @@ func Test_insertMigration(t *testing.T) {
 
 		db, err := sql.Open("postgres", string(conStr))
 		if err != nil {
-			t.Errorf("unable to open database: %v", err)
+			t.Error("unable to open database: %v", err)
 		}
 
 		if err := sqlutil.InsertMigration(context.Background(), db, "testing"); err != nil {

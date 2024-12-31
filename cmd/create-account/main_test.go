@@ -19,7 +19,7 @@ func Test_getPassword(t *testing.T) {
 	reader := &bytes.Buffer{}
 	_, err := reader.WriteString(pass)
 	if err != nil {
-		t.Errorf("unable to write to buffer: %+v", err)
+		t.Error("unable to write to buffer: %+v", err)
 	}
 	tests := []struct {
 		name    string
@@ -59,10 +59,10 @@ func Test_getPassword(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := getPassword(tt.args.password, tt.args.pwdFile, tt.args.pwdStdin, tt.args.reader)
 			if !tt.wantErr && err != nil {
-				t.Errorf("expected no error, but got %v", err)
+				t.Error("expected no error, but got %v", err)
 			}
 			if got != tt.want {
-				t.Errorf("getPassword() = '%v', want '%v'", got, tt.want)
+				t.Error("getPassword() = '%v', want '%v'", got, tt.want)
 			}
 		})
 	}

@@ -24,14 +24,14 @@ import (
 	"github.com/antinvestor/matrix/setup"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/mscs/msc2836"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
 
 // Enable MSCs - returns an error on unknown MSCs
 func Enable(cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, caches *caching.Caches) error {
 	for _, msc := range cfg.MSCs.MSCs {
-		util.GetLogger(context.Background()).WithField("msc", msc).Info("Enabling MSC")
+		util.GetLogger(context.Background()).With("msc", msc).Info("Enabling MSC")
 		if err := EnableMSC(cfg, cm, routers, monolith, msc, caches); err != nil {
 			return err
 		}
@@ -46,7 +46,7 @@ func EnableMSC(cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.R
 	case "msc2444": // enabled inside federationapi
 	case "msc2753": // enabled inside clientapi
 	default:
-		logrus.Warnf("EnableMSC: unknown MSC '%s', this MSC is either not supported or is natively supported by Dendrite", msc)
+		logrus.Warn("EnableMSC: unknown MSC '%s', this MSC is either not supported or is natively supported by Dendrite", msc)
 	}
 	return nil
 }

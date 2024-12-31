@@ -467,7 +467,7 @@ func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 	for targetUserID := range req.UserToDevices {
 		keys, err := a.KeyDatabase.CrossSigningKeysForUser(ctx, targetUserID)
 		if err != nil {
-			logrus.WithError(err).Errorf("Failed to get cross-signing keys for user %q", targetUserID)
+			logrus.With(slog.Any("error", err)).Error("Failed to get cross-signing keys for user %q", targetUserID)
 			continue
 		}
 
@@ -480,7 +480,7 @@ func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 
 			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, keyID)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				logrus.WithError(err).Errorf("Failed to get cross-signing signatures for user %q key %q", targetUserID, keyID)
+				logrus.With(slog.Any("error", err)).Error("Failed to get cross-signing signatures for user %q key %q", targetUserID, keyID)
 				continue
 			}
 

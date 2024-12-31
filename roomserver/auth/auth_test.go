@@ -88,7 +88,7 @@ func TestIsServerAllowed(t *testing.T) {
 			}
 
 			if got := IsServerAllowed(context.Background(), &FakeQuerier{}, tt.serverName, tt.serverCurrentlyInRoom, authEvents); got != tt.want {
-				t.Errorf("IsServerAllowed() = %v, want %v", got, tt.want)
+				t.Error("IsServerAllowed() = %v, want %v", got, tt.want)
 			}
 		})
 	}

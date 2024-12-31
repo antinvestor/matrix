@@ -82,7 +82,7 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 		}
 		ev, err := ToClientEvent(se, format, userIDForSender)
 		if err != nil {
-			logrus.WithError(err).Warn("Failed converting event to ClientEvent")
+			logrus.With(slog.Any("error", err)).Warn("Failed converting event to ClientEvent")
 			continue
 		}
 		evs = append(evs, *ev)
@@ -190,7 +190,7 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 			if err != nil {
 				errString = err.Error()
 			}
-			logrus.Warnf("Failed to find userID for prev_sender in ClientEvent: %s", errString)
+			logrus.Warn("Failed to find userID for prev_sender in ClientEvent: %s", errString)
 			// NOTE: Not much can be done here, so leave the previous value in place.
 		}
 		ce.Unsigned, err = json.Marshal(prev)

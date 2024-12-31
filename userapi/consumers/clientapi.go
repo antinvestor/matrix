@@ -93,7 +93,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		log.WithError(err).Error("userapi clientapi consumer: SplitID failure")
+		log.With(slog.Any("error", err)).Error("userapi clientapi consumer: SplitID failure")
 		return true
 	}
 	if domain != s.serverName {
@@ -107,12 +107,12 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 
 	updated, err := s.db.SetNotificationsRead(ctx, localpart, domain, roomID, uint64(spec.AsTimestamp(metadata.Timestamp)), true)
 	if err != nil {
-		log.WithError(err).Error("userapi EDU consumer")
+		log.With(slog.Any("error", err)).Error("userapi EDU consumer")
 		return false
 	}
 
 	if err = s.syncProducer.GetAndSendNotificationData(ctx, userID, roomID); err != nil {
-		log.WithError(err).Error("userapi EDU consumer: GetAndSendNotificationData failed")
+		log.With(slog.Any("error", err)).Error("userapi EDU consumer: GetAndSendNotificationData failed")
 		return false
 	}
 
@@ -120,7 +120,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 		return true
 	}
 	if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, domain, s.db); err != nil {
-		log.WithError(err).Error("userapi EDU consumer: NotifyUserCounts failed")
+		log.With(slog.Any("error", err)).Error("userapi EDU consumer: NotifyUserCounts failed")
 		return false
 	}
 

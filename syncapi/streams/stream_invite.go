@@ -59,7 +59,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		ctx, req.Device.UserID, r,
 	)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.InviteEventsInRange failed")
+		req.Log.With(slog.Any("error", err)).Error("p.DB.InviteEventsInRange failed")
 		return from
 	}
 
@@ -81,7 +81,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		}
 		ir, err := types.NewInviteResponse(ctx, p.rsAPI, inviteEvent, eventFormat)
 		if err != nil {
-			req.Log.WithError(err).Error("failed creating invite response")
+			req.Log.With(slog.Any("error", err)).Error("failed creating invite response")
 			continue
 		}
 		req.Response.Rooms.Invite[roomID] = ir

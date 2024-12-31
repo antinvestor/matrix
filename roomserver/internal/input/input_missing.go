@@ -10,7 +10,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
 	fedapi "github.com/antinvestor/matrix/federationapi/api"
@@ -101,7 +101,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		return nil, fmt.Errorf("expected to find missing events but didn't")
 	}
 	if isGapFilled {
-		t.log.Infof("Gap filled by /get_missing_events, injecting %d new events", len(newEvents))
+		t.log.Info("Gap filled by /get_missing_events, injecting %d new events", len(newEvents))
 		// we can just inject all the newEvents as new as we may have only missed 1 or 2 events and have filled
 		// in the gap in the DAG
 		for _, newEvent := range newEvents {
@@ -123,7 +123,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	// then there's nothing else to do, we have everything we need to deal
 	// with the new event.
 	if isGapFilled && prevStatesKnown {
-		t.log.Infof("Gap filled and state found for all prev events")
+		t.log.Info("Gap filled and state found for all prev events")
 		return nil, nil
 	}
 
@@ -346,10 +346,10 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 		return respState, true, nil
 	}
 
-	logrus.WithContext(ctx).Warnf("State for event %s not available locally, falling back to federation (via %d servers)", eventID, len(t.servers))
+	logrus.WithContext(ctx).Warn("State for event %s not available locally, falling back to federation (via %d servers)", eventID, len(t.servers))
 	respState, err := t.lookupStateBeforeEvent(ctx, roomVersion, roomID, eventID)
 	if err != nil {
-		logrus.WithContext(ctx).WithError(err).Errorf("Failed to look up state before event %s", eventID)
+		logrus.WithContext(ctx).With(slog.Any("error", err)).Error("Failed to look up state before event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupStateBeforeEvent: %w", err)
 	}
 
@@ -359,7 +359,7 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 	switch e := err.(type) {
 	case gomatrixserverlib.EventValidationError:
 		if !e.Persistable {
-			logrus.WithContext(ctx).WithError(err).Errorf("Failed to look up event %s", eventID)
+			logrus.WithContext(ctx).With(slog.Any("error", err)).Error("Failed to look up event %s", eventID)
 			return nil, false, e
 		}
 		validationError = e
@@ -368,7 +368,7 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 	case nil:
 		// do nothing
 	default:
-		logrus.WithContext(ctx).WithError(err).Errorf("Failed to look up event %s", eventID)
+		logrus.WithContext(ctx).With(slog.Any("error", err)).Error("Failed to look up event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupEvent: %w", err)
 	}
 	h = t.cacheAndReturn(h)
@@ -408,12 +408,12 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, even
 	roomState := state.NewStateResolution(t.db, t.roomInfo, t.inputer.Queryer)
 	stateAtEvents, err := t.db.StateAtEventIDs(ctx, []string{eventID})
 	if err != nil {
-		t.log.WithError(err).Warnf("failed to get state after %s locally", eventID)
+		t.log.With(slog.Any("error", err)).Warn("failed to get state after %s locally", eventID)
 		return nil
 	}
 	stateEntries, err := roomState.LoadCombinedStateAfterEvents(ctx, stateAtEvents)
 	if err != nil {
-		t.log.WithError(err).Warnf("failed to load combined state after %s locally", eventID)
+		t.log.With(slog.Any("error", err)).Warn("failed to load combined state after %s locally", eventID)
 		return nil
 	}
 	stateEventNIDs := make([]types.EventNID, 0, len(stateEntries))
@@ -425,7 +425,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, even
 	}
 	stateEvents, err := t.db.Events(ctx, t.roomInfo.RoomVersion, stateEventNIDs)
 	if err != nil {
-		t.log.WithError(err).Warnf("failed to load state events locally")
+		t.log.With(slog.Any("error", err)).Warn("failed to load state events locally")
 		return nil
 	}
 	res.StateEvents = make([]gomatrixserverlib.PDU, 0, len(stateEvents))
@@ -459,7 +459,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, even
 		for evID := range missingAuthEvents {
 			missingEventList = append(missingEventList, evID)
 		}
-		t.log.WithField("count", len(missingEventList)).Debugf("Fetching missing auth events")
+		t.log.With("count", len(missingEventList)).Debug("Fetching missing auth events")
 		events, err := t.db.EventsFromIDs(ctx, t.roomInfo, missingEventList)
 		if err != nil {
 			return nil
@@ -553,7 +553,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 	trace, ctx := internal.StartRegion(ctx, "getMissingEvents")
 	defer trace.EndRegion()
 
-	logger := t.log.WithField("event_id", e.EventID()).WithField("room_id", e.RoomID().String())
+	logger := t.log.With("event_id", e.EventID()).With("room_id", e.RoomID().String())
 	latest, _, _, err := t.db.LatestEventIDs(ctx, t.roomInfo.RoomNID)
 	if err != nil {
 		return nil, false, false, fmt.Errorf("t.DB.LatestEventIDs: %w", err)
@@ -577,7 +577,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 			missingResp = &m
 			break
 		} else {
-			logger.WithError(err).Warnf("%s pushed us an event but %q did not respond to /get_missing_events", t.origin, server)
+			logger.With(slog.Any("error", err)).Warn("%s pushed us an event but %q did not respond to /get_missing_events", t.origin, server)
 			if errors.Is(err, context.DeadlineExceeded) {
 				select {
 				case <-ctx.Done(): // the parent request context timed out
@@ -590,7 +590,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 	}
 
 	if missingResp == nil {
-		logger.WithError(err).Warnf(
+		logger.With(slog.Any("error", err)).Warn(
 			"%s pushed us an event but %d server(s) couldn't give us details about prev_events via /get_missing_events - dropping this event until it can",
 			t.origin, len(t.servers),
 		)
@@ -611,7 +611,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 		}
 		missingEvents = append(missingEvents, t.cacheAndReturn(ev))
 	}
-	logger.Debugf("get_missing_events returned %d events (%d passed signature checks)", len(missingResp.Events), len(missingEvents))
+	logger.Debug("get_missing_events returned %d events (%d passed signature checks)", len(missingResp.Events), len(missingEvents))
 
 	// topologically sort and sanity check that we are making forward progress
 	newEvents = gomatrixserverlib.ReverseTopologicalOrdering(
@@ -629,7 +629,7 @@ Event:
 	}
 	if !hasPrevEvent {
 		err = fmt.Errorf("called /get_missing_events but server %s didn't return any prev_events with IDs %v", t.origin, shouldHaveSomeEventIDs)
-		logger.WithError(err).Warnf(
+		logger.With(slog.Any("error", err)).Warn(
 			"%s pushed us an event but couldn't give us details about prev_events via /get_missing_events - dropping this event until it can",
 			t.origin,
 		)
@@ -712,7 +712,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 	trace, ctx := internal.StartRegion(ctx, "lookupMissingStateViaStateIDs")
 	defer trace.EndRegion()
 
-	t.log.Infof("lookupMissingStateViaStateIDs %s", eventID)
+	t.log.Info("lookupMissingStateViaStateIDs %s", eventID)
 	// fetch the state event IDs at the time of the event
 	var stateIDs gomatrixserverlib.StateIDResponse
 	var err error
@@ -765,7 +765,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 
 	concurrentRequests := 8
 	missingCount := len(missing)
-	t.log.WithField("event_id", eventID).Debugf("lookupMissingStateViaStateIDs missing %d/%d events", missingCount, len(wantIDs))
+	t.log.With("event_id", eventID).Debug("lookupMissingStateViaStateIDs missing %d/%d events", missingCount, len(wantIDs))
 
 	// If over 50% of the auth/state events from /state_ids are missing
 	// then we'll just call /state instead, otherwise we'll just end up
@@ -901,7 +901,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 		// fetch from the roomserver
 		events, err := t.db.EventsFromIDs(ctx, t.roomInfo, []string{missingEventID})
 		if err != nil {
-			t.log.Warnf("Failed to query roomserver for missing event %s: %s - falling back to remote", missingEventID, err)
+			t.log.Warn("Failed to query roomserver for missing event %s: %s - falling back to remote", missingEventID, err)
 		} else if len(events) == 1 {
 			return events[0].PDU, nil
 		}
@@ -915,7 +915,7 @@ serverLoop:
 		defer cancel()
 		txn, err := t.federation.GetEvent(reqctx, t.virtualHost, serverName, missingEventID)
 		if err != nil || len(txn.PDUs) == 0 {
-			t.log.WithError(err).WithField("missing_event_id", missingEventID).Warn("Failed to get missing /event for event ID")
+			t.log.With(slog.Any("error", err)).With("missing_event_id", missingEventID).Warn("Failed to get missing /event for event ID")
 			if errors.Is(err, context.DeadlineExceeded) {
 				select {
 				case <-reqctx.Done(): // this server took too long
@@ -943,18 +943,18 @@ serverLoop:
 			found = true
 			break serverLoop
 		default:
-			t.log.WithError(err).WithField("missing_event_id", missingEventID).Warnf("Failed to parse event JSON of event returned from /event")
+			t.log.With(slog.Any("error", err)).With("missing_event_id", missingEventID).Warn("Failed to parse event JSON of event returned from /event")
 			continue
 		}
 	}
 	if !found {
-		t.log.WithField("missing_event_id", missingEventID).Warnf("Failed to get missing /event for event ID from %d server(s)", len(t.servers))
+		t.log.With("missing_event_id", missingEventID).Warn("Failed to get missing /event for event ID from %d server(s)", len(t.servers))
 		return nil, fmt.Errorf("wasn't able to find event via %d server(s)", len(t.servers))
 	}
 	if err := gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
-		t.log.WithError(err).Warnf("Couldn't validate signature of event %q from /event", event.EventID())
+		t.log.With(slog.Any("error", err)).Warn("Couldn't validate signature of event %q from /event", event.EventID())
 		return nil, verifySigError{event.EventID(), err}
 	}
 	return t.cacheAndReturn(event), validationError

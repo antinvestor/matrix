@@ -81,7 +81,7 @@ func (s *openIDTokenStatements) SelectOpenIDTokenAtrributes(
 	openIDTokenAttrs.UserID = fmt.Sprintf("@%s:%s", localpart, serverName)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			log.WithError(err).Error("Unable to retrieve token from the db")
+			log.With(slog.Any("error", err)).Error("Unable to retrieve token from the db")
 		}
 		return nil, err
 	}

@@ -25,7 +25,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 type InboundPeeker struct {

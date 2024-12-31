@@ -15,7 +15,7 @@ import (
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -34,11 +34,11 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		t.Errorf("failed to get current working directory: %v", err)
+		t.Error("failed to get current working directory: %v", err)
 	}
 
 	maxSize := config.FileSizeBytes(8)
-	logger := log.New().WithField("mediaapi", "test")
+	logger := log.New().With("mediaapi", "test")
 	testdataPath := filepath.Join(wd, "./testdata")
 
 	cfg := &config.MediaAPI{
@@ -61,7 +61,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		ConnectionString: connStr,
 	})
 	if err != nil {
-		t.Errorf("error opening mediaapi database: %v", err)
+		t.Error("error opening mediaapi database: %v", err)
 	}
 
 	tests := []struct {
@@ -150,7 +150,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 				Logger:        tt.fields.Logger,
 			}
 			if got := r.doUpload(tt.args.ctx, tt.args.reqReader, tt.args.cfg, tt.args.db, tt.args.activeThumbnailGeneration); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("doUpload() = %+v, want %+v", got, tt.want)
+				t.Error("doUpload() = %+v, want %+v", got, tt.want)
 			}
 		})
 	}

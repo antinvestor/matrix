@@ -64,13 +64,13 @@ func (r *RoomEventProducer) ProduceRoomEvents(roomID string, updates []api.Outpu
 				"sender":         update.NewRoomEvent.Event.SenderID(),
 			})
 			if update.NewRoomEvent.Event.StateKey() != nil {
-				logger = logger.WithField("state_key", *update.NewRoomEvent.Event.StateKey())
+				logger = logger.With("state_key", *update.NewRoomEvent.Event.StateKey())
 			}
 			contentKey := keyContentFields[eventType]
 			if contentKey != "" {
 				value := gjson.GetBytes(update.NewRoomEvent.Event.Content(), contentKey)
 				if value.Exists() {
-					logger = logger.WithField("content_value", value.String())
+					logger = logger.With("content_value", value.String())
 				}
 			}
 
@@ -87,7 +87,7 @@ func (r *RoomEventProducer) ProduceRoomEvents(roomID string, updates []api.Outpu
 		}
 		logger.Tracef("Producing to topic '%s'", r.Topic)
 		if _, err := r.JetStream.PublishMsg(msg); err != nil {
-			logger.WithError(err).Errorf("Failed to produce to topic '%s': %s", r.Topic, err)
+			logger.With(slog.Any("error", err)).Error("Failed to produce to topic '%s': %s", r.Topic, err)
 			return err
 		}
 	}

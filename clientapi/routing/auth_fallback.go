@@ -21,7 +21,7 @@ import (
 
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // recaptchaTemplate is an HTML webpage template for recaptcha auth
@@ -151,7 +151,7 @@ func AuthFallback(
 		clientIP := req.RemoteAddr
 		err := req.ParseForm()
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("req.ParseForm failed")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("req.ParseForm failed")
 			w.WriteHeader(http.StatusBadRequest)
 			serveRecaptcha()
 			return
@@ -170,7 +170,7 @@ func AuthFallback(
 			return
 		case nil:
 		default: // something else failed
-			util.GetLogger(req.Context()).WithError(err).Error("failed to validate recaptcha")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("failed to validate recaptcha")
 			serveRecaptcha()
 			return
 		}
@@ -193,6 +193,6 @@ func writeHTTPMessage(
 	w.WriteHeader(header)
 	_, err := w.Write([]byte(message))
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("w.Write failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("w.Write failed")
 	}
 }

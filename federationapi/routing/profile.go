@@ -24,7 +24,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // GetProfile implements GET /_matrix/federation/v1/query/profile
@@ -45,7 +45,7 @@ func GetProfile(
 
 	_, domain, err := cfg.Matrix.SplitLocalID('@', userID)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam(fmt.Sprintf("Domain %q does not match this server", domain)),
@@ -60,7 +60,7 @@ func GetProfile(
 				JSON: spec.NotFound("The user does not exist or does not have a profile."),
 			}
 		}
-		util.GetLogger(httpReq.Context()).WithError(err).Error("userAPI.QueryProfile failed")
+		util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("userAPI.QueryProfile failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

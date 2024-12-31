@@ -109,7 +109,7 @@ func (p *SyncAPIProducer) SendToDevice(
 
 		eventJSON, err := json.Marshal(ote)
 		if err != nil {
-			log.WithError(err).Error("sendToDevice failed json.Marshal")
+			log.With(slog.Any("error", err)).Error("sendToDevice failed json.Marshal")
 			return err
 		}
 		m := nats.NewMsg(p.TopicSendToDeviceEvent)
@@ -119,10 +119,10 @@ func (p *SyncAPIProducer) SendToDevice(
 
 		if _, err = p.JetStream.PublishMsg(m, nats.Context(ctx)); err != nil {
 			if i < len(devices)-1 {
-				log.WithError(err).Warn("sendToDevice failed to PublishMsg, trying further devices")
+				log.With(slog.Any("error", err)).Warn("sendToDevice failed to PublishMsg, trying further devices")
 				continue
 			}
-			log.WithError(err).Error("sendToDevice failed to PublishMsg for all devices")
+			log.With(slog.Any("error", err)).Error("sendToDevice failed to PublishMsg for all devices")
 			return err
 		}
 	}

@@ -28,7 +28,7 @@ import (
 	uapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 func TestLoginFromJSONReader(t *testing.T) {
@@ -131,21 +131,21 @@ func TestLoginFromJSONReader(t *testing.T) {
 			cleanup(ctx, &util.JSONResponse{Code: http.StatusOK})
 
 			if login.Username() != tst.WantUsername {
-				t.Errorf("Username: got %q, want %q", login.Username(), tst.WantUsername)
+				t.Error("Username: got %q, want %q", login.Username(), tst.WantUsername)
 			}
 
 			if login.DeviceID == nil {
 				if tst.WantDeviceID != "" {
-					t.Errorf("DeviceID: got %v, want %q", login.DeviceID, tst.WantDeviceID)
+					t.Error("DeviceID: got %v, want %q", login.DeviceID, tst.WantDeviceID)
 				}
 			} else {
 				if *login.DeviceID != tst.WantDeviceID {
-					t.Errorf("DeviceID: got %q, want %q", *login.DeviceID, tst.WantDeviceID)
+					t.Error("DeviceID: got %q, want %q", *login.DeviceID, tst.WantDeviceID)
 				}
 			}
 
 			if !reflect.DeepEqual(userAPI.DeletedTokens, tst.WantDeletedTokens) {
-				t.Errorf("DeletedTokens: got %+v, want %+v", userAPI.DeletedTokens, tst.WantDeletedTokens)
+				t.Error("DeletedTokens: got %+v, want %+v", userAPI.DeletedTokens, tst.WantDeletedTokens)
 			}
 		})
 	}

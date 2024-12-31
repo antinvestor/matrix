@@ -77,14 +77,14 @@ func (t *OutputTypingConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) 
 	userID := msg.Header.Get(jetstream.UserID)
 	typing, err := strconv.ParseBool(msg.Header.Get("typing"))
 	if err != nil {
-		log.WithError(err).Errorf("EDU output log: typing parse failure")
+		log.With(slog.Any("error", err)).Error("EDU output log: typing parse failure")
 		return true
 	}
 
 	// only send typing events which originated from us
 	_, typingServerName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		log.WithError(err).WithField("user_id", userID).Error("Failed to extract domain from typing sender")
+		log.With(slog.Any("error", err)).With("user_id", userID).Error("Failed to extract domain from typing sender")
 		_ = msg.Ack()
 		return true
 	}
@@ -94,7 +94,7 @@ func (t *OutputTypingConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) 
 
 	joined, err := t.db.GetJoinedHosts(ctx, roomID)
 	if err != nil {
-		log.WithError(err).WithField("room_id", roomID).Error("failed to get joined hosts for room")
+		log.With(slog.Any("error", err)).With("room_id", roomID).Error("failed to get joined hosts for room")
 		return false
 	}
 
@@ -109,11 +109,11 @@ func (t *OutputTypingConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) 
 		"user_id": userID,
 		"typing":  typing,
 	}); err != nil {
-		log.WithError(err).Error("failed to marshal EDU JSON")
+		log.With(slog.Any("error", err)).Error("failed to marshal EDU JSON")
 		return true
 	}
 	if err := t.queues.SendEDU(edu, typingServerName, names); err != nil {
-		log.WithError(err).Error("failed to send EDU")
+		log.With(slog.Any("error", err)).Error("failed to send EDU")
 		return false
 	}
 

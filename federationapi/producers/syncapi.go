@@ -112,7 +112,7 @@ func (p *SyncAPIProducer) SendToDevice(
 
 		eventJSON, err := json.Marshal(ote)
 		if err != nil {
-			log.WithError(err).Error("sendToDevice failed json.Marshal")
+			log.With(slog.Any("error", err)).Error("sendToDevice failed json.Marshal")
 			return err
 		}
 		m := nats.NewMsg(p.TopicSendToDeviceEvent)
@@ -122,10 +122,10 @@ func (p *SyncAPIProducer) SendToDevice(
 
 		if _, err = p.JetStream.PublishMsg(m, nats.Context(ctx)); err != nil {
 			if i < len(devices)-1 {
-				log.WithError(err).Warn("sendToDevice failed to PublishMsg, trying further devices")
+				log.With(slog.Any("error", err)).Warn("sendToDevice failed to PublishMsg, trying further devices")
 				continue
 			}
-			log.WithError(err).Error("sendToDevice failed to PublishMsg for all devices")
+			log.With(slog.Any("error", err)).Error("sendToDevice failed to PublishMsg for all devices")
 			return err
 		}
 	}
@@ -170,7 +170,7 @@ func (p *SyncAPIProducer) SendDeviceListUpdate(
 	m := nats.NewMsg(p.TopicDeviceListUpdate)
 	m.Header.Set("origin", string(origin))
 	m.Data = deviceListUpdate
-	log.Debugf("Sending device list update: %+v", m.Header)
+	log.Debug("Sending device list update: %+v", m.Header)
 	_, err = p.JetStream.PublishMsg(m, nats.Context(ctx))
 	return err
 }
@@ -182,7 +182,7 @@ func (p *SyncAPIProducer) SendSigningKeyUpdate(
 	m.Header.Set("origin", string(origin))
 	m.Data = data
 
-	log.Debugf("Sending signing key update")
+	log.Debug("Sending signing key update")
 	_, err = p.JetStream.PublishMsg(m, nats.Context(ctx))
 	return err
 }

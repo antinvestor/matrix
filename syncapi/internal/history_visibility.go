@@ -211,7 +211,7 @@ func visibilityForEvents(
 	if senderID != nil {
 		membershipEvents, err = rsAPI.QueryMembershipAtEvent(ctx, roomID, eventIDs, *senderID)
 		if err != nil {
-			logrus.WithError(err).Error("visibilityForEvents: failed to fetch membership at event, defaulting to 'leave'")
+			logrus.With(slog.Any("error", err)).Error("visibilityForEvents: failed to fetch membership at event, defaulting to 'leave'")
 		}
 	}
 

@@ -92,7 +92,7 @@ func (s *OutputClientDataConsumer) Start() error {
 			return
 		}
 		ctx := context.Background()
-		logrus.Infof("Starting to index events")
+		logrus.Info("Starting to index events")
 		var offset int
 		start := time.Now()
 		count := 0
@@ -100,13 +100,13 @@ func (s *OutputClientDataConsumer) Start() error {
 		for {
 			evs, err := s.db.ReIndex(ctx, 1000, id)
 			if err != nil {
-				logrus.WithError(err).Errorf("unable to get events to index")
+				logrus.With(slog.Any("error", err)).Error("unable to get events to index")
 				return
 			}
 			if len(evs) == 0 {
 				break
 			}
-			logrus.Debugf("Indexing %d events", len(evs))
+			logrus.Debug("Indexing %d events", len(evs))
 			elements := make([]fulltext.IndexElement, 0, len(evs))
 
 			for streamPos, ev := range evs {
@@ -135,13 +135,13 @@ func (s *OutputClientDataConsumer) Start() error {
 				elements = append(elements, e)
 			}
 			if err = s.fts.Index(elements...); err != nil {
-				logrus.WithError(err).Error("unable to index events")
+				logrus.With(slog.Any("error", err)).Error("unable to index events")
 				continue
 			}
 			offset += len(evs)
 			count += len(elements)
 		}
-		logrus.Infof("Indexed %d events in %v", count, time.Since(start))
+		logrus.Info("Indexed %d events in %v", count, time.Since(start))
 	})
 	if err != nil {
 		return err
@@ -162,7 +162,7 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	var output eventutil.AccountData
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("client API server output log: message parse failure")
+		log.With(slog.Any("error", err)).Error("client API server output log: message parse failure")
 		sentry.CaptureException(err)
 		return true
 	}
@@ -181,15 +181,15 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.M
 			"type":       output.Type,
 			"room_id":    output.RoomID,
 			log.ErrorKey: err,
-		}).Errorf("could not save account data")
+		}).Error("could not save account data")
 		return false
 	}
 
 	if output.IgnoredUsers != nil {
 		if err := s.db.UpdateIgnoresForUser(ctx, userID, output.IgnoredUsers); err != nil {
-			log.WithError(err).WithFields(logrus.Fields{
+			log.With(slog.Any("error", err)).WithFields(logrus.Fields{
 				"user_id": userID,
-			}).Errorf("Failed to update ignored users")
+			}).Error("Failed to update ignored users")
 			sentry.CaptureException(err)
 		}
 	}

@@ -22,7 +22,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/internal/eventutil"
@@ -78,7 +78,7 @@ func SendRedaction(
 	// if user is member of room, and sender ID is nil, then this user doesn't have a pseudo ID for some reason,
 	// which is unexpected.
 	if senderID == nil {
-		util.GetLogger(req.Context()).WithField("userID", *deviceUserID).WithField("roomID", roomID).Error("missing sender ID for user, despite having membership")
+		util.GetLogger(req.Context()).With("userID", *deviceUserID).With("roomID", roomID).Error("missing sender ID for user, despite having membership")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -159,7 +159,7 @@ func SendRedaction(
 
 	err = proto.SetContent(r)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("proto.SetContent failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("proto.SetContent failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -184,7 +184,7 @@ func SendRedaction(
 	}
 	domain := device.UserDomain()
 	if err = roomserverAPI.SendEvents(context.Background(), rsAPI, roomserverAPI.KindNew, []*types.HeaderedEvent{e}, device.UserDomain(), domain, domain, nil, false); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("failed to SendEvents")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

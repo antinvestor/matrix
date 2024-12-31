@@ -27,7 +27,7 @@ import (
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 type upgradeRoomRequest struct {
@@ -61,7 +61,7 @@ func UpgradeRoom(
 
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("device UserID is invalid")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("device UserID is invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

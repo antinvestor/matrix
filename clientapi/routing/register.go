@@ -39,7 +39,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
@@ -529,7 +529,7 @@ func Register(
 		}
 		nres := &userapi.QueryNumericLocalpartResponse{}
 		if err = userAPI.QueryNumericLocalpart(req.Context(), nreq, nres); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("userAPI.QueryNumericLocalpart failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -728,7 +728,7 @@ func handleRegistrationFlow(
 			return util.JSONResponse{Code: http.StatusUnauthorized, JSON: spec.BadJSON(err.Error())}
 		case nil:
 		default:
-			util.GetLogger(req.Context()).WithError(err).Error("failed to validate recaptcha")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("failed to validate recaptcha")
 			return util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError{}}
 		}
 

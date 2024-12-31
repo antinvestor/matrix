@@ -94,25 +94,25 @@ func testSharedUsers(t *testing.T, rsAPI api.RoomserverInternalAPI) {
 
 	// Create the room
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-		t.Errorf("failed to send events: %v", err)
+		t.Error("failed to send events: %v", err)
 	}
 
 	// Query the shared users for Alice, there should only be Bob.
 	// This is used by the SyncAPI keychange consumer.
 	res := &api.QuerySharedUsersResponse{}
 	if err := rsAPI.QuerySharedUsers(ctx, &api.QuerySharedUsersRequest{UserID: alice.ID}, res); err != nil {
-		t.Errorf("unable to query known users: %v", err)
+		t.Error("unable to query known users: %v", err)
 	}
 	if _, ok := res.UserIDsToCount[bob.ID]; !ok {
-		t.Errorf("expected to find %s in shared users, but didn't: %+v", bob.ID, res.UserIDsToCount)
+		t.Error("expected to find %s in shared users, but didn't: %+v", bob.ID, res.UserIDsToCount)
 	}
 	// Also verify that we get the expected result when specifying OtherUserIDs.
 	// This is used by the SyncAPI when getting device list changes.
 	if err := rsAPI.QuerySharedUsers(ctx, &api.QuerySharedUsersRequest{UserID: alice.ID, OtherUserIDs: []string{bob.ID}}, res); err != nil {
-		t.Errorf("unable to query known users: %v", err)
+		t.Error("unable to query known users: %v", err)
 	}
 	if _, ok := res.UserIDsToCount[bob.ID]; !ok {
-		t.Errorf("expected to find %s in shared users, but didn't: %+v", bob.ID, res.UserIDsToCount)
+		t.Error("expected to find %s in shared users, but didn't: %+v", bob.ID, res.UserIDsToCount)
 	}
 }
 
@@ -140,25 +140,25 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 			ServerName:  serverName,
 			Password:    "someRandomPassword",
 		}, userRes); err != nil {
-			t.Errorf("failed to create account: %s", err)
+			t.Error("failed to create account: %s", err)
 		}
 	}
 
 	// Create the room in the database
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-		t.Errorf("failed to send events: %v", err)
+		t.Error("failed to send events: %v", err)
 	}
 
 	// Get the membership events BEFORE revoking guest access
 	membershipRes := &api.QueryMembershipsForRoomResponse{}
 	if err := rsAPI.QueryMembershipsForRoom(ctx, &api.QueryMembershipsForRoomRequest{LocalOnly: true, JoinedOnly: true, RoomID: room.ID}, membershipRes); err != nil {
-		t.Errorf("failed to query membership for room: %s", err)
+		t.Error("failed to query membership for room: %s", err)
 	}
 
 	// revoke guest access
 	revokeEvent := room.CreateAndInsert(t, alice, spec.MRoomGuestAccess, map[string]string{"guest_access": "forbidden"}, test.WithStateKey(""))
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{revokeEvent}, "test", "test", "test", nil, false); err != nil {
-		t.Errorf("failed to send events: %v", err)
+		t.Error("failed to send events: %v", err)
 	}
 
 	// TODO: Even though we are sending the events sync, the "kickUsers" function is sending the events async, so we need
@@ -167,7 +167,7 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 		// Get the membership events AFTER revoking guest access
 		membershipRes2 := &api.QueryMembershipsForRoomResponse{}
 		if err := rsAPI.QueryMembershipsForRoom(ctx, &api.QueryMembershipsForRoomRequest{LocalOnly: true, JoinedOnly: true, RoomID: room.ID}, membershipRes2); err != nil {
-			t.Errorf("failed to query membership for room: %s", err)
+			t.Error("failed to query membership for room: %s", err)
 		}
 
 		// The membership events should NOT match, as Bob (guest user) should now be kicked from the room
@@ -177,7 +177,7 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 		time.Sleep(time.Millisecond * 10)
 	}
 
-	t.Errorf("memberships didn't change in time")
+	t.Error("memberships didn't change in time")
 }
 
 func Test_QueryLeftUsers(t *testing.T) {
@@ -766,11 +766,11 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				testRoom := tc.prepareRoomFunc(t)
 				// Create the room
 				if err := api.SendEvents(processCtx.Context(), rsAPI, api.KindNew, testRoom.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 
 				if err := api.SendEvents(processCtx.Context(), rsAPI, api.KindNew, allowedByRoomExists.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 
 				roomID, _ := spec.NewRoomID(testRoom.ID)
@@ -862,7 +862,7 @@ func TestUpgrade(t *testing.T) {
 			if !reflect.DeepEqual(oldEv.Content(), newEv.Content()) {
 				t.Logf("OldEvent QueryCurrentState: %s", string(oldEv.Content()))
 				t.Logf("NewEvent QueryCurrentState: %s", string(newEv.Content()))
-				t.Errorf("event content mismatch")
+				t.Error("event content mismatch")
 			}
 		}
 	}
@@ -887,7 +887,7 @@ func TestUpgrade(t *testing.T) {
 			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
 				room := test.NewRoom(t, alice)
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return room.ID
 			},
@@ -898,7 +898,7 @@ func TestUpgrade(t *testing.T) {
 			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
 				room := test.NewRoom(t, alice)
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return room.ID
 			},
@@ -928,7 +928,7 @@ func TestUpgrade(t *testing.T) {
 				}, test.WithStateKey(alice.ID))
 
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return r.ID
 			},
@@ -941,7 +941,7 @@ func TestUpgrade(t *testing.T) {
 			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice)
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 
 				if err := rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{
@@ -976,7 +976,7 @@ func TestUpgrade(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 
 				if _, err := rsAPI.SetRoomAlias(ctx, spec.SenderID(alice.ID),
@@ -1017,7 +1017,7 @@ func TestUpgrade(t *testing.T) {
 					"membership": spec.Ban,
 				}, test.WithStateKey(charlie.ID))
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return r.ID
 			},
@@ -1032,7 +1032,7 @@ func TestUpgrade(t *testing.T) {
 
 				r.CreateAndInsert(t, alice, "m.space.child", map[string]interface{}{}, test.WithStateKey(spaceChild.ID))
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return r.ID
 			},
@@ -1062,7 +1062,7 @@ func TestUpgrade(t *testing.T) {
 				r.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{"membership": spec.Leave}, test.WithStateKey(alice.ID))
 
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return r.ID
 			},
@@ -1149,7 +1149,7 @@ func TestStateReset(t *testing.T) {
 
 		// Send and create the room
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// send a message
@@ -1157,7 +1157,7 @@ func TestStateReset(t *testing.T) {
 		charlieMsg := room.CreateAndInsert(t, charlie, "m.room.message", map[string]any{"body": "hello world"})
 
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobMsg, charlieMsg}, "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// Bob changes his name
@@ -1165,13 +1165,13 @@ func TestStateReset(t *testing.T) {
 		bobDisplayname := room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]any{"membership": "join", "displayname": expectedDisplayname}, test.WithStateKey(bob.ID))
 
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobDisplayname}, "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// Change another state event
 		jrEv := room.CreateAndInsert(t, alice, spec.MRoomJoinRules, gomatrixserverlib.JoinRuleContent{JoinRule: "invite"}, test.WithStateKey(""))
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{jrEv}, "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// send a message
@@ -1179,7 +1179,7 @@ func TestStateReset(t *testing.T) {
 		charlieMsg = room.CreateAndInsert(t, charlie, "m.room.message", map[string]any{"body": "hello world"})
 
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobMsg, charlieMsg}, "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// Craft the state reset message, which is using Bobs initial join event and the
@@ -1203,7 +1203,7 @@ func TestStateReset(t *testing.T) {
 
 		// Send the state reset message
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{stateResetMsg}, "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// Validate that there is a membership event for Bob

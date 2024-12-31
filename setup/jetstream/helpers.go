@@ -31,7 +31,7 @@ func Consumer(
 		// "Pull" suffixed to their name.
 		if _, err := js.ConsumerInfo(subj, durable); err == nil {
 			if err := js.DeleteConsumer(subj, durable); err != nil {
-				logrus.WithContext(ctx).Warnf("Failed to clean up old consumer %q", durable)
+				logrus.WithContext(ctx).Warn("Failed to clean up old consumer %q", durable)
 			}
 		}
 	}()
@@ -49,7 +49,7 @@ func Consumer(
 			select {
 			case <-ctx.Done():
 				if err := sub.Unsubscribe(); err != nil {
-					logrus.WithContext(ctx).Warnf("Failed to unsubscribe %q", durable)
+					logrus.WithContext(ctx).Warn("Failed to unsubscribe %q", durable)
 				}
 				return
 			default:
@@ -85,7 +85,7 @@ func Consumer(
 					}
 					// Something else went wrong, so we'll panic.
 					sentry.CaptureException(err)
-					logrus.WithContext(ctx).WithField("subject", subj).Fatal(err)
+					logrus.WithContext(ctx).With("subject", subj).Fatal(err)
 				}
 			}
 			if len(msgs) < 1 {
@@ -93,7 +93,7 @@ func Consumer(
 			}
 			for _, msg := range msgs {
 				if err = msg.InProgress(nats.Context(ctx)); err != nil {
-					logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.InProgress: %w", err))
+					logrus.WithContext(ctx).With("subject", subj).Warn(fmt.Errorf("msg.InProgress: %w", err))
 					sentry.CaptureException(err)
 					continue
 				}
@@ -101,14 +101,14 @@ func Consumer(
 			if f(ctx, msgs) {
 				for _, msg := range msgs {
 					if err = msg.AckSync(nats.Context(ctx)); err != nil {
-						logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.AckSync: %w", err))
+						logrus.WithContext(ctx).With("subject", subj).Warn(fmt.Errorf("msg.AckSync: %w", err))
 						sentry.CaptureException(err)
 					}
 				}
 			} else {
 				for _, msg := range msgs {
 					if err = msg.Nak(nats.Context(ctx)); err != nil {
-						logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.Nak: %w", err))
+						logrus.WithContext(ctx).With("subject", subj).Warn(fmt.Errorf("msg.Nak: %w", err))
 						sentry.CaptureException(err)
 					}
 				}

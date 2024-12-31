@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -61,7 +61,7 @@ func SetReceipt(req *http.Request, userAPI userapi.ClientUserAPI, syncProducer *
 		}
 		dataRes := userapi.InputAccountDataResponse{}
 		if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
+			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("userAPI.InputAccountData failed")
 			return util.ErrorResponse(err)
 		}
 

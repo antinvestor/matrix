@@ -67,7 +67,7 @@ func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, loc
 					"localpart": localpart,
 					"app_id0":   pusherDevice.Device.AppID,
 					"pushkey":   pusherDevice.Device.PushKey,
-				}).WithError(err).Error("HTTP push gateway request failed")
+				}).With(slog.Any("error", err)).Error("HTTP push gateway request failed")
 				return
 			}
 		}

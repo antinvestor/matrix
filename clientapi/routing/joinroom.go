@@ -26,7 +26,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 func JoinRoomByIDOrAlias(

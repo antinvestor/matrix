@@ -8,8 +8,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
 	asAPI "github.com/antinvestor/matrix/appservice/api"
@@ -207,7 +207,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	}
 
 	if err := r.Inputer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start roomserver input API")
+		logrus.With(slog.Any("error", err)).Panic("failed to start roomserver input API")
 	}
 }
 

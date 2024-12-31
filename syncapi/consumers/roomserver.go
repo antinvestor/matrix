@@ -106,7 +106,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	var output api.OutputEvent
 	if err = json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
+		log.With(slog.Any("error", err)).Error("roomserver output log: message parse failure")
 		return true
 	}
 
@@ -125,7 +125,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		err = s.onNewRoomEvent(s.ctx, *output.NewRoomEvent)
 		if err == nil && s.asProducer != nil {
 			if err = s.asProducer.ProduceRoomEvents(msg); err != nil {
-				log.WithError(err).Warn("failed to produce OutputAppserviceEvent")
+				log.With(slog.Any("error", err)).Warn("failed to produce OutputAppserviceEvent")
 			}
 		}
 	case api.OutputTypeOldRoomEvent:
@@ -143,11 +143,11 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	case api.OutputTypePurgeRoom:
 		err = s.onPurgeRoom(s.ctx, *output.PurgeRoom)
 		if err != nil {
-			logrus.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from sync API")
+			logrus.With("room_id", output.PurgeRoom.RoomID).With(slog.Any("error", err)).Error("Failed to purge room from sync API")
 			return true // non-fatal, as otherwise we end up in a loop of trying to purge the room
 		}
 	default:
-		log.WithField("type", output.Type).Debug(
+		log.With("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
 	}
@@ -158,7 +158,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		}
 		log.WithFields(log.Fields{
 			"type": output.Type,
-		}).WithError(err).Error("roomserver output log: failed to process event")
+		}).With(slog.Any("error", err)).Error("roomserver output log: failed to process event")
 		sentry.CaptureException(err)
 		return false
 	}
@@ -171,7 +171,7 @@ func (s *OutputRoomEventConsumer) onRedactEvent(
 ) error {
 	err := s.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause, s.rsAPI)
 	if err != nil {
-		log.WithError(err).Error("RedactEvent error'd")
+		log.With(slog.Any("error", err)).Error("RedactEvent error'd")
 		return err
 	}
 
@@ -180,7 +180,7 @@ func (s *OutputRoomEventConsumer) onRedactEvent(
 			"room_id":           msg.RedactedBecause.RoomID().String(),
 			"event_id":          msg.RedactedBecause.EventID(),
 			"redacted_event_id": msg.RedactedEventID,
-		}).WithError(err).Warn("Failed to redact relations")
+		}).With(slog.Any("error", err)).Warn("Failed to redact relations")
 		return err
 	}
 
@@ -294,11 +294,11 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		log.WithFields(log.Fields{
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
-		}).WithError(err).Warn("failed to index fulltext element")
+		}).With(slog.Any("error", err)).Warn("failed to index fulltext element")
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
-		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		log.With(slog.Any("error", err)).Error("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
@@ -306,7 +306,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		log.WithFields(log.Fields{
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
-		}).WithError(err).Warn("Failed to update relations")
+		}).With(slog.Any("error", err)).Warn("Failed to update relations")
 		return err
 	}
 
@@ -349,7 +349,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		log.WithFields(log.Fields{
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
-		}).WithError(err).Warn("failed to index fulltext element")
+		}).With(slog.Any("error", err)).Warn("failed to index fulltext element")
 	}
 
 	if err = s.db.UpdateRelations(ctx, ev); err != nil {
@@ -357,12 +357,12 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 			"room_id":  ev.RoomID().String(),
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
-		}).WithError(err).Warn("Failed to update relations")
+		}).With(slog.Any("error", err)).Warn("Failed to update relations")
 		return err
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
-		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		log.With(slog.Any("error", err)).Error("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
@@ -432,7 +432,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 			"event":      string(msg.Event.JSON()),
 			"pdupos":     pduPos,
 			log.ErrorKey: err,
-		}).Errorf("roomserver output log: write invite failure")
+		}).Error("roomserver output log: write invite failure")
 		return
 	}
 
@@ -451,7 +451,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,
 			log.ErrorKey: err,
-		}).Errorf("roomserver output log: remove invite failure")
+		}).Error("roomserver output log: remove invite failure")
 		return
 	}
 
@@ -470,7 +470,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 			"event_id":   msg.EventID,
 			"room_id":    msg.RoomID,
 			log.ErrorKey: err,
-		}).Errorf("roomID is invalid")
+		}).Error("roomID is invalid")
 		return
 	}
 	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, msg.TargetSenderID)
@@ -479,7 +479,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 			"event_id":   msg.EventID,
 			"sender_id":  msg.TargetSenderID,
 			log.ErrorKey: err,
-		}).Errorf("failed to find userID for sender")
+		}).Error("failed to find userID for sender")
 		return
 	}
 	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, userID.String())
@@ -493,7 +493,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
-		}).Errorf("roomserver output log: write peek failure")
+		}).Error("roomserver output log: write peek failure")
 		return
 	}
 
@@ -512,7 +512,7 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
-		}).Errorf("roomserver output log: write peek failure")
+		}).Error("roomserver output log: write peek failure")
 		return
 	}
 
@@ -526,13 +526,13 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 func (s *OutputRoomEventConsumer) onPurgeRoom(
 	ctx context.Context, req api.OutputPurgeRoom,
 ) error {
-	logrus.WithField("room_id", req.RoomID).Warn("Purging room from sync API")
+	logrus.With("room_id", req.RoomID).Warn("Purging room from sync API")
 
 	if err := s.db.PurgeRoom(ctx, req.RoomID); err != nil {
-		logrus.WithField("room_id", req.RoomID).WithError(err).Error("Failed to purge room from sync API")
+		logrus.With("room_id", req.RoomID).With(slog.Any("error", err)).Error("Failed to purge room from sync API")
 		return err
 	} else {
-		logrus.WithField("room_id", req.RoomID).Warn("Room purged from sync API")
+		logrus.With("room_id", req.RoomID).Warn("Room purged from sync API")
 		return nil
 	}
 }
@@ -635,7 +635,7 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPositio
 						log.WithFields(log.Fields{
 							"event_id": ev.EventID(),
 							"src_id":   srcEventID.Str,
-						}).WithError(err).Error("Failed to delete edited message from the fulltext index")
+						}).With(slog.Any("error", err)).Error("Failed to delete edited message from the fulltext index")
 					}
 				}
 			}

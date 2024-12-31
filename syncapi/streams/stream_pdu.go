@@ -75,7 +75,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	// Extract room state and recent events for all rooms the user is joined to.
 	joinedRoomIDs, err := snapshot.RoomIDsWithMembership(ctx, req.Device.UserID, spec.Join)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.RoomIDsWithMembership failed")
+		req.Log.With(slog.Any("error", err)).Error("p.DB.RoomIDsWithMembership failed")
 		return from
 	}
 
@@ -83,7 +83,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	eventFilter := req.Filter.Room.Timeline
 
 	if err = p.addIgnoredUsersToFilter(ctx, snapshot, req, &eventFilter); err != nil {
-		req.Log.WithError(err).Error("unable to update event filter with ignored users")
+		req.Log.With(slog.Any("error", err)).Error("unable to update event filter with ignored users")
 	}
 
 	eventFormat := synctypes.FormatSync
@@ -124,7 +124,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	// Add peeked rooms.
 	peeks, err := snapshot.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.PeeksInRange failed")
+		req.Log.With(slog.Any("error", err)).Error("p.DB.PeeksInRange failed")
 		return from
 	}
 	if len(peeks) > 0 {
@@ -148,7 +148,7 @@ func (p *PDUStreamProvider) CompleteSync(
 				events.Events, events.Limited, eventFormat,
 			)
 			if err != nil {
-				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
+				req.Log.With(slog.Any("error", err)).Error("p.getJoinResponseForCompleteSync failed")
 				if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
 					return from
 				}
@@ -182,12 +182,12 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	if req.WantFullState {
 		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
-			req.Log.WithError(err).Error("p.DB.GetStateDeltasForFullStateSync failed")
+			req.Log.With(slog.Any("error", err)).Error("p.DB.GetStateDeltasForFullStateSync failed")
 			return from
 		}
 	} else {
 		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
-			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
+			req.Log.With(slog.Any("error", err)).Error("p.DB.GetStateDeltas failed")
 			return from
 		}
 	}
@@ -201,12 +201,12 @@ func (p *PDUStreamProvider) IncrementalSync(
 	}
 
 	if err = p.addIgnoredUsersToFilter(ctx, snapshot, req, &eventFilter); err != nil {
-		req.Log.WithError(err).Error("unable to update event filter with ignored users")
+		req.Log.With(slog.Any("error", err)).Error("unable to update event filter with ignored users")
 	}
 
 	dbEvents, err := p.getRecentEvents(ctx, stateDeltas, r, eventFilter, snapshot)
 	if err != nil {
-		req.Log.WithError(err).Error("unable to get recent events")
+		req.Log.With(slog.Any("error", err)).Error("unable to get recent events")
 		return r.From
 	}
 
@@ -226,7 +226,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 		}
 		var pos types.StreamPosition
 		if pos, err = p.addRoomDeltaToResponse(ctx, snapshot, req.Device, newRange, delta, &eventFilter, &stateFilter, req, dbEvents); err != nil {
-			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
+			req.Log.With(slog.Any("error", err)).Error("d.addRoomDeltaToResponse failed")
 			if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
 				return newPos
 			}
@@ -381,7 +381,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// Applies the history visibility rules
 	events, err := applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, delta.RoomID, device.UserID, recentEvents)
 	if err != nil {
-		logrus.WithError(err).Error("unable to apply history visibility filter")
+		logrus.With(slog.Any("error", err)).Error("unable to apply history visibility filter")
 	}
 
 	if r.Backwards && len(events) > eventFilter.Limit {
@@ -437,7 +437,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		if hasMembershipChange {
 			jr.Summary, err = snapshot.GetRoomSummary(ctx, delta.RoomID, device.UserID)
 			if err != nil {
-				logrus.WithError(err).Warn("failed to get room summary")
+				logrus.With(slog.Any("error", err)).Warn("failed to get room summary")
 			}
 		}
 		jr.Timeline.PrevBatch = &prevBatch
@@ -536,7 +536,7 @@ func applyHistoryVisibilityFilter(
 		"room_id":  roomID,
 		"before":   len(recentEvents),
 		"after":    len(events),
-	}).Debugf("Applied history visibility (sync)")
+	}).Debug("Applied history visibility (sync)")
 	return events, nil
 }
 
@@ -578,7 +578,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 
 	jr.Summary, err = snapshot.GetRoomSummary(ctx, roomID, device.UserID)
 	if err != nil {
-		logrus.WithError(err).Warn("failed to get room summary")
+		logrus.With(slog.Any("error", err)).Warn("failed to get room summary")
 	}
 
 	// We don't include a device here as we don't need to send down
@@ -591,7 +591,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	if !isPeek {
 		events, err = applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, roomID, device.UserID, recentEvents)
 		if err != nil {
-			logrus.WithError(err).Error("unable to apply history visibility filter")
+			logrus.With(slog.Any("error", err)).Error("unable to apply history visibility filter")
 		}
 	}
 

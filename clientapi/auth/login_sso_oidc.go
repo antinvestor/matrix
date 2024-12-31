@@ -16,9 +16,13 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/oauth2"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strings"
@@ -26,7 +30,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/matrix/setup/config"
@@ -52,7 +56,10 @@ type oidcIdentityProvider struct {
 	accessTokenURL   string
 	userInfoURL      string
 
-	scopes              []string
+	scopes []string
+
+	oauth2Config oauth2.Config
+
 	responseMimeType    string
 	subPath             string
 	displayNamePath     string
@@ -76,30 +83,37 @@ func newSSOIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oidc
 	}
 }
 
-func (p *oidcIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce string) (string, error) {
+func (p *oidcIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce, codeVerifier string) (string, error) {
 	_, err := p.reload(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	u, err := resolveURL(p.authorizationURL, url.Values{
-		"client_id":     []string{p.cfg.ClientID},
-		"response_type": []string{"code"},
-		"redirect_uri":  []string{callbackURL},
-		"scope":         []string{strings.Join(p.scopes, " ")},
-		"state":         []string{nonce},
-	})
-	if err != nil {
-		return "", err
-	}
-	return u.String(), nil
+	// Generate PKCE code verifier and challenge
+	codeChallenge := p.generateCodeChallenge(codeVerifier)
 
+	oauth2Config := p.oauth2Config
+	oauth2Config.RedirectURL = callbackURL
+
+	// Step 1: Redirect user to provider's authorization URL
+	authURL := oauth2Config.AuthCodeURL(nonce,
+		oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("code_challenge", codeChallenge),
+		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+	)
+
+	return authURL, nil
 }
 
-func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL, nonce string, query url.Values) (*CallbackResult, error) {
+func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error) {
 	disc, err := p.reload(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	code := query.Get("code")
+	if code == "" {
+		return nil, spec.MissingParam("code parameter missing")
 	}
 
 	state := query.Get("state")
@@ -127,9 +141,10 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 		}
 	}
 
-	code := query.Get("code")
-	if code == "" {
-		return nil, spec.MissingParam("code parameter missing")
+	// Exchange authorization code for a token
+	token, err := p.oauth2Config.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", codeVerifier))
+	if err != nil {
+		return nil, fmt.Errorf("failed to exchange token: %v", err)
 	}
 
 	at, err := p.getAccessToken(ctx, callbackURL, code)
@@ -137,7 +152,7 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 		return nil, err
 	}
 
-	subject, displayName, suggestedLocalpart, err := p.getUserInfo(ctx, at)
+	subject, displayName, suggestedLocalpart, err := p.getUserInfo(ctx, token.AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -174,13 +189,39 @@ func (p *oidcIdentityProvider) reload(ctx context.Context) (*oidcDiscovery, erro
 		}
 
 		p.exp = now.Add(oidcDiscoveryMaxStaleness)
-		p.authorizationURL = disc.AuthorizationEndpoint
-		p.accessTokenURL = disc.TokenEndpoint
+
 		p.userInfoURL = disc.UserinfoEndpoint
 		p.disc = disc
+
+		// OAuth2 config with client_secret_post support
+		p.oauth2Config = oauth2.Config{
+			ClientID:     p.cfg.ClientID,
+			ClientSecret: p.cfg.ClientSecret,
+			Scopes:       []string{strings.Join(p.scopes, " ")},
+			Endpoint: oauth2.Endpoint{
+				AuthURL:   disc.AuthorizationEndpoint,
+				TokenURL:  disc.TokenEndpoint,
+				AuthStyle: oauth2.AuthStyleInParams, // Forces client_secret_post
+			},
+		}
+
 	}
 
 	return p.disc, nil
+}
+
+func (p *oidcIdentityProvider) generateCodeVerifier() string {
+	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	codeVerifier := make([]byte, 128)
+	for i := range codeVerifier {
+		codeVerifier[i] = charset[rand.IntN(len(charset))]
+	}
+	return string(codeVerifier)
+}
+
+func (p *oidcIdentityProvider) generateCodeChallenge(verifier string) string {
+	hash := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
 
 func (p *oidcIdentityProvider) getAccessToken(ctx context.Context, callbackURL, code string) (string, error) {
@@ -277,13 +318,13 @@ func httpDo(ctx context.Context, hc *http.Client, req *http.Request) (*http.Resp
 				if len(bs) > 80 {
 					bs = bs[:80]
 				}
-				util.GetLogger(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).Warnf("OAuth2 HTTP request failed: %s", string(bs))
+				util.GetLogger(ctx).With("url", req.URL.String()).With("status", resp.StatusCode).Warn("OAuth2 HTTP request failed: %s", string(bs))
 			}
 		case strings.HasPrefix(contentType, "application/json"):
 			// https://openid.net/specs/openid-connect-core-1_0.html#TokenErrorResponse
 			var body oauth2Error
 			if err := json.NewDecoder(resp.Body).Decode(&body); err == nil {
-				util.GetLogger(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).Warnf("OAuth2 HTTP request failed: %+v", &body)
+				util.GetLogger(ctx).With("url", req.URL.String()).With("status", resp.StatusCode).Warn("OAuth2 HTTP request failed: %+v", &body)
 			}
 			if body.Error != "" {
 				return nil, fmt.Errorf("OAuth2 request %q failed: %s (%s)", req.URL.String(), resp.Status, body.Error)
@@ -308,25 +349,6 @@ type oauth2Error struct {
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description"`
 	ErrorURI         string `json:"error_uri"`
-}
-
-func resolveURL(urlString string, defaultQuery url.Values) (*url.URL, error) {
-	u, err := url.Parse(urlString)
-	if err != nil {
-		return nil, err
-	}
-
-	if defaultQuery != nil {
-		q := u.Query()
-		for k, vs := range defaultQuery {
-			if q.Get(k) == "" {
-				q[k] = vs
-			}
-		}
-		u.RawQuery = q.Encode()
-	}
-
-	return u, nil
 }
 
 type oidcDiscovery struct {

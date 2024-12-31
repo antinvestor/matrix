@@ -54,17 +54,17 @@ func TestStateKeyTupleSorter(t *testing.T) {
 
 	for i := range want {
 		if input[i] != want[i] {
-			t.Errorf("Wanted %#v at index %d got %#v", want[i], i, input[i])
+			t.Error("Wanted %#v at index %d got %#v", want[i], i, input[i])
 		}
 
 		if !input.contains(want[i]) {
-			t.Errorf("Wanted %#v.contains(%#v) to be true but got false", input, want[i])
+			t.Error("Wanted %#v.contains(%#v) to be true but got false", input, want[i])
 		}
 	}
 
 	for i := range doNotWant {
 		if input.contains(doNotWant[i]) {
-			t.Errorf("Wanted %#v.contains(%#v) to be false but got true", input, doNotWant[i])
+			t.Error("Wanted %#v.contains(%#v) to be false but got true", input, doNotWant[i])
 		}
 	}
 

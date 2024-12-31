@@ -66,9 +66,9 @@ func (s *FederationInternalAPI) FetchKeys(
 
 		// Ask the fetcher to look up our keys.
 		if err := s.handleFetcherKeys(ctx, now, fetcher, requests, results); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
+			logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
 				"fetcher_name": fetcher.FetcherName(),
-			}).Errorf("Failed to retrieve %d key(s)", len(requests))
+			}).Error("Failed to retrieve %d key(s)", len(requests))
 			continue
 		}
 	}
@@ -80,7 +80,7 @@ func (s *FederationInternalAPI) FetchKeys(
 			// The results don't contain anything for this specific request, so
 			// we've failed to satisfy it from local keys, database keys or from
 			// all of the fetchers. Report an error.
-			logrus.Warnf("Failed to retrieve key %q for server %q", req.KeyID, req.ServerName)
+			logrus.Warn("Failed to retrieve key %q for server %q", req.KeyID, req.ServerName)
 		}
 	}
 
@@ -188,7 +188,7 @@ func (s *FederationInternalAPI) handleFetcherKeys(
 ) error {
 	logrus.WithFields(logrus.Fields{
 		"fetcher_name": fetcher.FetcherName(),
-	}).Infof("Fetching %d key(s)", len(requests))
+	}).Info("Fetching %d key(s)", len(requests))
 
 	// Create a context that limits our requests to 30 seconds.
 	fetcherCtx, fetcherCancel := context.WithTimeout(ctx, time.Second*30)
@@ -232,17 +232,17 @@ func (s *FederationInternalAPI) handleFetcherKeys(
 
 	// Store the keys from our store map.
 	if err = s.keyRing.KeyDatabase.StoreKeys(context.Background(), storeResults); err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
+		logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
 			"fetcher_name":  fetcher.FetcherName(),
 			"database_name": s.keyRing.KeyDatabase.FetcherName(),
-		}).Errorf("Failed to store keys in the database")
+		}).Error("Failed to store keys in the database")
 		return fmt.Errorf("server key API failed to store retrieved keys: %w", err)
 	}
 
 	if len(storeResults) > 0 {
 		logrus.WithFields(logrus.Fields{
 			"fetcher_name": fetcher.FetcherName(),
-		}).Infof("Updated %d of %d key(s) in database (%d keys remaining)", len(storeResults), len(results), len(requests))
+		}).Info("Updated %d of %d key(s) in database (%d keys remaining)", len(storeResults), len(results), len(requests))
 	}
 
 	return nil

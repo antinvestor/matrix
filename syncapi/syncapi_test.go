@@ -203,7 +203,7 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 				t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
 			}
 			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
-				t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
+				t.Error("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
 			}
 			t.Logf("res: %+v", res.Rooms.Join[room.ID])
 
@@ -304,7 +304,7 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 				t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
 			}
 			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
-				t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
+				t.Error("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
 			}
 			t.Logf("res: %+v", res.Rooms.Join[room.ID])
 
@@ -339,12 +339,12 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 				"since":        since,
 			})))
 			if w.Code != 200 {
-				t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+				t.Error("since=%s got HTTP %d want 200", since, w.Code)
 			}
 
 			res = *types.NewResponse()
 			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-				t.Errorf("failed to decode response body: %s", err)
+				t.Error("failed to decode response body: %s", err)
 			}
 			if len(res.Rooms.Join) != 1 {
 				t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
@@ -356,11 +356,11 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 					content := gomatrixserverlib.PowerLevelContent{}
 					err := json.Unmarshal(ev.Content, &content)
 					if err != nil {
-						t.Errorf("failed to unmarshal power level content: %s", err)
+						t.Error("failed to unmarshal power level content: %s", err)
 					}
 					otherUserLevel := content.UserLevel("@otheruser:localhost")
 					if otherUserLevel != 50 {
-						t.Errorf("Expected user PL of %d but got %d", 50, otherUserLevel)
+						t.Error("Expected user PL of %d but got %d", 50, otherUserLevel)
 					}
 				}
 			}
@@ -421,12 +421,12 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 			"timeout":      "0",
 		})))
 		if w.Code != 200 {
-			t.Errorf("got HTTP %d want 200", w.Code)
+			t.Error("got HTTP %d want 200", w.Code)
 			continue
 		}
 		var res types.Response
 		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-			t.Errorf("failed to decode response body: %s", err)
+			t.Error("failed to decode response body: %s", err)
 		}
 		sinceTokens[i] = res.NextBatch.String()
 		if i == 0 { // create event does not produce a room section
@@ -452,11 +452,11 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 			"since":        since,
 		})))
 		if w.Code != 200 {
-			t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+			t.Error("since=%s got HTTP %d want 200", since, w.Code)
 		}
 		var res types.Response
 		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-			t.Errorf("failed to decode response body: %s", err)
+			t.Error("failed to decode response body: %s", err)
 		}
 		if len(res.Rooms.Join) != 1 {
 			t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
@@ -515,19 +515,19 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 	}
 	var res types.Response
 	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-		t.Errorf("failed to decode response body: %s", err)
+		t.Error("failed to decode response body: %s", err)
 	}
 	if len(res.Presence.Events) != 1 {
 		t.Fatalf("expected 1 presence events, got: %+v", res.Presence.Events)
 	}
 	if res.Presence.Events[0].Sender != alice.UserID {
-		t.Errorf("sender: got %v want %v", res.Presence.Events[0].Sender, alice.UserID)
+		t.Error("sender: got %v want %v", res.Presence.Events[0].Sender, alice.UserID)
 	}
 	if res.Presence.Events[0].Type != "m.presence" {
-		t.Errorf("type: got %v want %v", res.Presence.Events[0].Type, "m.presence")
+		t.Error("type: got %v want %v", res.Presence.Events[0].Type, "m.presence")
 	}
 	if gjson.ParseBytes(res.Presence.Events[0].Content).Get("presence").Str != "online" {
-		t.Errorf("content: not online,  got %v", res.Presence.Events[0].Content)
+		t.Error("content: not online,  got %v", res.Presence.Events[0].Content)
 	}
 
 }
@@ -667,7 +667,7 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 					Chunk []synctypes.ClientEvent `json:"chunk"`
 				}
 				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-					t.Errorf("failed to decode response body: %s", err)
+					t.Error("failed to decode response body: %s", err)
 				}
 
 				verifyEventVisible(t, tc.wantResult.seeWithoutJoin, beforeJoinEv, res.Chunk)
@@ -702,7 +702,7 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 					t.Fatalf("got HTTP %d want %d", w.Code, 200)
 				}
 				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-					t.Errorf("failed to decode response body: %s", err)
+					t.Error("failed to decode response body: %s", err)
 				}
 				// verify results
 				verifyEventVisible(t, tc.wantResult.seeBeforeJoin, beforeJoinEv, res.Chunk)

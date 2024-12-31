@@ -33,7 +33,7 @@ import (
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
@@ -232,7 +232,7 @@ func SendEvent(
 		txnAndSessionID,
 		false,
 	); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
+		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -281,7 +281,7 @@ func updatePowerLevels(req *http.Request, r map[string]interface{}, roomID strin
 		if err != nil {
 			return err
 		} else if senderID == nil {
-			util.GetLogger(req.Context()).Warnf("sender ID not found for %s in %s", uID, *validRoomID)
+			util.GetLogger(req.Context()).Warn("sender ID not found for %s in %s", uID, *validRoomID)
 			continue
 		}
 		userMap[string(*senderID)] = level
@@ -369,7 +369,7 @@ func generateSendEvent(
 	}
 	err = proto.SetContent(r)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("proto.SetContent failed")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("proto.SetContent failed")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -410,7 +410,7 @@ func generateSendEvent(
 			JSON: spec.BadJSON(specificErr.Error()),
 		}
 	default:
-		util.GetLogger(ctx).WithError(err).Error("eventutil.BuildEvent failed")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("eventutil.BuildEvent failed")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -436,7 +436,7 @@ func generateSendEvent(
 	if e.Type() == "m.room.tombstone" {
 		content := make(map[string]interface{})
 		if err = json.Unmarshal(e.Content(), &content); err != nil {
-			util.GetLogger(ctx).WithError(err).Error("Cannot unmarshal the event content.")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("Cannot unmarshal the event content.")
 			return nil, &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("Cannot unmarshal the event content."),

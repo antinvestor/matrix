@@ -22,8 +22,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
@@ -110,9 +110,9 @@ func Setup(
 	sf := singleflight.Group{}
 
 	if cfg.Matrix.WellKnownClientName != "" {
-		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
+		logrus.Info("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
 		if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
-			logrus.Infof("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownSlidingSyncProxy)
+			logrus.Info("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownSlidingSyncProxy)
 		}
 		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
 			response := WellKnownClientResponse{
@@ -257,7 +257,7 @@ func Setup(
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
 		serverNotificationSender, err := getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
 		if err != nil {
-			logrus.WithError(err).Fatal("unable to get account for sending server notices")
+			logrus.With(slog.Any("error", err)).Fatal("unable to get account for sending server notices")
 		}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",

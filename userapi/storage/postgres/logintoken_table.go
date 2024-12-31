@@ -22,7 +22,7 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 const loginTokenSchema = `
@@ -86,7 +86,7 @@ func (s *loginTokenStatements) DeleteLoginToken(ctx context.Context, txn *sql.Tx
 		return err
 	}
 	if n, err := res.RowsAffected(); err == nil && n > 1 {
-		util.GetLogger(ctx).WithField("num_deleted", n).Infof("Deleted %d login tokens (%d likely additional expired token)", n, n-1)
+		util.GetLogger(ctx).With("num_deleted", n).Info("Deleted %d login tokens (%d likely additional expired token)", n, n-1)
 	}
 	return nil
 }

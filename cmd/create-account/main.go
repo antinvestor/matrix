@@ -95,7 +95,7 @@ func main() {
 	}
 
 	if err := internal.ValidateUsername(*username, cfg.Global.ServerName); err != nil {
-		logrus.WithError(err).Error("Specified username is invalid")
+		logrus.With(slog.Any("error", err)).Error("Specified username is invalid")
 		os.Exit(1)
 	}
 
@@ -105,7 +105,7 @@ func main() {
 	}
 
 	if err = internal.ValidatePassword(pass); err != nil {
-		logrus.WithError(err).Error("Specified password is invalid")
+		logrus.With(slog.Any("error", err)).Error("Specified password is invalid")
 		os.Exit(1)
 	}
 
@@ -116,7 +116,7 @@ func main() {
 		logrus.Fatalln("Failed to create the account:", err.Error())
 	}
 
-	logrus.Infof("Created account: %s (AccessToken: %s)", *username, accessToken)
+	logrus.Info("Created account: %s (AccessToken: %s)", *username, accessToken)
 }
 
 type sharedSecretRegistrationRequest struct {

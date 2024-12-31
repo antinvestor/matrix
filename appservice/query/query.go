@@ -87,12 +87,12 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 						log.WithFields(log.Fields{
 							"appservice_id": appservice.ID,
 							"status_code":   resp.StatusCode,
-						}).WithError(err).Error("Unable to close application service response body")
+						}).With(slog.Any("error", err)).Error("Unable to close application service response body")
 					}
 				}()
 			}
 			if err != nil {
-				log.WithError(err).Errorf("Issue querying room alias on application service %s", appservice.ID)
+				log.With(slog.Any("error", err)).Error("Issue querying room alias on application service %s", appservice.ID)
 				return err
 			}
 			switch resp.StatusCode {
@@ -168,7 +168,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 			if err != nil {
 				log.WithFields(log.Fields{
 					"appservice_id": appservice.ID,
-				}).WithError(err).Error("issue querying user ID on application service")
+				}).With(slog.Any("error", err)).Error("issue querying user ID on application service")
 				return err
 			}
 			if resp.StatusCode == http.StatusOK {
@@ -237,7 +237,7 @@ func (a *AppServiceQueryAPI) Locations(
 		}
 
 		if err := requestDo[[]api.ASLocationResponse](&as, requestUrl+"?"+params.Encode(), &asLocations); err != nil {
-			log.WithError(err).WithField("application_service", as.ID).Error("unable to get 'locations' from application service")
+			log.With(slog.Any("error", err)).With("application_service", as.ID).Error("unable to get 'locations' from application service")
 			continue
 		}
 
@@ -278,7 +278,7 @@ func (a *AppServiceQueryAPI) User(
 		}
 
 		if err := requestDo[[]api.ASUserResponse](&as, requestUrl+"?"+params.Encode(), &asUsers); err != nil {
-			log.WithError(err).WithField("application_service", as.ID).Error("unable to get 'user' from application service")
+			log.With(slog.Any("error", err)).With("application_service", as.ID).Error("unable to get 'user' from application service")
 			continue
 		}
 
@@ -320,7 +320,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		for _, as := range a.Cfg.Derived.ApplicationServices {
 			var proto api.ASProtocolResponse
 			if err := requestDo[api.ASProtocolResponse](&as, as.RequestUrl()+protocolPath+req.Protocol, &proto); err != nil {
-				log.WithError(err).WithField("application_service", as.ID).Error("unable to get 'protocol' from application service")
+				log.With(slog.Any("error", err)).With("application_service", as.ID).Error("unable to get 'protocol' from application service")
 				continue
 			}
 
@@ -350,7 +350,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		for _, p := range as.Protocols {
 			var proto api.ASProtocolResponse
 			if err := requestDo[api.ASProtocolResponse](&as, as.RequestUrl()+protocolPath+p, &proto); err != nil {
-				log.WithError(err).WithField("application_service", as.ID).Error("unable to get 'protocol' from application service")
+				log.With(slog.Any("error", err)).With("application_service", as.ID).Error("unable to get 'protocol' from application service")
 				continue
 			}
 			existing, ok := response[p]

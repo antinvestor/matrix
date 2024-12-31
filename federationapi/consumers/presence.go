@@ -29,8 +29,8 @@ import (
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
+	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -88,7 +88,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	userID := msg.Header.Get(jetstream.UserID)
 	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		log.WithError(err).WithField("user_id", userID).Error("failed to extract domain from receipt sender")
+		log.With(slog.Any("error", err)).With("user_id", userID).Error("failed to extract domain from receipt sender")
 		return true
 	}
 	if !t.isLocalServerName(serverName) {
@@ -97,13 +97,13 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 
 	parsedUserID, err := spec.NewUserID(userID, true)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("user_id", userID).Error("invalid user ID")
+		util.GetLogger(ctx).With(slog.Any("error", err)).With("user_id", userID).Error("invalid user ID")
 		return true
 	}
 
 	roomIDs, err := t.rsAPI.QueryRoomsForUser(t.ctx, *parsedUserID, "join")
 	if err != nil {
-		log.WithError(err).Error("failed to calculate joined rooms for user")
+		log.With(slog.Any("error", err)).Error("failed to calculate joined rooms for user")
 		return true
 	}
 
@@ -122,7 +122,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	// send this presence to all servers who share rooms with this user.
 	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, roomIDStrs, true, true)
 	if err != nil {
-		log.WithError(err).Error("failed to get joined hosts")
+		log.With(slog.Any("error", err)).Error("failed to get joined hosts")
 		return true
 	}
 
@@ -155,13 +155,13 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		Origin: string(serverName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
-		log.WithError(err).Error("failed to marshal EDU JSON")
+		log.With(slog.Any("error", err)).Error("failed to marshal EDU JSON")
 		return true
 	}
 
 	log.Tracef("sending presence EDU to %d servers", len(joined))
 	if err = t.queues.SendEDU(edu, serverName, joined); err != nil {
-		log.WithError(err).Error("failed to send EDU")
+		log.With(slog.Any("error", err)).Error("failed to send EDU")
 		return false
 	}
 

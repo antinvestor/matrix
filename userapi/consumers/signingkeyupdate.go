@@ -73,18 +73,18 @@ func (t *SigningKeyUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	var updatePayload api.CrossSigningKeyUpdate
 	if err := json.Unmarshal(msg.Data, &updatePayload); err != nil {
-		logrus.WithError(err).Errorf("Failed to read from signing key update input topic")
+		logrus.With(slog.Any("error", err)).Error("Failed to read from signing key update input topic")
 		return true
 	}
 	origin := spec.ServerName(msg.Header.Get("origin"))
 	if _, serverName, err := gomatrixserverlib.SplitID('@', updatePayload.UserID); err != nil {
-		logrus.WithError(err).Error("failed to split user id")
+		logrus.With(slog.Any("error", err)).Error("failed to split user id")
 		return true
 	} else if t.isLocalServerName(serverName) {
 		logrus.Warn("dropping device key update from ourself")
 		return true
 	} else if serverName != origin {
-		logrus.Warnf("dropping device key update, %s != %s", serverName, origin)
+		logrus.Warn("dropping device key update, %s != %s", serverName, origin)
 		return true
 	}
 

@@ -53,7 +53,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 		ctx, req.Device.UserID, r, &req.Filter.AccountData,
 	)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.GetAccountDataInRange failed")
+		req.Log.With(slog.Any("error", err)).Error("p.DB.GetAccountDataInRange failed")
 		return from
 	}
 
@@ -75,7 +75,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 			dataRes := userapi.QueryAccountDataResponse{}
 			err = p.userAPI.QueryAccountData(ctx, &dataReq, &dataRes)
 			if err != nil {
-				req.Log.WithError(err).Error("p.userAPI.QueryAccountData failed")
+				req.Log.With(slog.Any("error", err)).Error("p.userAPI.QueryAccountData failed")
 				continue
 			}
 			if roomID == "" {

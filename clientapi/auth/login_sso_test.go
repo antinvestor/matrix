@@ -42,7 +42,7 @@ func TestAuthenticator(t *testing.T) {
 			t.Fatalf("AuthorizationURL failed: %v", err)
 		}
 		if want := "aurl"; got != want {
-			t.Errorf("AuthorizationURL: got %q, want %q", got, want)
+			t.Error("AuthorizationURL: got %q, want %q", got, want)
 		}
 	})
 
@@ -52,7 +52,7 @@ func TestAuthenticator(t *testing.T) {
 			t.Fatalf("ProcessCallback failed: %v", err)
 		}
 		if want := (&CallbackResult{DisplayName: "aname"}); !reflect.DeepEqual(got, want) {
-			t.Errorf("ProcessCallback: got %+v, want %+v", got, want)
+			t.Error("ProcessCallback: got %+v, want %+v", got, want)
 		}
 	})
 }

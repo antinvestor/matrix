@@ -23,7 +23,7 @@ import (
 	"github.com/antinvestor/matrix/syncapi"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
 
 	capi "github.com/antinvestor/matrix/clientapi/api"

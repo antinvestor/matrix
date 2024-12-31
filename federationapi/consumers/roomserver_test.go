@@ -27,11 +27,11 @@ func TestCombineNoOp(t *testing.T) {
 	gotAdd, gotDel := combineDeltas(inputAdd1, inputDel1, inputAdd2, inputDel2)
 
 	if len(gotAdd) != 0 {
-		t.Errorf("wanted combined adds to be an empty list, got %#v", gotAdd)
+		t.Error("wanted combined adds to be an empty list, got %#v", gotAdd)
 	}
 
 	if len(gotDel) != 0 {
-		t.Errorf("wanted combined removes to be an empty list, got %#v", gotDel)
+		t.Error("wanted combined removes to be an empty list, got %#v", gotDel)
 	}
 }
 
@@ -44,10 +44,10 @@ func TestCombineDedup(t *testing.T) {
 	gotAdd, gotDel := combineDeltas(inputAdd1, inputDel1, inputAdd2, inputDel2)
 
 	if len(gotAdd) != 1 || gotAdd[0] != "a" {
-		t.Errorf("wanted combined adds to be %#v, got %#v", []string{"a"}, gotAdd)
+		t.Error("wanted combined adds to be %#v, got %#v", []string{"a"}, gotAdd)
 	}
 
 	if len(gotDel) != 1 || gotDel[0] != "b" {
-		t.Errorf("wanted combined removes to be %#v, got %#v", []string{"b"}, gotDel)
+		t.Error("wanted combined removes to be %#v, got %#v", []string{"b"}, gotDel)
 	}
 }

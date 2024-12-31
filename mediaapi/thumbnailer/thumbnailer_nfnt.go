@@ -55,7 +55,7 @@ func GenerateThumbnails(
 ) (busy bool, errorReturn error) {
 	img, err := readFile(string(src))
 	if err != nil {
-		logger.WithError(err).WithField("src", src).Error("Failed to read src file")
+		logger.With(slog.Any("error", err)).With("src", src).Error("Failed to read src file")
 		return false, err
 	}
 	for _, singleConfig := range configs {
@@ -65,7 +65,7 @@ func GenerateThumbnails(
 			activeThumbnailGeneration, maxThumbnailGenerators, db, logger,
 		)
 		if err != nil {
-			logger.WithError(err).WithField("src", src).Error("Failed to generate thumbnails")
+			logger.With(slog.Any("error", err)).With("src", src).Error("Failed to generate thumbnails")
 			return false, err
 		}
 		if busy {
@@ -88,7 +88,7 @@ func GenerateThumbnail(
 ) (busy bool, errorReturn error) {
 	img, err := readFile(string(src))
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
+		logger.With(slog.Any("error", err)).WithFields(log.Fields{
 			"src": src,
 		}).Error("Failed to read src file")
 		return false, err
@@ -99,7 +99,7 @@ func GenerateThumbnail(
 		maxThumbnailGenerators, db, logger,
 	)
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
+		logger.With(slog.Any("error", err)).WithFields(log.Fields{
 			"src": src,
 		}).Error("Failed to generate thumbnails")
 		return false, err
@@ -223,7 +223,7 @@ func createThumbnail(
 
 	err = db.StoreThumbnail(ctx, thumbnailMetadata)
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
+		logger.With(slog.Any("error", err)).WithFields(log.Fields{
 			"ActualWidth":  width,
 			"ActualHeight": height,
 		}).Error("Failed to store thumbnail metadata in database.")
@@ -268,7 +268,7 @@ func adjustSize(dst types.Path, img image.Image, w, h int, crop bool, logger *lo
 	}
 
 	if err = writeFile(out, string(dst)); err != nil {
-		logger.WithError(err).Error("Failed to encode and write image")
+		logger.With(slog.Any("error", err)).Error("Failed to encode and write image")
 		return -1, -1, err
 	}
 

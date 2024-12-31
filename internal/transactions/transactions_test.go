@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 type fakeType struct {
@@ -87,20 +87,20 @@ func TestCacheScope(t *testing.T) {
 	cache.AddTransaction(fakeAccessToken2, fakeTxnID, sendToDeviceEndpoint, fakeResponse3)
 
 	if res, ok := cache.FetchTransaction(fakeAccessToken, fakeTxnID, sendEndpoint); !ok {
-		t.Errorf("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
+		t.Error("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
 	} else if res.JSON != fakeResponse.JSON {
-		t.Errorf("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse.JSON, res.JSON)
+		t.Error("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse.JSON, res.JSON)
 	}
 	if res, ok := cache.FetchTransaction(fakeAccessToken2, fakeTxnID, sendEndpoint); !ok {
-		t.Errorf("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
+		t.Error("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
 	} else if res.JSON != fakeResponse2.JSON {
-		t.Errorf("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse2.JSON, res.JSON)
+		t.Error("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse2.JSON, res.JSON)
 	}
 
 	// Ensure the txnID is not shared across endpoints
 	if res, ok := cache.FetchTransaction(fakeAccessToken2, fakeTxnID, sendToDeviceEndpoint); !ok {
-		t.Errorf("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
+		t.Error("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
 	} else if res.JSON != fakeResponse3.JSON {
-		t.Errorf("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse2.JSON, res.JSON)
+		t.Error("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse2.JSON, res.JSON)
 	}
 }

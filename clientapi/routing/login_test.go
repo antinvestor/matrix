@@ -17,7 +17,7 @@ import (
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
@@ -71,7 +71,7 @@ func TestLogin(t *testing.T) {
 				ServerName:  serverName,
 				Password:    password,
 			}, userRes); err != nil {
-				t.Errorf("failed to create account: %s", err)
+				t.Error("failed to create account: %s", err)
 			}
 			if !userRes.AccountCreated {
 				t.Fatalf("account not created")

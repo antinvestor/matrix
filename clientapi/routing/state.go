@@ -26,7 +26,7 @@ import (
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -55,7 +55,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		RoomID:       roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{},
 	}, &stateRes); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("queryAPI.QueryLatestEventsAndState failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -75,7 +75,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		if ev.Type() == spec.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
+				util.GetLogger(ctx).With(slog.Any("error", err)).Error("json.Unmarshal for history visibility failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -101,7 +101,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		// user's membership if we want the latest state or not.
 		userID, err := spec.NewUserID(device.UserID, true)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("UserID is invalid")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("UserID is invalid")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.Unknown("Device UserID is invalid"),
@@ -112,7 +112,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			UserID: *userID,
 		}, &membershipRes)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed to QueryMembershipForUser")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -165,7 +165,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			StateToFetch: []gomatrixserverlib.StateKeyTuple{},
 		}, &stateAfterRes)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed to QueryMembershipForUser")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -176,7 +176,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 			})
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed converting to ClientEvent")
+				util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed converting to ClientEvent")
 				continue
 			}
 			stateEvents = append(
@@ -227,7 +227,7 @@ func OnIncomingStateTypeRequest(
 		})
 		if err != nil {
 			// TODO: work out better logic for failure cases (e.g. sender ID not found)
-			util.GetLogger(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("synctypes.FromClientStateKey failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),
@@ -261,7 +261,7 @@ func OnIncomingStateTypeRequest(
 		RoomID:       roomID,
 		StateToFetch: stateToFetch,
 	}, &stateRes); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error("queryAPI.QueryLatestEventsAndState failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -275,7 +275,7 @@ func OnIncomingStateTypeRequest(
 		if ev.Type() == spec.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
+				util.GetLogger(ctx).With(slog.Any("error", err)).Error("json.Unmarshal for history visibility failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -299,7 +299,7 @@ func OnIncomingStateTypeRequest(
 	if !worldReadable {
 		userID, err := spec.NewUserID(device.UserID, true)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("UserID is invalid")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("UserID is invalid")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.Unknown("Device UserID is invalid"),
@@ -312,7 +312,7 @@ func OnIncomingStateTypeRequest(
 			UserID: *userID,
 		}, &membershipRes)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed to QueryMembershipForUser")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -370,7 +370,7 @@ func OnIncomingStateTypeRequest(
 			},
 		}, &stateAfterRes)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
+			util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed to QueryMembershipForUser")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

@@ -258,7 +258,7 @@ func RoomPreset(p Preset) roomModifier {
 		case PresetNone:
 			r.preset = p
 		default:
-			t.Errorf("invalid RoomPreset: %v", p)
+			t.Error("invalid RoomPreset: %v", p)
 		}
 	}
 }

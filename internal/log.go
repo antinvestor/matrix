@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/matrix-org/dugong"
 	"github.com/sirupsen/logrus"
@@ -165,6 +165,6 @@ func CloseAndLogIfError(ctx context.Context, closer io.Closer, message string) {
 		ctx = context.TODO()
 	}
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error(message)
+		util.GetLogger(ctx).With(slog.Any("error", err)).Error(message)
 	}
 }

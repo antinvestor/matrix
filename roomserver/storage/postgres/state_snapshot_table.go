@@ -22,7 +22,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"

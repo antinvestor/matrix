@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/userapi/api"
@@ -73,7 +73,7 @@ func UploadKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *api.Device) 
 		}
 	}
 	if len(uploadRes.KeyErrors) > 0 {
-		util.GetLogger(req.Context()).WithField("key_errors", uploadRes.KeyErrors).Error("Failed to upload one or more keys")
+		util.GetLogger(req.Context()).With("key_errors", uploadRes.KeyErrors).Error("Failed to upload one or more keys")
 		return util.JSONResponse{
 			Code: 400,
 			JSON: uploadRes.KeyErrors,

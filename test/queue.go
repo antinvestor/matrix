@@ -48,7 +48,7 @@ func PrepareNatsDataSourceConnection(ctx context.Context) (dsConnection string, 
 
 		err = testcontainers.TerminateContainer(container)
 		if err != nil {
-			logrus.WithError(err).Error("failed to terminate container")
+			logrus.With(slog.Any("error", err)).Error("failed to terminate container")
 		}
 
 	}, nil

@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
@@ -154,12 +154,12 @@ func (r *Inputer) processRoomEvent(
 		case werr != nil:
 			// Something has gone wrong trying to find out if we rejected
 			// this event already.
-			logger.WithError(werr).Errorf("Failed to check if event %q is already seen", event.EventID())
+			logger.WithError(werr).Error("Failed to check if event %q is already seen", event.EventID())
 			return werr
 		case !wasRejected:
 			// We've seen this event before and it wasn't rejected so we
 			// should ignore it.
-			logger.Debugf("Already processed event %q, ignoring", event.EventID())
+			logger.Debug("Already processed event %q, ignoring", event.EventID())
 			return nil
 		}
 	}
@@ -306,7 +306,7 @@ func (r *Inputer) processRoomEvent(
 	}); err != nil {
 		isRejected = true
 		rejectionErr = err
-		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
+		logger.WithError(rejectionErr).Warn("Event %s not allowed by auth events", event.EventID())
 	}
 
 	// Accumulate the auth event NIDs.
@@ -342,7 +342,7 @@ func (r *Inputer) processRoomEvent(
 		// current room state.
 		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, roomInfo, headered, input.StateEventIDs, r.Queryer)
 		if err != nil {
-			logger.WithError(err).Warn("Error authing soft-failed event")
+			logger.With(slog.Any("error", err)).Warn("Error authing soft-failed event")
 		}
 	}
 
@@ -388,7 +388,7 @@ func (r *Inputer) processRoomEvent(
 	// doesn't have any associated state to store and we don't need to
 	// notify anyone about it.
 	if input.Kind == api.KindOutlier {
-		logger.WithField("rejected", isRejected).Debug("Stored outlier")
+		logger.With("rejected", isRejected).Debug("Stored outlier")
 		hooks.Run(hooks.KindNewEventPersisted, headered)
 		return nil
 	}
@@ -507,7 +507,7 @@ func (r *Inputer) processRoomEvent(
 				var aclEvent *types.HeaderedEvent
 				aclEvent, err = r.DB.GetStateEvent(ctx, event.RoomID().String(), acls.MRoomServerACL, "")
 				if err != nil {
-					logrus.WithError(err).Error("failed to get server ACLs")
+					logrus.With(slog.Any("error", err)).Error("failed to get server ACLs")
 				}
 				if aclEvent != nil {
 					strippedEvent := tables.StrippedEvent{
@@ -551,7 +551,7 @@ func (r *Inputer) processRoomEvent(
 	// If guest_access changed and is not can_join, kick all guest users.
 	if event.Type() == spec.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
 		if err = r.kickGuests(ctx, event, roomInfo); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
+			logrus.With(slog.Any("error", err)).Error("failed to kick guest users on m.room.guest_access revocation")
 		}
 	}
 
@@ -736,7 +736,7 @@ func (r *Inputer) fetchAuthEvents(
 		// so we'll need to filter through those in the next section.
 		res, err = r.FSAPI.GetEventAuth(ctx, virtualHost, serverName, event.Version(), event.RoomID().String(), event.EventID())
 		if err != nil {
-			logger.WithError(err).Warnf("Failed to get event auth from federation for %q: %s", event.EventID(), err)
+			logger.With(slog.Any("error", err)).Warn("Failed to get event auth from federation for %q: %s", event.EventID(), err)
 			continue
 		}
 		found = true
@@ -786,7 +786,7 @@ nextAuthEvent:
 			return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		if isRejected = err != nil; isRejected {
-			logger.WithError(err).Warnf("Auth event %s rejected", authEvent.EventID())
+			logger.With(slog.Any("error", err)).Warn("Auth event %s rejected", authEvent.EventID())
 		}
 
 		if roomInfo == nil {

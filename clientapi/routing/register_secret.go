@@ -15,7 +15,7 @@ import (
 	"github.com/patrickmn/go-cache"
 
 	"github.com/antinvestor/matrix/internal"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 type SharedSecretRegistrationRequest struct {

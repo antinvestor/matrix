@@ -40,20 +40,20 @@ func TestSyncTokens(t *testing.T) {
 
 	for a, b := range shouldPass {
 		if a != b {
-			t.Errorf("expected %q, got %q", a, b)
+			t.Error("expected %q, got %q", a, b)
 		}
 
 		// parse as topology token
 		if a[0] == 't' {
 			if _, err := NewTopologyTokenFromString(a); err != nil {
-				t.Errorf("expected %q to pass, but got %q", a, err)
+				t.Error("expected %q to pass, but got %q", a, err)
 			}
 		}
 
 		// parse as sync token
 		if a[0] == 's' {
 			if _, err := NewStreamTokenFromString(a); err != nil {
-				t.Errorf("expected %q to pass, but got %q", a, err)
+				t.Error("expected %q to pass, but got %q", a, err)
 			}
 		}
 	}
@@ -70,13 +70,13 @@ func TestSyncTokens(t *testing.T) {
 
 	for _, f := range append(shouldFail, "t1_2") {
 		if _, err := NewStreamTokenFromString(f); err == nil {
-			t.Errorf("NewStreamTokenFromString %q should have failed", f)
+			t.Error("NewStreamTokenFromString %q should have failed", f)
 		}
 	}
 
 	for _, f := range append(shouldFail, "s1_2_3_4") {
 		if _, err := NewTopologyTokenFromString(f); err == nil {
-			t.Errorf("NewTopologyTokenFromString %q should have failed", f)
+			t.Error("NewTopologyTokenFromString %q should have failed", f)
 		}
 	}
 }
@@ -194,11 +194,11 @@ func TestJoinResponse_MarshalJSON(t *testing.T) {
 			}
 			got, err := jr.MarshalJSON()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				t.Error("MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MarshalJSON() got = %v, want %v", string(got), string(tt.want))
+				t.Error("MarshalJSON() got = %v, want %v", string(got), string(tt.want))
 			}
 		})
 	}

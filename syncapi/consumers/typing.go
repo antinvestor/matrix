@@ -76,12 +76,12 @@ func (s *OutputTypingEventConsumer) onMessage(ctx context.Context, msgs []*nats.
 	userID := msg.Header.Get(jetstream.UserID)
 	typing, err := strconv.ParseBool(msg.Header.Get("typing"))
 	if err != nil {
-		log.WithError(err).Errorf("output log: typing parse failure")
+		log.With(slog.Any("error", err)).Error("output log: typing parse failure")
 		return true
 	}
 	timeout, err := strconv.Atoi(msg.Header.Get("timeout_ms"))
 	if err != nil {
-		log.WithError(err).Errorf("output log: timeout_ms parse failure")
+		log.With(slog.Any("error", err)).Error("output log: timeout_ms parse failure")
 		return true
 	}
 
