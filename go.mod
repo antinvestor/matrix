@@ -17,11 +17,11 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20241106185410-dbd5f31fefc0
-	github.com/pitabwire/util v0.1.0
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/pitabwire/util v0.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.20.5
 	github.com/redis/go-redis/v9 v9.7.0
@@ -36,6 +36,7 @@ require (
 	golang.org/x/crypto v0.29.0
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
 	golang.org/x/image v0.22.0
+	golang.org/x/oauth2 v0.21.0
 	golang.org/x/sync v0.9.0
 	golang.org/x/term v0.26.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
@@ -94,6 +95,7 @@ require (
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
+	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
