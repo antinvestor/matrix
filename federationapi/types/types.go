@@ -14,7 +14,7 @@
 
 package types
 
-import "github.com/matrix-org/gomatrixserverlib/spec"
+import "github.com/antinvestor/gomatrixserverlib/spec"
 
 const MSigningKeyUpdate = "m.signing_key_update" // TODO: move to gomatrixserverlib
 

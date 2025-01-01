@@ -20,8 +20,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/lib/pq"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal"

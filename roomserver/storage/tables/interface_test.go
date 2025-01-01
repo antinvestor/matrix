@@ -3,9 +3,9 @@ package tables
 import (
 	"testing"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/test"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 )
 

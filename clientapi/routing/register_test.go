@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/caching"
@@ -38,9 +39,8 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
 	"github.com/patrickmn/go-cache"
+	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 )
 

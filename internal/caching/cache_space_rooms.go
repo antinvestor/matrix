@@ -3,7 +3,7 @@ package caching
 import (
 	"context"
 
-	"github.com/matrix-org/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
 )
 
 // RoomHierarchy cache caches responses to federated room hierarchy requests (A.K.A. 'space summaries')

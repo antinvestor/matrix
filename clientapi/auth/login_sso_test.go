@@ -37,7 +37,7 @@ func TestAuthenticator(t *testing.T) {
 	}
 
 	t.Run("authorizationURL", func(t *testing.T) {
-		got, err := a.AuthorizationURL(ctx, "fake", "http://matrix.example.com/continue", "anonce")
+		got, err := a.AuthorizationURL(ctx, "fake", "http://matrix.example.com/continue", "anonce", "codeVerifier")
 		if err != nil {
 			t.Fatalf("AuthorizationURL failed: %v", err)
 		}
@@ -47,7 +47,7 @@ func TestAuthenticator(t *testing.T) {
 	})
 
 	t.Run("processCallback", func(t *testing.T) {
-		got, err := a.ProcessCallback(ctx, "fake", "http://matrix.example.com/continue", "anonce", url.Values{})
+		got, err := a.ProcessCallback(ctx, "fake", "http://matrix.example.com/continue", "anonce", "codeVerifier", url.Values{})
 		if err != nil {
 			t.Fatalf("ProcessCallback failed: %v", err)
 		}
@@ -59,10 +59,10 @@ func TestAuthenticator(t *testing.T) {
 
 type fakeIdentityProvider struct{}
 
-func (idp *fakeIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce string) (string, error) {
+func (idp *fakeIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce, codeVerifier string) (string, error) {
 	return "aurl", nil
 }
 
-func (idp *fakeIdentityProvider) ProcessCallback(ctx context.Context, callbackURL, nonce string, query url.Values) (*CallbackResult, error) {
+func (idp *fakeIdentityProvider) ProcessCallback(ctx context.Context, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error) {
 	return &CallbackResult{DisplayName: "aname"}, nil
 }

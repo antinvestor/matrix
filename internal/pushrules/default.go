@@ -1,6 +1,6 @@
 package pushrules
 
-import "github.com/matrix-org/gomatrixserverlib/spec"
+import "github.com/antinvestor/gomatrixserverlib/spec"
 
 // DefaultAccountRuleSets is the complete set of default push rules
 // for an account.

@@ -17,10 +17,10 @@ package routing
 import (
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/version"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // GetCapabilities returns information about the server's supported feature set

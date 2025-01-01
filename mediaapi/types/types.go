@@ -17,8 +17,8 @@ package types
 import (
 	"sync"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // FileSizeBytes is a file size in bytes

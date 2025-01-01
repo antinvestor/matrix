@@ -3,7 +3,7 @@ package caching
 import (
 	"context"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib"
 )
 
 // RoomVersionsCache contains the subset of functions needed for

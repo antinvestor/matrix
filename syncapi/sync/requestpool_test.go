@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type dummyPublisher struct {

@@ -17,7 +17,7 @@ package test
 import (
 	"context"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib"
 )
 
 // NopJSONVerifier is a JSONVerifier that verifies nothing and returns no errors.

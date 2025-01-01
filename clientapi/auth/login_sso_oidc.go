@@ -16,6 +16,8 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,8 +27,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"golang.org/x/oauth2"
+
+	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/matrix/setup/config"
@@ -48,11 +52,13 @@ type oidcIdentityProvider struct {
 	cfg *config.IdentityProvider
 	hc  *http.Client
 
-	authorizationURL string
-	accessTokenURL   string
-	userInfoURL      string
+	userInfoURL string
 
-	scopes              []string
+	scopes []string
+
+	resetOauth2Config bool
+	oauth2Config      oauth2.Config
+
 	responseMimeType    string
 	subPath             string
 	displayNamePath     string
@@ -76,30 +82,37 @@ func newSSOIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oidc
 	}
 }
 
-func (p *oidcIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce string) (string, error) {
+func (p *oidcIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce, codeVerifier string) (string, error) {
 	_, err := p.reload(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	u, err := resolveURL(p.authorizationURL, url.Values{
-		"client_id":     []string{p.cfg.ClientID},
-		"response_type": []string{"code"},
-		"redirect_uri":  []string{callbackURL},
-		"scope":         []string{strings.Join(p.scopes, " ")},
-		"state":         []string{nonce},
-	})
-	if err != nil {
-		return "", err
-	}
-	return u.String(), nil
+	// Generate PKCE code verifier and challenge
+	codeChallenge := p.generateCodeChallenge(codeVerifier)
 
+	oauth2Config := p.oauth2Config
+	oauth2Config.RedirectURL = callbackURL
+
+	// Step 1: Redirect user to provider's authorization URL
+	authURL := oauth2Config.AuthCodeURL(nonce,
+		oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("code_challenge", codeChallenge),
+		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+	)
+
+	return authURL, nil
 }
 
-func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL, nonce string, query url.Values) (*CallbackResult, error) {
+func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error) {
 	disc, err := p.reload(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	code := query.Get("code")
+	if code == "" {
+		return nil, spec.MissingParam("code parameter missing")
 	}
 
 	state := query.Get("state")
@@ -127,17 +140,13 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 		}
 	}
 
-	code := query.Get("code")
-	if code == "" {
-		return nil, spec.MissingParam("code parameter missing")
-	}
-
-	at, err := p.getAccessToken(ctx, callbackURL, code)
+	// Exchange authorization code for a token
+	token, err := p.oauth2Config.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", codeVerifier))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to exchange token: %v", err)
 	}
 
-	subject, displayName, suggestedLocalpart, err := p.getUserInfo(ctx, at)
+	subject, displayName, suggestedLocalpart, err := p.getUserInfo(ctx, token.AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -174,46 +183,32 @@ func (p *oidcIdentityProvider) reload(ctx context.Context) (*oidcDiscovery, erro
 		}
 
 		p.exp = now.Add(oidcDiscoveryMaxStaleness)
-		p.authorizationURL = disc.AuthorizationEndpoint
-		p.accessTokenURL = disc.TokenEndpoint
 		p.userInfoURL = disc.UserinfoEndpoint
 		p.disc = disc
+		p.resetOauth2Config = true
+	}
+
+	if p.resetOauth2Config {
+		// OAuth2 config with client_secret_post support
+		p.oauth2Config = oauth2.Config{
+			ClientID:     p.cfg.ClientID,
+			ClientSecret: p.cfg.ClientSecret,
+			Scopes:       []string{strings.Join(p.scopes, " ")},
+			Endpoint: oauth2.Endpoint{
+				AuthURL:   p.disc.AuthorizationEndpoint,
+				TokenURL:  p.disc.TokenEndpoint,
+				AuthStyle: oauth2.AuthStyleInParams, // Forces client_secret_post
+			},
+		}
+		p.resetOauth2Config = false
 	}
 
 	return p.disc, nil
 }
 
-func (p *oidcIdentityProvider) getAccessToken(ctx context.Context, callbackURL, code string) (string, error) {
-	body := url.Values{
-		"grant_type":    []string{"authorization_code"},
-		"code":          []string{code},
-		"redirect_uri":  []string{callbackURL},
-		"client_id":     []string{p.cfg.ClientID},
-		"client_secret": []string{p.cfg.ClientSecret},
-	}
-	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, p.accessTokenURL, strings.NewReader(body.Encode()))
-	if err != nil {
-		return "", err
-	}
-	hreq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	hreq.Header.Set("Accept", p.responseMimeType)
-
-	hresp, err := httpDo(ctx, p.hc, hreq)
-	if err != nil {
-		return "", fmt.Errorf("access token: %w", err)
-	}
-	defer hresp.Body.Close() // nolint:errcheck
-
-	var resp oauth2TokenResponse
-	if err := json.NewDecoder(hresp.Body).Decode(&resp); err != nil {
-		return "", err
-	}
-
-	if strings.ToLower(resp.TokenType) != "bearer" {
-		return "", fmt.Errorf("expected bearer token, got type %q", resp.TokenType)
-	}
-
-	return resp.AccessToken, nil
+func (p *oidcIdentityProvider) generateCodeChallenge(verifier string) string {
+	hash := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
 
 type oauth2TokenResponse struct {
@@ -308,25 +303,6 @@ type oauth2Error struct {
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description"`
 	ErrorURI         string `json:"error_uri"`
-}
-
-func resolveURL(urlString string, defaultQuery url.Values) (*url.URL, error) {
-	u, err := url.Parse(urlString)
-	if err != nil {
-		return nil, err
-	}
-
-	if defaultQuery != nil {
-		q := u.Query()
-		for k, vs := range defaultQuery {
-			if q.Get(k) == "" {
-				q[k] = vs
-			}
-		}
-		u.RawQuery = q.Encode()
-	}
-
-	return u, nil
 }
 
 type oidcDiscovery struct {

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/antinvestor/matrix/setup/config"
 )
@@ -29,13 +30,45 @@ func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
 		DiscoveryURL: s.URL + "/discovery",
 	}, s.Client())
 
-	got, err := idp.AuthorizationURL(ctx, "https://matrix.example.com/continue", "anonce")
+	got, err := idp.AuthorizationURL(ctx, "https://matrix.example.com/continue", "anonce", "codeVerifier")
 	if err != nil {
 		t.Fatalf("AuthorizationURL failed: %v", err)
 	}
 
-	if want := "http://oidc.example.com/authorize?client_id=aclientid&redirect_uri=https%3A%2F%2Fmatrix.example.com%2Fcontinue&response_type=code&scope=openid+profile+email&state=anonce"; got != want {
-		t.Errorf("AuthorizationURL: got %q, want %q", got, want)
+	parsedURL, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("Parse obtained url failed: %v", err)
+	}
+
+	if parsedURL.Scheme != "http" {
+		t.Errorf("Expected scheme 'http', got '%s'", parsedURL.Scheme)
+	}
+	if parsedURL.Host != "oidc.example.com" {
+		t.Errorf("Expected host 'oidc.example.com', got '%s'", parsedURL.Host)
+	}
+
+	// Verify the path
+	if parsedURL.Path != "/authorize" {
+		t.Errorf("Expected path '/authorize', got '%s'", parsedURL.Path)
+	}
+
+	// Verify query parameters
+	expectedParams := map[string]string{
+		"client_id":             "aclientid",
+		"redirect_uri":          "https://matrix.example.com/continue",
+		"response_type":         "code",
+		"scope":                 "openid profile offline contact",
+		"state":                 "anonce",
+		"code_challenge_method": "S256",
+		"access_type":           "offline",
+	}
+
+	queryParams := parsedURL.Query()
+	for key, expectedValue := range expectedParams {
+		actualValue := queryParams.Get(key)
+		if actualValue != expectedValue {
+			t.Errorf("Expected query param '%s' to have value '%s', got '%s'", key, expectedValue, actualValue)
+		}
 	}
 }
 
@@ -95,7 +128,7 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 				DiscoveryURL: sURL + "/discovery",
 			}, s.Client())
 
-			got, err := idp.ProcessCallback(ctx, callbackURL, "anonce", tst.Query)
+			got, err := idp.ProcessCallback(ctx, callbackURL, "anonce", "codeVerifier", tst.Query)
 			if err != nil {
 				t.Fatalf("ProcessCallback failed: %v", err)
 			}
@@ -114,11 +147,11 @@ func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
 		cfg: &config.IdentityProvider{
 			ClientID: "aclientid",
 		},
-		hc: http.DefaultClient,
-
-		authorizationURL: "https://oauth2.example.com/authorize",
-
+		hc:                http.DefaultClient,
+		exp:               time.Now().Add(2 * time.Minute),
+		resetOauth2Config: true,
 		disc: &oidcDiscovery{
+
 			Issuer:                "https://oauth2.example.com",
 			AuthorizationEndpoint: "https://oauth2.example.com/authorize",
 			TokenEndpoint:         "https://oauth2.example.com/token",
@@ -127,12 +160,12 @@ func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
 		},
 	}
 
-	got, err := idp.AuthorizationURL(ctx, "https://matrix.example.com/continue", "anonce")
+	got, err := idp.AuthorizationURL(ctx, "https://matrix.example.com/continue", "anonce", "codeVerifier")
 	if err != nil {
 		t.Fatalf("AuthorizationURL failed: %v", err)
 	}
 
-	if want := "https://oauth2.example.com/authorize?client_id=aclientid&redirect_uri=https%3A%2F%2Fmatrix.example.com%2Fcontinue&response_type=code&scope=&state=anonce"; got != want {
+	if want := "https://oauth2.example.com/authorize?access_type=offline&client_id=aclientid&code_challenge=N1E4yRMD7xixn_oFyO_W3htYN3rY7-HMDKJe6z6r928&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fmatrix.example.com%2Fcontinue&response_type=code&scope=&state=anonce"; got != want {
 		t.Errorf("AuthorizationURL: got %q, want %q", got, want)
 	}
 }
@@ -187,10 +220,11 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 					ClientID:     "aclientid",
 					ClientSecret: "aclientsecret",
 				},
-				hc: s.Client(),
+				hc:                s.Client(),
+				exp:               time.Now().Add(2 * time.Minute),
+				resetOauth2Config: true,
 
-				accessTokenURL: s.URL + "/token",
-				userInfoURL:    s.URL + "/userinfo",
+				userInfoURL: s.URL + "/userinfo",
 
 				subPath:             "sub",
 				displayNamePath:     "name",
@@ -198,14 +232,14 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 
 				disc: &oidcDiscovery{
 					Issuer:                "https://oauth2.example.com",
-					AuthorizationEndpoint: "https://oauth2.example.com/authorize",
-					TokenEndpoint:         "https://oauth2.example.com/token",
-					UserinfoEndpoint:      "https://oauth2.example.com/profile",
+					AuthorizationEndpoint: s.URL + "/authorize",
+					TokenEndpoint:         s.URL + "/token",
+					UserinfoEndpoint:      s.URL + "/userinfo",
 					ScopesSupported:       []string{},
 				},
 			}
 
-			got, err := idp.ProcessCallback(ctx, callbackURL, "anonce", tst.Query)
+			got, err := idp.ProcessCallback(ctx, callbackURL, "anonce", "codeVerifier", tst.Query)
 			if err != nil {
 				t.Fatalf("ProcessCallback failed: %v", err)
 			}
@@ -214,60 +248,6 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 				t.Errorf("ProcessCallback: got %+v, want %+v", got, tst.Want)
 			}
 		})
-	}
-}
-
-func TestOAuth2IdentityProviderGetAccessToken(t *testing.T) {
-	ctx := context.Background()
-
-	const callbackURL = "https://matrix.example.com/continue"
-
-	mux := http.NewServeMux()
-	var gotReq url.Values
-	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		gotReq = r.Form
-
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"access_token":"atoken", "token_type":"Bearer"}`))
-	})
-
-	s := httptest.NewServer(mux)
-	defer s.Close()
-
-	idp := &oidcIdentityProvider{
-		cfg: &config.IdentityProvider{
-			ID:           "anid",
-			ClientID:     "aclientid",
-			ClientSecret: "aclientsecret",
-		},
-		hc: s.Client(),
-
-		accessTokenURL: s.URL + "/token",
-	}
-
-	got, err := idp.getAccessToken(ctx, callbackURL, "acode")
-	if err != nil {
-		t.Fatalf("getAccessToken failed: %v", err)
-	}
-
-	if want := "atoken"; got != want {
-		t.Errorf("getAccessToken: got %q, want %q", got, want)
-	}
-
-	wantReq := url.Values{
-		"client_id":     []string{"aclientid"},
-		"client_secret": []string{"aclientsecret"},
-		"code":          []string{"acode"},
-		"grant_type":    []string{"authorization_code"},
-		"redirect_uri":  []string{callbackURL},
-	}
-	if !reflect.DeepEqual(gotReq, wantReq) {
-		t.Errorf("getAccessToken request: got %+v, want %+v", gotReq, wantReq)
 	}
 }
 

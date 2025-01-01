@@ -20,7 +20,7 @@ import (
 	"errors"
 
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 func (a *UserInternalAPI) PerformEnsureSSOAccountExists(ctx context.Context, req *api.QuerySSOAccountRequest, res *api.QuerySSOAccountResponse) error {

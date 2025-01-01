@@ -20,10 +20,10 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const filterSchema = `

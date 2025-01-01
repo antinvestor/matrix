@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"

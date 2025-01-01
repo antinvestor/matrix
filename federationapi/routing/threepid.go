@@ -21,15 +21,15 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -352,7 +352,10 @@ func buildMembershipEvent(
 	protoEvent.Depth = queryRes.Depth
 	protoEvent.PrevEvents = queryRes.LatestEvents
 
-	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	authEvents, err := gomatrixserverlib.NewAuthEvents(nil)
+	if err != nil {
+		return nil, err
+	}
 
 	for i := range queryRes.StateEvents {
 		err = authEvents.AddEvent(queryRes.StateEvents[i].PDU)
@@ -365,7 +368,7 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
+	refs, err := eventsNeeded.AuthEventReferences(authEvents)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +432,7 @@ func sendToRemoteServer(
 // found. Returning an error isn't necessary in this case as the event will be
 // rejected by gomatrixserverlib.
 func fillDisplayName(
-	builder *gomatrixserverlib.ProtoEvent, authEvents gomatrixserverlib.AuthEvents,
+	builder *gomatrixserverlib.ProtoEvent, authEvents *gomatrixserverlib.AuthEvents,
 ) error {
 	var content gomatrixserverlib.MemberContent
 	if err := json.Unmarshal(builder.Content, &content); err != nil {

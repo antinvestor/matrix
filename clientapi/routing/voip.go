@@ -22,12 +22,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/util"
+	"github.com/antinvestor/gomatrix"
+	"github.com/pitabwire/util"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // RequestTurnServer implements:

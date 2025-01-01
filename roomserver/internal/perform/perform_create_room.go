@@ -21,16 +21,16 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -351,7 +351,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	// TODO: 3pid invite events
 
 	var builtEvents []*types.HeaderedEvent
-	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	authEvents, err := gomatrixserverlib.NewAuthEvents(nil)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("rsapi.QuerySenderIDForUser failed")
 		return "", &util.JSONResponse{
@@ -381,7 +381,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			builder.PrevEvents = []string{builtEvents[i-1].EventID()}
 		}
 		var ev gomatrixserverlib.PDU
-		if err = builder.AddAuthEvents(&authEvents); err != nil {
+		if err = builder.AddAuthEvents(authEvents); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("AddAuthEvents failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -397,7 +397,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			}
 		}
 
-		if err = gomatrixserverlib.Allowed(ev, &authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		if err = gomatrixserverlib.Allowed(ev, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return c.RSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.Allowed failed")

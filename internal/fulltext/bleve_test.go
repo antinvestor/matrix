@@ -18,9 +18,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/process"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/fulltext"
 	"github.com/antinvestor/matrix/setup/config"

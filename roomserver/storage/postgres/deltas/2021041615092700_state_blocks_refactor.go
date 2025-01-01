@@ -22,7 +22,7 @@ import (
 
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
 

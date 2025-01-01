@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -478,7 +478,11 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, senderID spec.SenderID, userDomain spec.ServerName, newRoomID string, newVersion gomatrixserverlib.RoomVersion, eventsToMake []gomatrixserverlib.FledglingEvent) error {
 	var err error
 	var builtEvents []*types.HeaderedEvent
-	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	authEvents, err := gomatrixserverlib.NewAuthEvents(nil)
+	if err != nil {
+		return err
+	}
+
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
 
@@ -503,7 +507,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, send
 			return err
 		}
 		builder := verImpl.NewEventBuilderFromProtoEvent(&proto)
-		if err = builder.AddAuthEvents(&authEvents); err != nil {
+		if err = builder.AddAuthEvents(authEvents); err != nil {
 			return err
 		}
 
@@ -514,7 +518,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, send
 
 		}
 
-		if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		if err = gomatrixserverlib.Allowed(event, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.URSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
 			return fmt.Errorf("Failed to auth new %q event: %w", builder.Type, err)
@@ -594,8 +598,11 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, send
 	for i := range queryRes.StateEvents {
 		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(headeredEvent.PDU, &provider, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	provider, err := gomatrixserverlib.NewAuthEvents(stateEvents)
+	if err != nil {
+		return nil, err
+	}
+	if err = gomatrixserverlib.Allowed(headeredEvent.PDU, provider, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return r.URSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		return nil, api.ErrNotAllowed{Err: fmt.Errorf("failed to auth new %q event: %w", proto.Type, err)} // TODO: Is this error string comprehensible to the client?

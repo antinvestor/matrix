@@ -3,8 +3,8 @@ package input
 import (
 	"testing"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/matrix/test"
 )
@@ -50,15 +50,18 @@ func Test_EventAuth(t *testing.T) {
 	}, test.WithStateKey(bob.ID), test.WithAuthIDs(authEventIDs))
 
 	// Add the auth events to the allower
-	allower := gomatrixserverlib.NewAuthEvents(nil)
+	allower, err := gomatrixserverlib.NewAuthEvents(nil)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	for _, a := range authEvents {
-		if err := allower.AddEvent(a); err != nil {
+		if err = allower.AddEvent(a); err != nil {
 			t.Fatalf("allower.AddEvent failed: %v", err)
 		}
 	}
 
 	// Finally check that the event is NOT allowed
-	if err := gomatrixserverlib.Allowed(ev.PDU, &allower, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	if err := gomatrixserverlib.Allowed(ev.PDU, allower, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return spec.NewUserID(string(senderID), true)
 	}); err == nil {
 		t.Fatalf("event should not be allowed, but it was")

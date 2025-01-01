@@ -24,8 +24,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/syncapi/storage"

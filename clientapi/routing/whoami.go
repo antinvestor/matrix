@@ -16,7 +16,7 @@ import (
 	"net/http"
 
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // whoamiResponse represents an response for a `whoami` request

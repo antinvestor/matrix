@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/lib/pq"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 var serverNamesTables = []string{

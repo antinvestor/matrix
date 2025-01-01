@@ -23,10 +23,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	syncAPITypes "github.com/antinvestor/matrix/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"

@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // PerformLoginTokenCreation creates a new login token and associates it with the provided data.

@@ -26,10 +26,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/storage"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type phoneHomeStats struct {

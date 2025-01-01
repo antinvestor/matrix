@@ -3,9 +3,9 @@ package pushrules
 import (
 	"testing"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/google/go-cmp/cmp"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 func UserIDForSender(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {

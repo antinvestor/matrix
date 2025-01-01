@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/producers"
 	"github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -27,10 +30,7 @@ import (
 	syncTypes "github.com/antinvestor/matrix/syncapi/types"
 	userAPI "github.com/antinvestor/matrix/userapi/api"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )

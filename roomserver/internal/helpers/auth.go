@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/state"
@@ -78,7 +78,7 @@ func CheckForSoftFail(
 	}
 
 	// Check if the event is allowed.
-	if err = gomatrixserverlib.Allowed(event.PDU, &authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	if err = gomatrixserverlib.Allowed(event.PDU, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return querier.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		// return true, nil
@@ -106,11 +106,11 @@ func GetAuthEvents(
 	stateNeeded := gomatrixserverlib.StateNeededForAuth([]gomatrixserverlib.PDU{event})
 
 	// Load the actual auth events from the database.
-	authEvents, err := loadAuthEvents(ctx, db, roomVersion, stateNeeded, authStateEntries)
+	aEvent, err := loadAuthEvents(ctx, db, roomVersion, stateNeeded, authStateEntries)
 	if err != nil {
 		return nil, fmt.Errorf("loadAuthEvents: %w", err)
 	}
-	return &authEvents, nil
+	return aEvent, nil
 }
 
 type authEvents struct {
@@ -191,7 +191,8 @@ func loadAuthEvents(
 	roomVersion gomatrixserverlib.RoomVersion,
 	needed gomatrixserverlib.StateNeeded,
 	state []types.StateEntry,
-) (result authEvents, err error) {
+) (result *authEvents, err error) {
+	result = &authEvents{}
 	result.valid = true
 	// Look up the numeric IDs for the state keys needed for auth.
 	var neededStateKeys []string

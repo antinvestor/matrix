@@ -18,11 +18,11 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
+	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/federationapi/queue"

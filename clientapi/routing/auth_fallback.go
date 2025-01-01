@@ -21,7 +21,7 @@ import (
 
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // recaptchaTemplate is an HTML webpage template for recaptcha auth

@@ -21,7 +21,7 @@ import (
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 // LoginTypeApplicationService describes how to authenticate as an

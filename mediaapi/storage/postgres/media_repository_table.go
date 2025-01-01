@@ -20,10 +20,10 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/tables"
 	"github.com/antinvestor/matrix/mediaapi/types"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const mediaSchema = `

@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 type fakeType struct {

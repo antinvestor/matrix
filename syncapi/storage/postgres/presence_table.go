@@ -19,8 +19,8 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/lib/pq"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"

@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	fedTypes "github.com/antinvestor/matrix/federationapi/types"
@@ -27,10 +29,8 @@ import (
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
+	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 )
 

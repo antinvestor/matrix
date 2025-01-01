@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal"

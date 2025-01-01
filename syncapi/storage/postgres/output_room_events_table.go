@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -31,7 +32,6 @@ import (
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/lib/pq"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const outputRoomEventsSchema = `

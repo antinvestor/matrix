@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
-	"github.com/matrix-org/util"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
 	fedapi "github.com/antinvestor/matrix/federationapi/api"
@@ -961,14 +961,18 @@ serverLoop:
 }
 
 func checkAllowedByState(e gomatrixserverlib.PDU, stateEvents []gomatrixserverlib.PDU, userIDForSender spec.UserIDForSender) error {
-	authUsingState := gomatrixserverlib.NewAuthEvents(nil)
+	authUsingState, err := gomatrixserverlib.NewAuthEvents(nil)
+	if err != nil {
+		return err
+	}
+
 	for i := range stateEvents {
-		err := authUsingState.AddEvent(stateEvents[i])
+		err = authUsingState.AddEvent(stateEvents[i])
 		if err != nil {
 			return err
 		}
 	}
-	return gomatrixserverlib.Allowed(e, &authUsingState, userIDForSender)
+	return gomatrixserverlib.Allowed(e, authUsingState, userIDForSender)
 }
 
 func (t *missingStateReq) hadEvent(eventID string) {

@@ -20,12 +20,12 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const roomsSchema = `

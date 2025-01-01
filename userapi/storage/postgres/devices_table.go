@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/userutil"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -27,7 +28,6 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/lib/pq"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const devicesSchema = `

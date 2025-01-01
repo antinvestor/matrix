@@ -18,7 +18,7 @@ import (
 	"net/http"
 
 	"github.com/antinvestor/matrix/internal"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 type version struct {

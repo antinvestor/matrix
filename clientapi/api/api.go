@@ -14,7 +14,7 @@
 
 package api
 
-import "github.com/matrix-org/gomatrixserverlib/fclient"
+import "github.com/antinvestor/gomatrixserverlib/fclient"
 
 // ExtraPublicRoomsProvider provides a way to inject extra published rooms into /publicRooms requests.
 type ExtraPublicRoomsProvider interface {

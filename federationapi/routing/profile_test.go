@@ -22,6 +22,9 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	fedAPI "github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/federationapi/routing"
@@ -34,9 +37,6 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 	userAPI "github.com/antinvestor/matrix/userapi/api"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )

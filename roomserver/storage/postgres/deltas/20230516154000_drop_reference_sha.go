@@ -21,7 +21,7 @@ import (
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/lib/pq"
-	"github.com/matrix-org/util"
+	"github.com/pitabwire/util"
 )
 
 func UpDropEventReferenceSHAEvents(ctx context.Context, tx *sql.Tx) error {

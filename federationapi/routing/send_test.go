@@ -20,6 +20,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedAPI "github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/federationapi/routing"
 	"github.com/antinvestor/matrix/internal/caching"
@@ -30,9 +33,6 @@ import (
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )

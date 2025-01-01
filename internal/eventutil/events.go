@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib"
 )
 
 // ErrRoomNoExists is returned when trying to lookup the state of a room that
@@ -131,16 +131,19 @@ func addPrevEventsToEvent(
 
 	builder.Depth = queryRes.Depth
 
-	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	authEvents, err := gomatrixserverlib.NewAuthEvents(nil)
+	if err != nil {
+		return err
+	}
 
 	for i := range queryRes.StateEvents {
-		err := authEvents.AddEvent(queryRes.StateEvents[i].PDU)
+		err = authEvents.AddEvent(queryRes.StateEvents[i].PDU)
 		if err != nil {
 			return fmt.Errorf("authEvents.AddEvent: %w", err)
 		}
 	}
 
-	refs, err := eventsNeeded.AuthEventReferences(&authEvents)
+	refs, err := eventsNeeded.AuthEventReferences(authEvents)
 	if err != nil {
 		return fmt.Errorf("eventsNeeded.AuthEventReferences: %w", err)
 	}
