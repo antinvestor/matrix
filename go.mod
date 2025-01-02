@@ -9,7 +9,7 @@ require (
 	github.com/antinvestor/gomatrix v0.1.0
 	github.com/antinvestor/gomatrixserverlib v0.1.0
 	github.com/blevesearch/bleve/v2 v2.4.4
-	github.com/getsentry/sentry-go v0.30.0
+	github.com/getsentry/sentry-go v0.31.1
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
