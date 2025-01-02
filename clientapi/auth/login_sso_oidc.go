@@ -211,11 +211,6 @@ func (p *oidcIdentityProvider) generateCodeChallenge(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
 
-type oauth2TokenResponse struct {
-	TokenType   string `json:"token_type"`
-	AccessToken string `json:"access_token"`
-}
-
 func (p *oidcIdentityProvider) getUserInfo(ctx context.Context, accessToken string) (subject, displayName, suggestedLocalpart string, _ error) {
 	hreq, err := http.NewRequestWithContext(ctx, http.MethodGet, p.userInfoURL, nil)
 	if err != nil {
