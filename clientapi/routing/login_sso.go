@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
@@ -77,11 +78,24 @@ func SSORedirect(
 		}
 	}
 
+	callbackURL, err := syncCallbackURLWithConfig(cfg, req, "/login/sso/redirect")
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: err,
+		}
+	}
+
+	callbackURL = callbackURL.ResolveReference(&url.URL{
+		RawQuery: url.Values{"partition_id": []string{idpID}}.Encode(),
+	})
+
 	nonce := formatNonce(redirectURLStr)
 
 	codeVerifier := util.RandomString(128)
 
-	u, err := auth.AuthorizationURL(ctx, idpID, redirectURLStr, nonce, codeVerifier)
+	u, err := auth.AuthorizationURL(ctx, idpID, callbackURL.String(), nonce, codeVerifier)
 	if err != nil {
 		logger.WithError(err).Error("Failed to get LoginSSO authorization URL")
 		return util.JSONResponse{
@@ -123,6 +137,33 @@ func SSORedirect(
 
 	resp.Headers["Set-Cookie"] = []*http.Cookie{nonceCookie, codeVerifierCookie}
 	return resp
+}
+
+// syncCallbackURLWithConfig builds a callback URL from another LoginSSO
+// request and configuration.
+func syncCallbackURLWithConfig(cfg *config.LoginSSO, req *http.Request, expectedPath string) (*url.URL, error) {
+	u := &url.URL{
+		Scheme: "https",
+		Host:   req.Host,
+		Path:   req.URL.Path,
+	}
+	if req.TLS == nil {
+		u.Scheme = "http"
+	}
+
+	// Find the v3mux base, handling both `redirect` and
+	// `redirect/{idp}` and not hard-coding the Matrix version.
+	i := strings.Index(u.Path, expectedPath)
+	if i < 0 {
+		return nil, fmt.Errorf("cannot find %q to replace in URL %q", expectedPath, u.Path)
+	}
+	u.Path = u.Path[:i] + "/login/sso/callback"
+
+	cu, err := url.Parse(cfg.CallbackURL)
+	if err != nil {
+		return nil, err
+	}
+	return u.ResolveReference(cu), nil
 }
 
 // SSOCallback implements /login/sso/callback.
@@ -167,7 +208,7 @@ func SSOCallback(
 	}
 	logger.WithField("nonce", nonce.String()).Info("SSOCallback nonce found")
 
-	redirectURL, err := parseNonce(nonce.Value)
+	clientRedirectURL, err := parseNonce(nonce.Value)
 	if err != nil {
 		logger.WithError(err).Error("Failed to parse nonce")
 		return util.JSONResponse{
@@ -187,7 +228,20 @@ func SSOCallback(
 
 	logger.WithField("codeverifier", codeVerifier.String()).Info("SSOCallback codeVerifier found")
 
-	result, err := auth.ProcessCallback(ctx, idpID, redirectURL.String(), nonce.Value, codeVerifier.Value, query)
+	callbackURL, err := syncCallbackURLWithConfig(cfg, req, "/login/sso/callback")
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: err,
+		}
+	}
+
+	callbackURL = callbackURL.ResolveReference(&url.URL{
+		RawQuery: url.Values{"partition_id": []string{idpID}}.Encode(),
+	})
+
+	result, err := auth.ProcessCallback(ctx, idpID, callbackURL.String(), nonce.Value, codeVerifier.Value, query)
 	if err != nil {
 		logger.WithError(err).Error("Failed to process callback")
 		return util.JSONResponse{
@@ -221,9 +275,9 @@ func SSOCallback(
 	}
 	util.GetLogger(ctx).WithField("account", account).WithField("ssoIdentifier", result.Identifier).Info("LoginSSO created token")
 
-	rquery := redirectURL.Query()
+	rquery := clientRedirectURL.Query()
 	rquery.Set("loginToken", token.Token)
-	resp := util.RedirectResponse(redirectURL.ResolveReference(&url.URL{RawQuery: rquery.Encode()}).String())
+	resp := util.RedirectResponse(clientRedirectURL.ResolveReference(&url.URL{RawQuery: rquery.Encode()}).String())
 	resp.Headers["Set-Cookie"] = []*http.Cookie{{
 		Name:   "sso_nonce",
 		Value:  "",
