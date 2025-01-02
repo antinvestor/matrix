@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
@@ -295,7 +295,7 @@ func (u *latestEventsUpdater) latestState() error {
 			"new_state_nid": u.newStateNID,
 			"old_latest":    u.oldLatest.EventIDs(),
 			"new_latest":    u.latest.EventIDs(),
-		}).Warn("State reset detected (removing %d events)", removed)
+		}).Warnf("State reset detected (removing %d events)", removed)
 		sentry.WithScope(func(scope *sentry.Scope) {
 			scope.SetLevel("warning")
 			scope.SetTag("room_id", u.event.RoomID().String())

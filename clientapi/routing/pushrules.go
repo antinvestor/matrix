@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/pushrules"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -28,7 +28,7 @@ func errorResponse(ctx context.Context, err error, msg string, args ...interface
 		}
 		return util.MatrixErrorResponse(status, string(eerr.ErrCode), eerr.Err)
 	}
-	util.GetLogger(ctx).With(slog.Any("error", err)).Error(msg, args...)
+	util.GetLogger(ctx).WithError(err).Errorf(msg, args...)
 	return util.JSONResponse{
 		Code: http.StatusInternalServerError,
 		JSON: spec.InternalServerError{},
@@ -139,12 +139,12 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 		// TODO: The spec does not say what to do in this case, but
 		// this feels reasonable.
 		*((*rulesPtr)[i]) = newRule
-		util.GetLogger(ctx).Info("Modified existing push rule at %d", i)
+		util.GetLogger(ctx).Infof("Modified existing push rule at %d", i)
 	} else {
 		if i >= 0 {
 			// Delete old rule.
 			*rulesPtr = append((*rulesPtr)[:i], (*rulesPtr)[i+1:]...)
-			util.GetLogger(ctx).Info("Deleted old push rule at %d", i)
+			util.GetLogger(ctx).Infof("Deleted old push rule at %d", i)
 		} else {
 			// SPEC: When creating push rules, they MUST be enabled by default.
 			//
@@ -160,7 +160,7 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 		}
 
 		*rulesPtr = append((*rulesPtr)[:i], append([]*pushrules.Rule{&newRule}, (*rulesPtr)[i:]...)...)
-		util.GetLogger(ctx).With("after", afterRuleID).With("before", beforeRuleID).Info("Added new push rule at %d", i)
+		util.GetLogger(ctx).WithField("after", afterRuleID).WithField("before", beforeRuleID).Infof("Added new push rule at %d", i)
 	}
 
 	if err = userAPI.PerformPushRulesPut(ctx, device.UserID, ruleSets); err != nil {

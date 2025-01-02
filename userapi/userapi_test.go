@@ -22,13 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	api2 "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/producers"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	"golang.org/x/crypto/bcrypt"
@@ -147,11 +147,11 @@ func TestQueryProfile(t *testing.T) {
 
 			profile, gotErr := testAPI.QueryProfile(context.TODO(), tc.userID)
 			if tc.wantErr == nil && gotErr != nil || tc.wantErr != nil && gotErr == nil {
-				t.Error("QueryProfile %s error, got %s want %s", mode, gotErr, tc.wantErr)
+				t.Errorf("QueryProfile %s error, got %s want %s", mode, gotErr, tc.wantErr)
 				continue
 			}
 			if !reflect.DeepEqual(tc.wantRes, profile) {
-				t.Error("QueryProfile %s response got %+v want %+v", mode, profile, tc.wantRes)
+				t.Errorf("QueryProfile %s response got %+v want %+v", mode, profile, tc.wantRes)
 			}
 		}
 	}
@@ -224,10 +224,10 @@ func TestLoginToken(t *testing.T) {
 			}
 
 			if cresp.Metadata.Token == "" {
-				t.Error("PerformLoginTokenCreation Token: got %q, want non-empty", cresp.Metadata.Token)
+				t.Errorf("PerformLoginTokenCreation Token: got %q, want non-empty", cresp.Metadata.Token)
 			}
 			if cresp.Metadata.Expiration.Before(time.Now()) {
-				t.Error("PerformLoginTokenCreation Expiration: got %v, want non-expired", cresp.Metadata.Expiration)
+				t.Errorf("PerformLoginTokenCreation Expiration: got %v, want non-expired", cresp.Metadata.Expiration)
 			}
 
 			t.Log("Querying the login token like /login with m.login.token would...")
@@ -239,9 +239,9 @@ func TestLoginToken(t *testing.T) {
 			}
 
 			if qresp.Data == nil {
-				t.Error("QueryLoginToken Data: got %v, want non-nil", qresp.Data)
+				t.Errorf("QueryLoginToken Data: got %v, want non-nil", qresp.Data)
 			} else if want := "@auser:example.com"; qresp.Data.UserID != want {
-				t.Error("QueryLoginToken UserID: got %q, want %q", qresp.Data.UserID, want)
+				t.Errorf("QueryLoginToken UserID: got %q, want %q", qresp.Data.UserID, want)
 			}
 
 			t.Log("Deleting the login token like /login with m.login.token would...")
@@ -274,7 +274,7 @@ func TestLoginToken(t *testing.T) {
 			}
 
 			if qresp.Data != nil {
-				t.Error("QueryLoginToken Data: got %v, want nil", qresp.Data)
+				t.Errorf("QueryLoginToken Data: got %v, want nil", qresp.Data)
 			}
 		})
 	})
@@ -305,7 +305,7 @@ func TestLoginToken(t *testing.T) {
 			}
 
 			if qresp.Data != nil {
-				t.Error("QueryLoginToken Data: got %v, want nil", qresp.Data)
+				t.Errorf("QueryLoginToken Data: got %v, want nil", qresp.Data)
 			}
 		})
 	})

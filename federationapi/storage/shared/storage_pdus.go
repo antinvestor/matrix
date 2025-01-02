@@ -21,9 +21,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // AssociatePDUWithDestination creates an association that the

@@ -17,8 +17,8 @@ package routing
 import (
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -32,7 +32,7 @@ func Logout(
 		DeviceIDs: []string{device.ID},
 	}, &performRes)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("PerformDeviceDeletion failed")
+		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -55,7 +55,7 @@ func LogoutAll(
 		DeviceIDs: nil,
 	}, &performRes)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("PerformDeviceDeletion failed")
+		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

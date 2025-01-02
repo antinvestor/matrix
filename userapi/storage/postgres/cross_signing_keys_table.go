@@ -19,12 +19,12 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 var crossSigningKeysSchema = `

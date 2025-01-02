@@ -17,11 +17,11 @@ package federationapi
 import (
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/process"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/sirupsen/logrus"
 
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
@@ -36,7 +36,7 @@ import (
 	"github.com/antinvestor/matrix/setup/jetstream"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib"
 
 	"github.com/antinvestor/matrix/federationapi/routing"
 )

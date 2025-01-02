@@ -26,9 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"golang.org/x/crypto/bcrypt"
 
 	clientapi "github.com/antinvestor/matrix/clientapi/api"

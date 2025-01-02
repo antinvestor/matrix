@@ -42,7 +42,7 @@ func TestSSORedirect(t *testing.T) {
 			Config: config.LoginSSO{
 				DefaultProviderID: "adefault",
 			},
-			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http%3A%2F%2Fmatrix.example.com%2F_matrix%2Fv4%2Flogin%2Fsso%2Fcallback%3Fprovider%3Dadefault&nonce=.+&providerID=adefault`,
+			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http%3A%2F%2Fmatrix.example.com%2F_matrix%2Fv4%2Flogin%2Fsso%2Fcallback%3Fpartition_id%3Dadefault&nonce=.+&providerID=adefault`,
 			WantSetCookieRE: "sso_nonce=[^;].*Path=/_matrix/v4/login/sso",
 		},
 		{
@@ -62,7 +62,7 @@ func TestSSORedirect(t *testing.T) {
 					{ID: "secondprovider"},
 				},
 			},
-			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http%3A%2F%2Fmatrix.example.com%2F_matrix%2Fv4%2Flogin%2Fsso%2Fcallback%3Fprovider%3Dfirstprovider&nonce=.+&providerID=firstprovider`,
+			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http%3A%2F%2Fmatrix.example.com%2F_matrix%2Fv4%2Flogin%2Fsso%2Fcallback%3Fpartition_id%3Dfirstprovider&nonce=.+&providerID=firstprovider`,
 			WantSetCookieRE: "sso_nonce=[^;].*Path=/_matrix/v4/login/sso",
 		},
 		{
@@ -77,7 +77,7 @@ func TestSSORedirect(t *testing.T) {
 				},
 			},
 			IDPID:           "someprovider",
-			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http.*%3Fprovider%3Dsomeprovider&nonce=.+&providerID=someprovider`,
+			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http.*%3Fpartition_id%3Dsomeprovider&nonce=.+&providerID=someprovider`,
 			WantSetCookieRE: "sso_nonce=[^;].*Path=/_matrix/v4/login/sso",
 		},
 		{
@@ -92,7 +92,7 @@ func TestSSORedirect(t *testing.T) {
 				},
 			},
 			IDPID:           "someprovider",
-			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http.*%3Fprovider%3Dsomeprovider&nonce=.+&providerID=someprovider`,
+			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http.*%3Fpartition_id%3Dsomeprovider&nonce=.+&providerID=someprovider`,
 			WantSetCookieRE: "sso_nonce=[^;].*Path=/_matrix/v4/login/sso",
 		},
 	}
@@ -101,19 +101,26 @@ func TestSSORedirect(t *testing.T) {
 			got := SSORedirect(&tst.Req, tst.IDPID, &tst.Auth, &tst.Config)
 
 			if want := http.StatusFound; got.Code != want {
-				t.Error("SSORedirect Code: got %v, want %v", got.Code, want)
+				t.Errorf("SSORedirect Code: got %v, want %v", got.Code, want)
 			}
 
-			if m, err := regexp.MatchString(tst.WantLocationRE, got.Headers["Location"]); err != nil {
+			if m, err := regexp.MatchString(tst.WantLocationRE, got.Headers["Location"].(string)); err != nil {
 				t.Fatalf("WantSetCookieRE failed: %v", err)
 			} else if !m {
-				t.Error("SSORedirect Location: got %q, want match %v", got.Headers["Location"], tst.WantLocationRE)
+				t.Errorf("SSORedirect Location: got %q, want match %v", got.Headers["Location"], tst.WantLocationRE)
 			}
 
-			if m, err := regexp.MatchString(tst.WantSetCookieRE, got.Headers["Set-Cookie"]); err != nil {
-				t.Fatalf("WantSetCookieRE failed: %v", err)
-			} else if !m {
-				t.Error("SSORedirect Set-Cookie: got %q, want match %v", got.Headers["Set-Cookie"], tst.WantSetCookieRE)
+			cookies := got.Headers["Set-Cookie"].([]*http.Cookie)
+			for _, cookie := range cookies {
+
+				if cookie.Name == "sso_nonce" {
+					if m, err := regexp.MatchString(tst.WantSetCookieRE, cookie.String()); err != nil {
+						t.Fatalf("WantSetCookieRE failed: %v", err)
+					} else if !m {
+						t.Errorf("SSORedirect Set-Cookie: got %q, want match %v", got.Headers["Set-Cookie"], tst.WantSetCookieRE)
+					}
+				}
+
 			}
 		})
 	}
@@ -159,7 +166,7 @@ func TestSSORedirectError(t *testing.T) {
 			got := SSORedirect(&tst.Req, tst.IDPID, &tst.Auth, &tst.Config)
 
 			if got.Code != tst.WantCode {
-				t.Error("SSORedirect Code: got %v, want %v", got.Code, tst.WantCode)
+				t.Errorf("SSORedirect Code: got %v, want %v", got.Code, tst.WantCode)
 			}
 		})
 	}
@@ -196,6 +203,9 @@ func TestSSOCallback(t *testing.T) {
 					"Cookie": []string{(&http.Cookie{
 						Name:  "sso_nonce",
 						Value: nonce,
+					}).String(), (&http.Cookie{
+						Name:  "sso_code_verifier",
+						Value: "code_verifier",
 					}).String()},
 				},
 			},
@@ -228,6 +238,9 @@ func TestSSOCallback(t *testing.T) {
 					"Cookie": []string{(&http.Cookie{
 						Name:  "sso_nonce",
 						Value: nonce,
+					}).String(), (&http.Cookie{
+						Name:  "sso_code_verifier",
+						Value: "code_verifier",
 					}).String()},
 				},
 			},
@@ -261,6 +274,9 @@ func TestSSOCallback(t *testing.T) {
 					"Cookie": []string{(&http.Cookie{
 						Name:  "sso_nonce",
 						Value: nonce,
+					}).String(), (&http.Cookie{
+						Name:  "sso_code_verifier",
+						Value: "code_verifier",
 					}).String()},
 				},
 			},
@@ -293,6 +309,9 @@ func TestSSOCallback(t *testing.T) {
 					"Cookie": []string{(&http.Cookie{
 						Name:  "sso_nonce",
 						Value: nonce,
+					}).String(), (&http.Cookie{
+						Name:  "sso_code_verifier",
+						Value: "code_verifier",
 					}).String()},
 				},
 			},
@@ -311,26 +330,36 @@ func TestSSOCallback(t *testing.T) {
 
 			if want := http.StatusFound; got.Code != want {
 				t.Log(got)
-				t.Error("SSOCallback Code: got %v, want %v", got.Code, want)
+				t.Errorf("SSOCallback Code: got %v, want %v", got.Code, want)
 			}
 
-			if m, err := regexp.MatchString(tst.WantLocationRE, got.Headers["Location"]); err != nil {
+			if m, err := regexp.MatchString(tst.WantLocationRE, got.Headers["Location"].(string)); err != nil {
 				t.Fatalf("WantSetCookieRE failed: %v", err)
 			} else if !m {
-				t.Error("SSOCallback Location: got %q, want match %v", got.Headers["Location"], tst.WantLocationRE)
+				t.Errorf("SSOCallback Location: got %q, want match %v", got.Headers["Location"], tst.WantLocationRE)
 			}
 
-			if m, err := regexp.MatchString(tst.WantSetCookieRE, got.Headers["Set-Cookie"]); err != nil {
-				t.Fatalf("WantSetCookieRE failed: %v", err)
-			} else if !m {
-				t.Error("SSOCallback Set-Cookie: got %q, want match %v", got.Headers["Set-Cookie"], tst.WantSetCookieRE)
+			if got.Headers["Set-Cookes"] != nil {
+				cookies := got.Headers["Set-Cookie"].([]*http.Cookie)
+				for _, cookie := range cookies {
+
+					if cookie.Name == "sso_nonce" {
+
+						if m, err := regexp.MatchString(tst.WantSetCookieRE, cookie.String()); err != nil {
+							t.Fatalf("WantSetCookieRE failed: %v", err)
+						} else if !m {
+							t.Errorf("SSOCallback Set-Cookie: got %q, want match %v", got.Headers["Set-Cookie"], tst.WantSetCookieRE)
+						}
+					}
+
+				}
 			}
 
 			if diff := cmp.Diff(tst.WantAccountCreation, tst.UserAPI.gotAccountCreation); diff != "" {
-				t.Error("PerformAccountCreation: +got -want:\n%s", diff)
+				t.Errorf("PerformAccountCreation: +got -want:\n%s", diff)
 			}
 			if diff := cmp.Diff(tst.WantLoginTokenCreation, tst.UserAPI.gotLoginTokenCreation); diff != "" {
-				t.Error("PerformLoginTokenCreation: +got -want:\n%s", diff)
+				t.Errorf("PerformLoginTokenCreation: +got -want:\n%s", diff)
 			}
 
 		})
@@ -351,6 +380,9 @@ func TestSSOCallbackError(t *testing.T) {
 			"Cookie": []string{(&http.Cookie{
 				Name:  "sso_nonce",
 				Value: nonce,
+			}).String(), (&http.Cookie{
+				Name:  "sso_code_verifier",
+				Value: "code_verifier",
 			}).String()},
 		},
 	}
@@ -384,6 +416,9 @@ func TestSSOCallbackError(t *testing.T) {
 					"Cookie": []string{(&http.Cookie{
 						Name:  "sso_nonce",
 						Value: nonce,
+					}).String(), (&http.Cookie{
+						Name:  "sso_code_verifier",
+						Value: "code_verifier",
 					}).String()},
 				},
 			},
@@ -416,6 +451,9 @@ func TestSSOCallbackError(t *testing.T) {
 					"Cookie": []string{(&http.Cookie{
 						Name:  "sso_nonce",
 						Value: "badvalue",
+					}).String(), (&http.Cookie{
+						Name:  "sso_code_verifier",
+						Value: "code_verifier",
 					}).String()},
 				},
 			},
@@ -481,7 +519,7 @@ func TestSSOCallbackError(t *testing.T) {
 
 			if got.Code != tst.WantCode {
 				t.Log(got)
-				t.Error("SSOCallback Code: got %v, want %v", got.Code, tst.WantCode)
+				t.Errorf("SSOCallback Code: got %v, want %v", got.Code, tst.WantCode)
 			}
 		})
 	}
@@ -492,7 +530,7 @@ type fakeSSOAuthenticator struct {
 	callbackErr    error
 }
 
-func (auth *fakeSSOAuthenticator) AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce string) (string, error) {
+func (auth *fakeSSOAuthenticator) AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce, codeVerifier string) (string, error) {
 	if providerID == "" {
 		return "", errors.New("empty providerID")
 	}
@@ -510,7 +548,7 @@ func (auth *fakeSSOAuthenticator) AuthorizationURL(ctx context.Context, provider
 	}).String(), nil
 }
 
-func (auth *fakeSSOAuthenticator) ProcessCallback(ctx context.Context, providerID, callbackURL, nonce string, query url.Values) (*auth.CallbackResult, error) {
+func (auth *fakeSSOAuthenticator) ProcessCallback(ctx context.Context, providerID, callbackURL, nonce, codeVerifier string, query url.Values) (*auth.CallbackResult, error) {
 	return &auth.callbackResult, auth.callbackErr
 }
 

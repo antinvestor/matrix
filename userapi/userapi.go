@@ -17,13 +17,13 @@ package userapi
 import (
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/process"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
 	rsapi "github.com/antinvestor/matrix/roomserver/api"

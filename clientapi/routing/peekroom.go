@@ -18,10 +18,10 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/antinvestor/gomatrix"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
@@ -74,7 +74,7 @@ func PeekRoomByIDOrAlias(
 		}
 	case nil:
 	default:
-		logrus.With(slog.Any("error", err)).With("roomID", roomIDOrAlias).Error("Failed to peek room")
+		logrus.WithError(err).WithField("roomID", roomIDOrAlias).Errorf("Failed to peek room")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -113,7 +113,7 @@ func UnpeekRoomByID(
 		}
 	case nil:
 	default:
-		logrus.With(slog.Any("error", err)).With("roomID", roomID).Error("Failed to un-peek room")
+		logrus.WithError(err).WithField("roomID", roomID).Errorf("Failed to un-peek room")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

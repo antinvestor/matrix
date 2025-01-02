@@ -21,14 +21,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib/tokens"
+	"github.com/antinvestor/gomatrix"
+	"github.com/antinvestor/gomatrixserverlib/tokens"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/roomserver/types"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/internal/eventutil"
@@ -36,7 +37,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // Unspecced server notice request
@@ -182,7 +182,7 @@ func SendServerNotice(
 				},
 			}}
 			if err = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err != nil {
-				util.GetLogger(ctx).With(slog.Any("error", err)).Error("saveTagData failed")
+				util.GetLogger(ctx).WithError(err).Error("saveTagData failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -207,7 +207,7 @@ func SendServerNotice(
 		membershipRes := api.QueryMembershipForUserResponse{}
 		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
 		if err != nil {
-			util.GetLogger(ctx).With(slog.Any("error", err)).Error("unable to query membership for user")
+			util.GetLogger(ctx).WithError(err).Error("unable to query membership for user")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -230,7 +230,7 @@ func SendServerNotice(
 	}
 	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, rsAPI, time.Now())
 	if resErr != nil {
-		logrus.Error("failed to send message: %+v", resErr)
+		logrus.Errorf("failed to send message: %+v", resErr)
 		return *resErr
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)
@@ -258,7 +258,7 @@ func SendServerNotice(
 		txnAndSessionID,
 		false,
 	); err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("SendEvents failed")
+		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -325,7 +325,7 @@ func getSenderDevice(
 		cfg.Matrix.ServerNotices.AvatarURL,
 	)
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("userAPI.SetAvatarURL failed")
+		util.GetLogger(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
 		return nil, err
 	}
 
@@ -336,7 +336,7 @@ func getSenderDevice(
 		cfg.Matrix.ServerNotices.DisplayName,
 	)
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("userAPI.SetDisplayName failed")
+		util.GetLogger(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
 		return nil, err
 	}
 

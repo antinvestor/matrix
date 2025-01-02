@@ -23,8 +23,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/clientapi/api"
@@ -80,7 +80,7 @@ func GetPostPublicRooms(
 			"",
 		)
 		if err != nil {
-			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("failed to get public rooms")
+			util.GetLogger(req.Context()).WithError(err).Error("failed to get public rooms")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -94,7 +94,7 @@ func GetPostPublicRooms(
 
 	response, err := publicRooms(req.Context(), request, rsAPI, extRoomsProvider)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("failed to work out public rooms")
+		util.GetLogger(req.Context()).WithError(err).Errorf("failed to work out public rooms")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -123,7 +123,7 @@ func publicRooms(
 	// ParseInt returns 0 and an error when trying to parse an empty string
 	// In that case, we want to assign 0 so we ignore the error
 	if err != nil && len(request.Since) > 0 {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("strconv.ParseInt failed")
+		util.GetLogger(ctx).WithError(err).Error("strconv.ParseInt failed")
 		return nil, err
 	}
 	err = nil
@@ -186,7 +186,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 		// Atoi returns 0 and an error when trying to parse an empty string
 		// In that case, we want to assign 0 so we ignore the error
 		if err != nil && len(httpReq.FormValue("limit")) > 0 {
-			util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("strconv.Atoi failed")
+			util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 			return &util.JSONResponse{
 				Code: 400,
 				JSON: spec.BadJSON("limit param is not a number"),
@@ -267,12 +267,12 @@ func refreshPublicRoomCache(
 		IncludeAllNetworks: request.IncludeAllNetworks,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("QueryPublishedRooms failed")
+		util.GetLogger(ctx).WithError(err).Error("QueryPublishedRooms failed")
 		return publicRoomsCache
 	}
 	pubRooms, err := roomserverAPI.PopulatePublicRooms(ctx, queryRes.RoomIDs, rsAPI)
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("PopulatePublicRooms failed")
+		util.GetLogger(ctx).WithError(err).Error("PopulatePublicRooms failed")
 		return publicRoomsCache
 	}
 	publicRoomsCache = []fclient.PublicRoom{}

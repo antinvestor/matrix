@@ -20,16 +20,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/oauth2"
 	"io"
-	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"golang.org/x/oauth2"
+
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
 
@@ -52,13 +52,12 @@ type oidcIdentityProvider struct {
 	cfg *config.IdentityProvider
 	hc  *http.Client
 
-	authorizationURL string
-	accessTokenURL   string
-	userInfoURL      string
+	userInfoURL string
 
 	scopes []string
 
-	oauth2Config oauth2.Config
+	resetOauth2Config bool
+	oauth2Config      oauth2.Config
 
 	responseMimeType    string
 	subPath             string
@@ -147,11 +146,6 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 		return nil, fmt.Errorf("failed to exchange token: %v", err)
 	}
 
-	at, err := p.getAccessToken(ctx, callbackURL, code)
-	if err != nil {
-		return nil, err
-	}
-
 	subject, displayName, suggestedLocalpart, err := p.getUserInfo(ctx, token.AccessToken)
 	if err != nil {
 		return nil, err
@@ -189,72 +183,32 @@ func (p *oidcIdentityProvider) reload(ctx context.Context) (*oidcDiscovery, erro
 		}
 
 		p.exp = now.Add(oidcDiscoveryMaxStaleness)
-
 		p.userInfoURL = disc.UserinfoEndpoint
 		p.disc = disc
+		p.resetOauth2Config = true
+	}
 
+	if p.resetOauth2Config {
 		// OAuth2 config with client_secret_post support
 		p.oauth2Config = oauth2.Config{
 			ClientID:     p.cfg.ClientID,
 			ClientSecret: p.cfg.ClientSecret,
 			Scopes:       []string{strings.Join(p.scopes, " ")},
 			Endpoint: oauth2.Endpoint{
-				AuthURL:   disc.AuthorizationEndpoint,
-				TokenURL:  disc.TokenEndpoint,
+				AuthURL:   p.disc.AuthorizationEndpoint,
+				TokenURL:  p.disc.TokenEndpoint,
 				AuthStyle: oauth2.AuthStyleInParams, // Forces client_secret_post
 			},
 		}
-
+		p.resetOauth2Config = false
 	}
 
 	return p.disc, nil
 }
 
-func (p *oidcIdentityProvider) generateCodeVerifier() string {
-	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	codeVerifier := make([]byte, 128)
-	for i := range codeVerifier {
-		codeVerifier[i] = charset[rand.IntN(len(charset))]
-	}
-	return string(codeVerifier)
-}
-
 func (p *oidcIdentityProvider) generateCodeChallenge(verifier string) string {
 	hash := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(hash[:])
-}
-
-func (p *oidcIdentityProvider) getAccessToken(ctx context.Context, callbackURL, code string) (string, error) {
-	body := url.Values{
-		"grant_type":    []string{"authorization_code"},
-		"code":          []string{code},
-		"redirect_uri":  []string{callbackURL},
-		"client_id":     []string{p.cfg.ClientID},
-		"client_secret": []string{p.cfg.ClientSecret},
-	}
-	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, p.accessTokenURL, strings.NewReader(body.Encode()))
-	if err != nil {
-		return "", err
-	}
-	hreq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	hreq.Header.Set("Accept", p.responseMimeType)
-
-	hresp, err := httpDo(ctx, p.hc, hreq)
-	if err != nil {
-		return "", fmt.Errorf("access token: %w", err)
-	}
-	defer hresp.Body.Close() // nolint:errcheck
-
-	var resp oauth2TokenResponse
-	if err := json.NewDecoder(hresp.Body).Decode(&resp); err != nil {
-		return "", err
-	}
-
-	if strings.ToLower(resp.TokenType) != "bearer" {
-		return "", fmt.Errorf("expected bearer token, got type %q", resp.TokenType)
-	}
-
-	return resp.AccessToken, nil
 }
 
 type oauth2TokenResponse struct {
@@ -318,13 +272,13 @@ func httpDo(ctx context.Context, hc *http.Client, req *http.Request) (*http.Resp
 				if len(bs) > 80 {
 					bs = bs[:80]
 				}
-				util.GetLogger(ctx).With("url", req.URL.String()).With("status", resp.StatusCode).Warn("OAuth2 HTTP request failed: %s", string(bs))
+				util.GetLogger(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).Warnf("OAuth2 HTTP request failed: %s", string(bs))
 			}
 		case strings.HasPrefix(contentType, "application/json"):
 			// https://openid.net/specs/openid-connect-core-1_0.html#TokenErrorResponse
 			var body oauth2Error
 			if err := json.NewDecoder(resp.Body).Decode(&body); err == nil {
-				util.GetLogger(ctx).With("url", req.URL.String()).With("status", resp.StatusCode).Warn("OAuth2 HTTP request failed: %+v", &body)
+				util.GetLogger(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).Warnf("OAuth2 HTTP request failed: %+v", &body)
 			}
 			if body.Error != "" {
 				return nil, fmt.Errorf("OAuth2 request %q failed: %s (%s)", req.URL.String(), resp.Status, body.Error)

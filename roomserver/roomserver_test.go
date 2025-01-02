@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/internal/input"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
@@ -25,7 +25,7 @@ import (
 
 	userAPI "github.com/antinvestor/matrix/userapi/api"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib"
 
 	"github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/setup/jetstream"

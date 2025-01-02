@@ -25,9 +25,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v3"

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
@@ -14,7 +15,6 @@ import (
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func TestSingleTransactionOnInput(t *testing.T) {

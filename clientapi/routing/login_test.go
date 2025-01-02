@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/httputil"
@@ -15,8 +17,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/test"
@@ -71,7 +71,7 @@ func TestLogin(t *testing.T) {
 				ServerName:  serverName,
 				Password:    password,
 			}, userRes); err != nil {
-				t.Error("failed to create account: %s", err)
+				t.Errorf("failed to create account: %s", err)
 			}
 			if !userRes.AccountCreated {
 				t.Fatalf("account not created")

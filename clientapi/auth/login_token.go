@@ -18,11 +18,11 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/setup/config"
 	uapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -47,7 +47,7 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 
 	var res uapi.QueryLoginTokenResponse
 	if err := t.UserAPI.QueryLoginToken(ctx, &uapi.QueryLoginTokenRequest{Token: r.Token}, &res); err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("UserAPI.QueryLoginToken failed")
+		util.GetLogger(ctx).WithError(err).Error("UserAPI.QueryLoginToken failed")
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -71,7 +71,7 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 		if authRes.Code == http.StatusOK {
 			var res uapi.PerformLoginTokenDeletionResponse
 			if err := t.UserAPI.PerformLoginTokenDeletion(ctx, &uapi.PerformLoginTokenDeletionRequest{Token: r.Token}, &res); err != nil {
-				util.GetLogger(ctx).With(slog.Any("error", err)).Error("UserAPI.PerformLoginTokenDeletion failed")
+				util.GetLogger(ctx).WithError(err).Error("UserAPI.PerformLoginTokenDeletion failed")
 			}
 		}
 	}

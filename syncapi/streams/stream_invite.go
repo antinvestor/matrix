@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/storage"

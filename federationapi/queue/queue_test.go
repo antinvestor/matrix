@@ -22,14 +22,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/test/testrig"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"gotest.tools/v3/poll"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/antinvestor/matrix/federationapi/statistics"

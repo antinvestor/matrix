@@ -8,10 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -239,7 +239,7 @@ func (p *DB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent) error {
 		if err != nil {
 			return err
 		}
-		util.GetLogger(ctx).Info("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
+		util.GetLogger(ctx).Infof("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
 		_, err = txn.Stmt(p.insertNodeStmt).ExecContext(ctx, ev.EventID(), ev.OriginServerTS(), ev.RoomID().String(), count, base64.RawStdEncoding.EncodeToString(hash), 0)
 		return err
 	})

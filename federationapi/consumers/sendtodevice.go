@@ -18,9 +18,9 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
@@ -80,7 +80,7 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 	_, originServerName, err := gomatrixserverlib.SplitID('@', sender)
 	if err != nil {
 		sentry.CaptureException(err)
-		log.With(slog.Any("error", err)).With("user_id", sender).Error("Failed to extract domain from send-to-device sender")
+		log.WithError(err).WithField("user_id", sender).Error("Failed to extract domain from send-to-device sender")
 		return true
 	}
 	if !t.isLocalServerName(originServerName) {
@@ -90,14 +90,14 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 	var ote syncTypes.OutputSendToDeviceEvent
 	if err = json.Unmarshal(msg.Data, &ote); err != nil {
 		sentry.CaptureException(err)
-		log.With(slog.Any("error", err)).Error("output log: message parse failed (expected send-to-device)")
+		log.WithError(err).Errorf("output log: message parse failed (expected send-to-device)")
 		return true
 	}
 
 	_, destServerName, err := gomatrixserverlib.SplitID('@', ote.UserID)
 	if err != nil {
 		sentry.CaptureException(err)
-		log.With(slog.Any("error", err)).With("user_id", ote.UserID).Error("Failed to extract domain from send-to-device destination")
+		log.WithError(err).WithField("user_id", ote.UserID).Error("Failed to extract domain from send-to-device destination")
 		return true
 	}
 
@@ -123,13 +123,13 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 	}
 	if edu.Content, err = json.Marshal(tdm); err != nil {
 		sentry.CaptureException(err)
-		log.With(slog.Any("error", err)).Error("failed to marshal EDU JSON")
+		log.WithError(err).Error("failed to marshal EDU JSON")
 		return true
 	}
 
-	log.Debug("Sending send-to-device message into %q destination queue", destServerName)
+	log.Debugf("Sending send-to-device message into %q destination queue", destServerName)
 	if err := t.queues.SendEDU(edu, originServerName, []spec.ServerName{destServerName}); err != nil {
-		log.With(slog.Any("error", err)).Error("failed to send EDU")
+		log.WithError(err).Error("failed to send EDU")
 		return false
 	}
 

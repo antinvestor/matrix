@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/google/uuid"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -143,13 +143,13 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 	if err != nil {
 		switch err.(type) {
 		case roomserverAPI.ErrRoomUnknownOrNotAllowed:
-			util.GetLogger(req.Context()).With(slog.Any("error", err)).Debugln("room unknown/forbidden when handling CS room hierarchy request")
+			util.GetLogger(req.Context()).WithError(err).Debugln("room unknown/forbidden when handling CS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden("room is unknown/forbidden"),
 			}
 		default:
-			log.With(slog.Any("error", err)).Error("failed to fetch next page of room hierarchy (CS API)")
+			log.WithError(err).Errorf("failed to fetch next page of room hierarchy (CS API)")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),

@@ -20,9 +20,9 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -177,7 +177,7 @@ func (u *UserInteractive) challenge(sessionID string) *util.JSONResponse {
 func (u *UserInteractive) NewSession() *util.JSONResponse {
 	sessionID, err := GenerateAccessToken()
 	if err != nil {
-		logrus.With(slog.Any("error", err)).Error("failed to generate session ID")
+		logrus.WithError(err).Error("failed to generate session ID")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

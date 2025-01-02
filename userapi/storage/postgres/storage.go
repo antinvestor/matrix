@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/userapi/storage/shared"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"

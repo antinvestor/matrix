@@ -17,9 +17,9 @@ package routing
 import (
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 

@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	log "github.com/sirupsen/logrus"
 )
 

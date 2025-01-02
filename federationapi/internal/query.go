@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -59,7 +59,7 @@ func (a *FederationInternalAPI) fetchServerKeysFromCache(
 		}
 		// we should only get 1 result as we only gave 1 key ID
 		sk := serverKeysResponses[0]
-		util.GetLogger(ctx).Info("fetchServerKeysFromCache: minvalid:%v  keys: %+v", criteria.MinimumValidUntilTS, sk)
+		util.GetLogger(ctx).Infof("fetchServerKeysFromCache: minvalid:%v  keys: %+v", criteria.MinimumValidUntilTS, sk)
 		if criteria.MinimumValidUntilTS != 0 {
 			// check if it's still valid. if they have the same value that's also valid
 			if sk.ValidUntilTS < criteria.MinimumValidUntilTS {
@@ -84,12 +84,12 @@ func (a *FederationInternalAPI) QueryServerKeys(
 		res.ServerKeys = results
 		return nil
 	}
-	util.GetLogger(ctx).With("server", req.ServerName).With(slog.Any("error", err)).Warn("notary: failed to satisfy keys request entirely from cache, hitting direct")
+	util.GetLogger(ctx).WithField("server", req.ServerName).WithError(err).Warn("notary: failed to satisfy keys request entirely from cache, hitting direct")
 
 	serverKeys, err := a.fetchServerKeysDirectly(ctx, req.ServerName)
 	if err != nil {
 		// try to load as much as we can from the cache in a best effort basis
-		util.GetLogger(ctx).With("server", req.ServerName).With(slog.Any("error", err)).Warn("notary: failed to ask server for keys, returning best effort keys")
+		util.GetLogger(ctx).WithField("server", req.ServerName).WithError(err).Warn("notary: failed to ask server for keys, returning best effort keys")
 		serverKeysResponses, dbErr := a.db.GetNotaryKeys(ctx, req.ServerName, req.KeyIDs())
 		if dbErr != nil {
 			return fmt.Errorf("notary: server returned %s, and db returned %s", err, dbErr)
@@ -100,7 +100,7 @@ func (a *FederationInternalAPI) QueryServerKeys(
 	// cache it!
 	if err = a.db.UpdateNotaryKeys(context.Background(), req.ServerName, *serverKeys); err != nil {
 		// non-fatal, still return the response
-		util.GetLogger(ctx).With(slog.Any("error", err)).Warn("failed to UpdateNotaryKeys")
+		util.GetLogger(ctx).WithError(err).Warn("failed to UpdateNotaryKeys")
 	}
 	res.ServerKeys = []gomatrixserverlib.ServerKeys{*serverKeys}
 	return nil

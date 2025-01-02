@@ -3,8 +3,8 @@ package caching
 import (
 	"context"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // FederationCache contains the subset of functions needed for

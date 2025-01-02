@@ -22,9 +22,9 @@ import (
 	"fmt"
 
 	//"github.com/antinvestor/matrix/roomserver/internal"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
@@ -63,19 +63,19 @@ func (r *Queryer) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID
 	}
 	res := api.QueryServerJoinedToRoomResponse{}
 	if err = r.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("rsAPI.QueryServerJoinedToRoom failed")
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return nil, fmt.Errorf("InternalServerError: Failed to query room: %w", err)
 	}
 
 	userJoinedToRoom, err := r.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), senderID)
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("rsAPI.UserJoinedToRoom failed")
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
 		return nil, fmt.Errorf("InternalServerError: %w", err)
 	}
 
 	locallyJoinedUsers, err := r.LocallyJoinedUsers(ctx, roomInfo.RoomVersion, types.RoomNID(roomInfo.RoomNID))
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("rsAPI.GetLocallyJoinedUsers failed")
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
 		return nil, fmt.Errorf("InternalServerError: %w", err)
 	}
 
@@ -473,7 +473,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	} else {
 		stateEntries, err = helpers.StateBeforeEvent(ctx, r.DB, info, membershipEventNID, r)
 		if err != nil {
-			logrus.With("membership_event_nid", membershipEventNID).With(slog.Any("error", err)).Error("failed to load state before event")
+			logrus.WithField("membership_event_nid", membershipEventNID).WithError(err).Error("failed to load state before event")
 			return err
 		}
 		events, err = helpers.GetMembershipsAtState(ctx, r.DB, info, stateEntries, request.JoinedOnly)

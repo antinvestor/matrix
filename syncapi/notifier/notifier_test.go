@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -137,7 +137,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
-			t.Error("TestNewEventAndJoinedToRoom error: %s", err)
+			t.Errorf("TestNewEventAndJoinedToRoom error: %s", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
@@ -203,7 +203,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
-			t.Error("TestNewInviteEventForUser error: %s", err)
+			t.Errorf("TestNewInviteEventForUser error: %s", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
@@ -232,7 +232,7 @@ func TestEDUWakeup(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionAfter))
 		if err != nil {
-			t.Error("TestNewInviteEventForUser error: %v", err)
+			t.Errorf("TestNewInviteEventForUser error: %v", err)
 		}
 		mustEqualPositions(t, pos, syncPositionNewEDU)
 		wg.Done()
@@ -260,7 +260,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	poll := func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
-			t.Error("TestMultipleRequestWakeup error: %s", err)
+			t.Errorf("TestMultipleRequestWakeup error: %s", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
@@ -278,7 +278,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 
 	numWaiting := stream.NumWaiting()
 	if numWaiting != 0 {
-		t.Error("TestMultipleRequestWakeup NumWaiting() want 0, got %d", numWaiting)
+		t.Errorf("TestMultipleRequestWakeup NumWaiting() want 0, got %d", numWaiting)
 	}
 }
 
@@ -299,7 +299,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
-			t.Error("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
+			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter)
 		leaveWG.Done()
@@ -316,7 +316,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionAfter))
 		if err != nil {
-			t.Error("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
+			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter2)
 		aliceWG.Done()
@@ -326,7 +326,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 		// this should timeout with an error (but the main goroutine won't wait for the timeout explicitly)
 		_, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionAfter))
 		if err == nil {
-			t.Error("TestNewEventAndWasPreviouslyJoinedToRoom expect error but got nil")
+			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom expect error but got nil")
 		}
 	}()
 

@@ -18,9 +18,9 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
@@ -87,7 +87,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		sentry.CaptureException(err)
-		log.With(slog.Any("error", err)).Error("send-to-device: failed to split user id, dropping message")
+		log.WithError(err).Errorf("send-to-device: failed to split user id, dropping message")
 		return true
 	}
 	if !s.isLocalServerName(domain) {
@@ -98,7 +98,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 	var output types.OutputSendToDeviceEvent
 	if err = json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.With(slog.Any("error", err)).Error("send-to-device: message parse failure")
+		log.WithError(err).Errorf("send-to-device: message parse failure")
 		sentry.CaptureException(err)
 		return true
 	}
@@ -109,7 +109,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 		"device_id":  output.DeviceID,
 		"event_type": output.Type,
 	})
-	logger.Debug("sync API received send-to-device event from the clientapi/federationsender")
+	logger.Debugf("sync API received send-to-device event from the clientapi/federationsender")
 
 	// Check we actually got the requesting device in our store, if we receive a room key request
 	if output.Type == "m.room_key_request" {
@@ -120,7 +120,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 			if err = s.userAPI.PerformMarkAsStaleIfNeeded(ctx, &api.PerformMarkAsStaleRequest{
 				UserID: output.Sender, Domain: senderDomain, DeviceID: requestingDeviceID,
 			}, &struct{}{}); err != nil {
-				logger.With(slog.Any("error", err)).Error("failed to mark as stale if needed")
+				logger.WithError(err).Errorf("failed to mark as stale if needed")
 				return false
 			}
 		}
@@ -131,7 +131,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 	)
 	if err != nil {
 		sentry.CaptureException(err)
-		log.With(slog.Any("error", err)).Error("send-to-device: failed to store message")
+		log.WithError(err).Errorf("send-to-device: failed to store message")
 		return false
 	}
 

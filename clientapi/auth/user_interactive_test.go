@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -65,7 +65,7 @@ func TestUserInteractiveChallenge(t *testing.T) {
 		return
 	}
 	if errRes.Code != 401 {
-		t.Error("Expected HTTP 401, got %d", errRes.Code)
+		t.Errorf("Expected HTTP 401, got %d", errRes.Code)
 	}
 }
 
@@ -102,7 +102,7 @@ func TestUserInteractivePasswordLogin(t *testing.T) {
 	for _, tc := range testCases {
 		_, errRes := uia.Verify(ctx, tc, device)
 		if errRes != nil {
-			t.Error("Verify failed but expected success for request: %s - got %+v", string(tc), errRes)
+			t.Errorf("Verify failed but expected success for request: %s - got %+v", string(tc), errRes)
 		}
 	}
 }
@@ -183,11 +183,11 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 	for _, tc := range testCases {
 		_, errRes := uia.Verify(ctx, tc.body, device)
 		if errRes == nil {
-			t.Error("Verify succeeded but expected failure for request: %s", string(tc.body))
+			t.Errorf("Verify succeeded but expected failure for request: %s", string(tc.body))
 			continue
 		}
 		if errRes.Code != tc.wantRes.Code {
-			t.Error("got code %d want code %d for request: %s", errRes.Code, tc.wantRes.Code, string(tc.body))
+			t.Errorf("got code %d want code %d for request: %s", errRes.Code, tc.wantRes.Code, string(tc.body))
 		}
 	}
 }

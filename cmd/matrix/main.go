@@ -18,6 +18,7 @@ import (
 	"flag"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/httputil"
@@ -25,7 +26,6 @@ import (
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/setup/process"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 

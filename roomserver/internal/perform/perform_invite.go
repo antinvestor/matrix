@@ -19,6 +19,8 @@ import (
 	"crypto/ed25519"
 	"fmt"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
@@ -28,8 +30,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -251,7 +251,7 @@ func (r *Inviter) PerformInvite(
 	inputRes := &api.InputRoomEventsResponse{}
 	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
 	if err := inputRes.Err(); err != nil {
-		util.GetLogger(ctx).With("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
+		util.GetLogger(ctx).WithField("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
 		return api.ErrNotAllowed{Err: err}
 	}
 

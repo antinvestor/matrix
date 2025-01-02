@@ -19,8 +19,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // URLDecodeMapValues is a function that iterates through each of the items in a

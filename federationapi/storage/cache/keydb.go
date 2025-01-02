@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/caching"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // A Database implements gomatrixserverlib.KeyDatabase and is used to store

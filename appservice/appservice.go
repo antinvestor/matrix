@@ -18,9 +18,9 @@ import (
 	"context"
 	"sync"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/setup/process"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/sirupsen/logrus"
 
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"

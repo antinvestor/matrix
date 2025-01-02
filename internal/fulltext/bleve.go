@@ -18,9 +18,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/process"
 	"github.com/blevesearch/bleve/v2"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	// side effect imports to allow all possible languages
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ar"

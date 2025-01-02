@@ -23,11 +23,11 @@ import (
 
 	"github.com/tidwall/gjson"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal/eventutil"

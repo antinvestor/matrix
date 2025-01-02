@@ -12,14 +12,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/gomatrix"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/routing"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
@@ -139,7 +139,7 @@ func (f *fedClient) MakeJoin(ctx context.Context, origin, s spec.ServerName, roo
 			var needed gomatrixserverlib.StateNeeded
 			needed, err = gomatrixserverlib.StateNeededForProtoEvent(&res.JoinEvent)
 			if err != nil {
-				f.t.Error("StateNeededForEventBuilder: %v", err)
+				f.t.Errorf("StateNeededForEventBuilder: %v", err)
 				return
 			}
 			res.JoinEvent.AuthEvents = r.MustGetAuthEventRefsForEvent(f.t, needed)
@@ -216,7 +216,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 	fedRSApi := &fedRoomserverAPI{
 		inputRoomEvents: func(ctx context.Context, req *rsapi.InputRoomEventsRequest, res *rsapi.InputRoomEventsResponse) {
 			if req.Asynchronous {
-				t.Error("InputRoomEvents from PerformJoin MUST be synchronous")
+				t.Errorf("InputRoomEvents from PerformJoin MUST be synchronous")
 			}
 		},
 		queryRoomsForUser: func(ctx context.Context, userID spec.UserID, desiredMembership string) ([]spec.RoomID, error) {
@@ -252,7 +252,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 		ServerNames: []spec.ServerName{serverA},
 	}, &resp)
 	if resp.JoinedVia != serverA {
-		t.Error("PerformJoin: joined via %v want %v", resp.JoinedVia, serverA)
+		t.Errorf("PerformJoin: joined via %v want %v", resp.JoinedVia, serverA)
 	}
 	if resp.LastError != nil {
 		t.Fatalf("PerformJoin: returned error: %+v", *resp.LastError)
@@ -347,26 +347,26 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	for _, tc := range testCases {
 		ev, err := gomatrixserverlib.MustGetRoomVersion(tc.roomVer).NewEventFromTrustedJSON([]byte(tc.eventJSON), false)
 		if err != nil {
-			t.Error("failed to parse event: %s", err)
+			t.Errorf("failed to parse event: %s", err)
 		}
 		invReq, err := fclient.NewInviteV2Request(ev, nil)
 		if err != nil {
-			t.Error("failed to create invite v2 request: %s", err)
+			t.Errorf("failed to create invite v2 request: %s", err)
 			continue
 		}
 		_, err = fedCli.SendInviteV2(context.Background(), cfg.Global.ServerName, serverName, invReq)
 		if err == nil {
-			t.Error("expected an error, got none")
+			t.Errorf("expected an error, got none")
 			continue
 		}
 		gerr, ok := err.(gomatrix.HTTPError)
 		if !ok {
-			t.Error("failed to cast response error as gomatrix.HTTPError: %s", err)
+			t.Errorf("failed to cast response error as gomatrix.HTTPError: %s", err)
 			continue
 		}
 		t.Logf("Error: %+v", gerr)
 		if gerr.Code == 404 {
-			t.Error("invite event resulted in a 404")
+			t.Errorf("invite event resulted in a 404")
 		}
 	}
 }

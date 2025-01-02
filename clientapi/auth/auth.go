@@ -23,8 +23,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -67,7 +67,7 @@ func VerifyUserFromRequest(
 		AppServiceUserID: req.URL.Query().Get("user_id"),
 	}, &res)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("userAPI.QueryAccessToken failed")
+		util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryAccessToken failed")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

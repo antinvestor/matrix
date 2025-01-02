@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/input"
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
@@ -93,7 +93,7 @@ func (r *Peeker) performPeekRoomByAlias(
 		dirRes := fsAPI.PerformDirectoryLookupResponse{}
 		err = r.FSAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
 		if err != nil {
-			logrus.With(slog.Any("error", err)).Error("error looking up alias %q", req.RoomIDOrAlias)
+			logrus.WithError(err).Errorf("error looking up alias %q", req.RoomIDOrAlias)
 			return "", fmt.Errorf("looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
 		}
 		roomID = dirRes.RoomID
@@ -156,7 +156,7 @@ func (r *Peeker) performPeekRoomByID(
 	if ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", ""); ev != nil {
 		content := map[string]string{}
 		if err = json.Unmarshal(ev.Content(), &content); err != nil {
-			util.GetLogger(ctx).With(slog.Any("error", err)).Error("json.Unmarshal for history visibility failed")
+			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
 			return "", err
 		}
 		if visibility, ok := content["history_visibility"]; ok {

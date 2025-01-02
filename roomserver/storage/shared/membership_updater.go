@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type MembershipUpdater struct {

@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
@@ -63,11 +63,11 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			// Try to load the filter from the database
 			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 			if err != nil {
-				util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("gomatrixserverlib.SplitID failed")
+				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 				return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 			}
 			if err := syncDB.GetFilter(req.Context(), &filter, localpart, filterQuery); err != nil && !errors.Is(err, sql.ErrNoRows) {
-				util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("syncDB.GetFilter failed")
+				util.GetLogger(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
 				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
 			}
 		}

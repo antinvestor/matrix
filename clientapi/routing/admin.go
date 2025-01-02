@@ -10,11 +10,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
@@ -281,7 +281,7 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 			JSON: spec.NotFound(err.Error()),
 		}
 	default:
-		logrus.With(slog.Any("error", err)).With("roomID", vars["roomID"]).Error("Failed to evacuate room")
+		logrus.WithError(err).WithField("roomID", vars["roomID"]).Error("Failed to evacuate room")
 		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{
@@ -300,7 +300,7 @@ func AdminEvacuateUser(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 
 	affected, err := rsAPI.PerformAdminEvacuateUser(req.Context(), vars["userID"])
 	if err != nil {
-		logrus.With(slog.Any("error", err)).With("userID", vars["userID"]).Error("Failed to evacuate user")
+		logrus.WithError(err).WithField("userID", vars["userID"]).Error("Failed to evacuate user")
 		return util.MessageResponse(http.StatusBadRequest, err.Error())
 	}
 
@@ -411,7 +411,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *api.De
 func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *api.Device, natsClient *nats.Conn) util.JSONResponse {
 	_, err := natsClient.RequestMsg(nats.NewMsg(cfg.Matrix.JetStream.Prefixed(jetstream.InputFulltextReindex)), time.Second*10)
 	if err != nil {
-		logrus.With(slog.Any("error", err)).Error("failed to publish nats message")
+		logrus.WithError(err).Error("failed to publish nats message")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -483,7 +483,7 @@ func AdminDownloadState(req *http.Request, device *api.Device, rsAPI roomserverA
 				JSON: spec.NotFound(err.Error()),
 			}
 		}
-		logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
+		logrus.WithError(err).WithFields(logrus.Fields{
 			"userID":     device.UserID,
 			"serverName": serverName,
 			"roomID":     roomID,
@@ -507,7 +507,7 @@ func GetEventReports(
 
 	eventReports, count, err := rsAPI.QueryAdminEventReports(req.Context(), from, limit, backwards, userID, roomID)
 	if err != nil {
-		logrus.With(slog.Any("error", err)).Error("failed to query event reports")
+		logrus.WithError(err).Error("failed to query event reports")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

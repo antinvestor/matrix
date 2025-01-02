@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -220,7 +220,7 @@ func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence stri
 	}
 
 	if err := rp.producer.SendPresence(userID, presenceToSet, newPresence.ClientFields.StatusMsg); err != nil {
-		logrus.With(slog.Any("error", err)).Error("Unable to publish presence message from sync")
+		logrus.WithError(err).Error("Unable to publish presence message from sync")
 		return
 	}
 
@@ -312,7 +312,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	// Clean up old send-to-device messages from before this stream position.
 	// This is needed to avoid sending the same message multiple times
 	if err = rp.db.CleanSendToDeviceUpdates(syncReq.Context, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
-		syncReq.Log.With(slog.Any("error", err)).Error("p.DB.CleanSendToDeviceUpdates failed")
+		syncReq.Log.WithError(err).Error("p.DB.CleanSendToDeviceUpdates failed")
 	}
 
 	// loop until we get some data
@@ -338,7 +338,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				if syncReq.Context.Err() == nil {
 					err = internal.DeviceOTKCounts(syncReq.Context, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
 					if err != nil && err != context.Canceled {
-						syncReq.Log.With(slog.Any("error", err)).Warn("failed to get OTK counts")
+						syncReq.Log.WithError(err).Warn("failed to get OTK counts")
 					}
 				}
 				return util.JSONResponse{
@@ -356,17 +356,17 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 			case <-userStreamListener.GetNotifyChannel(syncReq.Since):
 				currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
-				syncReq.Log.With("currentPos", currentPos).Debugln("Responding to sync after wake-up")
+				syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync after wake-up")
 			}
 		} else {
-			syncReq.Log.With("currentPos", currentPos).Debugln("Responding to sync immediately")
+			syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
 		}
 
 		withTransaction := func(from types.StreamPosition, f func(snapshot storage.DatabaseTransaction) types.StreamPosition) types.StreamPosition {
 			var succeeded bool
 			snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
 			if err != nil {
-				logrus.With(slog.Any("error", err)).Error("Failed to acquire database snapshot for sync request")
+				logrus.WithError(err).Error("Failed to acquire database snapshot for sync request")
 				return from
 			}
 			defer func() {
@@ -595,7 +595,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("newSyncRequest failed")
+		util.GetLogger(req.Context()).WithError(err).Error("newSyncRequest failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -603,7 +603,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 	snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		logrus.With(slog.Any("error", err)).Error("Failed to acquire database snapshot for key change")
+		logrus.WithError(err).Error("Failed to acquire database snapshot for key change")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -617,7 +617,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 		syncReq.Response, fromToken.DeviceListPosition, toToken.DeviceListPosition,
 	)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("Failed to DeviceListCatchup info")
+		util.GetLogger(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

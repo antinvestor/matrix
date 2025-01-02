@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
@@ -14,7 +15,6 @@ import (
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 func mustPresenceTable(t *testing.T, _ test.DependancyOption) (tables.Presence, func()) {

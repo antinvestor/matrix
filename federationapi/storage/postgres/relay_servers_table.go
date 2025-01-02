@@ -18,10 +18,10 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const relayServersSchema = `

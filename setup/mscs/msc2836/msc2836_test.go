@@ -17,10 +17,10 @@ import (
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/matrix/internal/hooks"
 	"github.com/antinvestor/matrix/internal/httputil"

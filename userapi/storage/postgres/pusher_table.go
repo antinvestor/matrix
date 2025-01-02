@@ -21,11 +21,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // See https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-pushers

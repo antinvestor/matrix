@@ -20,10 +20,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 
+	"github.com/antinvestor/gomatrix"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/clientapi/httputil"
@@ -32,7 +33,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrix"
 	"github.com/pitabwire/util"
 )
 
@@ -52,7 +52,7 @@ func GetProfile(
 			}
 		}
 
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("getProfile failed")
+		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -108,7 +108,7 @@ func SetAvatarURL(
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("gomatrixserverlib.SplitID failed")
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -132,7 +132,7 @@ func SetAvatarURL(
 
 	profile, changed, err := profileAPI.SetAvatarURL(req.Context(), localpart, domain, r.AvatarURL)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("profileAPI.SetAvatarURL failed")
+		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -197,7 +197,7 @@ func SetDisplayName(
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("gomatrixserverlib.SplitID failed")
+		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -221,7 +221,7 @@ func SetDisplayName(
 
 	profile, changed, err := profileAPI.SetDisplayName(req.Context(), localpart, domain, r.DisplayName)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("profileAPI.SetDisplayName failed")
+		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -261,7 +261,7 @@ func updateProfile(
 
 	rooms, err := rsAPI.QueryRoomsForUser(ctx, *deviceUserID, "join")
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("QueryRoomsForUser failed")
+		util.GetLogger(ctx).WithError(err).Error("QueryRoomsForUser failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -275,7 +275,7 @@ func updateProfile(
 
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("gomatrixserverlib.SplitID failed")
+		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -293,7 +293,7 @@ func updateProfile(
 			JSON: spec.BadJSON(e.Error()),
 		}, e
 	default:
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("buildMembershipEvents failed")
+		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -301,7 +301,7 @@ func updateProfile(
 	}
 
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, device.UserDomain(), domain, domain, nil, false); err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("SendEvents failed")
+		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

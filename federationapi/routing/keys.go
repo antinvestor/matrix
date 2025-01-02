@@ -19,13 +19,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	clienthttputil "github.com/antinvestor/matrix/clientapi/httputil"
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
@@ -251,7 +251,7 @@ func NotaryKeys(
 		for _, keys := range keyList {
 			j, err := json.Marshal(keys)
 			if err != nil {
-				logrus.With(slog.Any("error", err)).Error("Failed to marshal %q response", serverName)
+				logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -262,7 +262,7 @@ func NotaryKeys(
 				string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, j,
 			)
 			if err != nil {
-				logrus.With(slog.Any("error", err)).Error("Failed to sign %q response", serverName)
+				logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},

@@ -33,13 +33,13 @@ import (
 	"sync"
 	"unicode"
 
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/mediaapi/fileutils"
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/thumbnailer"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -179,7 +179,7 @@ func Download(
 		// it to the client, be more generic.
 		var perr *fs.PathError
 		if errors.As(err, &perr) {
-			dReq.Logger.With(slog.Any("error", err)).Error("failed to open file")
+			dReq.Logger.WithError(err).Error("failed to open file")
 			dReq.jsonErrorResponse(w, util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound("File not found"),
@@ -208,7 +208,7 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 	// Marshal JSON response into raw bytes to send as the HTTP body
 	resBytes, err := json.Marshal(res.JSON)
 	if err != nil {
-		r.Logger.With(slog.Any("error", err)).Error("Failed to marshal JSONResponse")
+		r.Logger.WithError(err).Error("Failed to marshal JSONResponse")
 		// this should never fail to be marshalled so drop err to the floor
 		res = util.MessageResponse(http.StatusNotFound, "Download request failed: "+err.Error())
 		resBytes, _ = json.Marshal(res.JSON)
@@ -216,7 +216,7 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 
 	// Set status code and write the body
 	w.WriteHeader(res.Code)
-	r.Logger.With("code", res.Code).Tracef("Responding (%d bytes)", len(resBytes))
+	r.Logger.WithField("code", res.Code).Tracef("Responding (%d bytes)", len(resBytes))
 
 	// we don't really care that much if we fail to write the error response
 	w.Write(resBytes) // nolint: errcheck
@@ -405,7 +405,7 @@ func multipartResponse(w http.ResponseWriter, r *downloadRequest, contentType st
 	w.Header().Del("Content-Length") // let Go handle the content length
 	defer func() {
 		if err := mw.Close(); err != nil {
-			r.Logger.With(slog.Any("error", err)).Error("Failed to close multipart writer")
+			r.Logger.WithError(err).Error("Failed to close multipart writer")
 		}
 	}()
 
@@ -658,7 +658,7 @@ func (r *downloadRequest) getRemoteFile(
 				cfg.MaxThumbnailGenerators,
 			)
 			if err != nil {
-				r.Logger.With(slog.Any("error", err)).Error("r.fetchRemoteFileAndStoreMetadata: failed to fetch remote file")
+				r.Logger.WithError(err).Errorf("r.fetchRemoteFileAndStoreMetadata: failed to fetch remote file")
 				return err
 			}
 		} else {
@@ -760,7 +760,7 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 			activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger,
 		)
 		if err != nil {
-			r.Logger.With(slog.Any("error", err)).Warn("Error generating thumbnails")
+			r.Logger.WithError(err).Warn("Error generating thumbnails")
 		}
 		if busy {
 			r.Logger.Warn("Maximum number of active thumbnail generators reached. Skipping pre-generation.")
@@ -894,7 +894,7 @@ func (r *downloadRequest) fetchRemoteFile(
 	// Data is truncated to maxFileSizeBytes. Content-Length was reported as 0 < Content-Length <= maxFileSizeBytes so this is OK.
 	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reader, absBasePath)
 	if err != nil {
-		r.Logger.With(slog.Any("error", err)).WithFields(log.Fields{
+		r.Logger.WithError(err).WithFields(log.Fields{
 			"MaxFileSizeBytes": maxFileSizeBytes,
 		}).Warn("Error while downloading file from remote server")
 		return "", false, errors.New("file could not be downloaded from remote server")
@@ -914,7 +914,7 @@ func (r *downloadRequest) fetchRemoteFile(
 		return "", false, fmt.Errorf("fileutils.MoveFileWithHashCheck: %w", err)
 	}
 	if duplicate {
-		r.Logger.With("dst", finalPath).Trace("File was stored previously - discarding duplicate")
+		r.Logger.WithField("dst", finalPath).Trace("File was stored previously - discarding duplicate")
 		// Continue on to store the metadata in the database
 	}
 

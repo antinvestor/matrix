@@ -21,9 +21,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
@@ -44,7 +44,7 @@ func MakeJoin(
 ) util.JSONResponse {
 	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID.String())
 	if err != nil {
-		util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("failed obtaining room version")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("failed obtaining room version")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -57,7 +57,7 @@ func MakeJoin(
 	}
 	res := api.QueryServerJoinedToRoomResponse{}
 	if err = rsAPI.QueryServerJoinedToRoom(httpReq.Context(), &req, &res); err != nil {
-		util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("rsAPI.QueryServerJoinedToRoom failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -67,7 +67,7 @@ func MakeJoin(
 	createJoinTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
 		identity, signErr := cfg.Matrix.SigningIdentityFor(request.Destination())
 		if signErr != nil {
-			util.GetLogger(httpReq.Context()).WithError(signErr).Error("obtaining signing identity for %s failed", request.Destination())
+			util.GetLogger(httpReq.Context()).WithError(signErr).Errorf("obtaining signing identity for %s failed", request.Destination())
 			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
 		}
 
@@ -101,7 +101,7 @@ func MakeJoin(
 
 	senderIDPtr, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID, userID)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("rsAPI.QuerySenderIDForUser failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QuerySenderIDForUser failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -201,7 +201,7 @@ func SendJoin(
 ) util.JSONResponse {
 	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID.String())
 	if err != nil {
-		util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("rsAPI.QueryRoomVersionForRoom failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryRoomVersionForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -285,7 +285,7 @@ func SendJoin(
 		ResolveState: true,
 	}, &stateAndAuthChainResponse)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("rsAPI.QueryStateAndAuthChain failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("rsAPI.QueryStateAndAuthChain failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -321,7 +321,7 @@ func SendJoin(
 			},
 		}, &rsResponse)
 		if rsResponse.ErrMsg != "" {
-			util.GetLogger(httpReq.Context()).With(logrus.ErrorKey, rsResponse.ErrMsg).Error("SendEvents failed")
+			util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, rsResponse.ErrMsg).Error("SendEvents failed")
 			if rsResponse.NotAllowed {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,

@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
@@ -60,10 +60,10 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 	senderID, err := r.URSAPI.QuerySenderIDForUser(ctx, *fullRoomID, userID)
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed getting senderID for user")
+		util.GetLogger(ctx).WithError(err).Error("Failed getting senderID for user")
 		return "", err
 	} else if senderID == nil {
-		util.GetLogger(ctx).With("userID", userID).With("roomID", *fullRoomID).Error("No senderID for user")
+		util.GetLogger(ctx).WithField("userID", userID).WithField("roomID", *fullRoomID).Error("No senderID for user")
 		return "", fmt.Errorf("No sender ID for %s in %s", userID, *fullRoomID)
 	}
 
@@ -164,7 +164,7 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 
 	switch resErr.(type) {
 	case api.ErrNotAllowed:
-		util.GetLogger(ctx).With(logrus.ErrorKey, resErr).Warn("UpgradeRoom: Could not restrict power levels in old room")
+		util.GetLogger(ctx).WithField(logrus.ErrorKey, resErr).Warn("UpgradeRoom: Could not restrict power levels in old room")
 	case nil:
 		return r.sendHeaderedEvent(ctx, userDomain, restrictedPowerLevelsHeadered, api.DoNotSendToOtherServers)
 	default:
@@ -234,7 +234,7 @@ func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api
 	})
 	switch resErr.(type) {
 	case api.ErrNotAllowed:
-		util.GetLogger(ctx).With(logrus.ErrorKey, resErr).Warn("UpgradeRoom: Could not set empty canonical alias event in old room")
+		util.GetLogger(ctx).WithField(logrus.ErrorKey, resErr).Warn("UpgradeRoom: Could not set empty canonical alias event in old room")
 	case nil:
 		return r.sendHeaderedEvent(ctx, userDomain, emptyCanonicalAliasEvent, api.DoNotSendToOtherServers)
 	default:
@@ -271,7 +271,7 @@ func publishNewRoomAndUnpublishOldRoom(
 		Visibility: spec.Public,
 	}); err != nil {
 		// treat as non-fatal since the room is already made by this point
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("failed to publish room")
+		util.GetLogger(ctx).WithError(err).Error("failed to publish room")
 	}
 
 	// remove the old room from the published room list
@@ -280,7 +280,7 @@ func publishNewRoomAndUnpublishOldRoom(
 		Visibility: "private",
 	}); err != nil {
 		// treat as non-fatal since the room is already made by this point
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("failed to un-publish room")
+		util.GetLogger(ctx).WithError(err).Error("failed to un-publish room")
 	}
 }
 
@@ -409,7 +409,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// need to send the original power levels again later on.
 	powerLevelContent, err := oldPowerLevelsEvent.PowerLevels()
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error()
+		util.GetLogger(ctx).WithError(err).Error()
 		return nil, fmt.Errorf("Power level event content was invalid")
 	}
 
@@ -458,7 +458,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 			StateKey: tuple.StateKey,
 		}
 		if err = json.Unmarshal(event.Content(), &newEvent.Content); err != nil {
-			logrus.With(slog.Any("error", err)).Error("Failed to unmarshal old event")
+			logrus.WithError(err).Error("Failed to unmarshal old event")
 			continue
 		}
 		eventsToMake = append(eventsToMake, newEvent)
@@ -478,7 +478,11 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, senderID spec.SenderID, userDomain spec.ServerName, newRoomID string, newVersion gomatrixserverlib.RoomVersion, eventsToMake []gomatrixserverlib.FledglingEvent) error {
 	var err error
 	var builtEvents []*types.HeaderedEvent
-	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	authEvents, err := gomatrixserverlib.NewAuthEvents(nil)
+	if err != nil {
+		return err
+	}
+
 	for i, e := range eventsToMake {
 		depth := i + 1 // depth starts at 1
 
@@ -503,7 +507,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, send
 			return err
 		}
 		builder := verImpl.NewEventBuilderFromProtoEvent(&proto)
-		if err = builder.AddAuthEvents(&authEvents); err != nil {
+		if err = builder.AddAuthEvents(authEvents); err != nil {
 			return err
 		}
 
@@ -514,7 +518,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, send
 
 		}
 
-		if err = gomatrixserverlib.Allowed(event, &authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		if err = gomatrixserverlib.Allowed(event, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.URSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
 			return fmt.Errorf("Failed to auth new %q event: %w", builder.Type, err)
@@ -594,8 +598,11 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, send
 	for i := range queryRes.StateEvents {
 		stateEvents[i] = queryRes.StateEvents[i].PDU
 	}
-	provider := gomatrixserverlib.NewAuthEvents(stateEvents)
-	if err = gomatrixserverlib.Allowed(headeredEvent.PDU, &provider, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	provider, err := gomatrixserverlib.NewAuthEvents(stateEvents)
+	if err != nil {
+		return nil, err
+	}
+	if err = gomatrixserverlib.Allowed(headeredEvent.PDU, provider, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return r.URSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}); err != nil {
 		return nil, api.ErrNotAllowed{Err: fmt.Errorf("failed to auth new %q event: %w", proto.Type, err)} // TODO: Is this error string comprehensible to the client?

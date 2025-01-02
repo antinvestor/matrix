@@ -18,8 +18,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const assumedOfflineSchema = `

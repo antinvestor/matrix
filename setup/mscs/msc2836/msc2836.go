@@ -27,6 +27,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	fs "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/internal/hooks"
 	"github.com/antinvestor/matrix/internal/httputil"
@@ -36,9 +39,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -117,7 +117,7 @@ func Enable(
 		he := headeredEvent.(*types.HeaderedEvent)
 		hookErr := db.StoreRelation(context.Background(), he)
 		if hookErr != nil {
-			util.GetLogger(context.Background()).WithError(hookErr).With("event_id", he.EventID()).Error(
+			util.GetLogger(context.Background()).WithError(hookErr).WithField("event_id", he.EventID()).Error(
 				"failed to StoreRelation",
 			)
 		}
@@ -125,7 +125,7 @@ func Enable(
 		// so we catch child metadata originating from /send transactions
 		hookErr = db.UpdateChildMetadata(context.Background(), he)
 		if hookErr != nil {
-			util.GetLogger(context.Background()).With(slog.Any("error", err)).With("event_id", he.EventID()).Warn(
+			util.GetLogger(context.Background()).WithError(err).WithField("event_id", he.EventID()).Warn(
 				"failed to update child metadata for event",
 			)
 		}
@@ -167,7 +167,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 	return func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		relation, err := NewEventRelationshipRequest(req.Body)
 		if err != nil {
-			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("failed to decode HTTP request as JSON")
+			util.GetLogger(req.Context()).WithError(err).Error("failed to decode HTTP request as JSON")
 			return util.JSONResponse{
 				Code: 400,
 				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
@@ -206,7 +206,7 @@ func federatedEventRelationship(
 ) util.JSONResponse {
 	relation, err := NewEventRelationshipRequest(bytes.NewBuffer(fedReq.Content()))
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("failed to decode HTTP request as JSON")
+		util.GetLogger(ctx).WithError(err).Error("failed to decode HTTP request as JSON")
 		return util.JSONResponse{
 			Code: 400,
 			JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
@@ -244,7 +244,7 @@ func federatedEventRelationship(
 	}, &queryRes)
 	if err != nil {
 		// they may already have the auth events so don't fail this request
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed to QueryAuthChain")
+		util.GetLogger(ctx).WithError(err).Error("Failed to QueryAuthChain")
 	}
 	res.AuthChain = make(gomatrixserverlib.EventJSONs, len(queryRes.AuthChain))
 	for i := range queryRes.AuthChain {
@@ -332,12 +332,12 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *types.HeaderedEvent
 		// we don't do fed hits for fed requests, and we can't ask servers without a room ID!
 		return nil
 	}
-	logger := util.GetLogger(rc.ctx).With("room_id", roomID)
+	logger := util.GetLogger(rc.ctx).WithField("room_id", roomID)
 	// if they supplied a room_id, check the room exists.
 
 	roomVersion, err := rc.rsAPI.QueryRoomVersionForRoom(rc.ctx, roomID)
 	if err != nil {
-		logger.With(slog.Any("error", err)).Warn("failed to query room version for room, does this room exist?")
+		logger.WithError(err).Warn("failed to query room version for room, does this room exist?")
 		return nil
 	}
 
@@ -348,7 +348,7 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *types.HeaderedEvent
 		UserID: rc.userID,
 	}, &queryMemRes)
 	if err != nil {
-		logger.With(slog.Any("error", err)).Warn("failed to query membership for user in room")
+		logger.WithError(err).Warn("failed to query membership for user in room")
 		return nil
 	}
 	if !queryMemRes.IsInRoom {
@@ -361,7 +361,7 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *types.HeaderedEvent
 		RoomID: roomID,
 	}, &queryRes)
 	if err != nil {
-		logger.With(slog.Any("error", err)).Error("failed to QueryJoinedHostServerNamesInRoom")
+		logger.WithError(err).Error("failed to QueryJoinedHostServerNamesInRoom")
 		return nil
 	}
 	// query up to 5 servers
@@ -385,7 +385,7 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *types.HeaderedEvent
 			}
 		}
 	}
-	logger.With("servers", serversToQuery).Warn("failed to query event relationships")
+	logger.WithField("servers", serversToQuery).Warn("failed to query event relationships")
 	return nil
 }
 
@@ -417,7 +417,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 				RecentFirst: true,
 			}, rc.roomVersion)
 			if err != nil {
-				util.GetLogger(rc.ctx).With(slog.Any("error", err)).With("server", srv).Error("includeChildren: failed to call MSC2836EventRelationships")
+				util.GetLogger(rc.ctx).WithError(err).WithField("server", srv).Error("includeChildren: failed to call MSC2836EventRelationships")
 			} else {
 				mscRes := &MSC2836EventRelationshipsResponse{
 					MSC2836EventRelationshipsResponse: res,
@@ -435,7 +435,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	}
 	children, err := db.ChildrenForParent(rc.ctx, parentID, constRelType, recentFirst)
 	if err != nil {
-		util.GetLogger(rc.ctx).With(slog.Any("error", err)).Error("failed to get ChildrenForParent")
+		util.GetLogger(rc.ctx).WithError(err).Error("failed to get ChildrenForParent")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -490,7 +490,7 @@ func walkThread(
 	}
 	limited, err := eventWalker.WalkFrom(rc.req.EventID)
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("Failed to WalkFrom %s", rc.req.EventID)
+		util.GetLogger(ctx).WithError(err).Errorf("Failed to WalkFrom %s", rc.req.EventID)
 	}
 	return result, limited
 }
@@ -507,7 +507,7 @@ func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv spec.ServerName,
 		RecentFirst: rc.req.RecentFirst,
 	}, ver)
 	if err != nil {
-		util.GetLogger(rc.ctx).With(slog.Any("error", err)).Error("Failed to call MSC2836EventRelationships")
+		util.GetLogger(rc.ctx).WithError(err).Error("Failed to call MSC2836EventRelationships")
 		return nil, err
 	}
 	mscRes := &MSC2836EventRelationshipsResponse{
@@ -529,7 +529,7 @@ func (rc *reqCtx) authorisedToSeeEvent(event *types.HeaderedEvent) bool {
 			RoomID: event.RoomID().String(),
 		}, &res)
 		if err != nil {
-			util.GetLogger(rc.ctx).With(slog.Any("error", err)).Error("authorisedToSeeEvent: failed to QueryJoinedHostServerNamesInRoom")
+			util.GetLogger(rc.ctx).WithError(err).Error("authorisedToSeeEvent: failed to QueryJoinedHostServerNamesInRoom")
 			return false
 		}
 		for _, srv := range res.ServerNames {
@@ -549,7 +549,7 @@ func (rc *reqCtx) authorisedToSeeEvent(event *types.HeaderedEvent) bool {
 		UserID: rc.userID,
 	}, &queryMembershipRes)
 	if err != nil {
-		util.GetLogger(rc.ctx).With(slog.Any("error", err)).Error("authorisedToSeeEvent: failed to QueryMembershipForUser")
+		util.GetLogger(rc.ctx).WithError(err).Error("authorisedToSeeEvent: failed to QueryMembershipForUser")
 		return false
 	}
 	return queryMembershipRes.IsInRoom
@@ -557,13 +557,13 @@ func (rc *reqCtx) authorisedToSeeEvent(event *types.HeaderedEvent) bool {
 
 func (rc *reqCtx) getServersForEventID(eventID string) []spec.ServerName {
 	if rc.req.RoomID == "" {
-		util.GetLogger(rc.ctx).With("event_id", eventID).Error(
+		util.GetLogger(rc.ctx).WithField("event_id", eventID).Error(
 			"getServersForEventID: event exists in unknown room",
 		)
 		return nil
 	}
 	if rc.roomVersion == "" {
-		util.GetLogger(rc.ctx).With("event_id", eventID).Error(
+		util.GetLogger(rc.ctx).WithField("event_id", eventID).Errorf(
 			"getServersForEventID: event exists in %s with unknown room version", rc.req.RoomID,
 		)
 		return nil
@@ -573,7 +573,7 @@ func (rc *reqCtx) getServersForEventID(eventID string) []spec.ServerName {
 		RoomID: rc.req.RoomID,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(rc.ctx).With(slog.Any("error", err)).Error("getServersForEventID: failed to QueryJoinedHostServerNamesInRoom")
+		util.GetLogger(rc.ctx).WithError(err).Error("getServersForEventID: failed to QueryJoinedHostServerNamesInRoom")
 		return nil
 	}
 	// query up to 5 servers
@@ -594,7 +594,7 @@ func (rc *reqCtx) remoteEventRelationships(eventID string) *MSC2836EventRelation
 	for _, srv := range serversToQuery {
 		res, err = rc.MSC2836EventRelationships(eventID, srv, rc.roomVersion)
 		if err != nil {
-			util.GetLogger(rc.ctx).With(slog.Any("error", err)).With("server", srv).Error("remoteEventRelationships: failed to call MSC2836EventRelationships")
+			util.GetLogger(rc.ctx).WithError(err).WithField("server", srv).Error("remoteEventRelationships: failed to call MSC2836EventRelationships")
 		} else {
 			break
 		}
@@ -625,7 +625,7 @@ func (rc *reqCtx) lookForEvent(eventID string) *types.HeaderedEvent {
 			rc.injectResponseToRoomserver(queryRes)
 			err := rc.db.MarkChildrenExplored(context.Background(), eventID)
 			if err != nil {
-				util.GetLogger(rc.ctx).With(slog.Any("error", err)).Warn("failed to mark children of %s as explored", eventID)
+				util.GetLogger(rc.ctx).WithError(err).Warnf("failed to mark children of %s as explored", eventID)
 			}
 		}
 	}
@@ -642,11 +642,11 @@ func (rc *reqCtx) getLocalEvent(roomID, eventID string) *types.HeaderedEvent {
 		EventIDs: []string{eventID},
 	}, &queryEventsRes)
 	if err != nil {
-		util.GetLogger(rc.ctx).With(slog.Any("error", err)).Error("getLocalEvent: failed to QueryEventsByID")
+		util.GetLogger(rc.ctx).WithError(err).Error("getLocalEvent: failed to QueryEventsByID")
 		return nil
 	}
 	if len(queryEventsRes.Events) == 0 {
-		util.GetLogger(rc.ctx).With("event_id", eventID).Info("getLocalEvent: event does not exist")
+		util.GetLogger(rc.ctx).WithField("event_id", eventID).Infof("getLocalEvent: event does not exist")
 		return nil // event does not exist
 	}
 	return queryEventsRes.Events[0]
@@ -681,7 +681,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 	// we've got the data by this point so use a background context
 	err := roomserver.SendInputRoomEvents(context.Background(), rc.rsAPI, rc.serverName, ires, false)
 	if err != nil {
-		util.GetLogger(rc.ctx).With(slog.Any("error", err)).Error("failed to inject MSC2836EventRelationshipsResponse into the roomserver")
+		util.GetLogger(rc.ctx).WithError(err).Error("failed to inject MSC2836EventRelationshipsResponse into the roomserver")
 	}
 	// update the child count / hash columns for these nodes. We need to do this here because not all events will make it
 	// through to the KindNewEventPersisted hook because the roomserver will ignore duplicates. Duplicates have meaning though
@@ -689,7 +689,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 	for _, ev := range ires {
 		err = rc.db.UpdateChildMetadata(context.Background(), ev.Event)
 		if err != nil {
-			util.GetLogger(rc.ctx).With(slog.Any("error", err)).With("event_id", ev.Event.EventID()).Warn("failed to update child metadata for event")
+			util.GetLogger(rc.ctx).WithError(err).WithField("event_id", ev.Event.EventID()).Warn("failed to update child metadata for event")
 		}
 	}
 }
@@ -701,20 +701,20 @@ func (rc *reqCtx) addChildMetadata(ev *types.HeaderedEvent) {
 	}
 	err := ev.SetUnsignedField("children_hash", spec.Base64Bytes(hash))
 	if err != nil {
-		util.GetLogger(rc.ctx).With(slog.Any("error", err)).Warn("Failed to set children_hash")
+		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children_hash")
 	}
 	err = ev.SetUnsignedField("children", map[string]int{
 		constRelType: count,
 	})
 	if err != nil {
-		util.GetLogger(rc.ctx).With(slog.Any("error", err)).Warn("Failed to set children count")
+		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to set children count")
 	}
 }
 
 func (rc *reqCtx) getChildMetadata(eventID string) (count int, hash []byte) {
 	children, err := rc.db.ChildrenForParent(rc.ctx, eventID, constRelType, false)
 	if err != nil {
-		util.GetLogger(rc.ctx).With(slog.Any("error", err)).Warn("Failed to get ChildrenForParent for getting child metadata")
+		util.GetLogger(rc.ctx).WithError(err).Warn("Failed to get ChildrenForParent for getting child metadata")
 		return
 	}
 	if len(children) == 0 {
@@ -747,7 +747,7 @@ func (rc *reqCtx) hasUnexploredChildren(eventID string) bool {
 	// extract largest child count from event
 	eventCount, eventHash, explored, err := rc.db.ChildMetadata(rc.ctx, eventID)
 	if err != nil {
-		util.GetLogger(rc.ctx).With(slog.Any("error", err)).With("event_id", eventID).Warn(
+		util.GetLogger(rc.ctx).WithError(err).WithField("event_id", eventID).Warn(
 			"failed to get ChildMetadata from db",
 		)
 		return false
@@ -789,7 +789,7 @@ type walker struct {
 func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
 	children, err := w.childrenForParent(eventID)
 	if err != nil {
-		util.GetLogger(w.ctx).With(slog.Any("error", err)).Error("WalkFrom() childrenForParent failed, cannot walk")
+		util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
 		return false, err
 	}
 	var next *walkInfo
@@ -803,7 +803,7 @@ func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
 		// find the children's children
 		children, err = w.childrenForParent(next.EventID)
 		if err != nil {
-			util.GetLogger(w.ctx).With(slog.Any("error", err)).Error("WalkFrom() childrenForParent failed, cannot walk")
+			util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
 			return false, err
 		}
 		toWalk = w.addChildren(toWalk, children, next.Depth+1)

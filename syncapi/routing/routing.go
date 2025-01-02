@@ -17,8 +17,8 @@ package routing
 import (
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/caching"

@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/blevesearch/bleve/v2/search"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -124,13 +124,13 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		orderByTime,
 	)
 	if err != nil {
-		logrus.With(slog.Any("error", err)).Error("failed to search fulltext")
+		logrus.WithError(err).Error("failed to search fulltext")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	logrus.Debug("Search took %s", result.Took)
+	logrus.Debugf("Search took %s", result.Took)
 
 	// From was specified but empty, return no results, only the count
 	if from != nil && *from == "" {
@@ -167,7 +167,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 	evs, err := syncDB.Events(ctx, wantEvents)
 	if err != nil {
-		logrus.With(slog.Any("error", err)).Error("failed to get events from database")
+		logrus.WithError(err).Error("failed to get events from database")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -188,7 +188,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	for _, event := range evs {
 		eventsBefore, eventsAfter, err := contextEvents(ctx, snapshot, event, roomFilter, searchReq)
 		if err != nil {
-			logrus.With(slog.Any("error", err)).Error("failed to get context events")
+			logrus.WithError(err).Error("failed to get context events")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -196,7 +196,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		}
 		startToken, endToken, err := getStartEnd(ctx, snapshot, eventsBefore, eventsAfter)
 		if err != nil {
-			logrus.With(slog.Any("error", err)).Error("failed to get start/end")
+			logrus.WithError(err).Error("failed to get start/end")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -207,7 +207,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		for _, ev := range append(eventsBefore, eventsAfter...) {
 			userID, queryErr := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
 			if queryErr != nil {
-				logrus.WithError(queryErr).With("sender_id", ev.SenderID()).Warn("failed to query userprofile")
+				logrus.WithError(queryErr).WithField("sender_id", ev.SenderID()).Warn("failed to query userprofile")
 				continue
 			}
 
@@ -215,7 +215,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			if !ok {
 				stateEvent, stateErr := snapshot.GetStateEvent(ctx, ev.RoomID().String(), spec.MRoomMember, string(ev.SenderID()))
 				if stateErr != nil {
-					logrus.WithError(stateErr).With("sender_id", event.SenderID()).Warn("failed to query userprofile")
+					logrus.WithError(stateErr).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
 					continue
 				}
 				if stateEvent == nil {
@@ -234,7 +234,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		if err != nil {
-			util.GetLogger(req.Context()).With(slog.Any("error", err)).With("senderID", event.SenderID()).Error("Failed converting to ClientEvent")
+			util.GetLogger(req.Context()).WithError(err).WithField("senderID", event.SenderID()).Error("Failed converting to ClientEvent")
 			continue
 		}
 
@@ -260,7 +260,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			stateFilter := synctypes.DefaultStateFilter()
 			state, err := snapshot.CurrentState(ctx, event.RoomID().String(), &stateFilter, nil)
 			if err != nil {
-				logrus.With(slog.Any("error", err)).Error("unable to get current state")
+				logrus.WithError(err).Error("unable to get current state")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -295,7 +295,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		},
 	}
 
-	logrus.Debug("Full search request took %v", time.Since(start))
+	logrus.Debugf("Full search request took %v", time.Since(start))
 
 	succeeded = true
 	return util.JSONResponse{
@@ -314,19 +314,19 @@ func contextEvents(
 ) ([]*types.HeaderedEvent, []*types.HeaderedEvent, error) {
 	id, _, err := snapshot.SelectContextEvent(ctx, event.RoomID().String(), event.EventID())
 	if err != nil {
-		logrus.With(slog.Any("error", err)).Error("failed to query context event")
+		logrus.WithError(err).Error("failed to query context event")
 		return nil, nil, err
 	}
 	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.BeforeLimit
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, event.RoomID().String(), roomFilter)
 	if err != nil {
-		logrus.With(slog.Any("error", err)).Error("failed to query before context event")
+		logrus.WithError(err).Error("failed to query before context event")
 		return nil, nil, err
 	}
 	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.AfterLimit
 	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, event.RoomID().String(), roomFilter)
 	if err != nil {
-		logrus.With(slog.Any("error", err)).Error("failed to query after context event")
+		logrus.WithError(err).Error("failed to query after context event")
 		return nil, nil, err
 	}
 	return eventsBefore, eventsAfter, err

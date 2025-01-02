@@ -20,14 +20,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/pitabwire/util"
 )
 
 // PerformLoginTokenCreation creates a new login token and associates it with the provided data.
 func (a *UserInternalAPI) PerformLoginTokenCreation(ctx context.Context, req *api.PerformLoginTokenCreationRequest, res *api.PerformLoginTokenCreationResponse) error {
-	util.GetLogger(ctx).With("user_id", req.Data.UserID).Info("PerformLoginTokenCreation")
+	util.GetLogger(ctx).WithField("user_id", req.Data.UserID).Info("PerformLoginTokenCreation")
 	_, domain, err := gomatrixserverlib.SplitID('@', req.Data.UserID)
 	if err != nil {
 		return err

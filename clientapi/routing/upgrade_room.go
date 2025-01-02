@@ -18,6 +18,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/internal/eventutil"
@@ -25,8 +27,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/version"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -61,7 +61,7 @@ func UpgradeRoom(
 
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("device UserID is invalid")
+		util.GetLogger(req.Context()).WithError(err).Error("device UserID is invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

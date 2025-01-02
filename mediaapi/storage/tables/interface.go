@@ -18,8 +18,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/mediaapi/types"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type Thumbnails interface {

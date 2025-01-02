@@ -20,10 +20,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 const outboundPeeksSchema = `

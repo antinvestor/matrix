@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -66,7 +66,7 @@ func (r *Joiner) PerformJoin(
 	logger.Info("User requested to room join")
 	roomID, joinedVia, err = r.performJoin(context.Background(), req)
 	if err != nil {
-		logger.With(slog.Any("error", err)).Error("Failed to join room")
+		logger.WithError(err).Error("Failed to join room")
 		sentry.CaptureException(err)
 		return "", "", err
 	}
@@ -119,7 +119,7 @@ func (r *Joiner) performJoinRoomByAlias(
 		dirRes := fsAPI.PerformDirectoryLookupResponse{}
 		err = r.FSAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
 		if err != nil {
-			logrus.With(slog.Any("error", err)).Error("error looking up alias %q", req.RoomIDOrAlias)
+			logrus.WithError(err).Errorf("error looking up alias %q", req.RoomIDOrAlias)
 			return "", "", fmt.Errorf("looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
 		}
 		roomID = dirRes.RoomID
@@ -260,7 +260,7 @@ func (r *Joiner) performJoinRoomByID(
 		guestAccess := "forbidden"
 		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, spec.MRoomGuestAccess, "")
 		if (err != nil && !errors.Is(err, sql.ErrNoRows)) || guestAccessEvent == nil {
-			logrus.With(slog.Any("error", err)).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
+			logrus.WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
 		}
 		if guestAccessEvent != nil {
 			guestAccess = gjson.GetBytes(guestAccessEvent.Content(), "guest_access").String()
@@ -294,7 +294,7 @@ func (r *Joiner) performJoinRoomByID(
 		var pseudoIDKey ed25519.PrivateKey
 		pseudoIDKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
 		if err != nil {
-			util.GetLogger(ctx).With(slog.Any("error", err)).Error("GetOrCreateUserRoomPrivateKey failed")
+			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
 			return "", "", err
 		}
 

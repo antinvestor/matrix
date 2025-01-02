@@ -20,8 +20,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/producers"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"

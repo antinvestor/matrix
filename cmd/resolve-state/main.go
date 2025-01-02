@@ -11,6 +11,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/state"
@@ -19,8 +21,6 @@ import (
 	"github.com/antinvestor/matrix/setup"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // This is a utility for inspecting state snapshots and running state resolution

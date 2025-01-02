@@ -18,11 +18,11 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/antinvestor/gomatrix"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -45,7 +45,7 @@ func GetTags(
 
 	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("obtainSavedTags failed")
+		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -85,7 +85,7 @@ func PutTag(
 
 	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("obtainSavedTags failed")
+		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -98,7 +98,7 @@ func PutTag(
 	tagContent.Tags[tag] = properties
 
 	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("saveTagData failed")
+		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -133,7 +133,7 @@ func DeleteTag(
 
 	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("obtainSavedTags failed")
+		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -152,7 +152,7 @@ func DeleteTag(
 	}
 
 	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("saveTagData failed")
+		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

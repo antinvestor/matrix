@@ -18,9 +18,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -34,7 +34,7 @@ func GetNotifications(
 		var err error
 		limit, err = strconv.ParseInt(limitStr, 10, 64)
 		if err != nil {
-			util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("ParseInt(limit) failed")
+			util.GetLogger(req.Context()).WithError(err).Error("ParseInt(limit) failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -45,7 +45,7 @@ func GetNotifications(
 	var queryRes userapi.QueryNotificationsResponse
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("SplitID failed")
+		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -59,13 +59,13 @@ func GetNotifications(
 		Only:       req.URL.Query().Get("only"),
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("QueryNotifications failed")
+		util.GetLogger(req.Context()).WithError(err).Error("QueryNotifications failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	util.GetLogger(req.Context()).With("from", req.URL.Query().Get("from")).With("limit", limit).With("only", req.URL.Query().Get("only")).With("next", queryRes.NextToken).Info("QueryNotifications: len %d", len(queryRes.Notifications))
+	util.GetLogger(req.Context()).WithField("from", req.URL.Query().Get("from")).WithField("limit", limit).WithField("only", req.URL.Query().Get("only")).WithField("next", queryRes.NextToken).Infof("QueryNotifications: len %d", len(queryRes.Notifications))
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: queryRes,

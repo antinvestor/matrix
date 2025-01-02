@@ -20,11 +20,11 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
 )
@@ -59,7 +59,7 @@ func GetDeviceByID(
 		UserID: device.UserID,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("QueryDevices failed")
+		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -99,7 +99,7 @@ func GetDevicesByLocalpart(
 		UserID: device.UserID,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("QueryDevices failed")
+		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -144,7 +144,7 @@ func UpdateDeviceByID(
 		DisplayName:      payload.DisplayName,
 	}, &performRes)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("PerformDeviceUpdate failed")
+		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceUpdate failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -214,7 +214,7 @@ func DeleteDeviceById(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("gomatrixserverlib.SplitID failed")
+		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -235,7 +235,7 @@ func DeleteDeviceById(
 		UserID:    device.UserID,
 		DeviceIDs: []string{deviceID},
 	}, &res); err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("userAPI.PerformDeviceDeletion failed")
+		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -280,7 +280,7 @@ func DeleteDevices(
 
 	payload := devicesDeleteJSON{}
 	if err = json.Unmarshal(bodyBytes, &payload); err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("unable to unmarshal device deletion request")
+		util.GetLogger(ctx).WithError(err).Error("unable to unmarshal device deletion request")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -292,7 +292,7 @@ func DeleteDevices(
 		UserID:    device.UserID,
 		DeviceIDs: payload.Devices,
 	}, &res); err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("userAPI.PerformDeviceDeletion failed")
+		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

@@ -20,13 +20,13 @@ import (
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/internal"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // GetEvent implements

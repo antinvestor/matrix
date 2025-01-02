@@ -18,10 +18,10 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/relayapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
@@ -35,7 +35,7 @@ func SendTransactionToRelay(
 	txnID gomatrixserverlib.TransactionID,
 	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Info("Processing send_relay for %s", userID.String())
+	logrus.Infof("Processing send_relay for %s", userID.String())
 
 	var txnEvents fclient.RelayEvents
 	if err := json.Unmarshal(fedReq.Content(), &txnEvents); err != nil {
@@ -62,7 +62,7 @@ func SendTransactionToRelay(
 	t.TransactionID = txnID
 	t.Destination = userID.Domain()
 
-	util.GetLogger(httpReq.Context()).Warn("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
+	util.GetLogger(httpReq.Context()).Warnf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
 
 	err := relayAPI.PerformStoreTransaction(httpReq.Context(), t, userID)
 	if err != nil {

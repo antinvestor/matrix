@@ -15,6 +15,8 @@
 package setup
 
 import (
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi"
 	"github.com/antinvestor/matrix/clientapi/api"
@@ -33,8 +35,6 @@ import (
 	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 )
 
 // Monolith represents an instantiation of all dependencies required to build

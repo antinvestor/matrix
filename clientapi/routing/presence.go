@@ -20,13 +20,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
@@ -71,7 +71,7 @@ func SetPresence(
 	}
 	err := producer.SendPresence(req.Context(), userID, presenceStatus, presence.StatusMsg)
 	if err != nil {
-		log.With(slog.Any("error", err)).Error("failed to update presence")
+		log.WithError(err).Errorf("failed to update presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -96,7 +96,7 @@ func GetPresence(
 
 	presence, err := natsClient.RequestMsg(msg, time.Second*10)
 	if err != nil {
-		log.With(slog.Any("error", err)).Error("unable to get presence")
+		log.WithError(err).Errorf("unable to get presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -106,7 +106,7 @@ func GetPresence(
 	statusMsg := presence.Header.Get("status_msg")
 	e := presence.Header.Get("error")
 	if e != "" {
-		log.Error("received error msg from nats: %s", e)
+		log.Errorf("received error msg from nats: %s", e)
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: types.PresenceClientResponse{

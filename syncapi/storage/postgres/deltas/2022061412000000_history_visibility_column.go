@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func UpAddHistoryVisibilityColumnOutputRoomEvents(ctx context.Context, tx *sql.Tx) error {

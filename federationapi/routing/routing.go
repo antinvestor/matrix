@@ -22,6 +22,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedInternal "github.com/antinvestor/matrix/federationapi/internal"
 	"github.com/antinvestor/matrix/federationapi/producers"
 	"github.com/antinvestor/matrix/internal"
@@ -32,9 +35,6 @@ import (
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -110,7 +110,7 @@ func Setup(
 	})
 
 	if cfg.Matrix.WellKnownServerName != "" {
-		logrus.Info("Setting m.server as %s at /.well-known/matrix/server", cfg.Matrix.WellKnownServerName)
+		logrus.Infof("Setting m.server as %s at /.well-known/matrix/server", cfg.Matrix.WellKnownServerName)
 		wkMux.Handle("/server", httputil.MakeExternalAPI("wellknown", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -391,7 +391,7 @@ func Setup(
 				}
 			}
 
-			logrus.Debug("Processing make_join for user %s, room %s", userID.String(), roomID.String())
+			logrus.Debugf("Processing make_join for user %s, room %s", userID.String(), roomID.String())
 			return MakeJoin(
 				httpReq, request, cfg, rsAPI, *roomID, *userID, remoteVersions,
 			)
@@ -695,10 +695,10 @@ func MakeFedHTTPAPI(
 		logger := util.GetLogger(req.Context())
 		if fedReq == nil {
 
-			logger.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, errResp.Code)
+			logger.Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, errResp.Code)
 			w.WriteHeader(errResp.Code)
 			if err := enc.Encode(errResp); err != nil {
-				logger.With(slog.Any("error", err)).Error("failed to encode JSON response")
+				logger.WithError(err).Error("failed to encode JSON response")
 			}
 			return
 		}

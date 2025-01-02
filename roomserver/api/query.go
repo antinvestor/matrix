@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
@@ -464,19 +464,19 @@ func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID sp
 	}
 	res := QueryServerJoinedToRoomResponse{}
 	if err = rq.Roomserver.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("rsAPI.QueryServerJoinedToRoom failed")
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return nil, fmt.Errorf("InternalServerError: Failed to query room: %w", err)
 	}
 
 	userJoinedToRoom, err := rq.Roomserver.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), senderID)
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("rsAPI.UserJoinedToRoom failed")
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
 		return nil, fmt.Errorf("InternalServerError: %w", err)
 	}
 
 	locallyJoinedUsers, err := rq.Roomserver.LocallyJoinedUsers(ctx, roomInfo.RoomVersion, types.RoomNID(roomInfo.RoomNID))
 	if err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("rsAPI.GetLocallyJoinedUsers failed")
+		util.GetLogger(ctx).WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
 		return nil, fmt.Errorf("InternalServerError: %w", err)
 	}
 

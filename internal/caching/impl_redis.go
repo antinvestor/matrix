@@ -23,9 +23,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
 	"github.com/redis/go-redis/v9"
 )
 

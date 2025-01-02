@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrix"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
@@ -101,10 +101,10 @@ func (r *FederationInternalAPI) PerformJoin(
 			serverName,
 			request.Unsigned,
 		); err != nil {
-			logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
+			logrus.WithError(err).WithFields(logrus.Fields{
 				"server_name": serverName,
 				"room_id":     request.RoomID,
-			}).Warn("Failed to join room through server")
+			}).Warnf("Failed to join room through server")
 			lastErr = err
 			continue
 		}
@@ -130,7 +130,7 @@ func (r *FederationInternalAPI) PerformJoin(
 		}
 	}
 
-	logrus.Error(
+	logrus.Errorf(
 		"failed to join user %q to room %q through %d server(s): last error %s",
 		request.UserID, request.RoomID, len(request.ServerNames), lastErr,
 	)
@@ -217,7 +217,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
 
-	logrus.With("room", roomID).Info("Joined federated room with %d hosts", len(joinedHosts))
+	logrus.WithField("room", roomID).Infof("Joined federated room with %d hosts", len(joinedHosts))
 	if _, err = r.db.UpdateRoom(context.Background(), roomID, joinedHosts, nil, true); err != nil {
 		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
 	}
@@ -285,10 +285,10 @@ func (r *FederationInternalAPI) PerformOutboundPeek(
 			serverName,
 			supportedVersions,
 		); err != nil {
-			logrus.With(slog.Any("error", err)).WithFields(logrus.Fields{
+			logrus.WithError(err).WithFields(logrus.Fields{
 				"server_name": serverName,
 				"room_id":     request.RoomID,
-			}).Warn("Failed to peek room through server")
+			}).Warnf("Failed to peek room through server")
 			lastErr = err
 			continue
 		}
@@ -310,7 +310,7 @@ func (r *FederationInternalAPI) PerformOutboundPeek(
 		}
 	}
 
-	logrus.Error(
+	logrus.Errorf(
 		"failed to peek room %q through %d server(s): last error %s",
 		request.RoomID, len(request.ServerNames), lastErr,
 	)
@@ -345,10 +345,10 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	if outboundPeek != nil {
 		nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 		if nowMilli > outboundPeek.RenewedTimestamp+outboundPeek.RenewalInterval {
-			logrus.Info("stale outbound peek to %s for %s already exists; renewing", serverName, roomID)
+			logrus.Infof("stale outbound peek to %s for %s already exists; renewing", serverName, roomID)
 			renewing = true
 		} else {
-			logrus.Info("live outbound peek to %s for %s already exists", serverName, roomID)
+			logrus.Infof("live outbound peek to %s for %s already exists", serverName, roomID)
 			return nil
 		}
 	}
@@ -407,7 +407,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 		}
 	}
 
-	// logrus.Warn("got respPeek %#v", respPeek)
+	// logrus.Warnf("got respPeek %#v", respPeek)
 	// Send the newly returned state to the roomserver to update our local view.
 	if err = roomserverAPI.SendEventWithState(
 		ctx, r.rsAPI, r.cfg.Matrix.ServerName,
@@ -460,7 +460,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		)
 		if err != nil {
 			// TODO: Check if the user was not allowed to leave the room.
-			logrus.With(slog.Any("error", err)).Warn("r.federation.MakeLeave failed")
+			logrus.WithError(err).Warnf("r.federation.MakeLeave failed")
 			r.statistics.ForServer(serverName).Failure()
 			continue
 		}
@@ -497,12 +497,12 @@ func (r *FederationInternalAPI) PerformLeave(
 				"membership": "leave",
 			}
 			if err = leaveEB.SetContent(content); err != nil {
-				logrus.With(slog.Any("error", err)).Warn("respMakeLeave.LeaveEvent.SetContent failed")
+				logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.SetContent failed")
 				continue
 			}
 		}
 		if err = leaveEB.SetUnsigned(struct{}{}); err != nil {
-			logrus.With(slog.Any("error", err)).Warn("respMakeLeave.LeaveEvent.SetUnsigned failed")
+			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.SetUnsigned failed")
 			continue
 		}
 
@@ -514,7 +514,7 @@ func (r *FederationInternalAPI) PerformLeave(
 			r.cfg.Matrix.PrivateKey,
 		)
 		if err != nil {
-			logrus.With(slog.Any("error", err)).Warn("respMakeLeave.LeaveEvent.Build failed")
+			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.Build failed")
 			continue
 		}
 
@@ -526,7 +526,7 @@ func (r *FederationInternalAPI) PerformLeave(
 			event,
 		)
 		if err != nil {
-			logrus.With(slog.Any("error", err)).Warn("r.federation.SendLeave failed")
+			logrus.WithError(err).Warnf("r.federation.SendLeave failed")
 			r.statistics.ForServer(serverName).Failure()
 			continue
 		}
@@ -663,7 +663,7 @@ func (r *FederationInternalAPI) PerformBroadcastEDU(
 		return nil
 	}
 
-	logrus.WithContext(ctx).Info("Sending wake-up EDU to %d destination(s)", len(destinations))
+	logrus.WithContext(ctx).Infof("Sending wake-up EDU to %d destination(s)", len(destinations))
 
 	edu := &gomatrixserverlib.EDU{
 		Type:   "org.matrix.dendrite.wakeup",
@@ -795,7 +795,7 @@ func (r *FederationInternalAPI) P2PQueryRelayServers(
 	request *api.P2PQueryRelayServersRequest,
 	response *api.P2PQueryRelayServersResponse,
 ) error {
-	logrus.Info("Getting relay servers for: %s", request.Server)
+	logrus.Infof("Getting relay servers for: %s", request.Server)
 	relayServers, err := r.db.P2PGetRelayServersForServer(ctx, request.Server)
 	if err != nil {
 		return err
@@ -811,7 +811,7 @@ func (r *FederationInternalAPI) P2PAddRelayServers(
 	request *api.P2PAddRelayServersRequest,
 	response *api.P2PAddRelayServersResponse,
 ) error {
-	logrus.Info("Adding relay servers for: %s", request.Server)
+	logrus.Infof("Adding relay servers for: %s", request.Server)
 	err := r.db.P2PAddRelayServersForServer(ctx, request.Server, request.RelayServers)
 	if err != nil {
 		return err
@@ -826,7 +826,7 @@ func (r *FederationInternalAPI) P2PRemoveRelayServers(
 	request *api.P2PRemoveRelayServersRequest,
 	response *api.P2PRemoveRelayServersResponse,
 ) error {
-	logrus.Info("Adding relay servers for: %s", request.Server)
+	logrus.Infof("Adding relay servers for: %s", request.Server)
 	err := r.db.P2PRemoveRelayServersForServer(ctx, request.Server, request.RelayServers)
 	if err != nil {
 		return err

@@ -10,8 +10,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 // Statistics contains information about all of the remote federated

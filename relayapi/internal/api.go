@@ -17,12 +17,12 @@ package internal
 import (
 	"sync"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/producers"
 	"github.com/antinvestor/matrix/relayapi/storage"
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 )
 
 type RelayInternalAPI struct {

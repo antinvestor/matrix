@@ -4,22 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 )
 
 // ServerKeyCache contains the subset of functions needed for
 // a server key cache.
 type ServerKeyCache interface {
 	// request -> timestamp is emulating gomatrixserverlib.FetchKeys:
-	// https://github.com/matrix-org/gomatrixserverlib/blob/f69539c86ea55d1e2cc76fd8e944e2d82d30397c/keyring.go#L95
+	// https://github.com/antinvestor/gomatrixserverlib/blob/f69539c86ea55d1e2cc76fd8e944e2d82d30397c/keyring.go#L95
 	// The timestamp should be the timestamp of the event that is being
 	// verified. We will not return keys from the cache that are not valid
 	// at this timestamp.
 	GetServerKey(ctx context.Context, request gomatrixserverlib.PublicKeyLookupRequest, timestamp spec.Timestamp) (response gomatrixserverlib.PublicKeyLookupResult, ok bool)
 
 	// request -> result is emulating gomatrixserverlib.StoreKeys:
-	// https://github.com/matrix-org/gomatrixserverlib/blob/f69539c86ea55d1e2cc76fd8e944e2d82d30397c/keyring.go#L112
+	// https://github.com/antinvestor/gomatrixserverlib/blob/f69539c86ea55d1e2cc76fd8e944e2d82d30397c/keyring.go#L112
 	StoreServerKey(ctx context.Context, request gomatrixserverlib.PublicKeyLookupRequest, response gomatrixserverlib.PublicKeyLookupResult) error
 }
 

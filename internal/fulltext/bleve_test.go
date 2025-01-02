@@ -18,8 +18,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/process"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/fulltext"
@@ -243,17 +243,17 @@ func TestSearch(t *testing.T) {
 
 			got, err := f.Search(tt.args.term, searchRooms, tt.args.keys, tt.args.limit, tt.args.from, tt.args.orderByStreamPos)
 			if (err != nil) != tt.wantErr {
-				t.Error("Search() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Search() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			highlights := f.GetHighlights(got)
 			if !reflect.DeepEqual(highlights, tt.wantHighlights) {
-				t.Error("Search() got highligts = %v, want %v", highlights, tt.wantHighlights)
+				t.Errorf("Search() got highligts = %v, want %v", highlights, tt.wantHighlights)
 			}
 
 			if !reflect.DeepEqual(len(got.Hits), tt.wantCount) {
-				t.Error("Search() got = %v, want %v", len(got.Hits), tt.wantCount)
+				t.Errorf("Search() got = %v, want %v", len(got.Hits), tt.wantCount)
 			}
 			if tt.args.orderByStreamPos {
 				if got.Hits[0].ID != eventIDs[29] {

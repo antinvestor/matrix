@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib"
 
 	"github.com/antinvestor/matrix/roomserver/types"
 )

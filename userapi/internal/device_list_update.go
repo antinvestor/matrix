@@ -25,13 +25,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/antinvestor/gomatrix"
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -241,7 +241,7 @@ func (u *DeviceListUpdater) CleanUp() error {
 	if len(res.LeftUsers) == 0 {
 		return nil
 	}
-	logrus.Debug("Deleting %d stale device list entries", len(res.LeftUsers))
+	logrus.Debugf("Deleting %d stale device list entries", len(res.LeftUsers))
 	return u.db.DeleteStaleDeviceLists(u.process.Context(), res.LeftUsers)
 }
 
@@ -339,7 +339,7 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 		// fetch what keys we had already and only emit changes
 		if err = u.db.DeviceKeysJSON(ctx, existingKeys); err != nil {
 			// non-fatal, log and continue
-			util.GetLogger(ctx).With(slog.Any("error", err)).With("user_id", event.UserID).Error(
+			util.GetLogger(ctx).WithError(err).WithField("user_id", event.UserID).Errorf(
 				"failed to query device keys json for calculating diffs",
 			)
 		}
@@ -493,7 +493,7 @@ func (u *DeviceListUpdater) processServer(serverName spec.ServerName) (time.Dura
 		return defaultWaitTime, false
 	}
 
-	logger := util.GetLogger(ctx).With("server_name", serverName)
+	logger := util.GetLogger(ctx).WithField("server_name", serverName)
 	deviceListUpdateCount.WithLabelValues(string(serverName)).Inc()
 
 	waitTime := defaultWaitTime // How long should we wait to try again?
@@ -501,7 +501,7 @@ func (u *DeviceListUpdater) processServer(serverName spec.ServerName) (time.Dura
 
 	userIDs, err := u.db.StaleDeviceLists(ctx, []spec.ServerName{serverName})
 	if err != nil {
-		logger.With(slog.Any("error", err)).Error("Failed to load stale device lists")
+		logger.WithError(err).Error("Failed to load stale device lists")
 		return waitTime, true
 	}
 
@@ -547,7 +547,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 		}
 		switch e := err.(type) {
 		case *json.UnmarshalTypeError, *json.SyntaxError:
-			logger.With(slog.Any("error", err)).Debug("Device list update for %q contained invalid JSON", userID)
+			logger.WithError(err).Debugf("Device list update for %q contained invalid JSON", userID)
 			return defaultWaitTime, nil
 		case *fedsenderapi.FederationClientError:
 			if e.RetryAfter > 0 {
@@ -571,12 +571,12 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 			}
 		default:
 			// Something else failed
-			logger.With(slog.Any("error", err)).Debug("GetUserDevices returned unknown error type: %T", err)
+			logger.WithError(err).Debugf("GetUserDevices returned unknown error type: %T", err)
 			return time.Minute * 10, err
 		}
 	}
 	if res.UserID != userID {
-		logger.With(slog.Any("error", err)).Debug("User ID %q in device list update response doesn't match expected %q", res.UserID, userID)
+		logger.WithError(err).Debugf("User ID %q in device list update response doesn't match expected %q", res.UserID, userID)
 		return defaultWaitTime, nil
 	}
 	if res.MasterKey != nil || res.SelfSigningKey != nil {
@@ -598,7 +598,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 	}
 	err = u.updateDeviceList(&res)
 	if err != nil {
-		logger.With(slog.Any("error", err)).Error("Fetched device list but failed to store/emit it")
+		logger.WithError(err).Error("Fetched device list but failed to store/emit it")
 		return defaultWaitTime, err
 	}
 	return defaultWaitTime, nil
@@ -611,7 +611,7 @@ func (u *DeviceListUpdater) updateDeviceList(res *fclient.RespUserDevices) error
 	for i, device := range res.Devices {
 		keyJSON, err := json.Marshal(device.Keys)
 		if err != nil {
-			util.GetLogger(ctx).With("keys", device.Keys).Error("failed to marshal keys, skipping device")
+			util.GetLogger(ctx).WithField("keys", device.Keys).Error("failed to marshal keys, skipping device")
 			continue
 		}
 		keys[i] = api.DeviceMessage{
@@ -635,7 +635,7 @@ func (u *DeviceListUpdater) updateDeviceList(res *fclient.RespUserDevices) error
 	// fetch what keys we had already and only emit changes
 	if err := u.db.DeviceKeysJSON(ctx, existingKeys); err != nil {
 		// non-fatal, log and continue
-		util.GetLogger(ctx).With(slog.Any("error", err)).With("user_id", res.UserID).Error(
+		util.GetLogger(ctx).WithError(err).WithField("user_id", res.UserID).Errorf(
 			"failed to query device keys json for calculating diffs",
 		)
 	}

@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/fclient"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -213,7 +213,7 @@ func InviteV1(
 	var strippedState []gomatrixserverlib.InviteStrippedState
 	if jsonErr := json.Unmarshal(event.Unsigned(), &strippedState); jsonErr != nil {
 		// just warn, they may not have added any.
-		util.GetLogger(httpReq.Context()).Warn("failed to extract stripped state from invite event")
+		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
 	}
 
 	if event.StateKey() == nil {
@@ -284,13 +284,13 @@ func handleInviteResult(ctx context.Context, inviteEvent gomatrixserverlib.PDU, 
 	switch e := err.(type) {
 	case nil:
 	case spec.InternalServerError:
-		util.GetLogger(ctx).With(slog.Any("error", err))
+		util.GetLogger(ctx).WithError(err)
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	case spec.MatrixError:
-		util.GetLogger(ctx).With(slog.Any("error", err))
+		util.GetLogger(ctx).WithError(err)
 		code := http.StatusInternalServerError
 		switch e.ErrCode {
 		case spec.ErrorForbidden:
@@ -306,7 +306,7 @@ func handleInviteResult(ctx context.Context, inviteEvent gomatrixserverlib.PDU, 
 			JSON: e,
 		}
 	default:
-		util.GetLogger(ctx).With(slog.Any("error", err))
+		util.GetLogger(ctx).WithError(err)
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("unknown error"),
@@ -315,7 +315,7 @@ func handleInviteResult(ctx context.Context, inviteEvent gomatrixserverlib.PDU, 
 
 	headeredInvite := &types.HeaderedEvent{PDU: inviteEvent}
 	if err = rsAPI.HandleInvite(ctx, headeredInvite); err != nil {
-		util.GetLogger(ctx).With(slog.Any("error", err)).Error("HandleInvite failed")
+		util.GetLogger(ctx).WithError(err).Error("HandleInvite failed")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

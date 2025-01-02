@@ -21,12 +21,12 @@ import (
 
 	"github.com/lib/pq"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var staleDeviceListsSchema = `

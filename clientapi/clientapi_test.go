@@ -13,6 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/gomatrix"
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/appservice"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/clientapi/routing"
@@ -32,9 +35,6 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi"
 	uapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
@@ -385,7 +385,7 @@ func createAccessTokens(t *testing.T, accessTokens map[*test.User]userDevice, us
 			ServerName:  serverName,
 			Password:    password,
 		}, userRes); err != nil {
-			t.Error("failed to create account: %s", err)
+			t.Errorf("failed to create account: %s", err)
 		}
 		req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
 			"type": authtypes.LoginTypePassword,

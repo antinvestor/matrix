@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/userutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	log "github.com/sirupsen/logrus"
 )

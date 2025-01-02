@@ -18,13 +18,13 @@ import (
 	"math"
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -84,7 +84,7 @@ func GetMemberships(
 			// If you have left the room then this will be the members of the room when you left.
 			atToken, err = db.EventPositionInTopology(req.Context(), queryRes.EventID)
 			if err != nil {
-				util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("unable to get 'atToken'")
+				util.GetLogger(req.Context()).WithError(err).Error("unable to get 'atToken'")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -95,7 +95,7 @@ func GetMemberships(
 
 	eventIDs, err := db.SelectMemberships(req.Context(), roomID, atToken, membership, notMembership)
 	if err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("db.SelectMemberships failed")
+		util.GetLogger(req.Context()).WithError(err).Error("db.SelectMemberships failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -104,7 +104,7 @@ func GetMemberships(
 
 	qryRes := &api.QueryEventsByIDResponse{}
 	if err := rsAPI.QueryEventsByID(req.Context(), &api.QueryEventsByIDRequest{EventIDs: eventIDs, RoomID: roomID}, qryRes); err != nil {
-		util.GetLogger(req.Context()).With(slog.Any("error", err)).Error("rsAPI.QueryEventsByID failed")
+		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

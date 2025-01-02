@@ -18,8 +18,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 )
 
@@ -47,7 +47,7 @@ func GetOpenIDUserInfo(
 	var openIDTokenAttrResponse userapi.QueryOpenIDTokenResponse
 	err := userAPI.QueryOpenIDToken(httpReq.Context(), &req, &openIDTokenAttrResponse)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).With(slog.Any("error", err)).Error("userAPI.QueryOpenIDToken failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("userAPI.QueryOpenIDToken failed")
 	}
 
 	var res interface{} = openIDUserInfoResponse{Sub: openIDTokenAttrResponse.Sub}

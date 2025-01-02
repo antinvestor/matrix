@@ -20,12 +20,12 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib/spec"
 
 	"github.com/pitabwire/util"
 )
