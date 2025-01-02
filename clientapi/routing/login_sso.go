@@ -171,6 +171,7 @@ func SSOCallback(
 	cfg *config.LoginSSO,
 	serverName spec.ServerName,
 ) util.JSONResponse {
+
 	if auth == nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -179,25 +180,33 @@ func SSOCallback(
 	}
 
 	ctx := req.Context()
+	logger := util.GetLogger(ctx)
 
 	query := req.URL.Query()
 	idpID := query.Get("partition_id")
+
+	logger.WithField("partition_id", idpID).Info("SSOCallback partition from url query")
+
 	if idpID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.MissingParam("provider parameter missing"),
+			JSON: spec.MissingParam("partition_id parameter missing"),
 		}
 	}
 
 	nonce, err := req.Cookie("sso_nonce")
 	if err != nil {
+		logger.WithError(err).Error("Failed to get nonce")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.MissingParam("no nonce cookie: " + err.Error()),
 		}
 	}
+	logger.WithField("nonce", nonce.String()).Info("SSOCallback nonce found")
+
 	finalRedirectURL, err := parseNonce(nonce.Value)
 	if err != nil {
+		logger.WithError(err).Error("Failed to parse nonce")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: err,
@@ -206,15 +215,18 @@ func SSOCallback(
 
 	codeVerifier, err := req.Cookie("sso_code_verifier")
 	if err != nil {
+		logger.WithError(err).Error("Failed to get code verifier")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.MissingParam("no code verifier cookie: " + err.Error()),
 		}
 	}
 
+	logger.WithField("codeverifier", codeVerifier.String()).Info("SSOCallback codeVerifier found")
+
 	callbackURL, err := buildCallbackURLFromOther(cfg, req, "/login/sso/callback")
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
+		logger.WithError(err).Error("Failed to build callback URL")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
@@ -224,15 +236,18 @@ func SSOCallback(
 	callbackURL = callbackURL.ResolveReference(&url.URL{
 		RawQuery: url.Values{"partition_id": []string{idpID}}.Encode(),
 	})
+
+	logger.WithField("callback url", callbackURL).Info("SSOCallback built callback url")
+
 	result, err := auth.ProcessCallback(ctx, idpID, callbackURL.String(), nonce.Value, codeVerifier.Value, query)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to process callback")
+		logger.WithError(err).Error("Failed to process callback")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
 		}
 	}
-	util.GetLogger(ctx).WithField("result", result).Info("LoginSSO callback done")
+	logger.WithField("result", result).Info("LoginSSO callback done")
 
 	if result.Identifier.Subject == "" || result.Identifier.Issuer == "" {
 		// Not authenticated yet.
