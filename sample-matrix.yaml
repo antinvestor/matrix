@@ -196,7 +196,7 @@ client_api:
   # recaptcha_sitekey_class: "h-captcha"
 
   login_sso:
-    callback_url: "http://localhost:8008/_matrix/v3/login/sso/callback"
+    callback_url: "http://localhost:8008/_matrix/client/v3/login/sso/callback"
     default_provider: auth0
     providers:
       - id: auth0

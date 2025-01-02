@@ -105,6 +105,9 @@ func (p *oidcIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL
 }
 
 func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error) {
+
+	logger := util.GetLogger(ctx)
+
 	disc, err := p.reload(ctx)
 	if err != nil {
 		return nil, err
@@ -140,11 +143,16 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 		}
 	}
 
+	p.oauth2Config.RedirectURL = callbackURL
+	codeVerifierOpt := oauth2.SetAuthURLParam("code_verifier", codeVerifier)
+
 	// Exchange authorization code for a token
-	token, err := p.oauth2Config.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", codeVerifier))
+	token, err := p.oauth2Config.Exchange(ctx, code, codeVerifierOpt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange token: %v", err)
 	}
+
+	logger.WithField("access token", token.AccessToken).WithField("refresh token", token.RefreshToken).Info("obtained token from authentication service")
 
 	subject, displayName, suggestedLocalpart, err := p.getUserInfo(ctx, token.AccessToken)
 	if err != nil {
