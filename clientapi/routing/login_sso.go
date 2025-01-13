@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"golang.org/x/oauth2"
 	"net/http"
 	"net/url"
 	"path"
@@ -110,7 +111,7 @@ func SSORedirect(
 	nonceCookie := &http.Cookie{
 		Name:     "sso_nonce",
 		Value:    nonce,
-		Path:     path.Dir(redirectURL.Path),
+		Path:     path.Dir(req.URL.Path),
 		Expires:  time.Now().Add(10 * time.Minute),
 		Secure:   redirectURL.Scheme == "https",
 		SameSite: http.SameSiteNoneMode,
@@ -124,7 +125,7 @@ func SSORedirect(
 	codeVerifierCookie := &http.Cookie{
 		Name:     "sso_code_verifier",
 		Value:    codeVerifier,
-		Path:     path.Dir(redirectURL.Path),
+		Path:     path.Dir(req.URL.Path),
 		Expires:  time.Now().Add(10 * time.Minute),
 		Secure:   redirectURL.Scheme == "https",
 		SameSite: http.SameSiteNoneMode,
@@ -265,7 +266,7 @@ func SSOCallback(
 		}
 	}
 
-	token, err := createLoginToken(ctx, userAPI, account.UserID)
+	token, err := createLoginToken(ctx, userAPI, account.UserID, result.Token)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Errorf("PerformLoginTokenCreation failed")
 		return util.JSONResponse{
@@ -356,8 +357,8 @@ func verifyUserExits(ctx context.Context, serverName spec.ServerName, userAPI us
 
 // createLoginToken produces a new login token, valid for the given
 // user.
-func createLoginToken(ctx context.Context, userAPI userAPIForSSO, userID string) (*uapi.LoginTokenMetadata, error) {
-	req := uapi.PerformLoginTokenCreationRequest{Data: uapi.LoginTokenData{UserID: userID}}
+func createLoginToken(ctx context.Context, userAPI userAPIForSSO, userID string, ssoToken *oauth2.Token) (*uapi.LoginTokenMetadata, error) {
+	req := uapi.PerformLoginTokenCreationRequest{Data: uapi.LoginTokenData{UserID: userID, SSOToken: ssoToken}}
 	var resp uapi.PerformLoginTokenCreationResponse
 	if err := userAPI.PerformLoginTokenCreation(ctx, &req, &resp); err != nil {
 		return nil, err

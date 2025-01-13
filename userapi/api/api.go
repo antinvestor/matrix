@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"golang.org/x/oauth2"
 	"strings"
 	"time"
 
@@ -367,6 +368,7 @@ type PerformDeviceCreationRequest struct {
 	Localpart   string
 	ServerName  spec.ServerName // optional: if blank, default server name used
 	AccessToken string          // optional: if blank one will be made on your behalf
+	ExtraData   *oauth2.Token   // optional: if specified this is what will be used by the application
 	// optional: if nil an ID is generated for you. If set, replaces any existing device session,
 	// which will generate a new access token and invalidate the old one.
 	DeviceID *string

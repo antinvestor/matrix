@@ -133,6 +133,7 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 				t.Fatalf("ProcessCallback failed: %v", err)
 			}
 
+			got.Token = nil
 			if !reflect.DeepEqual(got, tst.Want) {
 				t.Errorf("ProcessCallback: got %+v, want %+v", got, tst.Want)
 			}
@@ -243,6 +244,8 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ProcessCallback failed: %v", err)
 			}
+
+			got.Token = nil
 
 			if !reflect.DeepEqual(got, tst.Want) {
 				t.Errorf("ProcessCallback: got %+v, want %+v", got, tst.Want)

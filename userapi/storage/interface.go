@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -82,7 +83,7 @@ type Device interface {
 	// an error will be returned.
 	// If no device ID is given one is generated.
 	// Returns the device on success.
-	CreateDevice(ctx context.Context, localpart string, serverName spec.ServerName, deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string) (dev *api.Device, returnErr error)
+	CreateDevice(ctx context.Context, localpart string, serverName spec.ServerName, deviceID *string, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string) (dev *api.Device, returnErr error)
 	UpdateDevice(ctx context.Context, localpart string, serverName spec.ServerName, deviceID string, displayName *string) error
 	UpdateDeviceLastSeen(ctx context.Context, localpart string, serverName spec.ServerName, deviceID, ipAddr, userAgent string) error
 	RemoveDevices(ctx context.Context, localpart string, serverName spec.ServerName, devices []string) error

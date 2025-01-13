@@ -308,7 +308,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 		"device_id":    req.DeviceID,
 		"display_name": req.DeviceDisplayName,
 	}).Info("PerformDeviceCreation")
-	dev, err := a.DB.CreateDevice(ctx, req.Localpart, serverName, req.DeviceID, req.AccessToken, req.DeviceDisplayName, req.IPAddr, req.UserAgent)
+	dev, err := a.DB.CreateDevice(ctx, req.Localpart, serverName, req.DeviceID, req.AccessToken, req.ExtraData, req.DeviceDisplayName, req.IPAddr, req.UserAgent)
 	if err != nil {
 		return err
 	}

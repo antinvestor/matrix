@@ -17,7 +17,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"golang.org/x/oauth2"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -39,6 +41,8 @@ CREATE TABLE IF NOT EXISTS userapi_devices (
     -- The access token granted to this device. This has to be the primary key
     -- so we can distinguish which device is making a given request.
     access_token TEXT NOT NULL PRIMARY KEY,
+    -- The full token data as obtained from sso authentication
+    extra_data JSONB,
     -- The auto-allocated unique ID of the session identified by the access token.
     -- This can be used as a secure substitution of the access token in situations
     -- where data is associated with access tokens (e.g. transaction storage),
@@ -71,7 +75,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS userapi_device_localpart_id_idx ON userapi_dev
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO userapi_devices(device_id, localpart, server_name, access_token, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
+	"INSERT INTO userapi_devices(device_id, localpart, server_name, access_token, extra_data, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
 	" RETURNING session_id"
 
 const selectDeviceByTokenSQL = "" +
@@ -146,28 +150,35 @@ func NewPostgresDevicesTable(db *sql.DB, serverName spec.ServerName) (tables.Dev
 	}.Prepare(db)
 }
 
-// insertDevice creates a new device. Returns an error if any device with the same access token already exists.
+// InsertDevice creates a new device. Returns an error if any device with the same access token already exists.
 // Returns an error if the user already has a device with the given device ID.
 // Returns the device on success.
 func (s *devicesStatements) InsertDevice(
 	ctx context.Context, txn *sql.Tx, id string,
 	localpart string, serverName spec.ServerName,
-	accessToken string, displayName *string, ipAddr, userAgent string,
+	accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
+
+	extraDataJson, err := json.Marshal(&extraData)
+	if err != nil {
+		return nil, fmt.Errorf("insertDeviceStmt: %w", err)
+	}
+
 	stmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
-	if err := stmt.QueryRowContext(ctx, id, localpart, serverName, accessToken, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Scan(&sessionID); err != nil {
+	if err := stmt.QueryRowContext(ctx, id, localpart, serverName, accessToken, extraDataJson, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Scan(&sessionID); err != nil {
 		return nil, fmt.Errorf("insertDeviceStmt: %w", err)
 	}
 	dev := &api.Device{
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, serverName),
 		AccessToken: accessToken,
-		SessionID:   sessionID,
-		LastSeenTS:  createdTimeMS,
-		LastSeenIP:  ipAddr,
-		UserAgent:   userAgent,
+
+		SessionID:  sessionID,
+		LastSeenTS: createdTimeMS,
+		LastSeenIP: ipAddr,
+		UserAgent:  userAgent,
 	}
 	if displayName != nil {
 		dev.DisplayName = *displayName
@@ -177,10 +188,10 @@ func (s *devicesStatements) InsertDevice(
 
 func (s *devicesStatements) InsertDeviceWithSessionID(ctx context.Context, txn *sql.Tx, id,
 	localpart string, serverName spec.ServerName,
-	accessToken string, displayName *string, ipAddr, userAgent string,
+	accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
 	sessionID int64,
 ) (*api.Device, error) {
-	return s.InsertDevice(ctx, txn, id, localpart, serverName, accessToken, displayName, ipAddr, userAgent)
+	return s.InsertDevice(ctx, txn, id, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
 }
 
 // deleteDevice removes a single device by id and user localpart.

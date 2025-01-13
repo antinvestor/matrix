@@ -117,7 +117,7 @@ func TestSSORedirect(t *testing.T) {
 					if m, err := regexp.MatchString(tst.WantSetCookieRE, cookie.String()); err != nil {
 						t.Fatalf("WantSetCookieRE failed: %v", err)
 					} else if !m {
-						t.Errorf("SSORedirect Set-Cookie: got %q, want match %v", got.Headers["Set-Cookie"], tst.WantSetCookieRE)
+						t.Errorf("SSORedirect Set-Cookie: got %q, want match %v ", got.Headers["Set-Cookie"], tst.WantSetCookieRE)
 					}
 				}
 

@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/oauth2"
 	"strconv"
 	"strings"
 	"time"
@@ -636,7 +637,7 @@ func (d *Database) GetDevicesByID(ctx context.Context, deviceIDs []string) ([]ap
 // Returns the device on success.
 func (d *Database) CreateDevice(
 	ctx context.Context, localpart string, serverName spec.ServerName,
-	deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string,
+	deviceID *string, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
 ) (dev *api.Device, returnErr error) {
 	if deviceID != nil {
 		_, ok := d.Writer.(*sqlutil.ExclusiveWriter)
@@ -650,7 +651,7 @@ func (d *Database) CreateDevice(
 				}
 				// No devices yet, only create a new one
 				if len(devices) == 0 {
-					dev, err = d.Devices.InsertDevice(ctx, txn, *deviceID, localpart, serverName, accessToken, displayName, ipAddr, userAgent)
+					dev, err = d.Devices.InsertDevice(ctx, txn, *deviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
 					return err
 				}
 				sessionID := devices[0].SessionID + 1
@@ -660,7 +661,7 @@ func (d *Database) CreateDevice(
 					return err
 				}
 				// Create a new device with the session ID incremented
-				dev, err = d.Devices.InsertDeviceWithSessionID(ctx, txn, *deviceID, localpart, serverName, accessToken, displayName, ipAddr, userAgent, sessionID)
+				dev, err = d.Devices.InsertDeviceWithSessionID(ctx, txn, *deviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent, sessionID)
 				return err
 			})
 		} else {
@@ -671,7 +672,7 @@ func (d *Database) CreateDevice(
 					return err
 				}
 
-				dev, err = d.Devices.InsertDevice(ctx, txn, *deviceID, localpart, serverName, accessToken, displayName, ipAddr, userAgent)
+				dev, err = d.Devices.InsertDevice(ctx, txn, *deviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
 				return err
 			})
 		}
@@ -687,7 +688,7 @@ func (d *Database) CreateDevice(
 
 			returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 				var err error
-				dev, err = d.Devices.InsertDevice(ctx, txn, newDeviceID, localpart, serverName, accessToken, displayName, ipAddr, userAgent)
+				dev, err = d.Devices.InsertDevice(ctx, txn, newDeviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
 				return err
 			})
 			if returnErr == nil {

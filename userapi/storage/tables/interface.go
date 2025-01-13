@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"golang.org/x/oauth2"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -55,8 +56,8 @@ type AccountsTable interface {
 }
 
 type DevicesTable interface {
-	InsertDevice(ctx context.Context, txn *sql.Tx, id, localpart string, serverName spec.ServerName, accessToken string, displayName *string, ipAddr, userAgent string) (*api.Device, error)
-	InsertDeviceWithSessionID(ctx context.Context, txn *sql.Tx, id, localpart string, serverName spec.ServerName, accessToken string, displayName *string, ipAddr, userAgent string, sessionID int64) (*api.Device, error)
+	InsertDevice(ctx context.Context, txn *sql.Tx, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string) (*api.Device, error)
+	InsertDeviceWithSessionID(ctx context.Context, txn *sql.Tx, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string, sessionID int64) (*api.Device, error)
 	DeleteDevice(ctx context.Context, txn *sql.Tx, id, localpart string, serverName spec.ServerName) error
 	DeleteDevices(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, devices []string) error
 	DeleteDevicesByLocalpart(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, exceptDeviceID string) error

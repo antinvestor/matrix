@@ -81,7 +81,7 @@ func mustMakeAccountAndDevice(
 	if err != nil {
 		t.Fatalf("unable to create account: %v", err)
 	}
-	_, err = devDB.InsertDevice(ctx, nil, "deviceID", localpart, serverName, util.RandomString(16), nil, "", userAgent)
+	_, err = devDB.InsertDevice(ctx, nil, "deviceID", localpart, serverName, util.RandomString(16), nil, nil, "", userAgent)
 	if err != nil {
 		t.Fatalf("unable to create device: %v", err)
 	}

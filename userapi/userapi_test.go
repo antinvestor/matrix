@@ -219,7 +219,7 @@ func TestLoginToken(t *testing.T) {
 				Data: api.LoginTokenData{UserID: "@auser:example.com"},
 			}
 			var cresp api.PerformLoginTokenCreationResponse
-			if err := userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
+			if err = userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
 				t.Fatalf("PerformLoginTokenCreation failed: %v", err)
 			}
 

@@ -17,6 +17,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"golang.org/x/oauth2"
 	"net/http"
 	"net/url"
 	"time"
@@ -82,6 +83,7 @@ type CallbackResult struct {
 	Identifier      UserIdentifier
 	DisplayName     string
 	SuggestedUserID string
+	Token           *oauth2.Token
 }
 
 type UserIdentifier struct {

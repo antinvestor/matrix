@@ -64,9 +64,9 @@ func Login(
 			return *authErr
 		}
 		// make a device/access token
-		authErr2 := completeAuth(req.Context(), cfg.Matrix, userAPI, login, req.RemoteAddr, req.UserAgent())
-		cleanup(req.Context(), &authErr2)
-		return authErr2
+		authResponse := completeAuth(req.Context(), cfg.Matrix, userAPI, login, req.RemoteAddr, req.UserAgent())
+		cleanup(req.Context(), &authResponse)
+		return authResponse
 	}
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
@@ -78,6 +78,7 @@ func completeAuth(
 	ctx context.Context, cfg *config.Global, userAPI userapi.ClientUserAPI, login *auth.Login,
 	ipAddr, userAgent string,
 ) util.JSONResponse {
+
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
@@ -85,6 +86,10 @@ func completeAuth(
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
+	}
+
+	if login.ExtraData != nil {
+		token = login.ExtraData.AccessToken
 	}
 
 	localpart, serverName, err := userutil.ParseUsernameParam(login.Username(), cfg)
@@ -101,6 +106,7 @@ func completeAuth(
 		DeviceDisplayName: login.InitialDisplayName,
 		DeviceID:          login.DeviceID,
 		AccessToken:       token,
+		ExtraData:         login.ExtraData,
 		Localpart:         localpart,
 		ServerName:        serverName,
 		IPAddr:            ipAddr,

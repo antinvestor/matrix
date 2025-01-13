@@ -170,6 +170,7 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 		},
 		DisplayName:     displayName,
 		SuggestedUserID: suggestedLocalpart,
+		Token:           token,
 	}
 
 	return res, nil

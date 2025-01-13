@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -31,9 +32,12 @@ CREATE TABLE IF NOT EXISTS userapi_login_tokens (
 	token TEXT NOT NULL PRIMARY KEY,
 	-- When the token expires
 	token_expires_at TIMESTAMP NOT NULL,
-
+	
     -- The mxid for this account
-	user_id TEXT NOT NULL
+	user_id TEXT NOT NULL,
+                                                
+    -- Stores any extra data that may be required for login
+	extra_data JSONB
 );
 
 -- This index allows efficient garbage collection of expired tokens.
@@ -41,13 +45,13 @@ CREATE INDEX IF NOT EXISTS userapi_login_tokens_expiration_idx ON userapi_login_
 `
 
 const insertLoginTokenSQL = "" +
-	"INSERT INTO userapi_login_tokens(token, token_expires_at, user_id) VALUES ($1, $2, $3)"
+	"INSERT INTO userapi_login_tokens(token, token_expires_at, user_id, extra_data) VALUES ($1, $2, $3, $4)"
 
 const deleteLoginTokenSQL = "" +
 	"DELETE FROM userapi_login_tokens WHERE token = $1 OR token_expires_at <= $2"
 
 const selectLoginTokenSQL = "" +
-	"SELECT user_id FROM userapi_login_tokens WHERE token = $1 AND token_expires_at > $2"
+	"SELECT user_id, extra_data FROM userapi_login_tokens WHERE token = $1 AND token_expires_at > $2"
 
 type loginTokenStatements struct {
 	insertStmt *sql.Stmt
@@ -68,14 +72,20 @@ func NewPostgresLoginTokenTable(db *sql.DB) (tables.LoginTokenTable, error) {
 	}.Prepare(db)
 }
 
-// insert adds an already generated token to the database.
+// InsertLoginToken insert adds an already generated token to the database.
 func (s *loginTokenStatements) InsertLoginToken(ctx context.Context, txn *sql.Tx, metadata *api.LoginTokenMetadata, data *api.LoginTokenData) error {
+
+	extraData, err := json.Marshal(data.SSOToken)
+	if err != nil {
+		return err
+	}
+
 	stmt := sqlutil.TxStmt(txn, s.insertStmt)
-	_, err := stmt.ExecContext(ctx, metadata.Token, metadata.Expiration.UTC(), data.UserID)
+	_, err = stmt.ExecContext(ctx, metadata.Token, metadata.Expiration.UTC(), data.UserID, extraData)
 	return err
 }
 
-// deleteByToken removes the named token.
+// DeleteLoginToken removes the named token.
 //
 // As a simple way to garbage-collect stale tokens, we also remove all expired tokens.
 // The userapi_login_tokens_expiration_idx index should make that efficient.
@@ -91,12 +101,22 @@ func (s *loginTokenStatements) DeleteLoginToken(ctx context.Context, txn *sql.Tx
 	return nil
 }
 
-// selectByToken returns the data associated with the given token. May return sql.ErrNoRows.
+// SelectLoginToken returns the data associated with the given token. May return sql.ErrNoRows.
 func (s *loginTokenStatements) SelectLoginToken(ctx context.Context, token string) (*api.LoginTokenData, error) {
-	var data api.LoginTokenData
-	err := s.selectStmt.QueryRowContext(ctx, token, time.Now().UTC()).Scan(&data.UserID)
+	var (
+		data      api.LoginTokenData
+		extraData []byte
+	)
+	err := s.selectStmt.QueryRowContext(ctx, token, time.Now().UTC()).Scan(&data.UserID, &extraData)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(extraData) > 0 && string(extraData) != "null" {
+		err = json.Unmarshal(extraData, data.SSOToken)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &data, nil

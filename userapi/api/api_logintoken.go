@@ -16,6 +16,7 @@ package api
 
 import (
 	"context"
+	"golang.org/x/oauth2"
 	"time"
 )
 
@@ -43,7 +44,8 @@ type LoginTokenInternalAPI interface {
 // provided by the calling code.
 type LoginTokenData struct {
 	// UserID is the full mxid of the user.
-	UserID string
+	UserID   string
+	SSOToken *oauth2.Token
 }
 
 // LoginTokenMetadata contains metadata created and maintained by the User API.

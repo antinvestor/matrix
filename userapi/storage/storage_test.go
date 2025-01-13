@@ -168,7 +168,7 @@ func Test_Devices(t *testing.T) {
 		db, closeDb := mustCreateUserDatabase(t, testOpts)
 		defer closeDb()
 
-		deviceWithID, err := db.CreateDevice(ctx, localpart, domain, &deviceID, accessToken, nil, "", "")
+		deviceWithID, err := db.CreateDevice(ctx, localpart, domain, &deviceID, accessToken, nil, nil, "", "")
 		assert.NoError(t, err, "unable to create deviceWithoutID")
 
 		gotDevice, err := db.GetDeviceByID(ctx, localpart, domain, deviceID)
@@ -181,7 +181,7 @@ func Test_Devices(t *testing.T) {
 
 		// create a device without existing device ID
 		accessToken = util.RandomString(16)
-		deviceWithoutID, err := db.CreateDevice(ctx, localpart, domain, nil, accessToken, nil, "", "")
+		deviceWithoutID, err := db.CreateDevice(ctx, localpart, domain, nil, accessToken, nil, nil, "", "")
 		assert.NoError(t, err, "unable to create deviceWithoutID")
 		gotDeviceWithoutID, err := db.GetDeviceByID(ctx, localpart, domain, deviceWithoutID.ID)
 		assert.NoError(t, err, "unable to get device by id")
@@ -220,7 +220,7 @@ func Test_Devices(t *testing.T) {
 		// create one more device and remove the devices step by step
 		newDeviceID := util.RandomString(16)
 		accessToken = util.RandomString(16)
-		_, err = db.CreateDevice(ctx, localpart, domain, &newDeviceID, accessToken, nil, "", "")
+		_, err = db.CreateDevice(ctx, localpart, domain, &newDeviceID, accessToken, nil, nil, "", "")
 		assert.NoError(t, err, "unable to create new device")
 
 		devices, err = db.GetDevicesByLocalpart(ctx, localpart, domain)
