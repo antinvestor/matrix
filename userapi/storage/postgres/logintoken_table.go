@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"golang.org/x/oauth2"
 	"time"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -113,10 +114,14 @@ func (s *loginTokenStatements) SelectLoginToken(ctx context.Context, token strin
 	}
 
 	if len(extraData) > 0 && string(extraData) != "null" {
-		err = json.Unmarshal(extraData, data.SSOToken)
+
+		ssoToken := &oauth2.Token{}
+
+		err = json.Unmarshal(extraData, ssoToken)
 		if err != nil {
 			return nil, err
 		}
+		data.SSOToken = ssoToken
 	}
 
 	return &data, nil
