@@ -30,10 +30,8 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
 // oidcDiscoveryMaxStaleness indicates how stale the Discovery
@@ -59,10 +57,7 @@ type oidcIdentityProvider struct {
 	resetOauth2Config bool
 	oauth2Config      oauth2.Config
 
-	responseMimeType    string
-	subPath             string
-	displayNamePath     string
-	suggestedUserIDPath string
+	responseMimeType string
 
 	disc *oidcDiscovery
 	exp  time.Time
@@ -74,11 +69,8 @@ func newSSOIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oidc
 		cfg: cfg,
 		hc:  hc,
 
-		scopes:              []string{"openid", "profile", "offline", "contact"},
-		responseMimeType:    "application/json",
-		subPath:             "sub",
-		displayNamePath:     "name",
-		suggestedUserIDPath: "preferred_username",
+		scopes:           []string{"openid", "profile", "offline", "contact"},
+		responseMimeType: "application/json",
 	}
 }
 
@@ -239,22 +231,22 @@ func (p *oidcIdentityProvider) getUserInfo(ctx context.Context, accessToken stri
 		return "", "", "", err
 	}
 
-	if res := gjson.GetBytes(body, p.subPath); !res.Exists() {
-		return "", "", "", fmt.Errorf("no %q in user info response body", p.subPath)
-	} else {
-		subject = res.String()
-	}
-	if subject == "" {
-		return "", "", "", fmt.Errorf("empty subject in user info")
+	var profileInfo map[string]any
+	err = json.Unmarshal(body, &profileInfo)
+
+	if err != nil {
+		return "", "", "", fmt.Errorf("unmarshal user info response body: %w", err)
 	}
 
-	if p.suggestedUserIDPath != "" {
-		suggestedLocalpart = gjson.GetBytes(body, p.suggestedUserIDPath).String()
+	subject = profileInfo["sub"].(string)
+	displayName = profileInfo["name"].(string)
+
+	contacts := profileInfo["contacts"].([]map[string]any)
+	if len(contacts) == 0 {
+		return "", "", "", fmt.Errorf("no contacts in user info response body")
 	}
 
-	if p.displayNamePath != "" {
-		displayName = gjson.GetBytes(body, p.displayNamePath).String()
-	}
+	suggestedLocalpart = contacts[0]["detail"].(string)
 
 	return
 }

@@ -326,6 +326,7 @@ type PerformAccountCreationRequest struct {
 	Localpart   string          // Required: The localpart for this account. Ignored if account type is guest.
 	ServerName  spec.ServerName // optional: if not specified, default server name used instead
 
+	DisplayName  string // optional: the name an account will be displayed as, if any.
 	AppServiceID string // optional: the application service ID (not user ID) creating this account, if any.
 	Password     string // optional: if missing then this account will be a passwordless account
 	OnConflict   Conflict

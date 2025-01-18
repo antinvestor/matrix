@@ -257,7 +257,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return nil
 	}
 
-	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, serverName, req.Localpart); err != nil {
+	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, serverName, req.DisplayName); err != nil {
 		return fmt.Errorf("a.DB.SetDisplayName: %w", err)
 	}
 

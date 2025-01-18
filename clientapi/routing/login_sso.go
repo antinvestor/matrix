@@ -257,7 +257,7 @@ func SSOCallback(
 		return util.RedirectResponse(result.RedirectURL)
 	}
 
-	account, err := verifyUserExits(ctx, serverName, userAPI, result.Identifier)
+	account, err := verifyUserExits(ctx, serverName, userAPI, result)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Error("failed to find user")
 		return util.JSONResponse{
@@ -337,11 +337,15 @@ func parseNonce(s string) (redirectURL *url.URL, _ error) {
 // verifyUserExits resolves an sso.UserIdentifier to a local
 // part using the User API. Returns empty if there is no associated
 // user.
-func verifyUserExits(ctx context.Context, serverName spec.ServerName, userAPI userAPIForSSO, id auth.UserIdentifier) (account *uapi.Account, _ error) {
+func verifyUserExits(ctx context.Context, serverName spec.ServerName, userAPI userAPIForSSO, callBackRes *auth.CallbackResult) (account *uapi.Account, _ error) {
+
+	id := callBackRes.Identifier
+
 	req := &uapi.QuerySSOAccountRequest{
-		ServerName: serverName,
-		Issuer:     id.Issuer,
-		Subject:    id.Subject,
+		ServerName:  serverName,
+		Issuer:      id.Issuer,
+		Subject:     id.Subject,
+		DisplayName: callBackRes.DisplayName,
 	}
 	var res uapi.QuerySSOAccountResponse
 	if err := userAPI.PerformEnsureSSOAccountExists(ctx, req, &res); err != nil {

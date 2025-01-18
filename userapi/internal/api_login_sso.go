@@ -41,6 +41,7 @@ func (a *UserInternalAPI) PerformEnsureSSOAccountExists(ctx context.Context, req
 		var accRes api.PerformAccountCreationResponse
 		err = a.PerformAccountCreation(ctx, &api.PerformAccountCreationRequest{
 			Localpart:   req.Subject,
+			DisplayName: req.DisplayName,
 			ServerName:  req.ServerName,
 			AccountType: api.AccountTypeUser,
 			OnConflict:  api.ConflictAbort,

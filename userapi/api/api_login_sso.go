@@ -25,8 +25,8 @@ type SSOAPI interface {
 }
 
 type QuerySSOAccountRequest struct {
-	ServerName      spec.ServerName
-	Issuer, Subject string
+	ServerName                   spec.ServerName
+	Issuer, Subject, DisplayName string
 }
 
 type QuerySSOAccountResponse struct {
