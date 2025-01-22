@@ -268,8 +268,12 @@ github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOf
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/testcontainers/testcontainers-go v0.34.0 h1:5fbgF0vIN5u+nD3IWabQwRybuB4GY8G2HHgCkbMzMHo=
 github.com/testcontainers/testcontainers-go v0.34.0/go.mod h1:6P/kMkQe8yqPHfPWNulFGdFHTD8HB2vLq/231xY2iPQ=
+github.com/testcontainers/testcontainers-go v0.35.0 h1:uADsZpTKFAtp8SLK+hMwSaa+X+JiERHtd4sQAFmXeMo=
+github.com/testcontainers/testcontainers-go v0.35.0/go.mod h1:oEVBj5zrfJTrgjwONs1SsRbnBtH9OKl+IGl3UMcr2B4=
 github.com/testcontainers/testcontainers-go/modules/nats v0.34.0 h1:9xFzu6rGI455l5qJczyhra0JFNsPPHyswOEgqxDBWTU=
 github.com/testcontainers/testcontainers-go/modules/nats v0.34.0/go.mod h1:SMNmYCd6EXGRboIoyKQK1Cb+e+u/Yzk7RzD6Jroz+mA=
+github.com/testcontainers/testcontainers-go/modules/nats v0.35.0 h1:tP62cjqzED7z7TjwMID1Xy0b2EDlE5YkUT3Aptpr+4o=
+github.com/testcontainers/testcontainers-go/modules/nats v0.35.0/go.mod h1:uGmuW8+W7fr+4esMkzOhgqc0yQlYw5AWati19g7q4oQ=
 github.com/tidwall/gjson v1.14.2/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/gjson v1.18.0 h1:FIDeeyB800efLX89e5a8Y0BNH+LOngJyGrIWxG2FKQY=
 github.com/tidwall/gjson v1.18.0/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
