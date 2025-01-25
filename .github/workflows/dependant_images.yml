@@ -35,10 +35,3 @@ jobs:
           file: Redis.Dockerfile
           push: true
           tags: ghcr.io/antinvestor/redis:latest
-
-      - name: Build and Pushing Nats Image to GHCR
-        uses: docker/build-push-action@v6
-        with:
-          file: Nats.Dockerfile
-          push: true
-          tags: ghcr.io/antinvestor/nats:latest
