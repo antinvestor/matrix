@@ -19,8 +19,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/oauth2"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/userutil"

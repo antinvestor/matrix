@@ -18,9 +18,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"golang.org/x/oauth2"
 	"strings"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"

@@ -18,8 +18,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"golang.org/x/oauth2"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"

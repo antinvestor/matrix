@@ -18,12 +18,13 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"golang.org/x/oauth2"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth"

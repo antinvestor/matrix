@@ -17,10 +17,11 @@ package auth
 import (
 	"context"
 	"fmt"
-	"golang.org/x/oauth2"
 	"net/http"
 	"net/url"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/matrix/setup/config"
 )

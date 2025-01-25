@@ -17,9 +17,10 @@ package auth
 import (
 	"context"
 	"encoding/json"
-	"golang.org/x/oauth2"
 	"net/http"
 	"sync"
+
+	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"

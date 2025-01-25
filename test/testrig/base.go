@@ -16,9 +16,10 @@ package testrig
 
 import (
 	"fmt"
-	"github.com/pitabwire/util"
 	"testing"
 	"time"
+
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/process"

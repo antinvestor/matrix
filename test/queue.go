@@ -16,9 +16,10 @@ package test
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/setup/config"
 	"net/url"
 	"os"
+
+	"github.com/antinvestor/matrix/setup/config"
 )
 
 //const NatsImage = "nats:2.10"
@@ -53,7 +54,6 @@ import (
 //	}, nil
 //}
 
-//
 // PrepareNatsDataSourceConnection Prepare a nats connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests

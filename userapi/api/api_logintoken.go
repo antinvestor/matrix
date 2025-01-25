@@ -16,8 +16,9 @@ package api
 
 import (
 	"context"
-	"golang.org/x/oauth2"
 	"time"
+
+	"golang.org/x/oauth2"
 )
 
 // DefaultLoginTokenLifetime determines how old a valid token may be.

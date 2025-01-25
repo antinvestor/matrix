@@ -18,8 +18,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"golang.org/x/oauth2"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"

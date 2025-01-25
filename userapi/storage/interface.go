@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+
 	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/gomatrixserverlib"
