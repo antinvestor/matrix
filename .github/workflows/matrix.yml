@@ -74,11 +74,7 @@ jobs:
         image: ghcr.io/antinvestor/nats
         ports:
           - 4222:4222
-        options: >-
-          --health-cmd "curl --fail http://localhost:8222/healthz || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
       - name: Install libolm and dependencies
