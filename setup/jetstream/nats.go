@@ -45,7 +45,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 }
 
 // nolint:gocyclo
-func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn, error) {
+func setupNATS(processCtx *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn, error) {
 	if nc == nil {
 		var err error
 		var opts []natsclient.Option
@@ -67,7 +67,12 @@ func setupNATS(_ *process.ProcessContext, cfg *config.JetStream, nc *natsclient.
 	var info *natsclient.StreamInfo
 	for _, stream := range streams { // streams are defined in streams.go
 		streamName := cfg.Prefixed(stream.Name)
-		info, err = s.StreamInfo(streamName)
+
+		opts := []natsclient.JSOpt{
+			natsclient.Context(processCtx.Context()),
+		}
+
+		info, err = s.StreamInfo(streamName, opts...)
 		if err != nil && !errors.Is(err, natsclient.ErrStreamNotFound) {
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
