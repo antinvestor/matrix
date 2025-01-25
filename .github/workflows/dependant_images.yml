@@ -1,6 +1,6 @@
 # Based on https://github.com/docker/build-push-action
 
-name: "Build redis image"
+name: "Build dependant images"
 
 on:
   workflow_dispatch: # A build was manually requested
@@ -29,9 +29,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Pushing Image to Github Container Registry
+      - name: Build and Pushing Redis Image to GHCR
         uses: docker/build-push-action@v6
         with:
           file: Redis.Dockerfile
           push: true
           tags: ghcr.io/antinvestor/redis:latest
+
+      - name: Build and Pushing Nats Image to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          file: Nats.Dockerfile
+          push: true
+          tags: ghcr.io/antinvestor/nats:latest

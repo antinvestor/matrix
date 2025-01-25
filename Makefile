@@ -1,12 +1,12 @@
 
 ENV_LOCAL_TEST=\
-  TEST_DATABASE_URL=postgres://ant:secret@localhost:5434/service_profile?sslmode=disable \
-  POSTGRES_PASSWORD=secret \
-  POSTGRES_DB=service_profile \
-  POSTGRES_HOST=profile_db \
-  POSTGRES_USER=ant \
-  CONTACT_ENCRYPTION_KEY=ualgJEcb4GNXLn3jYV9TUGtgYrdTMg \
-  CONTACT_ENCRYPTION_SALT=VufLmnycUCgz
+  TESTING_DATABASE_URI=postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable \
+  POSTGRES_PASSWORD=s3cr3t \
+  POSTGRES_DB=matrix \
+  POSTGRES_HOST=localhost \
+  POSTGRES_USER=matrix \
+  TESTING_CACHE_URI=redis://matrix:s3cr3t@localhost:6378 \
+  TESTING_QUEUE_URI=nats://matrix:s3cr3t@localhost:4221
 
 SERVICE		?= $(shell basename `go list`)
 VERSION		?= $(shell git describe --tags --always --dirty --match=v* 2> /dev/null || cat $(PWD)/.version 2> /dev/null || echo v0)
@@ -45,7 +45,7 @@ docker-setup: ## sets up docker container images
 
 pg_wait:
 	@count=0; \
-	until  nc -z localhost 5434; do \
+	until  nc -z localhost 5431; do \
 	  if [ $$count -gt 30 ]; then echo "can't wait forever for pg"; exit 1; fi; \
 	    sleep 1; echo "waiting for postgresql" $$count; count=$$(($$count+1)); done; \
 	    sleep 5;
@@ -60,7 +60,6 @@ docker-stop: ## stops all docker containers
 # if it's not specified it will run all tests
 tests: ## runs all system tests
 	$(ENV_LOCAL_TEST) \
-	FILES=$(go list ./...  | grep -v /vendor/);\
 	go test ./... -v -run=$(INTEGRATION_TEST_SUITE_PATH)  -coverprofile=coverage.out;\
 	RETURNCODE=$$?;\
 	if [ "$$RETURNCODE" -ne 0 ]; then\

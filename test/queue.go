@@ -16,68 +16,62 @@ package test
 
 import (
 	"context"
-
-	"github.com/sirupsen/logrus"
-	"github.com/testcontainers/testcontainers-go"
-	tcNats "github.com/testcontainers/testcontainers-go/modules/nats"
+	"github.com/antinvestor/matrix/setup/config"
+	"net/url"
+	"os"
 )
 
-const NatsImage = "nats:2.10"
-
-func setupNats(ctx context.Context) (*tcNats.NATSContainer, error) {
-	return tcNats.Run(ctx, NatsImage)
-}
+//const NatsImage = "nats:2.10"
+//
+//func setupNats(ctx context.Context) (*tcNats.NATSContainer, error) {
+//	return tcNats.Run(ctx, NatsImage)
+//}
 
 // PrepareNatsDataSourceConnection Prepare a nats connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same connection, which will have data from previous tests
 // unless close() is called.
-func PrepareNatsDataSourceConnection(ctx context.Context) (dsConnection string, close func(), err error) {
-
-	container, err := setupNats(ctx)
-	if err != nil {
-		return "", nil, err
-	}
-
-	connStr, err := container.ConnectionString(ctx)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return connStr, func() {
-
-		err = testcontainers.TerminateContainer(container)
-		if err != nil {
-			logrus.WithError(err).Error("failed to terminate container")
-		}
-
-	}, nil
-}
-
-//func clearQueue(ctx context.Context, natsUriStr string) error {
+//func PrepareNatsDataSourceConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
 //
-//	return nil
-//}
-//
-//// PrepareNatsDataSourceConnection Prepare a nats connection string for testing.
-//// Returns the connection string to use and a close function which must be called when the test finishes.
-//// Calling this function twice will return the same database, which will have data from previous tests
-//// unless close() is called.
-//func PrepareNatsDataSourceConnection(ctx context.Context) (connStr config.DataSource, close func(), err error) {
-//
-//	natsUriStr := os.Getenv("TESTING_QUEUE_URI")
-//	if natsUriStr == "" {
-//		natsUriStr = "nats://127.0.0.1:4222"
-//	}
-//
-//	parsedNatsUri, err := url.Parse(natsUriStr)
+//	container, err := setupNats(ctx)
 //	if err != nil {
-//		return "", func() {}, err
+//		return "", nil, err
 //	}
 //
-//	natsUriStr = parsedNatsUri.String()
+//	connStr, err := container.ConnectionString(ctx)
+//	if err != nil {
+//		return "", nil, err
+//	}
 //
-//	return config.DataSource(natsUriStr), func() {
-//		_ = clearQueue(ctx, natsUriStr)
+//	return config.DataSource(connStr), func() {
+//
+//		err = testcontainers.TerminateContainer(container)
+//		if err != nil {
+//			logrus.WithError(err).Error("failed to terminate container")
+//		}
+//
 //	}, nil
 //}
+
+//
+// PrepareNatsDataSourceConnection Prepare a nats connection string for testing.
+// Returns the connection string to use and a close function which must be called when the test finishes.
+// Calling this function twice will return the same database, which will have data from previous tests
+// unless close() is called.
+func PrepareNatsDataSourceConnection(_ context.Context) (connStr config.DataSource, close func(), err error) {
+
+	natsUriStr := os.Getenv("TESTING_QUEUE_URI")
+	if natsUriStr == "" {
+		natsUriStr = "nats://localhost:4222"
+	}
+
+	parsedNatsUri, err := url.Parse(natsUriStr)
+	if err != nil {
+		return "", func() {}, err
+	}
+
+	natsUriStr = parsedNatsUri.String()
+
+	return config.DataSource(natsUriStr), func() {
+	}, nil
+}

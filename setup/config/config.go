@@ -119,6 +119,18 @@ type Path string
 // A DataSource for opening a postgresql database using lib/pq.
 type DataSource string
 
+func (d DataSource) ToArray() []DataSource {
+
+	var connectionDSList []DataSource
+	connectionUris := strings.Split(string(d), ",")
+	for _, connectionUri := range connectionUris {
+		dataSourceUri := DataSource(connectionUri)
+		connectionDSList = append(connectionDSList, dataSourceUri)
+	}
+
+	return connectionDSList
+}
+
 func (d DataSource) IsSQLite() bool {
 	return strings.HasPrefix(string(d), "file:")
 }
@@ -334,10 +346,10 @@ func (config *Dendrite) LoadEnv() {
 type DefaultOpts struct {
 	DatabaseConnectionStr DataSource
 	CacheConnectionStr    DataSource
-	QueueConnectionStr    string
+	QueueConnectionStr    DataSource
 }
 
-// SetDefaults sets default config values if they are not explicitly set.
+// Defaults sets default config values if they are not explicitly set.
 func (config *Dendrite) Defaults(opts DefaultOpts) {
 	config.Version = Version
 

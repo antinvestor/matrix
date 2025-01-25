@@ -28,6 +28,7 @@ type JWTClaims struct {
 	PartitionID string         `json:"partition_id,omitempty"`
 	AccessID    string         `json:"access_id,omitempty"`
 	ContactID   string         `json:"contact_id,omitempty"`
+	DeviceID    string         `json:"device_id,omitempty"`
 	Roles       []string       `json:"roles,omitempty"`
 	jwt.RegisteredClaims
 }
@@ -108,6 +109,25 @@ func (a *JWTClaims) GetContactId() string {
 	return result
 }
 
+func (a *JWTClaims) GetDeviceId() string {
+
+	result := a.ContactID
+	if result != "" {
+		return result
+	}
+	val, ok := a.Ext["device_id"]
+	if !ok {
+		return ""
+	}
+
+	result, ok = val.(string)
+	if !ok {
+		return ""
+	}
+
+	return result
+}
+
 func (a *JWTClaims) GetRoles() []string {
 
 	var result = a.Roles
@@ -156,6 +176,7 @@ func (a *JWTClaims) AsMetadata() map[string]string {
 	m["partition_id"] = a.GetPartitionId()
 	m["access_id"] = a.GetAccessId()
 	m["contact_id"] = a.GetContactId()
+	m["device_id"] = a.GetDeviceId()
 	m["roles"] = strings.Join(a.GetRoles(), ",")
 	return m
 }

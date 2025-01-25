@@ -49,12 +49,10 @@ func (c *JetStream) Defaults(opts DefaultOpts) {
 	c.TopicPrefix = "Matrix"
 	c.Credentials = ""
 
-	connectionUriStr := opts.QueueConnectionStr
-	connectionUris := strings.Split(connectionUriStr, ",")
-	for _, natsUri := range connectionUris {
-		dataSourceUri := DataSource(natsUri)
-		if dataSourceUri.IsNats() {
-			c.Addresses = append(c.Addresses, natsUri)
+	connectionUris := opts.QueueConnectionStr.ToArray()
+	for _, ds := range connectionUris {
+		if ds.IsNats() {
+			c.Addresses = append(c.Addresses, string(ds))
 		}
 	}
 

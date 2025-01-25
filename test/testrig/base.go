@@ -16,6 +16,7 @@ package testrig
 
 import (
 	"fmt"
+	"github.com/pitabwire/util"
 	"testing"
 	"time"
 
@@ -47,7 +48,7 @@ func CreateConfig(t *testing.T, testOpts test.DependancyOption) (*config.Dendrit
 	cfg.Global.ServerName = "test"
 	// use a distinct prefix else concurrent postgres runs will clash since NATS will use
 	// the file system event with InMemory=true :(
-	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%s_", testOpts.Database())
+	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%s", util.RandomString(8))
 	cfg.SyncAPI.Fulltext.InMemory = true
 
 	return &cfg, processContext, func() {

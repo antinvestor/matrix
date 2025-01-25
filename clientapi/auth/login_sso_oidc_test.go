@@ -116,7 +116,7 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 			})
 			mux.HandleFunc("/userinfo", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"sub":"asub", "name":"aname", "preferred_username":"auser"}`))
+				_, _ = w.Write([]byte(`{"sub":"asub", "name":"aname", "contacts":[{"detail":"auser"}]}`))
 			})
 
 			s := httptest.NewServer(mux)
@@ -209,7 +209,7 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 			})
 			mux.HandleFunc("/userinfo", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"sub":"asub", "name":"aname", "preferred_user":"auser"}`))
+				_, _ = w.Write([]byte(`{"sub":"asub", "name":"aname", "contacts":[{"detail":"auser"}]}`))
 			})
 
 			s := httptest.NewServer(mux)
@@ -226,10 +226,6 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 				resetOauth2Config: true,
 
 				userInfoURL: s.URL + "/userinfo",
-
-				subPath:             "sub",
-				displayNamePath:     "name",
-				suggestedUserIDPath: "preferred_user",
 
 				disc: &oidcDiscovery{
 					Issuer:                "https://oauth2.example.com",
@@ -262,7 +258,7 @@ func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
 	mux.HandleFunc("/userinfo", func(w http.ResponseWriter, r *http.Request) {
 		gotHeader = r.Header
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"sub":"asub", "name":"aname", "preferred_user":"auser"}`))
+		_, _ = w.Write([]byte(`{"sub":"asub", "name":"aname", "contacts":[{"detail":"auser"}]}`))
 	})
 
 	s := httptest.NewServer(mux)
@@ -278,10 +274,7 @@ func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
 
 		userInfoURL: s.URL + "/userinfo",
 
-		responseMimeType:    "application/json",
-		subPath:             "sub",
-		displayNamePath:     "name",
-		suggestedUserIDPath: "preferred_user",
+		responseMimeType: "application/json",
 	}
 
 	gotSub, gotName, gotSuggestedUser, err := idp.getUserInfo(ctx, "atoken")

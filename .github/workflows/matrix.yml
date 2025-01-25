@@ -70,6 +70,15 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      nats:
+        image: ghcr.io/antinvestor/nats
+        ports:
+          - 4222:4222
+        options: >-
+          --health-cmd "curl --fail http://localhost:8222/healthz || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - name: Install libolm and dependencies
@@ -85,7 +94,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run unit tests
         env:
-          TESTING_QUEUE_URI: nats://localhost:4222
+          TESTING_QUEUE_URI: nats://matrix:s3cr3t@localhost:4222
           TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379/0
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |

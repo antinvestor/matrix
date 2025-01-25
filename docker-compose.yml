@@ -15,7 +15,7 @@ services:
     networks:
       - internal
     ports:
-      - "5432:5432"
+      - "5431:5432"
 
   cache:
     hostname: cache
@@ -24,7 +24,7 @@ services:
     networks:
       - internal
     ports:
-      - "6379:6379"
+      - "6378:6379"
     environment:
       REDIS_ARGS: "--databases 10000 --requirepass s3cr3t --user matrix on >s3cr3t ~* +@all"
     command: [
@@ -47,8 +47,8 @@ services:
     networks:
       - internal
     ports:
-      - "4222:4222"
-    command: [ "--js" ]
+      - "4221:4222"
+    command: [ "--js", "--user", "matrix", "--pass", "s3cr3t" ]
 
 
   matrix:
@@ -70,7 +70,7 @@ services:
     environment:
       DATABASE_URI: postgres://matrix:s3cr3t@datastore/matrix?sslmode=disable
       CACHE_URI: redis://matrix:s3cr3t@cache:6379/0?protocol=3
-      QUEUE_URI: nats://queue:4222
+      QUEUE_URI: nats://matrix:s3cr3t@queue:4222
     command: [ "--config", "/etc/matrix/config.yaml" ]
     configs:
       - source: matrix_key

@@ -384,6 +384,7 @@ func createAccessTokens(t *testing.T, accessTokens map[*test.User]userDevice, us
 			Localpart:   localpart,
 			ServerName:  serverName,
 			Password:    password,
+			DisplayName: localpart,
 		}, userRes); err != nil {
 			t.Errorf("failed to create account: %s", err)
 		}

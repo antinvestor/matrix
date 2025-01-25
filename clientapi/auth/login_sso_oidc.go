@@ -241,12 +241,15 @@ func (p *oidcIdentityProvider) getUserInfo(ctx context.Context, accessToken stri
 	subject = profileInfo["sub"].(string)
 	displayName = profileInfo["name"].(string)
 
-	contacts := profileInfo["contacts"].([]map[string]any)
-	if len(contacts) == 0 {
-		return "", "", "", fmt.Errorf("no contacts in user info response body")
-	}
+	contacts, ok := profileInfo["contacts"].([]any)
+	if ok {
+		if len(contacts) == 0 {
+			return "", "", "", fmt.Errorf("no contacts in user info response body")
+		}
 
-	suggestedLocalpart = contacts[0]["detail"].(string)
+		firstContact := contacts[0].(map[string]any)
+		suggestedLocalpart = firstContact["detail"].(string)
+	}
 
 	return
 }
