@@ -15,6 +15,8 @@ github.com/RoaringBitmap/roaring v1.9.3/go.mod h1:6AXUsoIEzDTFFQCe1RbGA6uFONMhve
 github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
 github.com/antinvestor/gomatrix v0.1.0 h1:vR9g38qXcWy7VJm+rZNZuKu9pt6qEbgBuJoM5qQ3w6Y=
 github.com/antinvestor/gomatrix v0.1.0/go.mod h1:ew4nnccrtkFpnyZ2zDLdWRl73+h4EaMvboCFXkb5AwQ=
+github.com/antinvestor/gomatrix v0.1.2 h1:/22DvtqwQ2Ud9D0f7ycCUkaAEI9NeMv71JOEImDiDWM=
+github.com/antinvestor/gomatrix v0.1.2/go.mod h1:ew4nnccrtkFpnyZ2zDLdWRl73+h4EaMvboCFXkb5AwQ=
 github.com/antinvestor/gomatrixserverlib v0.1.0 h1:mHS71fyD6OIyFelaKrM8hJ+rPJk/AXoB9jb8r8GU2/I=
 github.com/antinvestor/gomatrixserverlib v0.1.0/go.mod h1:2wkaXVmY4JArYtQmnUp65XJCrXCcU6GFNmU6MWSfwBA=
 github.com/antinvestor/gomatrixserverlib v0.1.2 h1:QW8QHxnk/XYCY9c+7qbgUBKCFyVbiXUZkmj5XEPWR2g=
