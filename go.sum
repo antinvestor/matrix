@@ -17,6 +17,8 @@ github.com/antinvestor/gomatrix v0.1.0 h1:vR9g38qXcWy7VJm+rZNZuKu9pt6qEbgBuJoM5q
 github.com/antinvestor/gomatrix v0.1.0/go.mod h1:ew4nnccrtkFpnyZ2zDLdWRl73+h4EaMvboCFXkb5AwQ=
 github.com/antinvestor/gomatrixserverlib v0.1.0 h1:mHS71fyD6OIyFelaKrM8hJ+rPJk/AXoB9jb8r8GU2/I=
 github.com/antinvestor/gomatrixserverlib v0.1.0/go.mod h1:2wkaXVmY4JArYtQmnUp65XJCrXCcU6GFNmU6MWSfwBA=
+github.com/antinvestor/gomatrixserverlib v0.1.2 h1:QW8QHxnk/XYCY9c+7qbgUBKCFyVbiXUZkmj5XEPWR2g=
+github.com/antinvestor/gomatrixserverlib v0.1.2/go.mod h1:2wkaXVmY4JArYtQmnUp65XJCrXCcU6GFNmU6MWSfwBA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bits-and-blooms/bitset v1.12.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
