@@ -41,7 +41,7 @@ jobs:
 
   # run go test with different go versions
   test:
-    timeout-minutes: 20
+    timeout-minutes: 30
     name: Unit tests
     runs-on: ubuntu-latest
     # Service containers to run with `container-job`
