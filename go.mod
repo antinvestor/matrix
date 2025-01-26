@@ -36,7 +36,7 @@ require (
 	golang.org/x/image v0.23.0
 	golang.org/x/oauth2 v0.24.0
 	golang.org/x/sync v0.10.0
-	golang.org/x/term v0.27.0
+	golang.org/x/term v0.28.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.1
@@ -94,7 +94,7 @@ require (
 	go.etcd.io/bbolt v1.3.7 // indirect
 	go.mau.fi/util v0.8.3 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/protobuf v1.35.2 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
