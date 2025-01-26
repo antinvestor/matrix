@@ -6,7 +6,7 @@ require (
 	github.com/Arceliar/phony v0.0.0-20220903101357-530938a4b13d
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/MFAshby/stdemuxerhook v1.0.0
-	github.com/antinvestor/gomatrix v0.1.0
+	github.com/antinvestor/gomatrix v0.1.2
 	github.com/antinvestor/gomatrixserverlib v0.1.2
 	github.com/blevesearch/bleve/v2 v2.4.4
 	github.com/getsentry/sentry-go v0.31.1
