@@ -22,7 +22,8 @@ func mustCreateEventJSONTable(t *testing.T, _ test.DependancyOption) (tables.Eve
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: connStr,
+		ConnectionString:   connStr,
+		MaxOpenConnections: 10,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.EventJSON

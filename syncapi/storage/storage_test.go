@@ -32,7 +32,8 @@ func MustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database
 	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
 	db, err := storage.NewSyncServerDatasource(context.Background(), cm, &config.DatabaseOptions{
-		ConnectionString: connStr,
+		ConnectionString:   connStr,
+		MaxOpenConnections: 10,
 	})
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)

@@ -58,7 +58,8 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
 	db, err := storage.NewMediaAPIDatasource(cm, &config.DatabaseOptions{
-		ConnectionString: connStr,
+		ConnectionString:   connStr,
+		MaxOpenConnections: 10,
 	})
 	if err != nil {
 		t.Errorf("error opening mediaapi database: %v", err)

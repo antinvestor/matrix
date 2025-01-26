@@ -23,7 +23,8 @@ func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.KeyDatab
 	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
 	db, err := storage.NewKeyDatabase(cm, &config.DatabaseOptions{
-		ConnectionString: connStr,
+		ConnectionString:   connStr,
+		MaxOpenConnections: 10,
 	})
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)

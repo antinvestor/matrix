@@ -43,7 +43,8 @@ func mustCreateUserDatabase(t *testing.T, _ test.DependancyOption) (storage.User
 	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
 	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
-		ConnectionString: connStr,
+		ConnectionString:   connStr,
+		MaxOpenConnections: 10,
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
 		t.Fatalf("NewUserDatabase returned %s", err)

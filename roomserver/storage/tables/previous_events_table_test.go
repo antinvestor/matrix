@@ -22,7 +22,8 @@ func mustCreatePreviousEventsTable(t *testing.T, _ test.DependancyOption) (tab t
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: connStr,
+		ConnectionString:   connStr,
+		MaxOpenConnections: 10,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	err = postgres.CreatePrevEventsTable(db)

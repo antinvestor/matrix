@@ -38,7 +38,8 @@ func mustMakeDBs(t *testing.T, _ test.DependancyOption) (
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: connStr,
+		ConnectionString:   connStr,
+		MaxOpenConnections: 10,
 	}, nil)
 	if err != nil {
 		t.Fatalf("failed to open db: %s", err)

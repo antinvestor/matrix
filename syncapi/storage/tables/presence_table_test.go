@@ -25,7 +25,8 @@ func mustPresenceTable(t *testing.T, _ test.DependancyOption) (tables.Presence, 
 		t.Fatalf("failed to open database: %s", err)
 	}
 	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString: connStr,
+		ConnectionString:   connStr,
+		MaxOpenConnections: 10,
 	}, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		t.Fatalf("failed to open db: %s", err)
