@@ -41,7 +41,7 @@ jobs:
 
   # run go test with different go versions
   test:
-    timeout-minutes: 30
+    timeout-minutes: 20
     name: Unit tests
     runs-on: ubuntu-latest
     # Service containers to run with `container-job`
@@ -91,11 +91,11 @@ jobs:
       - name: Run unit tests
         env:
           TESTING_QUEUE_URI: nats://localhost:4222
-          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379/0
+          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
-          go test -json -v ./... | tee /tmp/gotest.log | gotestfmt
+          go test -json -v ./... 
 
   # build Dendrite for linux with different architectures and go versions
   build:
@@ -225,7 +225,7 @@ jobs:
         shell: bash
         env:
           TESTING_QUEUE_URI: nats://localhost:4222
-          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379/0
+          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
