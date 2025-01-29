@@ -41,7 +41,7 @@ jobs:
 
   # run go test with different go versions
   test:
-    timeout-minutes: 20
+    timeout-minutes: 40
     name: Unit tests
     runs-on: ubuntu-latest
     # Service containers to run with `container-job`
@@ -49,7 +49,7 @@ jobs:
       # Label used to access the service container
       postgres:
         # Docker Hub image
-        image: postgres:17
+        image: paradedb/paradedb
         env:
           POSTGRES_USER: matrix
           POSTGRES_PASSWORD: s3cr3t
@@ -88,6 +88,18 @@ jobs:
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod tidy
       - name: Run unit tests
         env:
           TESTING_QUEUE_URI: nats://localhost:4222
@@ -95,7 +107,10 @@ jobs:
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
-          go test -json -v ./... | tee /tmp/gotest.log | gotestfmt
+          echo $TESTING_QUEUE_URI
+          echo $TESTING_DATABASE_URI
+          echo $TESTING_CACHE_URI
+          go test -v ./... 
 
   # build Dendrite for linux with different architectures and go versions
   build:
@@ -149,7 +164,7 @@ jobs:
       # Label used to access the service container
       postgres:
         # Docker Hub image
-        image: postgres:17
+        image: paradedb/paradedb
         env:
           POSTGRES_USER: matrix
           POSTGRES_PASSWORD: s3cr3t

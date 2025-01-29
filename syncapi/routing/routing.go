@@ -22,7 +22,6 @@ import (
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/caching"
-	"github.com/antinvestor/matrix/internal/fulltext"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
@@ -42,7 +41,6 @@ func Setup(
 	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
 	lazyLoadCache caching.LazyLoadCache,
-	fts fulltext.Indexer,
 	rateLimits *httputil.RateLimits,
 ) {
 	v1unstablemux := csMux.PathPrefix("/{apiversion:(?:v1|unstable)}/").Subrouter()
@@ -176,7 +174,7 @@ func Setup(
 				nb := req.FormValue("next_batch")
 				nextBatch = &nb
 			}
-			return Search(req, device, syncDB, fts, nextBatch, rsAPI)
+			return Search(req, device, syncDB, nextBatch, rsAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

@@ -67,6 +67,11 @@ type DatabaseTransaction interface {
 	// Returns an error if there was a problem talking with the database.
 	// Does not include any transaction IDs in the returned events.
 	Events(ctx context.Context, eventIDs []string) ([]*rstypes.HeaderedEvent, error)
+
+	SearchEvents(ctx context.Context, searchTerm string, roomIDs []string, keys []string, limit, offset int) (*types.SearchResult, error)
+
+	ExcludeEventsFromSearchIndex(ctx context.Context, events []string) error
+
 	// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
@@ -128,6 +133,11 @@ type Database interface {
 	// Returns an error if there was a problem talking with the database.
 	// Does not include any transaction IDs in the returned events.
 	Events(ctx context.Context, eventIDs []string) ([]*rstypes.HeaderedEvent, error)
+
+	// SearchEvents performs a full-text search using the BM25 index
+	SearchEvents(ctx context.Context, searchTerm string, roomIDs []string, keys []string, limit, offset int) (*types.SearchResult, error)
+
+	ExcludeEventsFromSearchIndex(ctx context.Context, events []string) error
 	// WriteEvent into the database. It is not safe to call this function from multiple goroutines, as it would create races
 	// when generating the sync stream position for this event. Returns the sync stream position for the inserted event.
 	// Returns an error if there was a problem inserting this event.

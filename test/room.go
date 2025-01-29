@@ -212,7 +212,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	return headeredEvent
 }
 
-// Add a new event to this room DAG. Not thread-safe.
+// InsertEvent Add a new event to this room DAG. Not thread-safe.
 func (r *Room) InsertEvent(t *testing.T, he *rstypes.HeaderedEvent) {
 	t.Helper()
 	// Add the event to the list of auth/state events

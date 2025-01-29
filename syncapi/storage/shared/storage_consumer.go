@@ -137,6 +137,16 @@ func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Dev
 	return out
 }
 
+func (d *Database) SearchEvents(ctx context.Context, searchTerm string, roomIDs []string, keys []string, limit, offset int) (*types.SearchResult, error) {
+	return d.OutputEvents.SearchEvents(ctx, searchTerm, roomIDs, keys, limit, offset)
+}
+
+func (d *Database) ExcludeEventsFromSearchIndex(ctx context.Context, eventIDs []string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.OutputEvents.ExcludeEventsFromSearchIndex(ctx, txn, eventIDs)
+	})
+}
+
 // AddInviteEvent stores a new invite event for a user.
 // If the invite was successfully stored this returns the stream ID it was stored at.
 // Returns an error if there was a problem communicating with the database.

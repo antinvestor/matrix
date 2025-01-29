@@ -19,8 +19,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
@@ -50,7 +52,7 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   room_id TEXT NOT NULL,
   -- The headered JSON for the event, containing potentially additional metadata such as
   -- the room version. Stored as TEXT because this should be valid UTF-8.
-  headered_event_json TEXT NOT NULL,
+  headered_event_json JSONB NOT NULL,
   -- The event type e.g 'm.room.member'.
   type TEXT NOT NULL,
   -- The 'sender' property of the event.
@@ -70,6 +72,8 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   -- that relates to the moment these were retrieved rather than the moment these
   -- were emitted.
   exclude_from_sync BOOL DEFAULT FALSE,
+  -- Excludes edited messages from the search index.  
+  exclude_from_search BOOL DEFAULT FALSE,
   -- The history visibility before this event (1 - world_readable; 2 - shared; 3 - invited; 4 - joined)
   history_visibility SMALLINT NOT NULL DEFAULT 2
 );
@@ -82,7 +86,12 @@ CREATE INDEX IF NOT EXISTS syncapi_output_room_events_add_state_ids_idx ON synca
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_remove_state_ids_idx ON syncapi_output_room_events ((remove_state_ids IS NOT NULL));
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_recent_events_idx ON syncapi_output_room_events (room_id, exclude_from_sync, id, sender, type);
 
-
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_fts_idx ON syncapi_output_room_events
+USING bm25 (event_id, id, room_id, headered_event_json, type, exclude_from_search, sender, contains_url)
+WITH (
+    	key_field='event_id',
+    	json_fields = '{ "headered_event_json": {"fast": true, "normalizer": "raw"}}'
+    );
 `
 
 const insertEventSQL = "" +
@@ -93,10 +102,10 @@ const insertEventSQL = "" +
 	"RETURNING id"
 
 const selectEventsSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events WHERE event_id = ANY($1)"
+	"SELECT id, event_id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
 const selectEventsWithFilterSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events WHERE event_id = ANY($1)" +
+	"SELECT id, event_id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events WHERE event_id = ANY($1)" +
 	" AND ( $2::text[] IS NULL OR     sender  = ANY($2)  )" +
 	" AND ( $3::text[] IS NULL OR NOT(sender  = ANY($3)) )" +
 	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
@@ -191,7 +200,10 @@ const purgeEventsSQL = "" +
 
 const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE id > $1 AND type = ANY($2) ORDER BY id ASC LIMIT $3"
 
+const excludeEventsFromIndexSQL = `UPDATE syncapi_output_room_events SET exclude_from_search = TRUE WHERE event_id = ANY($1)`
+
 type outputRoomEventsStatements struct {
+	db                             *sql.DB
 	insertEventStmt                *sql.Stmt
 	selectEventsStmt               *sql.Stmt
 	selectEventsWitFilterStmt      *sql.Stmt
@@ -207,10 +219,11 @@ type outputRoomEventsStatements struct {
 	selectContextAfterEventStmt    *sql.Stmt
 	purgeEventsStmt                *sql.Stmt
 	selectSearchStmt               *sql.Stmt
+	excludeEventsFromIndexStmt     *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
-	s := &outputRoomEventsStatements{}
+	s := &outputRoomEventsStatements{db: db}
 	_, err := db.Exec(outputRoomEventsSchema)
 	if err != nil {
 		return nil, err
@@ -220,12 +233,12 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 
 	var cName string
 	err = db.QueryRowContext(context.Background(), "select constraint_name from information_schema.table_constraints where table_name = 'syncapi_output_room_events' AND constraint_name = 'syncapi_event_id_idx'").Scan(&cName)
-	switch err {
-	case sql.ErrNoRows: // migration was already executed, as the index was renamed
+	switch {
+	case errors.Is(err, sql.ErrNoRows): // migration was already executed, as the index was renamed
 		if err = sqlutil.InsertMigration(context.Background(), db, migrationName); err != nil {
 			return nil, fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
 		}
-	case nil:
+	case err == nil:
 	default:
 		return nil, err
 	}
@@ -262,6 +275,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
 		{&s.purgeEventsStmt, purgeEventsSQL},
 		{&s.selectSearchStmt, selectSearchSQL},
+		{&s.excludeEventsFromIndexStmt, excludeEventsFromIndexSQL},
 	}.Prepare(db)
 }
 
@@ -357,7 +371,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	return stateNeeded, eventIDToEvent, rows.Err()
 }
 
-// MaxID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
+// SelectMaxEventID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
 // then this function should only ever be used at startup, as it will race with inserting events if it is
 // done afterwards. If there are no inserted events, 0 is returned.
 func (s *outputRoomEventsStatements) SelectMaxEventID(
@@ -520,7 +534,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	return result, rows.Err()
 }
 
-// selectEvents returns the events for the given event IDs. If an event is
+// SelectEvents returns the events for the given event IDs. If an event is
 // missing from the database, it will be omitted.
 func (s *outputRoomEventsStatements) SelectEvents(
 	ctx context.Context, txn *sql.Tx, eventIDs []string, filter *synctypes.RoomEventFilter, preserveOrder bool,
@@ -664,45 +678,6 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	return lastID, evts, rows.Err()
 }
 
-func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
-	var result []types.StreamEvent
-	for rows.Next() {
-		var (
-			eventID           string
-			streamPos         types.StreamPosition
-			eventBytes        []byte
-			excludeFromSync   bool
-			sessionID         *int64
-			txnID             *string
-			transactionID     *api.TransactionID
-			historyVisibility gomatrixserverlib.HistoryVisibility
-		)
-		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID, &historyVisibility); err != nil {
-			return nil, err
-		}
-		// TODO: Handle redacted events
-		var ev rstypes.HeaderedEvent
-		if err := json.Unmarshal(eventBytes, &ev); err != nil {
-			return nil, err
-		}
-
-		if sessionID != nil && txnID != nil {
-			transactionID = &api.TransactionID{
-				SessionID:     *sessionID,
-				TransactionID: *txnID,
-			}
-		}
-		ev.Visibility = historyVisibility
-		result = append(result, types.StreamEvent{
-			HeaderedEvent:   &ev,
-			StreamPosition:  streamPos,
-			TransactionID:   transactionID,
-			ExcludeFromSync: excludeFromSync,
-		})
-	}
-	return result, rows.Err()
-}
-
 func (s *outputRoomEventsStatements) PurgeEvents(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
@@ -732,4 +707,174 @@ func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, l
 		result[id] = ev
 	}
 	return result, rows.Err()
+}
+
+// escapeSpecialCharacters escapes the special characters in a query term.
+func (s *outputRoomEventsStatements) escapeSpecialCharacters(input string) string {
+	specialChars := "+,^`,:{},\"[],()<>,~!\\* "
+	escaped := strings.Builder{}
+
+	for _, char := range input {
+		if strings.ContainsRune(specialChars, char) {
+			escaped.WriteRune('\\')
+		}
+		escaped.WriteRune(char)
+	}
+
+	return escaped.String()
+}
+
+func (s *outputRoomEventsStatements) SearchEvents(
+	ctx context.Context, searchTerm string, roomIDs []string,
+	keys []string, limit, offset int,
+) (*types.SearchResult, error) {
+
+	const (
+		searchEventsSQL = `SELECT id, event_id, headered_event_json, history_visibility, '' AS highlight, paradedb.score(event_id) AS score  
+	 FROM  syncapi_output_room_events   WHERE  %s  ORDER BY score LIMIT $%d OFFSET $%d`
+
+		searchEventsCountSQL = `SELECT COUNT(*) FROM syncapi_output_room_events  WHERE  %s `
+	)
+	var (
+		rows            *sql.Rows
+		err             error
+		whereKeyStrings []string
+		whereParams     []any
+		totalCount      int
+	)
+
+	escapedRoomIDs := make([]string, len(roomIDs))
+	for i, roomID := range roomIDs {
+		escapedRoomIDs[i] = s.escapeSpecialCharacters(roomID)
+	}
+	whereParams = append(whereParams, strings.Join(escapedRoomIDs, " "))
+
+	whereRoomIDQueryStr := ""
+	if len(roomIDs) > 0 {
+		whereRoomIDQueryStr = " room_id @@@ $1  AND "
+	}
+
+	whereExclusionQueryStr := " exclude_from_search @@@ 'false' "
+
+	if len(keys) == 0 {
+		keys = append(keys, "content.body", "content.name", "content.topic")
+	}
+
+	k := len(whereParams) + 1
+	for i, key := range keys {
+		j := i + k
+		whereParams = append(whereParams, searchTerm)
+		whereKeyString := fmt.Sprintf(" paradedb.fuzzy_phrase( field => 'headered_event_json.%s', value => $%d, match_all_terms => false, distance => 0) ", key, j)
+		whereKeyStrings = append(whereKeyStrings, whereKeyString)
+	}
+
+	whereShouldQueryStr := fmt.Sprintf(" should => ARRAY[ %s ]", strings.Join(whereKeyStrings, ", "))
+
+	finalWhereStr := fmt.Sprintf("%s %s AND event_id @@@ paradedb.boolean(  %s )", whereRoomIDQueryStr, whereExclusionQueryStr, whereShouldQueryStr)
+
+	totalCountQuery := fmt.Sprintf(searchEventsCountSQL, finalWhereStr)
+	totalsRow := s.db.QueryRowContext(ctx, totalCountQuery, whereParams...)
+	err = totalsRow.Scan(&totalCount)
+	if err != nil {
+		return nil, err
+	}
+
+	parameterCount := len(whereParams)
+	finalQuery := fmt.Sprintf(searchEventsSQL, finalWhereStr, parameterCount+1, parameterCount+2)
+
+	whereParams = append(whereParams, limit, offset)
+
+	rows, err = s.db.QueryContext(ctx, finalQuery, whereParams...)
+	if err != nil {
+		return nil, err
+	}
+
+	defer internal.CloseAndLogIfError(ctx, rows, "SearchEvents: rows.close() failed")
+	resultHits, err := rowsToSearchResult(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.SearchResult{Results: resultHits, Total: totalCount}, nil
+}
+
+func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
+	var result []types.StreamEvent
+	for rows.Next() {
+		var (
+			eventID           string
+			streamPos         types.StreamPosition
+			eventBytes        []byte
+			excludeFromSync   bool
+			sessionID         *int64
+			txnID             *string
+			transactionID     *api.TransactionID
+			historyVisibility gomatrixserverlib.HistoryVisibility
+		)
+		if err := rows.Scan(&streamPos, &eventID, &eventBytes, &sessionID, &excludeFromSync, &txnID, &historyVisibility); err != nil {
+			return nil, err
+		}
+		// TODO: Handle redacted events
+		var ev rstypes.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
+			return nil, err
+		}
+
+		if sessionID != nil && txnID != nil {
+			transactionID = &api.TransactionID{
+				SessionID:     *sessionID,
+				TransactionID: *txnID,
+			}
+		}
+		ev.Visibility = historyVisibility
+		result = append(result, types.StreamEvent{
+			HeaderedEvent:   &ev,
+			StreamPosition:  streamPos,
+			TransactionID:   transactionID,
+			ExcludeFromSync: excludeFromSync,
+		})
+	}
+	return result, rows.Err()
+}
+
+func rowsToSearchResult(rows *sql.Rows) ([]*types.SearchResultHit, error) {
+	var result []*types.SearchResultHit
+
+	for rows.Next() {
+		var (
+			eventID           string
+			highlight         *string
+			streamPos         types.StreamPosition
+			eventBytes        []byte
+			score             *float64
+			historyVisibility gomatrixserverlib.HistoryVisibility
+		)
+		if err := rows.Scan(&streamPos, &eventID, &eventBytes, &historyVisibility, &highlight, &score); err != nil {
+			return nil, err
+		}
+		// TODO: Handle redacted events
+		var ev rstypes.HeaderedEvent
+		if err := json.Unmarshal(eventBytes, &ev); err != nil {
+			return nil, err
+		}
+
+		highlightFinal := ""
+		if highlight != nil {
+			highlightFinal = *highlight
+		}
+
+		ev.Visibility = historyVisibility
+		result = append(result, &types.SearchResultHit{
+			Event:          &ev,
+			StreamPosition: streamPos,
+			Highlight:      highlightFinal,
+			Score:          score,
+		})
+	}
+	return result, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) ExcludeEventsFromSearchIndex(ctx context.Context, txn *sql.Tx, eventIDs []string) error {
+	_, err := sqlutil.TxStmt(txn, s.excludeEventsFromIndexStmt).ExecContext(ctx, pq.StringArray(eventIDs))
+	return err
 }

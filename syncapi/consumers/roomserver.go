@@ -22,8 +22,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/tidwall/gjson"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/fulltext"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
@@ -40,7 +41,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -55,7 +55,6 @@ type OutputRoomEventConsumer struct {
 	pduStream    streams.StreamProvider
 	inviteStream streams.StreamProvider
 	notifier     *notifier.Notifier
-	fts          fulltext.Indexer
 	asProducer   *producers.AppserviceEventProducer
 }
 
@@ -69,7 +68,6 @@ func NewOutputRoomEventConsumer(
 	pduStream streams.StreamProvider,
 	inviteStream streams.StreamProvider,
 	rsAPI api.SyncRoomserverAPI,
-	fts *fulltext.Search,
 	asProducer *producers.AppserviceEventProducer,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
@@ -83,7 +81,6 @@ func NewOutputRoomEventConsumer(
 		pduStream:    pduStream,
 		inviteStream: inviteStream,
 		rsAPI:        rsAPI,
-		fts:          fts,
 		asProducer:   asProducer,
 	}
 }
@@ -290,11 +287,12 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write new event failure")
 		return nil
 	}
-	if err = s.writeFTS(ev, pduPos); err != nil {
+
+	if err = s.checkIndexExclusion(ctx, ev); err != nil {
 		log.WithFields(log.Fields{
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
-		}).WithError(err).Warn("failed to index fulltext element")
+		}).WithError(err).Warn("failed to exclude from search index element")
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
@@ -345,11 +343,11 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		return nil
 	}
 
-	if err = s.writeFTS(ev, pduPos); err != nil {
+	if err = s.checkIndexExclusion(ctx, ev); err != nil {
 		log.WithFields(log.Fields{
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
-		}).WithError(err).Warn("failed to index fulltext element")
+		}).WithError(err).Warn("failed to exclude from search index element")
 	}
 
 	if err = s.db.UpdateRelations(ctx, ev); err != nil {
@@ -590,40 +588,13 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 	return event, err
 }
 
-func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPosition types.StreamPosition) error {
-	if !s.cfg.Fulltext.Enabled {
-		return nil
-	}
-	e := fulltext.IndexElement{
-		EventID:        ev.EventID(),
-		RoomID:         ev.RoomID().String(),
-		StreamPosition: int64(pduPosition),
-	}
-	e.SetContentType(ev.Type())
+func (s *OutputRoomEventConsumer) checkIndexExclusion(ctx context.Context, ev *rstypes.HeaderedEvent) error {
 
 	var relatesTo gjson.Result
 	switch ev.Type() {
 	case "m.room.message":
-		e.Content = gjson.GetBytes(ev.Content(), "body").String()
+		_ = gjson.GetBytes(ev.Content(), "body").String()
 		relatesTo = gjson.GetBytes(ev.Content(), "m\\.relates_to")
-	case spec.MRoomName:
-		e.Content = gjson.GetBytes(ev.Content(), "name").String()
-	case spec.MRoomTopic:
-		e.Content = gjson.GetBytes(ev.Content(), "topic").String()
-	case spec.MRoomRedaction:
-		log.Tracef("Redacting event: %s", ev.Redacts())
-		if err := s.fts.Delete(ev.Redacts()); err != nil {
-			return fmt.Errorf("failed to delete entry from fulltext index: %w", err)
-		}
-		return nil
-	default:
-		return nil
-	}
-	if e.Content != "" {
-		log.Tracef("Indexing element: %+v", e)
-		if err := s.fts.Index(e); err != nil {
-			return err
-		}
 		// If the event is an edited message we remove the original event from the index
 		// to avoid duplicates in the search results.
 		if relatesTo.Exists() {
@@ -631,7 +602,8 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPositio
 			if _, ok := relatedData["rel_type"]; ok && relatedData["rel_type"].Str == "m.replace" {
 				// We remove the original event from the index
 				if srcEventID, ok := relatedData["event_id"]; ok {
-					if err := s.fts.Delete(srcEventID.Str); err != nil {
+					err := s.db.ExcludeEventsFromSearchIndex(ctx, []string{srcEventID.Str})
+					if err != nil {
 						log.WithFields(log.Fields{
 							"event_id": ev.EventID(),
 							"src_id":   srcEventID.Str,
@@ -640,6 +612,15 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *rstypes.HeaderedEvent, pduPositio
 				}
 			}
 		}
+	case spec.MRoomRedaction:
+		log.Tracef("Redacting event: %s", ev.Redacts())
+		if err := s.db.ExcludeEventsFromSearchIndex(ctx, []string{ev.EventID()}); err != nil {
+			return fmt.Errorf("failed to exclude entry from search index: %w", err)
+		}
+		return nil
+	default:
+		return nil
 	}
+
 	return nil
 }

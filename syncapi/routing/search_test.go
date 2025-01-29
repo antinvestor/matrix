@@ -10,7 +10,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/fulltext"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
@@ -211,16 +210,10 @@ func TestSearch(t *testing.T) {
 		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
 		defer closeDB()
 
-		// create requisites
-		fts, err := fulltext.New(processCtx, cfg.SyncAPI.Fulltext)
-		assert.NoError(t, err)
-		assert.NotNil(t, fts)
-
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		db, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
 		assert.NoError(t, err)
 
-		elements := []fulltext.IndexElement{}
 		// store the events in the database
 		var sp types.StreamPosition
 		for _, x := range room.Events() {
@@ -233,20 +226,11 @@ func TestSearch(t *testing.T) {
 			x.StateKeyResolved = x.StateKey()
 			sp, err = db.WriteEvent(processCtx.Context(), x, stateEvents, stateEventIDs, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 			assert.NoError(t, err)
+			assert.True(t, sp > 0, "expected to have a stream position greater than zero")
 			if x.Type() != "m.room.message" {
 				continue
 			}
-			elements = append(elements, fulltext.IndexElement{
-				EventID:        x.EventID(),
-				RoomID:         x.RoomID().String(),
-				Content:        string(x.Content()),
-				ContentType:    x.Type(),
-				StreamPosition: int64(sp),
-			})
 		}
-		// Index the events
-		err = fts.Index(elements...)
-		assert.NoError(t, err)
 
 		// run the tests
 		for _, tc := range testCases {
@@ -256,7 +240,7 @@ func TestSearch(t *testing.T) {
 				assert.NoError(t, err)
 				req := httptest.NewRequest(http.MethodPost, "/", reqBody)
 
-				res := Search(req, tc.device, db, fts, tc.from, &FakeSyncRoomserverAPI{})
+				res := Search(req, tc.device, db, tc.from, &FakeSyncRoomserverAPI{})
 				if !tc.wantOK && !res.Is2xx() {
 					return
 				}

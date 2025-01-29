@@ -1397,7 +1397,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 	room := test.NewRoom(t, user)
 	AddPublicRoutes(processCtx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
 
-	if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+	if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 		t.Fatalf("failed to send events: %v", err)
 	}
 
@@ -1417,7 +1417,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	for _, e := range events {
 		roomEvents := append([]*rstypes.HeaderedEvent{}, e)
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, roomEvents, "test", "test", "test", nil, false); err != nil {
+		if err = api.SendEvents(ctx, rsAPI, api.KindNew, roomEvents, "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 

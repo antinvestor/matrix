@@ -21,9 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/internal"
+	"github.com/sirupsen/logrus"
 )
 
 const createDBMigrationsSQL = "" +
@@ -38,6 +37,16 @@ const insertVersionSQL = "" +
 	" VALUES ($1, $2, $3)"
 
 const selectDBMigrationsSQL = "SELECT version FROM db_migrations"
+
+const createNecessaryExtensionsSQL = `
+	CREATE EXTENSION IF NOT EXISTS pg_search;
+	CREATE EXTENSION IF NOT EXISTS pg_analytics;
+	CREATE EXTENSION IF NOT EXISTS pg_ivm;
+	CREATE EXTENSION IF NOT EXISTS vector;
+	CREATE EXTENSION IF NOT EXISTS postgis;
+	CREATE EXTENSION IF NOT EXISTS postgis_topology;
+	CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
+	CREATE EXTENSION IF NOT EXISTS postgis_tiger_geocoder;`
 
 // Migration defines a migration to be run.
 type Migration struct {
@@ -137,7 +146,11 @@ func (m *Migrator) insertMigration(ctx context.Context, txn *sql.Tx, migrationNa
 // migrations table, if it doesn't exist.
 func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]struct{}, error) {
 	result := make(map[string]struct{})
-	_, err := m.db.ExecContext(ctx, createDBMigrationsSQL)
+	_, err := m.db.ExecContext(ctx, createNecessaryExtensionsSQL)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create db_migrations: %w", err)
+	}
+	_, err = m.db.ExecContext(ctx, createDBMigrationsSQL)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create db_migrations: %w", err)
 	}

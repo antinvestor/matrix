@@ -17,18 +17,9 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"strings"
-	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/getsentry/sentry-go"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/matrix/internal/eventutil"
-	"github.com/antinvestor/matrix/internal/fulltext"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/setup/process"
@@ -36,6 +27,10 @@ import (
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/getsentry/sentry-go"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
@@ -50,7 +45,6 @@ type OutputClientDataConsumer struct {
 	stream       streams.StreamProvider
 	notifier     *notifier.Notifier
 	serverName   spec.ServerName
-	fts          fulltext.Indexer
 	cfg          *config.SyncAPI
 }
 
@@ -63,7 +57,6 @@ func NewOutputClientDataConsumer(
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
-	fts *fulltext.Search,
 ) *OutputClientDataConsumer {
 	return &OutputClientDataConsumer{
 		ctx:          process.Context(),
@@ -76,76 +69,12 @@ func NewOutputClientDataConsumer(
 		notifier:     notifier,
 		stream:       stream,
 		serverName:   cfg.Matrix.ServerName,
-		fts:          fts,
 		cfg:          cfg,
 	}
 }
 
 // Start consuming from room servers
 func (s *OutputClientDataConsumer) Start() error {
-	_, err := s.nats.Subscribe(s.topicReIndex, func(msg *nats.Msg) {
-		if err := msg.Ack(); err != nil {
-			return
-		}
-		if !s.cfg.Fulltext.Enabled {
-			logrus.Warn("Fulltext indexing is disabled")
-			return
-		}
-		ctx := context.Background()
-		logrus.Infof("Starting to index events")
-		var offset int
-		start := time.Now()
-		count := 0
-		var id int64 = 0
-		for {
-			evs, err := s.db.ReIndex(ctx, 1000, id)
-			if err != nil {
-				logrus.WithError(err).Errorf("unable to get events to index")
-				return
-			}
-			if len(evs) == 0 {
-				break
-			}
-			logrus.Debugf("Indexing %d events", len(evs))
-			elements := make([]fulltext.IndexElement, 0, len(evs))
-
-			for streamPos, ev := range evs {
-				id = streamPos
-				e := fulltext.IndexElement{
-					EventID:        ev.EventID(),
-					RoomID:         ev.RoomID().String(),
-					StreamPosition: streamPos,
-				}
-				e.SetContentType(ev.Type())
-
-				switch ev.Type() {
-				case "m.room.message":
-					e.Content = gjson.GetBytes(ev.Content(), "body").String()
-				case spec.MRoomName:
-					e.Content = gjson.GetBytes(ev.Content(), "name").String()
-				case spec.MRoomTopic:
-					e.Content = gjson.GetBytes(ev.Content(), "topic").String()
-				default:
-					continue
-				}
-
-				if strings.TrimSpace(e.Content) == "" {
-					continue
-				}
-				elements = append(elements, e)
-			}
-			if err = s.fts.Index(elements...); err != nil {
-				logrus.WithError(err).Error("unable to index events")
-				continue
-			}
-			offset += len(evs)
-			count += len(elements)
-		}
-		logrus.Infof("Indexed %d events in %v", count, time.Since(start))
-	})
-	if err != nil {
-		return err
-	}
 	return jetstream.Consumer(
 		s.ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
