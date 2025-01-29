@@ -75,6 +75,10 @@ type Events interface {
 	// DeleteEventsForRoom removes all event information for a room. This should only be done when removing the room entirely.
 	DeleteEventsForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
 
+	// SearchEvents performs a full-text search using the BM25 index
+	SearchEvents(ctx context.Context, searchTerm string, roomIDs []string, keys []string, limit, offset int) (*types.SearchResult, error)
+	ExcludeEventsFromSearchIndex(ctx context.Context, txn *sql.Tx, eventIDs []string) error
+
 	SelectContextEvent(ctx context.Context, txn *sql.Tx, roomID, eventID string) (int, rstypes.HeaderedEvent, error)
 	SelectContextBeforeEvent(ctx context.Context, txn *sql.Tx, id int, roomID string, filter *synctypes.RoomEventFilter) ([]*rstypes.HeaderedEvent, error)
 	SelectContextAfterEvent(ctx context.Context, txn *sql.Tx, id int, roomID string, filter *synctypes.RoomEventFilter) (int, []*rstypes.HeaderedEvent, error)

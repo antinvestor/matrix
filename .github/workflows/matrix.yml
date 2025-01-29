@@ -49,7 +49,7 @@ jobs:
       # Label used to access the service container
       postgres:
         # Docker Hub image
-        image: postgres:17
+        image: paradedb/paradedb
         env:
           POSTGRES_USER: matrix
           POSTGRES_PASSWORD: s3cr3t

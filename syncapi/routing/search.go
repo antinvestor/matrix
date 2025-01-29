@@ -17,19 +17,16 @@ package routing
 import (
 	"context"
 	"net/http"
-	"sort"
 	"strconv"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/blevesearch/bleve/v2/search"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/matrix/clientapi/httputil"
-	"github.com/antinvestor/matrix/internal/fulltext"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -39,7 +36,7 @@ import (
 )
 
 // nolint:gocyclo
-func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts fulltext.Indexer, from *string, rsAPI roomserverAPI.SyncRoomserverAPI) util.JSONResponse {
+func Search(req *http.Request, device *api.Device, syncDB storage.Database, from *string, rsAPI roomserverAPI.SyncRoomserverAPI) util.JSONResponse {
 	start := time.Now()
 	var (
 		searchReq SearchRequest
@@ -95,7 +92,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	for _, roomID := range joinedRooms {
 		joinedRoomsMap[roomID] = struct{}{}
 	}
-	rooms := []string{}
+	var rooms []string
 	if searchReq.SearchCategories.RoomEvents.Filter.Rooms != nil {
 		for _, roomID := range *searchReq.SearchCategories.RoomEvents.Filter.Rooms {
 			if _, ok := joinedRoomsMap[roomID]; ok {
@@ -113,15 +110,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		}
 	}
 
-	orderByTime := searchReq.SearchCategories.RoomEvents.OrderBy == "recent"
-
-	result, err := fts.Search(
-		searchReq.SearchCategories.RoomEvents.SearchTerm,
-		rooms,
+	result, err := syncDB.SearchEvents(ctx,
+		searchReq.SearchCategories.RoomEvents.SearchTerm, rooms,
 		searchReq.SearchCategories.RoomEvents.Keys,
-		searchReq.SearchCategories.RoomEvents.Filter.Limit,
-		nextBatch,
-		orderByTime,
+		searchReq.SearchCategories.RoomEvents.Filter.Limit, nextBatch,
 	)
 	if err != nil {
 		logrus.WithError(err).Error("failed to search fulltext")
@@ -130,7 +122,6 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			JSON: spec.InternalServerError{},
 		}
 	}
-	logrus.Debugf("Search took %s", result.Took)
 
 	// From was specified but empty, return no results, only the count
 	if from != nil && *from == "" {
@@ -139,7 +130,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			JSON: SearchResponse{
 				SearchCategories: SearchCategoriesResponse{
 					RoomEvents: RoomEventsResponse{
-						Count:     int(result.Total),
+						Count:     result.Total,
 						NextBatch: nil,
 					},
 				},
@@ -147,45 +138,31 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		}
 	}
 
-	results := []Result{}
-
-	wantEvents := make([]string, 0, len(result.Hits))
-	eventScore := make(map[string]*search.DocumentMatch)
-
-	for _, hit := range result.Hits {
-		wantEvents = append(wantEvents, hit.ID)
-		eventScore[hit.ID] = hit
-	}
+	var results []Result
 
 	// Filter on m.room.message, as otherwise we also get events like m.reaction
 	// which "breaks" displaying results in Element Web.
-	types := []string{"m.room.message"}
+	eventTypes := []string{"m.room.message"}
 	roomFilter := &synctypes.RoomEventFilter{
 		Rooms: &rooms,
-		Types: &types,
-	}
-
-	evs, err := syncDB.Events(ctx, wantEvents)
-	if err != nil {
-		logrus.WithError(err).Error("failed to get events from database")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
+		Types: &eventTypes,
 	}
 
 	groups := make(map[string]RoomResult)
 	knownUsersProfiles := make(map[string]ProfileInfoResponse)
 
+	//orderByTime := searchReq.SearchCategories.RoomEvents.OrderBy == "recent"
+
 	// Sort the events by depth, as the returned values aren't ordered
-	if orderByTime {
-		sort.Slice(evs, func(i, j int) bool {
-			return evs[i].Depth() > evs[j].Depth()
-		})
-	}
+	//if orderByTime {
+	//	sort.Slice(evs, func(i, j int) bool {
+	//		return evs[i].Depth() > evs[j].Depth()
+	//	})
+	//}
 
 	stateForRooms := make(map[string][]synctypes.ClientEvent)
-	for _, event := range evs {
+	for _, hit := range result.Results {
+		event := hit.Event
 		eventsBefore, eventsAfter, err := contextEvents(ctx, snapshot, event, roomFilter, searchReq)
 		if err != nil {
 			logrus.WithError(err).Error("failed to get context events")
@@ -238,6 +215,11 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			continue
 		}
 
+		hitScore := 0.0
+		if hit.Score != nil {
+			hitScore = *hit.Score
+		}
+
 		results = append(results, Result{
 			Context: SearchContextResponse{
 				Start: startToken.String(),
@@ -250,7 +232,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				}),
 				ProfileInfo: profileInfos,
 			},
-			Rank:   eventScore[event.EventID()].Score,
+			Rank:   hitScore,
 			Result: *clientEvent,
 		})
 		roomGroup := groups[event.RoomID().String()]
@@ -273,10 +255,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	}
 
 	var nextBatchResult *string = nil
-	if int(result.Total) > nextBatch+len(results) {
+	if result.Total > nextBatch+len(results) {
 		nb := strconv.Itoa(len(results) + nextBatch)
 		nextBatchResult = &nb
-	} else if int(result.Total) == nextBatch+len(results) {
+	} else if result.Total == nextBatch+len(results) {
 		// Sytest expects a next_batch even if we don't actually have any more results
 		nb := ""
 		nextBatchResult = &nb
@@ -285,11 +267,11 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	res := SearchResponse{
 		SearchCategories: SearchCategoriesResponse{
 			RoomEvents: RoomEventsResponse{
-				Count:      int(result.Total),
+				Count:      result.Total,
 				Groups:     Groups{RoomID: groups},
 				Results:    results,
 				NextBatch:  nextBatchResult,
-				Highlights: fts.GetHighlights(result),
+				Highlights: result.Highlights(),
 				State:      stateForRooms,
 			},
 		},

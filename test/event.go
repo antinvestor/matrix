@@ -15,7 +15,6 @@
 package test
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"testing"
 	"time"
@@ -111,7 +110,7 @@ func AssertEventsEqual(t *testing.T, gots, wants []*types.HeaderedEvent) {
 	for i := range wants {
 		w := wants[i].JSON()
 		g := gots[i].JSON()
-		if !bytes.Equal(w, g) {
+		if !DeepJsonCompare(w, g) {
 			t.Errorf("event at index %d mismatch:\ngot  %s\n\nwant %s", i, string(g), string(w))
 		}
 	}

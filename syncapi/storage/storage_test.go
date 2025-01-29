@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"reflect"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -187,7 +186,8 @@ func TestRecentEventsPDU(t *testing.T) {
 				}
 
 				for j := range streamEvents.Events {
-					if !reflect.DeepEqual(streamEvents.Events[j].JSON(), tc.WantEvents[j].JSON()) {
+
+					if !test.DeepJsonCompare(streamEvents.Events[j].JSON(), tc.WantEvents[j].JSON()) {
 						st.Errorf("event %d got %s want %s", j, string(streamEvents.Events[j].JSON()), string(tc.WantEvents[j].JSON()))
 					}
 				}

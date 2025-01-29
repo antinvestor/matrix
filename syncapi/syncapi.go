@@ -17,7 +17,6 @@ package syncapi
 import (
 	"context"
 
-	"github.com/antinvestor/matrix/internal/fulltext"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -67,14 +66,6 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to load notifier ")
 	}
 
-	var fts *fulltext.Search
-	if dendriteCfg.SyncAPI.Fulltext.Enabled {
-		fts, err = fulltext.New(processContext, dendriteCfg.SyncAPI.Fulltext)
-		if err != nil {
-			logrus.WithError(err).Panicf("failed to create full text")
-		}
-	}
-
 	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
 		Topic:     dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		JetStream: js,
@@ -109,7 +100,7 @@ func AddPublicRoutes(
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		processContext, &dendriteCfg.SyncAPI, js, syncDB, notifier, streams.PDUStreamProvider,
-		streams.InviteStreamProvider, rsAPI, fts, asProducer,
+		streams.InviteStreamProvider, rsAPI, asProducer,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
@@ -117,7 +108,7 @@ func AddPublicRoutes(
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
 		processContext, &dendriteCfg.SyncAPI, js, natsClient, syncDB, notifier,
-		streams.AccountDataStreamProvider, fts,
+		streams.AccountDataStreamProvider,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
@@ -155,7 +146,7 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		routers.Client, requestPool, syncDB, userAPI,
-		rsAPI, &dendriteCfg.SyncAPI, caches, fts,
+		rsAPI, &dendriteCfg.SyncAPI, caches,
 		rateLimits,
 	)
 }
