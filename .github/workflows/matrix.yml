@@ -110,7 +110,7 @@ jobs:
           echo $TESTING_QUEUE_URI
           echo $TESTING_DATABASE_URI
           echo $TESTING_CACHE_URI
-          go test -json -v ./... | tee /tmp/gotest.log | gotestfmt
+          go test -json -parallel 10 -v ./... | tee /tmp/gotest.log | gotestfmt
 
   # build Dendrite for linux with different architectures and go versions
   build:
