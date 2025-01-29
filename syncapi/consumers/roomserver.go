@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"

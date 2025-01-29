@@ -18,10 +18,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/antinvestor/matrix/internal"
-	"github.com/sirupsen/logrus"
 	"sync"
 	"time"
+
+	"github.com/antinvestor/matrix/internal"
+	"github.com/sirupsen/logrus"
 )
 
 const createDBMigrationsSQL = "" +

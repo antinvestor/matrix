@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/setup/config"
