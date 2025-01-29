@@ -31,7 +31,7 @@ require (
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	golang.org/x/crypto v0.32.0
-	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
+	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
 	golang.org/x/image v0.23.0
 	golang.org/x/oauth2 v0.25.0
 	golang.org/x/sync v0.10.0
