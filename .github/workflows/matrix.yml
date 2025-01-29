@@ -41,7 +41,7 @@ jobs:
 
   # run go test with different go versions
   test:
-    timeout-minutes: 20
+    timeout-minutes: 40
     name: Unit tests
     runs-on: ubuntu-latest
     # Service containers to run with `container-job`
@@ -110,7 +110,7 @@ jobs:
           echo $TESTING_QUEUE_URI
           echo $TESTING_DATABASE_URI
           echo $TESTING_CACHE_URI
-          go test -json -parallel 10 -v ./... | tee /tmp/gotest.log | gotestfmt
+          go test -v ./... 
 
   # build Dendrite for linux with different architectures and go versions
   build:
