@@ -183,9 +183,9 @@ jobs:
         working-directory: matrix
         env:
           DOCKER_BUILDKIT: 1
-          TESTING_QUEUE_URI: nats://matrix:s3cr3t@queuestore:4222
-          TESTING_CACHE_URI: redis://matrix:s3cr3t@cachestore:6379
-          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
+          QUEUE_URI: nats://matrix:s3cr3t@queuestore:4222
+          CACHE_URI: redis://matrix:s3cr3t@cachestore:6379
+          DATABASE_URI: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
         with:
@@ -196,12 +196,12 @@ jobs:
         working-directory: complement
         run: |
           set -o pipefail &&
-          go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
+          go test -v -json -tags dendrite_blacklist
         shell: bash
         env:
-          TESTING_QUEUE_URI: nats://matrix:s3cr3t@queuestore:4222
-          TESTING_CACHE_URI: redis://matrix:s3cr3t@cachestore:6379
-          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
+          COMPLEMENT_MATRIX_QUEUE_URI: nats://matrix:s3cr3t@queuestore:4222
+          COMPLEMENT_MATRIX_CACHE_URI: redis://matrix:s3cr3t@cachestore:6379
+          COMPLEMENT_MATRIX_DATABASE_URI: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
 
