@@ -44,36 +44,6 @@ jobs:
     timeout-minutes: 40
     name: Unit tests
     runs-on: ubuntu-latest
-    # Service containers to run with `container-job`
-    services:
-      # Label used to access the service container
-      datastore:
-        # Docker Hub image
-        image: paradedb/paradedb
-        env:
-          POSTGRES_USER: matrix
-          POSTGRES_PASSWORD: s3cr3t
-          POSTGRES_DB: matrix
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      cachestore:
-        image: ghcr.io/antinvestor/redis
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli -u redis://matrix:s3cr3t@localhost:6379 ping | grep PONG"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      queuestore:
-        image: nats
-        ports:
-          - 4222:4222
 
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +53,14 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+      - name: Run docker compose
+        uses: hoverkraft-tech/compose-action@v2.0.1
+        with:
+          compose-file: "./docker-compose.yml"
+          services: |
+            datastore
+            cachestore
+            queuestore
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
         with:
@@ -102,15 +80,18 @@ jobs:
         run: go mod tidy
       - name: Run unit tests
         env:
-          TESTING_QUEUE_URI: nats://localhost:${{ job.services.queuestore.ports[4222] }}
-          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:${{ job.services.cachestore.ports[6379] }}
-          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:${{ job.services.datastore.ports[5432] }}/matrix?sslmode=disable
+          TESTING_QUEUE_URI: nats://matrix:s3cr3t@localhost:4221
+          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6378
+          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable
         run: |
           set -euo pipefail
           echo $TESTING_QUEUE_URI
           echo $TESTING_DATABASE_URI
           echo $TESTING_CACHE_URI
           go test -v ./... 
+      - name: Tear down test containers
+        run: docker compose down
+
 
   # build Matrix for linux with different architectures and go versions
   build:

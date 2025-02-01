@@ -24,7 +24,7 @@ services:
     ports:
       - "5431:5432"
 
-  cache:
+  cachestore:
     hostname: cache
     image: redis:latest
     restart: always
@@ -50,7 +50,7 @@ services:
     tmpfs:
       - /data:rw,noexec,nosuid,size=1G
 
-  queue:
+  queuestore:
     hostname: queue
     image: nats:2.10
     restart: always
