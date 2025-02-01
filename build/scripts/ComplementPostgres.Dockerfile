@@ -32,9 +32,9 @@ ENV SERVER_NAME=localhost
 ENV API=0
 ENV COVER=0
 
-ENV TESTING_QUEUE_URI="nats://matrix:s3cr3t@localhost:4221"
-ENV TESTING_CACHE_URI="redis://matrix:s3cr3t@localhost:6378"
-ENV TESTING_DATABASE_URI="postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable"
+ENV TESTING_QUEUE_URI="nats://matrix:s3cr3t@queuestore:4221"
+ENV TESTING_CACHE_URI="redis://matrix:s3cr3t@cachestore:6378"
+ENV TESTING_DATABASE_URI="postgres://matrix:s3cr3t@datastore:5431/matrix?sslmode=disable"
 
 # Expose ports
 EXPOSE 8008 8448

@@ -183,9 +183,9 @@ jobs:
         working-directory: matrix
         env:
           DOCKER_BUILDKIT: 1
-          TESTING_QUEUE_URI: nats://matrix:s3cr3t@localhost:4221
-          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6378
-          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable
+          TESTING_QUEUE_URI: nats://matrix:s3cr3t@queuestore:4221
+          TESTING_CACHE_URI: redis://matrix:s3cr3t@cachestore:6378
+          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@datastore:5431/matrix?sslmode=disable
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
         with:
