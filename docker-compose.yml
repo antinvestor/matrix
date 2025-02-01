@@ -7,11 +7,18 @@ services:
       POSTGRES_PASSWORD: s3cr3t
       POSTGRES_USER: matrix
       POSTGRES_DATABASE: matrix
+      # Add performance optimizations for testing
+      POSTGRES_MAX_CONNECTIONS: "500"
+      POSTGRES_SHARED_BUFFERS: "512MB"
+      POSTGRES_WORK_MEM: "16MB"
+      POSTGRES_MAINTENANCE_WORK_MEM: "128MB"
+      POSTGRES_EFFECTIVE_CACHE_SIZE: "1GB"
+      POSTGRES_RANDOM_PAGE_COST: "1.1"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U matrix" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 2s
+      timeout: 3s
+      retries: 3
     networks:
       - internal
     ports:
@@ -26,19 +33,22 @@ services:
     ports:
       - "6378:6379"
     environment:
-      REDIS_ARGS: "--databases 10000 --requirepass s3cr3t --user matrix on >s3cr3t ~* +@all"
+      REDIS_ARGS: "--databases 10000 --requirepass s3cr3t --user matrix on >s3cr3t ~* +@all --maxmemory 512mb --maxmemory-policy allkeys-lru"
     command: [
       "redis-server",
       "--databases", "10000",
       "--requirepass", "s3cr3t",
-      "--user", "matrix", "on", ">s3cr3t", "~*", "+@all"
+      "--user", "matrix", "on", ">s3cr3t", "~*", "+@all",
+      "--maxmemory", "512mb",
+      "--maxmemory-policy", "allkeys-lru"
     ]
     healthcheck:
       test: [ "CMD", "redis-cli", "-u", "redis://:s3cr3t@localhost:6379", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
+      interval: 2s
+      timeout: 3s
+      retries: 3
+    tmpfs:
+      - /data:rw,noexec,nosuid,size=1G
 
   queue:
     hostname: queue
@@ -48,8 +58,11 @@ services:
       - internal
     ports:
       - "4221:4222"
-    command: [ "--js", "--user", "matrix", "--pass", "s3cr3t" ]
-
+    command: [
+      "--js",
+      "--user", "matrix",
+      "--pass", "s3cr3t"
+    ]
 
   matrix:
     hostname: matrix

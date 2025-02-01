@@ -47,7 +47,7 @@ jobs:
     # Service containers to run with `container-job`
     services:
       # Label used to access the service container
-      postgres:
+      datastore:
         # Docker Hub image
         image: paradedb/paradedb
         env:
@@ -61,7 +61,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      redis:
+      cachestore:
         image: ghcr.io/antinvestor/redis
         ports:
           - 6379:6379
@@ -70,7 +70,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      nats:
+      queuestore:
         image: nats
         ports:
           - 4222:4222
@@ -102,9 +102,9 @@ jobs:
         run: go mod tidy
       - name: Run unit tests
         env:
-          TESTING_QUEUE_URI: nats://localhost:4222
-          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379
-          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
+          TESTING_QUEUE_URI: nats://queuestore:4222
+          TESTING_CACHE_URI: redis://matrix:s3cr3t@cachestore:6379
+          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
         run: |
           set -euo pipefail
           echo $TESTING_QUEUE_URI

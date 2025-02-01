@@ -990,6 +990,7 @@ func TestCapabilities(t *testing.T) {
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+
 		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
@@ -1144,6 +1145,7 @@ func Test3PID(t *testing.T) {
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
 		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+
 		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
 		AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, caching.DisableMetrics)
 
@@ -2214,6 +2216,7 @@ func TestKeyBackup(t *testing.T) {
 }
 
 func TestGetMembership(t *testing.T) {
+	t.Parallel()
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 
@@ -2285,7 +2288,6 @@ func TestGetMembership(t *testing.T) {
 
 		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
 		defer closeRig()
-
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -2359,7 +2361,6 @@ func TestCreateRoomInvite(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-
 		natsInstance := jetstream.NATSInstance{}
 		jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
@@ -2419,7 +2420,6 @@ func TestReportEvent(t *testing.T) {
 	bob := test.NewUser(t)
 	charlie := test.NewUser(t)
 	room := test.NewRoom(t, alice)
-
 	room.CreateAndInsert(t, charlie, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(charlie.ID))
