@@ -44,36 +44,6 @@ jobs:
     timeout-minutes: 40
     name: Unit tests
     runs-on: ubuntu-latest
-    # Service containers to run with `container-job`
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: paradedb/paradedb
-        env:
-          POSTGRES_USER: matrix
-          POSTGRES_PASSWORD: s3cr3t
-          POSTGRES_DB: matrix
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: ghcr.io/antinvestor/redis
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli -u redis://matrix:s3cr3t@localhost:6379 ping | grep PONG"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      nats:
-        image: nats
-        ports:
-          - 4222:4222
 
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +53,14 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+      - name: Run docker compose
+        uses: hoverkraft-tech/compose-action@v2.0.1
+        with:
+          compose-file: "./docker-compose.yml"
+          services: |
+            datastore
+            cachestore
+            queuestore
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
         with:
@@ -102,17 +80,17 @@ jobs:
         run: go mod tidy
       - name: Run unit tests
         env:
-          TESTING_QUEUE_URI: nats://localhost:4222
-          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379
-          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
+          TESTING_QUEUE_URI: nats://matrix:s3cr3t@localhost:4221
+          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6378
+          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable
         run: |
           set -euo pipefail
-          echo $TESTING_QUEUE_URI
-          echo $TESTING_DATABASE_URI
-          echo $TESTING_CACHE_URI
-          go test -v ./... 
+          go test -json -parallel 8 -v ./... | tee /tmp/gotest.log | gotestfmt -hide all
+      - name: Tear down test containers
+        run: docker compose down --remove-orphans
 
-  # build Dendrite for linux with different architectures and go versions
+
+  # build Matrix for linux with different architectures and go versions
   build:
     name: Build for Linux
     timeout-minutes: 5
@@ -159,41 +137,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-    # Service containers to run with `container-job`
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: paradedb/paradedb
-        env:
-          POSTGRES_USER: matrix
-          POSTGRES_PASSWORD: s3cr3t
-          POSTGRES_DB: matrix
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: ghcr.io/antinvestor/redis
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli -u redis://matrix:s3cr3t@localhost:6379 ping | grep PONG"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      nats:
-        image: nats
-        ports:
-          - 4222:4222
     steps:
       - name: Run actions/checkout@v4 for matrix
         uses: actions/checkout@v4
         with:
           path: matrix
+      - name: Run docker compose
+        uses: hoverkraft-tech/compose-action@v2.0.1
+        with:
+          compose-file: "./matrix/docker-compose.yml"
+          services: |
+            datastore
+            cachestore
+            queuestore
       - name: Install libolm and dependencies
         run: sudo apt-get install libolm-dev libolm3
       - name: Setup go
@@ -227,6 +183,9 @@ jobs:
         working-directory: matrix
         env:
           DOCKER_BUILDKIT: 1
+          QUEUE_URI: nats://matrix:s3cr3t@queuestore:4222
+          CACHE_URI: redis://matrix:s3cr3t@cachestore:6379
+          DATABASE_URI: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
         with:
@@ -234,17 +193,18 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       # Run Complement
       - name: Run Complement Tests
+        working-directory: complement
         run: |
           set -o pipefail &&
-          go test -v -json -tags dendrite_blacklist ./tests ./tests/csapi 2>&1 | gotestfmt -hide all
+          go test -v -json -tags dendrite_blacklist
         shell: bash
         env:
-          TESTING_QUEUE_URI: nats://localhost:4222
-          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379
-          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
+          COMPLEMENT_MATRIX_QUEUE_URI: nats://matrix:s3cr3t@queuestore:4222
+          COMPLEMENT_MATRIX_CACHE_URI: redis://matrix:s3cr3t@cachestore:6379
+          COMPLEMENT_MATRIX_DATABASE_URI: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
-        working-directory: complement
+
 
   integration-tests-done:
     name: Integration tests passed

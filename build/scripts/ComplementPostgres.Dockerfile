@@ -1,40 +1,50 @@
-#syntax=docker/dockerfile:1.13
+FROM docker.io/golang:1.23 AS build
 
-FROM golang:1.23-bookworm AS build
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash curl git gcc libc6-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# we will dump the binaries and config file to this location to ensure any local untracked files
-# that come from the COPY . . file don't contaminate the build
+# Set up working directory
 RUN mkdir /matrix
-
-# Utilise Docker caching when downloading dependencies, this stops us needlessly
-# downloading dependencies every time.
-ARG CGO
-RUN --mount=target=. \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=${CGO} go build -o /matrix ./cmd/generate-config && \
-    CGO_ENABLED=${CGO} go build -o /matrix ./cmd/generate-keys && \
-    CGO_ENABLED=${CGO} go build -o /matrix/matrix ./cmd/matrix && \
-    CGO_ENABLED=${CGO} go build -cover -covermode=atomic -o /matrix/matrix-cover -coverpkg "github.com/antinvestor/..." ./cmd/matrix && \
-    cp build/scripts/complement-cmd.sh /complement-cmd.sh
-
 WORKDIR /matrix
-RUN ./generate-keys --private-key matrix_key.pem
 
+# Copy source code
+COPY . .
+
+# Build binaries
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=${CGO} go build -v -trimpath -o /matrix ./cmd/generate-config && \
+    CGO_ENABLED=${CGO} go build -v -trimpath -o /matrix ./cmd/generate-keys && \
+    CGO_ENABLED=${CGO} go build -v -trimpath -o /matrix ./cmd/matrix && \
+    CGO_ENABLED=${CGO} go build -v -trimpath -cover -covermode=atomic -o /matrix/matrix-cover \
+    -coverpkg "github.com/antinvestor/..." ./cmd/matrix
+
+# Copy scripts
+RUN cp build/scripts/complement-cmd.sh /matrix/complement-cmd.sh
+
+# Generate keys
+RUN /matrix/generate-keys --private-key /matrix/matrix_key.pem
+
+# Set environment variables
 ENV SERVER_NAME=localhost
 ENV API=0
 ENV COVER=0
+
+ENV QUEUE_URI="nats://matrix:s3cr3t@queuestore:4222"
+ENV CACHE_URI="redis://matrix:s3cr3t@cachestore:6379"
+ENV DATABASE_URI="postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable"
+
+# Expose ports
 EXPOSE 8008 8448
 
-
-# At runtime, generate TLS cert based on the CA now mounted at /ca
-# At runtime, replace the SERVER_NAME with what we are told
-CMD ./generate-keys --keysize 1024 --server $SERVER_NAME \
-    --tls-cert server.crt --tls-key server.key --tls-authority-cert \
+# Run the application
+CMD ["sh", "-c", "/matrix/generate-keys --keysize 1024 --server $SERVER_NAME \
+    --tls-cert /matrix/server.crt --tls-key /matrix/server.key --tls-authority-cert \
     /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key && \
-    ./generate-config -server $SERVER_NAME --ci --cache_uri "redis://matrix:s3cr3t@localhost:6379/0" \
-    --database_uri "postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable" > matrix.yaml && \
-    # Bump max_open_conns up here in the global database config
-    sed -i 's/max_open_conns:.*$/max_open_conns: 1990/g' matrix.yaml && \
+    /matrix/generate-config -server $SERVER_NAME --ci --cache_uri $CACHE_URI \
+    --database_uri $DATABASE_URI --queue_uri $QUEUE_URI > /matrix/matrix.yaml && \
+    sed -i 's/max_open_conns:.*$/max_open_conns: 1990/g' /matrix/matrix.yaml && \
     cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && \
-    update-ca-certificates && exec /complement-cmd.sh
+    update-ca-certificates && exec /matrix/complement-cmd.sh"]
