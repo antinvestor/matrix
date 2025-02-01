@@ -38,7 +38,7 @@ Examples of good descriptions:
 - How: "Errors in the logs saying 500 internal server error"
 - When: "After upgrading to 0.3.0"
 
-- What: "Dendrite ran out of memory"
+- What: "Matrix ran out of memory"
 - Who: "Server admin"
 - How: "Lots of logs about device change updates"
 - When: "After my server joined Matrix HQ"
