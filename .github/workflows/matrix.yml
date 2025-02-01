@@ -102,9 +102,9 @@ jobs:
         run: go mod tidy
       - name: Run unit tests
         env:
-          TESTING_QUEUE_URI: nats://localhost:4222
-          TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6379
-          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5432/matrix?sslmode=disable
+          TESTING_QUEUE_URI: nats://queuestore:${{ job.services.queuestore.ports[4222] }}
+          TESTING_CACHE_URI: redis://matrix:s3cr3t@cachestore:${{ job.services.cachestore.ports[6379] }}
+          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@datastore:${{ job.services.datastore.ports[5432] }}/matrix?sslmode=disable
         run: |
           set -euo pipefail
           echo $TESTING_QUEUE_URI
@@ -112,7 +112,7 @@ jobs:
           echo $TESTING_CACHE_URI
           go test -v ./... 
 
-  # build Dendrite for linux with different architectures and go versions
+  # build Matrix for linux with different architectures and go versions
   build:
     name: Build for Linux
     timeout-minutes: 5
