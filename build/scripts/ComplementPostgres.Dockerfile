@@ -32,9 +32,9 @@ ENV SERVER_NAME=localhost
 ENV API=0
 ENV COVER=0
 
-ENV QUEUE_URI="nats://matrix:s3cr3t@queuestore:4221"
-ENV CACHE_URI="redis://matrix:s3cr3t@cachestore:6378"
-ENV DATABASE_URI="postgres://matrix:s3cr3t@datastore:5431/matrix?sslmode=disable"
+ENV QUEUE_URI="nats://matrix:s3cr3t@queuestore:4222"
+ENV CACHE_URI="redis://matrix:s3cr3t@cachestore:6379"
+ENV DATABASE_URI="postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable"
 
 # Expose ports
 EXPOSE 8008 8448
