@@ -73,9 +73,9 @@ services:
     depends_on:
       datastore:
         condition: service_healthy
-      cache:
+      cachestore:
         condition: service_healthy
-      queue:
+      queuestore:
         condition: service_started
     networks:
       - internal

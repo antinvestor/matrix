@@ -90,7 +90,7 @@ jobs:
           echo $TESTING_CACHE_URI
           go test -v ./... 
       - name: Tear down test containers
-        run: docker compose down
+        run: docker compose down cachestore datastore queuestore
 
 
   # build Matrix for linux with different architectures and go versions
