@@ -85,12 +85,9 @@ jobs:
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable
         run: |
           set -euo pipefail
-          echo $TESTING_QUEUE_URI
-          echo $TESTING_DATABASE_URI
-          echo $TESTING_CACHE_URI
-          go test -v ./... 
+          go test -json -parallel 8 -v ./... | tee /tmp/gotest.log | gotestfmt
       - name: Tear down test containers
-        run: docker compose down cachestore datastore queuestore
+        run: docker compose down --remove-orphans
 
 
   # build Matrix for linux with different architectures and go versions
