@@ -764,7 +764,7 @@ func (s *outputRoomEventsStatements) SearchEvents(
 	for i, key := range keys {
 		j := i + k
 		whereParams = append(whereParams, searchTerm)
-		whereKeyString := fmt.Sprintf(" paradedb.fuzzy_phrase( field => 'headered_event_json.%s', value => $%d, match_all_terms => false, distance => 0) ", key, j)
+		whereKeyString := fmt.Sprintf(" paradedb.match( field => 'headered_event_json.%s', value => $%d, distance => 0) ", key, j)
 		whereKeyStrings = append(whereKeyStrings, whereKeyString)
 	}
 

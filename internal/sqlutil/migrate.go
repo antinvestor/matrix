@@ -148,7 +148,7 @@ func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]struct{},
 	result := make(map[string]struct{})
 	_, err := m.db.ExecContext(ctx, createNecessaryExtensionsSQL)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create db_migrations: %w", err)
+		return nil, fmt.Errorf("unable to create necessary extensions: %w", err)
 	}
 	_, err = m.db.ExecContext(ctx, createDBMigrationsSQL)
 	if err != nil {
