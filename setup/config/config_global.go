@@ -85,6 +85,8 @@ type Global struct {
 
 	// Configuration for the caches.
 	Cache CacheOptions `yaml:"cache"`
+
+	DistributedAPI DistributedAPI `yaml:"distributed_api"`
 }
 
 func (c *Global) Defaults(opts DefaultOpts) {
@@ -497,4 +499,22 @@ func (d *DataUnit) UnmarshalText(text []byte) error {
 	}
 	*d = DataUnit(v * magnitude)
 	return nil
+}
+
+// DistributedAPI The configuration to enable the use of distributed stores of data
+type DistributedAPI struct {
+	Enabled              bool     `yaml:"enabled"`
+	TokenServiceUri      string   `yaml:"token_service_uri"`
+	TokenServiceUserName string   `yaml:"token_service_username"`
+	TokenServiceSecret   string   `yaml:"token_service_secret"`
+	TokenServiceAudience []string `yaml:"token_service_audience"`
+	ProfileServiceUri    string   `yaml:"profile_service_uri"`
+	PartitionServiceUri  string   `yaml:"partition_service_uri"`
+}
+
+func (d *DistributedAPI) Defaults() {
+	d.Enabled = false
+}
+
+func (d *DistributedAPI) Verify(configErrs *ConfigErrors) {
 }

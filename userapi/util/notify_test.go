@@ -91,7 +91,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}
 		defer closeDb()
 		cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
-		db, err := storage.NewUserDatabase(ctx, cm, &config.DatabaseOptions{
+		db, err := storage.NewUserDatabase(ctx, nil, cm, &config.DatabaseOptions{
 			ConnectionString: connStr,
 		}, "test", bcrypt.MinCost, 0, 0, "")
 		if err != nil {

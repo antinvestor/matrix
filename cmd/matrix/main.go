@@ -16,6 +16,8 @@ package main
 
 import (
 	"flag"
+	apis "github.com/antinvestor/apis/go/common"
+	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -141,6 +143,22 @@ func main() {
 		}()
 	}
 
+	var profileCli *profilev1.ProfileClient
+
+	if cfg.Global.DistributedAPI.Enabled {
+		apiConfig := cfg.Global.DistributedAPI
+		ctx := processCtx.Context()
+		profileCli, err = profilev1.NewProfileClient(ctx,
+			apis.WithEndpoint(apiConfig.ProfileServiceUri),
+			apis.WithTokenEndpoint(apiConfig.TokenServiceUri),
+			apis.WithTokenUsername(apiConfig.TokenServiceUserName),
+			apis.WithTokenPassword(apiConfig.TokenServiceSecret),
+			apis.WithAudiences(apiConfig.TokenServiceAudience...))
+		if err != nil {
+			logrus.WithError(err).Panicf("failed to initialize profile api")
+		}
+	}
+
 	federationClient := basepkg.CreateFederationClient(cfg, dnsCache)
 	httpClient := basepkg.CreateClient(cfg, dnsCache)
 
@@ -167,7 +185,7 @@ func main() {
 	// dependency. Other components also need updating after their dependencies are up.
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federationClient, caching.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federationClient, profileCli, caching.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
 	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
 
 	rsAPI.SetAppserviceAPI(asAPI)

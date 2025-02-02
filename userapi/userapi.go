@@ -15,6 +15,7 @@
 package userapi
 
 import (
+	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -48,9 +49,12 @@ func NewInternalAPI(
 	natsInstance *jetstream.NATSInstance,
 	rsAPI rsapi.UserRoomserverAPI,
 	fedClient fedsenderapi.KeyserverFederationAPI,
+	profileCli *profilev1.ProfileClient,
 	enableMetrics bool,
 	blacklistedOrBackingOffFn func(s spec.ServerName) (*statistics.ServerStatistics, error),
 ) *internal.UserInternalAPI {
+
+	var err error
 	js, _ := natsInstance.Prepare(processContext, &dendriteCfg.Global.JetStream)
 	appServices := dendriteCfg.Derived.ApplicationServices
 
@@ -58,6 +62,7 @@ func NewInternalAPI(
 
 	db, err := storage.NewUserDatabase(
 		processContext.Context(),
+		profileCli,
 		cm,
 		&dendriteCfg.UserAPI.AccountDatabase,
 		dendriteCfg.Global.ServerName,

@@ -35,7 +35,7 @@ func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.UserData
 		t.Fatalf("failed to open database: %s", err)
 	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
+	db, err := storage.NewUserDatabase(context.Background(), nil, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,
 	}, "", 4, 0, 0, "")
@@ -167,7 +167,7 @@ func TestLocalRoomMembers(t *testing.T) {
 		}
 		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(nil, nil)
-		db, err := storage.NewUserDatabase(processCtx.Context(), cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+		db, err := storage.NewUserDatabase(processCtx.Context(), nil, cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 		assert.NoError(t, err)
 
 		err = rsapi.SendEvents(processCtx.Context(), rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
@@ -315,7 +315,7 @@ func BenchmarkLocalRoomMembers(b *testing.B) {
 	}
 	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 	rsAPI.SetFederationAPI(nil, nil)
-	db, err := storage.NewUserDatabase(processCtx.Context(), cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+	db, err := storage.NewUserDatabase(processCtx.Context(), nil, cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 	assert.NoError(b, err)
 
 	consumer := OutputRoomEventConsumer{db: db, rsAPI: rsAPI, serverName: "test", cfg: &cfg.UserAPI}

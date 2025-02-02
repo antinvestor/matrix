@@ -25,7 +25,6 @@ import (
 	"github.com/antinvestor/matrix/clientapi/userutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 
 	log "github.com/sirupsen/logrus"
@@ -46,7 +45,7 @@ CREATE TABLE IF NOT EXISTS userapi_accounts (
     -- If the account is currently active
     is_deactivated BOOLEAN DEFAULT FALSE,
 	-- The account_type (user = 1, guest = 2, admin = 3, appservice = 4)
-	account_type SMALLINT NOT NULL
+	account_type SMALLINT NOT NULL DEFAULT 1
     -- TODO:
     -- upgraded_ts, devices, any email reset stuff?
 );
@@ -91,18 +90,6 @@ func NewPostgresAccountsTable(db *sql.DB, serverName spec.ServerName) (tables.Ac
 		return nil, err
 	}
 	m := sqlutil.NewMigrator(db)
-	m.AddMigrations([]sqlutil.Migration{
-		{
-			Version: "userapi: add is active",
-			Up:      deltas.UpIsActive,
-			Down:    deltas.DownIsActive,
-		},
-		{
-			Version: "userapi: add account type",
-			Up:      deltas.UpAddAccountType,
-			Down:    deltas.DownAddAccountType,
-		},
-	}...)
 	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err

@@ -23,7 +23,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
 )
@@ -70,10 +69,6 @@ func NewPostgresCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, erro
 	}
 
 	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "keyserver: cross signing signature indexes",
-		Up:      deltas.UpFixCrossSigningSignatureIndexes,
-	})
 	if err = m.Up(context.Background()); err != nil {
 		return nil, err
 	}

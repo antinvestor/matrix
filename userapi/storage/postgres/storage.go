@@ -16,14 +16,12 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/userapi/storage/shared"
 
 	// Import the postgres database driver.
@@ -38,17 +36,6 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	}
 
 	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "userapi: rename tables",
-		Up:      deltas.UpRenameTables,
-		Down:    deltas.DownRenameTables,
-	})
-	m.AddMigrations(sqlutil.Migration{
-		Version: "userapi: server names",
-		Up: func(ctx context.Context, txn *sql.Tx) error {
-			return deltas.UpServerNames(ctx, txn, serverName)
-		},
-	})
 	if err = m.Up(ctx); err != nil {
 		return nil, err
 	}
@@ -107,12 +94,6 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	}
 
 	m = sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "userapi: server names populate",
-		Up: func(ctx context.Context, txn *sql.Tx) error {
-			return deltas.UpServerNamesPopulate(ctx, txn, serverName)
-		},
-	})
 	if err = m.Up(ctx); err != nil {
 		return nil, err
 	}
