@@ -20,6 +20,15 @@ type Profile struct {
 	ServerName  string `json:"server_name,omitempty"` // NOTSPEC: only set by Pinecone user provider
 	DisplayName string `json:"display_name"`
 	AvatarURL   string `json:"avatar_url"`
+
+	Contacts []Contact `json:"contacts,omitempty"` // NOTSPEC: only set by distributed api provider
+}
+
+type Contact struct {
+	ID       string `json:"id"`
+	Detail   string `json:"detail"`
+	Type     string `json:"type"`
+	Verified bool   `json:"verified"`
 }
 
 // FullyQualifiedProfile represents the profile for a Matrix account.

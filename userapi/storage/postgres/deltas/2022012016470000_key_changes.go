@@ -35,35 +35,5 @@ func UpRefactorKeyChanges(ctx context.Context, tx *sql.Tx) error {
 		}
 	}
 
-	_, err := tx.ExecContext(ctx, `
-		-- make the new table
-		DROP TABLE IF EXISTS keyserver_key_changes;
-		CREATE TABLE IF NOT EXISTS keyserver_key_changes (
-			change_id BIGINT PRIMARY KEY DEFAULT nextval('keyserver_key_changes_seq'),
-			user_id TEXT NOT NULL,
-			CONSTRAINT keyserver_key_changes_unique_per_user UNIQUE (user_id)
-		);
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to execute upgrade: %w", err)
-	}
-	return nil
-}
-
-func DownRefactorKeyChanges(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.ExecContext(ctx, `
-	-- Drop all data and revert back, we can't keep the data as Kafka offsets determine the numbers
-	DROP SEQUENCE IF EXISTS keyserver_key_changes_seq;
-	DROP TABLE IF EXISTS keyserver_key_changes;
-	CREATE TABLE IF NOT EXISTS keyserver_key_changes (
-		partition BIGINT NOT NULL,
-		log_offset BIGINT NOT NULL,
-		user_id TEXT NOT NULL,
-		CONSTRAINT keyserver_key_changes_unique UNIQUE (partition, log_offset)
-	);
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to execute downgrade: %w", err)
-	}
 	return nil
 }

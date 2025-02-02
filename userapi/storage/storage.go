@@ -17,12 +17,16 @@ package storage
 import (
 	"context"
 	"fmt"
+
+	profilev1 "github.com/antinvestor/apis/go/profile/v1"
+
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/userapi/storage/distributed"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
 )
 
@@ -30,6 +34,7 @@ import (
 // and sets postgres connection parameters
 func NewUserDatabase(
 	ctx context.Context,
+	profileCli *profilev1.ProfileClient,
 	conMan *sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	serverName spec.ServerName,
@@ -38,12 +43,24 @@ func NewUserDatabase(
 	loginTokenLifetime time.Duration,
 	serverNoticesLocalpart string,
 ) (UserDatabase, error) {
-	switch {
-	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(ctx, conMan, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
-	default:
+	if !dbProperties.ConnectionString.IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type")
 	}
+	pgUserDb, err := postgres.NewDatabase(ctx, conMan, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+	if err != nil {
+		return nil, err
+	}
+
+	if profileCli == nil {
+		return pgUserDb, nil
+	}
+
+	distributedDb, err := distributed.NewDatabase(ctx, profileCli, pgUserDb)
+	if err != nil {
+		return nil, err
+	}
+
+	return distributedDb, nil
 }
 
 // NewKeyDatabase opens a new Postgres database (base on dataSourceName) scheme)

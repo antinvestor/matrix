@@ -79,7 +79,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, testOpts test.Dependanc
 	}
 	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 
-	accountDB, err := storage.NewUserDatabase(ctx.Context(), cm, &cfg.UserAPI.AccountDatabase, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
+	accountDB, err := storage.NewUserDatabase(ctx.Context(), nil, cm, &cfg.UserAPI.AccountDatabase, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
 	}

@@ -42,7 +42,7 @@ func mustCreateUserDatabase(t *testing.T, _ test.DependancyOption) (storage.User
 		t.Fatalf("failed to open database: %s", err)
 	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewUserDatabase(context.Background(), cm, &config.DatabaseOptions{
+	db, err := storage.NewUserDatabase(context.Background(), nil, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")

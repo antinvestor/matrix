@@ -28,7 +28,6 @@ import (
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/lib/pq"
 )
@@ -129,10 +128,6 @@ func NewPostgresDevicesTable(db *sql.DB, serverName spec.ServerName) (tables.Dev
 		return nil, err
 	}
 	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "userapi: add last_seen_ts",
-		Up:      deltas.UpLastSeenTSIP,
-	})
 	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err

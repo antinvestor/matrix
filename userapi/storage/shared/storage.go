@@ -1106,7 +1106,7 @@ func (d *KeyDatabase) CrossSigningKeysForUser(ctx context.Context, userID string
 	return results, nil
 }
 
-// CrossSigningKeysForUser returns the latest known cross-signing keys for a user, if any.
+// CrossSigningKeysDataForUser returns the latest known cross-signing keys for a user, if any.
 func (d *KeyDatabase) CrossSigningKeysDataForUser(ctx context.Context, userID string) (types.CrossSigningKeyMap, error) {
 	return d.CrossSigningKeysTable.SelectCrossSigningKeysForUser(ctx, nil, userID)
 }
