@@ -17,6 +17,7 @@ package distributed
 import (
 	"context"
 	"database/sql"
+
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -45,7 +46,7 @@ func (s *profilesApi) toProfile(profileID string, properties map[string]string, 
 
 	name, ok := properties[propertiesMatrixName]
 	if !ok {
-		name, _ = properties[propertiesOriginName]
+		name = properties[propertiesOriginName]
 	}
 
 	var internalContacts []authtypes.Contact

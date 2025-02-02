@@ -15,8 +15,9 @@
 package userapi
 
 import (
-	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"time"
+
+	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"

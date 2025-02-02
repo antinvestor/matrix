@@ -16,9 +16,10 @@ package main
 
 import (
 	"flag"
+	"time"
+
 	apis "github.com/antinvestor/apis/go/common"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
-	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal"
@@ -155,7 +156,7 @@ func main() {
 			apis.WithTokenPassword(apiConfig.TokenServiceSecret),
 			apis.WithAudiences(apiConfig.TokenServiceAudience...))
 		if err != nil {
-			logrus.WithError(err).Panicf("failed to initialize profile api")
+			logrus.WithError(err).Panicf("failed to initialise profile api")
 		}
 	}
 

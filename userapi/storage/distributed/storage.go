@@ -17,6 +17,7 @@ package distributed
 import (
 	"context"
 	"fmt"
+
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/matrix/userapi/storage/shared"
 
