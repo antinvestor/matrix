@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"net/http"
 	"strings"
 
@@ -75,7 +76,9 @@ func Setup(
 	transactionsCache *transactions.Cache,
 	federationSender federationAPI.ClientFederationAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	natsClient *nats.Conn, enableMetrics bool,
+	natsClient *nats.Conn,
+	partitionCli *partitionv1.PartitionClient,
+	enableMetrics bool,
 ) {
 	cfg := &dendriteCfg.ClientAPI
 	mscCfg := &dendriteCfg.MSCs
@@ -90,7 +93,7 @@ func Setup(
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
-	ssoAuth := auth.NewAuthenticator(&cfg.LoginSSO)
+	ssoAuth := auth.NewAuthenticator(&cfg.LoginSSO, partitionCli)
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,

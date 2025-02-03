@@ -65,6 +65,7 @@ type oidcIdentityProvider struct {
 }
 
 func newSSOIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oidcIdentityProvider {
+
 	return &oidcIdentityProvider{
 		cfg: cfg,
 		hc:  hc,

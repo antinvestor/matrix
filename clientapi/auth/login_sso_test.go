@@ -20,7 +20,7 @@ func TestNewAuthenticator(t *testing.T) {
 				DiscoveryURL: "http://oidc.example.com/discovery",
 			},
 		},
-	})
+	}, nil)
 	if a == nil {
 		t.Fatalf("NewAuthenticator failed to be instantiated")
 	}
@@ -30,11 +30,10 @@ func TestAuthenticator(t *testing.T) {
 	ctx := context.Background()
 
 	var idp fakeIdentityProvider
-	a := Authenticator{
-		providers: map[string]ssoIdentityProvider{
-			"fake": &idp,
-		},
-	}
+
+	a := Authenticator{}
+
+	a.providers.Store("fake", &idp)
 
 	t.Run("authorizationURL", func(t *testing.T) {
 		got, err := a.AuthorizationURL(ctx, "fake", "http://matrix.example.com/continue", "anonce", "codeVerifier")
