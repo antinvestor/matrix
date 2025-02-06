@@ -64,7 +64,7 @@ type oidcIdentityProvider struct {
 	mu   sync.Mutex
 }
 
-func newSSOIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oidcIdentityProvider {
+func newSSOIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) SSOIdentityProvider {
 
 	return &oidcIdentityProvider{
 		cfg: cfg,

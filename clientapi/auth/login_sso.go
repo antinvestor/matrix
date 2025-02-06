@@ -77,9 +77,10 @@ func (auth *Authenticator) GetProvider(ctx context.Context, providerID string) (
 		providerID = auth.cfg.DefaultProviderID
 	}
 
-	provider, ok := auth.providers.Load(providerID)
+	storedVal, ok := auth.providers.Load(providerID)
+	provider := storedVal.(SSOIdentityProvider)
 	if ok {
-		return provider.(SSOIdentityProvider), nil
+		return provider, nil
 	}
 
 	if auth.partitionCli == nil {
@@ -125,9 +126,9 @@ func (auth *Authenticator) GetProvider(ctx context.Context, providerID string) (
 		},
 	}
 
-	p := newSSOIdentityProvider(&idp, hc)
+	provider = newSSOIdentityProvider(&idp, hc)
 	auth.providers.Store(idp.ID, provider)
-	return p, nil
+	return provider, nil
 
 }
 
