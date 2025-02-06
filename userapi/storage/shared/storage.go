@@ -421,9 +421,9 @@ func (d *Database) GetAccountByLocalpart(ctx context.Context, localpart string, 
 
 // SearchProfiles returns all profiles where the provided localpart or display name
 // match any part of the profiles in the database.
-func (d *Database) SearchProfiles(ctx context.Context, searchString string, limit int,
+func (d *Database) SearchProfiles(ctx context.Context, localpart string, searchString string, limit int,
 ) ([]authtypes.Profile, error) {
-	return d.Profiles.SelectProfilesBySearch(ctx, searchString, limit)
+	return d.Profiles.SelectProfilesBySearch(ctx, localpart, searchString, limit)
 }
 
 // DeactivateAccount deactivates the user's account, removing all ability for the user to login again.

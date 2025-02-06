@@ -145,7 +145,7 @@ func (s *profilesStatements) SetDisplayName(
 }
 
 func (s *profilesStatements) SelectProfilesBySearch(
-	ctx context.Context, searchString string, limit int,
+	ctx context.Context, _, searchString string, limit int,
 ) ([]authtypes.Profile, error) {
 	var profiles []authtypes.Profile
 	// The fmt.Sprintf directive below is building a parameter for the

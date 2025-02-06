@@ -67,7 +67,9 @@ func SearchUserDirectory(
 		return util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
 	}
 
+	activeUserLocalpart, _, _ := gomatrixserverlib.SplitID('@', device.UserID)
 knownUsersLoop:
+
 	for _, profile := range knownUsersRes.Users {
 		if len(results) == limit {
 			response.Limited = true
@@ -78,6 +80,7 @@ knownUsersLoop:
 		localpart, serverName, _ := gomatrixserverlib.SplitID('@', userID)
 		if serverName == localServerName {
 			userReq := &userapi.QuerySearchProfilesRequest{
+				Localpart:    activeUserLocalpart,
 				SearchString: localpart,
 				Limit:        limit,
 			}

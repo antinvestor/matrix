@@ -15,6 +15,8 @@
 package setup
 
 import (
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
+	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
@@ -51,6 +53,8 @@ type Monolith struct {
 	UserAPI       userapi.UserInternalAPI
 	RelayAPI      relayAPI.RelayInternalAPI
 
+	PartitionCli *partitionv1.PartitionClient
+	ProfileCli   *profilev1.ProfileClient
 	// Optional
 	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
 	ExtUserDirectoryProvider userapi.QuerySearchProfilesAPI
@@ -64,6 +68,7 @@ func (m *Monolith) AddAllPublicRoutes(
 	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	caches *caching.Caches,
+
 	enableMetrics bool,
 ) {
 	userDirectoryProvider := m.ExtUserDirectoryProvider
@@ -73,7 +78,7 @@ func (m *Monolith) AddAllPublicRoutes(
 	clientapi.AddPublicRoutes(
 		processCtx, routers, cfg, natsInstance, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationAPI, m.UserAPI, userDirectoryProvider,
-		m.ExtPublicRoomsProvider, enableMetrics,
+		m.ExtPublicRoomsProvider, m.PartitionCli, enableMetrics,
 	)
 	federationapi.AddPublicRoutes(
 		processCtx, routers, cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,

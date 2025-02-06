@@ -15,6 +15,7 @@
 package clientapi
 
 import (
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -44,7 +45,9 @@ func AddPublicRoutes(
 	fsAPI federationAPI.ClientFederationAPI,
 	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.QuerySearchProfilesAPI,
-	extRoomsProvider api.ExtraPublicRoomsProvider, enableMetrics bool,
+	extRoomsProvider api.ExtraPublicRoomsProvider,
+	partitionCli *partitionv1.PartitionClient,
+	enableMetrics bool,
 ) {
 	js, natsClient := natsInstance.Prepare(processContext, &cfg.Global.JetStream)
 
@@ -63,6 +66,6 @@ func AddPublicRoutes(
 		cfg, rsAPI, asAPI,
 		userAPI, userDirectoryProvider, federation,
 		syncProducer, transactionsCache, fsAPI,
-		extRoomsProvider, natsClient, enableMetrics,
+		extRoomsProvider, natsClient, partitionCli, enableMetrics,
 	)
 }

@@ -309,6 +309,8 @@ type QueryDevicesResponse struct {
 
 // QuerySearchProfilesRequest is the request for QueryProfile
 type QuerySearchProfilesRequest struct {
+	// Required: The localpart for this account, this is used to scope the search to current users reach only
+	Localpart string
 	// The search string to match
 	SearchString string
 	// How many results to return

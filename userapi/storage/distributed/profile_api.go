@@ -133,13 +133,14 @@ func (s *profilesApi) SetDisplayName(
 }
 
 func (s *profilesApi) SelectProfilesBySearch(
-	ctx context.Context, searchString string, limit int,
+	ctx context.Context, localPart, searchString string, limit int,
 ) ([]authtypes.Profile, error) {
 	var profiles []authtypes.Profile
 
 	roster, err := s.profileClient.Client.SearchRoster(ctx, &profilev1.SearchRosterRequest{
-		Query: searchString,
-		Count: int32(limit),
+		ProfileId: localPart,
+		Query:     searchString,
+		Count:     int32(limit),
 	})
 	if err != nil {
 		return nil, err

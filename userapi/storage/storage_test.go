@@ -412,7 +412,7 @@ func Test_Profile(t *testing.T) {
 		assert.False(t, changed)
 
 		// search profiles
-		searchRes, err := db.SearchProfiles(ctx, "Alice", 2)
+		searchRes, err := db.SearchProfiles(ctx, "Alice", "Alice", 2)
 		assert.NoError(t, err, "unable to search profiles")
 		assert.Equal(t, 1, len(searchRes))
 		assert.Equal(t, *wantProfile, searchRes[0])
