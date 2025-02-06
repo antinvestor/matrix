@@ -16,9 +16,10 @@ package routing
 
 import (
 	"context"
-	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"net/http"
 	"strings"
+
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"

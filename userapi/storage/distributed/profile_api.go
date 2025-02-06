@@ -162,7 +162,3 @@ func (s *profilesApi) SelectProfilesBySearch(
 
 	}
 }
-
-func extractFromContext(ctx context.Context) string {
-	return ""
-}

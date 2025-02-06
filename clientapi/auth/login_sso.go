@@ -17,11 +17,12 @@ package auth
 import (
 	"context"
 	"fmt"
-	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
+
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 
 	"golang.org/x/oauth2"
 

@@ -16,8 +16,9 @@ package main
 
 import (
 	"flag"
-	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"time"
+
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 
 	apis "github.com/antinvestor/apis/go/common"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
