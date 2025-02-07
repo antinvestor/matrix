@@ -44,7 +44,7 @@ type RegistrationTokens interface {
 
 type Profile interface {
 	GetProfileByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName) (*authtypes.Profile, error)
-	SearchProfiles(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
+	SearchProfiles(ctx context.Context, localpart string, searchString string, limit int) ([]authtypes.Profile, error)
 	SetAvatarURL(ctx context.Context, localpart string, serverName spec.ServerName, avatarURL string) (*authtypes.Profile, bool, error)
 	SetDisplayName(ctx context.Context, localpart string, serverName spec.ServerName, displayName string) (*authtypes.Profile, bool, error)
 }

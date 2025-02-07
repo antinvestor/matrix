@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"strings"
 
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
+
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/gorilla/mux"
@@ -75,7 +77,9 @@ func Setup(
 	transactionsCache *transactions.Cache,
 	federationSender federationAPI.ClientFederationAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	natsClient *nats.Conn, enableMetrics bool,
+	natsClient *nats.Conn,
+	partitionCli *partitionv1.PartitionClient,
+	enableMetrics bool,
 ) {
 	cfg := &dendriteCfg.ClientAPI
 	mscCfg := &dendriteCfg.MSCs
@@ -90,7 +94,7 @@ func Setup(
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
-	ssoAuth := auth.NewAuthenticator(&cfg.LoginSSO)
+	ssoAuth := auth.NewAuthenticator(&cfg.LoginSSO, partitionCli)
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,

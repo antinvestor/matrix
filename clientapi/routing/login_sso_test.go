@@ -530,6 +530,10 @@ type fakeSSOAuthenticator struct {
 	callbackErr    error
 }
 
+func (auth *fakeSSOAuthenticator) GetProvider(ctx context.Context, providerID string) (auth.SSOIdentityProvider, error) {
+	return nil, errors.New("sso authenticator does not implement this function")
+}
+
 func (auth *fakeSSOAuthenticator) AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce, codeVerifier string) (string, error) {
 	if providerID == "" {
 		return "", errors.New("empty providerID")

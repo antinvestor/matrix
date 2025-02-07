@@ -19,7 +19,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
+
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 
 	"golang.org/x/oauth2"
 
@@ -31,13 +34,26 @@ import (
 // honoured.
 const maxHTTPTimeout = 10 * time.Second
 
+const partitionPropertyClientIDKey = "client_id"
+const partitionPropertyClientSecretKey = "client_secret"
+const partitionPropertyDiscoveryUriKey = "client_discovery_uri"
+
 // An Authenticator keeps a set of identity providers and dispatches
 // calls to one of them, based on configured ID.
 type Authenticator struct {
-	providers map[string]ssoIdentityProvider
+	cfg          *config.LoginSSO
+	partitionCli *partitionv1.PartitionClient
+	providers    sync.Map
 }
 
-func NewAuthenticator(cfg *config.LoginSSO) *Authenticator {
+func NewAuthenticator(cfg *config.LoginSSO, partitionCli *partitionv1.PartitionClient) *Authenticator {
+
+	a := &Authenticator{
+		cfg:          cfg,
+		partitionCli: partitionCli,
+		providers:    sync.Map{},
+	}
+
 	hc := &http.Client{
 		Timeout: maxHTTPTimeout,
 		Transport: &http.Transport{
@@ -46,35 +62,93 @@ func NewAuthenticator(cfg *config.LoginSSO) *Authenticator {
 		},
 	}
 
-	a := &Authenticator{
-		providers: make(map[string]ssoIdentityProvider, len(cfg.Providers)),
-	}
 	for _, pcfg := range cfg.Providers {
 		pcfg = pcfg.WithDefaults()
-
-		a.providers[pcfg.ID] = newSSOIdentityProvider(&pcfg, hc)
+		provider := newSSOIdentityProvider(&pcfg, hc)
+		a.providers.Store(pcfg.ID, provider)
 	}
 
 	return a
 }
 
-func (auth *Authenticator) AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce, codeVerifier string) (string, error) {
-	p := auth.providers[providerID]
-	if p == nil {
-		return "", fmt.Errorf("unknown identity provider: %s", providerID)
+func (auth *Authenticator) GetProvider(ctx context.Context, providerID string) (SSOIdentityProvider, error) {
+
+	if providerID == "" {
+		providerID = auth.cfg.DefaultProviderID
+	}
+
+	storedVal, ok := auth.providers.Load(providerID)
+	provider := storedVal.(SSOIdentityProvider)
+	if ok {
+		return provider, nil
+	}
+
+	if auth.partitionCli == nil {
+		return nil, fmt.Errorf("no provider resolved")
+	}
+
+	resp, err := auth.partitionCli.GetPartition(ctx, providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	partitionClientID, ok := resp.GetProperties()[partitionPropertyClientIDKey]
+	if !ok {
+		return nil, fmt.Errorf("no client_id in partition response")
+	}
+
+	partitionClientSecret, ok := resp.GetProperties()[partitionPropertyClientSecretKey]
+	if !ok {
+		return nil, fmt.Errorf("no client_secret in partition response")
+	}
+
+	partitionDiscoveryUri, ok := resp.GetProperties()[partitionPropertyDiscoveryUriKey]
+	if !ok {
+		return nil, fmt.Errorf("no discovery uri in partition response")
+	}
+
+	idp := config.IdentityProvider{
+		ID:           providerID,
+		Name:         resp.GetName(),
+		ClientID:     partitionClientID,
+		ClientSecret: partitionClientSecret,
+		DiscoveryURL: partitionDiscoveryUri,
+		JWTLogin: config.JWTLogin{
+			Audience: "service_matrix",
+		},
+	}
+
+	hc := &http.Client{
+		Timeout: maxHTTPTimeout,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			Proxy:             http.ProxyFromEnvironment,
+		},
+	}
+
+	provider = newSSOIdentityProvider(&idp, hc)
+	auth.providers.Store(idp.ID, provider)
+	return provider, nil
+
+}
+
+func (auth *Authenticator) AuthorizationURL(ctx context.Context, partitionID, callbackURL, nonce, codeVerifier string) (string, error) {
+	p, err := auth.GetProvider(ctx, partitionID)
+	if err != nil {
+		return "", err
 	}
 	return p.AuthorizationURL(ctx, callbackURL, nonce, codeVerifier)
 }
 
 func (auth *Authenticator) ProcessCallback(ctx context.Context, partitionID, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error) {
-	p := auth.providers[partitionID]
-	if p == nil {
-		return nil, fmt.Errorf("unknown partition provider: %s", partitionID)
+	p, err := auth.GetProvider(ctx, partitionID)
+	if err != nil {
+		return nil, err
 	}
 	return p.ProcessCallback(ctx, callbackURL, nonce, codeVerifier, query)
 }
 
-type ssoIdentityProvider interface {
+type SSOIdentityProvider interface {
 	AuthorizationURL(ctx context.Context, callbackURL, nonce, codeVerifier string) (string, error)
 	ProcessCallback(ctx context.Context, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error)
 }
