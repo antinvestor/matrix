@@ -531,11 +531,11 @@ func TestSetAvatarURL(t *testing.T) {
 	changeDisplayName := "mxc://newMXID"
 
 	testCases := []struct {
-		name      string
-		user      *test.User
-		wantOK    bool
-		changeReq io.Reader
-		avatarUrl string
+		name       string
+		user       *test.User
+		wantOK     bool
+		changeReq  io.Reader
+		avatar_url string
 	}{
 		{
 			name: "invalid user",
@@ -550,16 +550,16 @@ func TestSetAvatarURL(t *testing.T) {
 			user: notLocalUser,
 		},
 		{
-			name:      "existing user is allowed to change own avatar",
-			user:      alice,
-			wantOK:    true,
-			avatarUrl: changeDisplayName,
+			name:       "existing user is allowed to change own avatar",
+			user:       alice,
+			wantOK:     true,
+			avatar_url: changeDisplayName,
 		},
 		{
-			name:      "existing user is not allowed to change own avatar if avatar is empty",
-			user:      bob,
-			wantOK:    false,
-			avatarUrl: "",
+			name:       "existing user is not allowed to change own avatar if avatar is empty",
+			user:       bob,
+			wantOK:     false,
+			avatar_url: "",
 		},
 	}
 
@@ -605,16 +605,16 @@ func TestSetAvatarURL(t *testing.T) {
 					t.Fatalf("expected HTTP 200, got %d", rec.Code)
 				}
 
-				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "avatarUrl").Str; tc.wantOK && gotDisplayName != wantAvatarURL {
+				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "avatar_url").Str; tc.wantOK && gotDisplayName != wantAvatarURL {
 					t.Fatalf("expected displayname to be '%s', but got '%s'", wantAvatarURL, gotDisplayName)
 				}
 
 				// now set the new display name
-				wantAvatarURL = tc.avatarUrl
-				tc.changeReq = strings.NewReader(fmt.Sprintf(`{"avatarUrl":"%s"}`, tc.avatarUrl))
+				wantAvatarURL = tc.avatar_url
+				tc.changeReq = strings.NewReader(fmt.Sprintf(`{"avatar_url":"%s"}`, tc.avatar_url))
 
 				rec = httptest.NewRecorder()
-				req = httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/profile/"+tc.user.ID+"/avatarUrl", tc.changeReq)
+				req = httptest.NewRequest(http.MethodPut, "/_matrix/client/v3/profile/"+tc.user.ID+"/avatar_url", tc.changeReq)
 				req.Header.Set("Authorization", "Bearer "+accessTokens[tc.user].accessToken)
 
 				routers.Client.ServeHTTP(rec, req)
@@ -624,14 +624,14 @@ func TestSetAvatarURL(t *testing.T) {
 
 				// now only get the display name
 				rec = httptest.NewRecorder()
-				req = httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/profile/"+tc.user.ID+"/avatarUrl", strings.NewReader(""))
+				req = httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/profile/"+tc.user.ID+"/avatar_url", strings.NewReader(""))
 
 				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 				}
 
-				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "avatarUrl").Str; tc.wantOK && gotDisplayName != wantAvatarURL {
+				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "avatar_url").Str; tc.wantOK && gotDisplayName != wantAvatarURL {
 					t.Fatalf("expected displayname to be '%s', but got '%s'", wantAvatarURL, gotDisplayName)
 				}
 			})
