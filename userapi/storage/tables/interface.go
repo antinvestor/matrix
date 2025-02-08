@@ -103,7 +103,7 @@ type ProfileTable interface {
 	SelectProfileByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName) (*authtypes.Profile, error)
 	SetAvatarURL(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, avatarURL string) (*authtypes.Profile, bool, error)
 	SetDisplayName(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, displayName string) (*authtypes.Profile, bool, error)
-	SelectProfilesBySearch(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
+	SelectProfilesBySearch(ctx context.Context, localpart, searchString string, limit int) ([]authtypes.Profile, error)
 }
 
 type ThreePIDTable interface {

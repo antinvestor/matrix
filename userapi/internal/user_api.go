@@ -480,7 +480,7 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, userID string) (*aut
 }
 
 func (a *UserInternalAPI) QuerySearchProfiles(ctx context.Context, req *api.QuerySearchProfilesRequest, res *api.QuerySearchProfilesResponse) error {
-	profiles, err := a.DB.SearchProfiles(ctx, req.SearchString, req.Limit)
+	profiles, err := a.DB.SearchProfiles(ctx, req.Localpart, req.SearchString, req.Limit)
 	if err != nil {
 		return err
 	}

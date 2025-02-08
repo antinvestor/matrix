@@ -18,6 +18,8 @@ import (
 	"flag"
 	"time"
 
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
+
 	apis "github.com/antinvestor/apis/go/common"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 
@@ -144,7 +146,10 @@ func main() {
 		}()
 	}
 
-	var profileCli *profilev1.ProfileClient
+	var (
+		profileCli   *profilev1.ProfileClient
+		partitionCli *partitionv1.PartitionClient
+	)
 
 	if cfg.Global.DistributedAPI.Enabled {
 		apiConfig := cfg.Global.DistributedAPI
@@ -156,7 +161,18 @@ func main() {
 			apis.WithTokenPassword(apiConfig.TokenServiceSecret),
 			apis.WithAudiences(apiConfig.TokenServiceAudience...))
 		if err != nil {
-			logrus.WithError(err).Panicf("failed to initialise profile api")
+			logrus.WithError(err).Panicf("failed to initialise profile api client")
+		}
+
+		partitionCli, err = partitionv1.NewPartitionsClient(ctx,
+			apis.WithEndpoint(apiConfig.ProfileServiceUri),
+			apis.WithTokenEndpoint(apiConfig.TokenServiceUri),
+			apis.WithTokenUsername(apiConfig.TokenServiceUserName),
+			apis.WithTokenPassword(apiConfig.TokenServiceSecret),
+			apis.WithAudiences(apiConfig.TokenServiceAudience...))
+
+		if err != nil {
+			logrus.WithError(err).Panicf("failed to initialise partition api client")
 		}
 	}
 
@@ -204,6 +220,9 @@ func main() {
 		FederationAPI: fsAPI,
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
+
+		PartitionCli: partitionCli,
+		ProfileCli:   profileCli,
 	}
 	monolith.AddAllPublicRoutes(processCtx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
 
