@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
-	"github.com/pitabwire/frame"
 	"os"
 	"strings"
+
+	"github.com/pitabwire/frame"
 
 	log "github.com/sirupsen/logrus"
 )

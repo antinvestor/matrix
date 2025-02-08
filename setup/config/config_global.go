@@ -2,12 +2,13 @@ package config
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
