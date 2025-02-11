@@ -16,10 +16,10 @@ package main
 
 import (
 	"flag"
-	"github.com/pitabwire/frame"
-	"time"
-
+	"fmt"
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
+	"github.com/pitabwire/frame"
+	"strings"
 
 	apis "github.com/antinvestor/apis/go/common"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
@@ -77,7 +77,7 @@ func main() {
 		}
 		logrus.Fatalf("Failed to start due to configuration errors")
 	}
-	processCtx := process.NewProcessContext()
+	processCtx := process.NewProcessContextFilled(ctx)
 
 	internal.SetupStdLogging()
 	internal.SetupHookLogging(cfg.Logging)
@@ -125,14 +125,7 @@ func main() {
 		if err != nil {
 			logrus.WithError(err).Panic("failed to start Sentry")
 		}
-		go func() {
-			processCtx.ComponentStarted()
-			<-processCtx.WaitForShutdown()
-			if !sentry.Flush(time.Second * 5) {
-				logrus.Warnf("failed to flush all Sentry events!")
-			}
-			processCtx.ComponentFinished()
-		}()
+
 	}
 
 	var (
@@ -141,24 +134,38 @@ func main() {
 	)
 
 	if cfg.Global.DistributedAPI.Enabled {
+
+		err = service.RegisterForJwt(ctx)
+		if err != nil {
+			log.WithError(err).Fatal("main -- could not register fo jwt")
+		}
+
+		oauth2ServiceHost := cfg.Global.GetOauth2ServiceURI()
+		oauth2ServiceURL := fmt.Sprintf("%s/oauth2/token", oauth2ServiceHost)
+
+		audienceList := make([]string, 0)
+		oauth2ServiceAudience := cfg.Global.Oauth2ServiceAudience
+		if oauth2ServiceAudience != "" {
+			audienceList = strings.Split(oauth2ServiceAudience, ",")
+		}
+
 		apiConfig := cfg.Global.DistributedAPI
-		ctx := processCtx.Context()
 		profileCli, err = profilev1.NewProfileClient(ctx,
 			apis.WithEndpoint(apiConfig.ProfileServiceUri),
-			apis.WithTokenEndpoint(apiConfig.TokenServiceUri),
-			apis.WithTokenUsername(apiConfig.TokenServiceUserName),
-			apis.WithTokenPassword(apiConfig.TokenServiceSecret),
-			apis.WithAudiences(apiConfig.TokenServiceAudience...))
+			apis.WithTokenEndpoint(oauth2ServiceURL),
+			apis.WithTokenUsername(service.JwtClientID()),
+			apis.WithTokenPassword(service.JwtClientSecret()),
+			apis.WithAudiences(audienceList...))
 		if err != nil {
 			logrus.WithError(err).Panicf("failed to initialise profile api client")
 		}
 
 		partitionCli, err = partitionv1.NewPartitionsClient(ctx,
 			apis.WithEndpoint(apiConfig.ProfileServiceUri),
-			apis.WithTokenEndpoint(apiConfig.TokenServiceUri),
-			apis.WithTokenUsername(apiConfig.TokenServiceUserName),
-			apis.WithTokenPassword(apiConfig.TokenServiceSecret),
-			apis.WithAudiences(apiConfig.TokenServiceAudience...))
+			apis.WithTokenEndpoint(oauth2ServiceURL),
+			apis.WithTokenUsername(service.JwtClientID()),
+			apis.WithTokenPassword(service.JwtClientSecret()),
+			apis.WithAudiences(audienceList...))
 
 		if err != nil {
 			logrus.WithError(err).Panicf("failed to initialise partition api client")
@@ -236,11 +243,6 @@ func main() {
 
 	serviceOptions := []frame.Option{httpOpt}
 	service.Init(serviceOptions...)
-
-	err = service.RegisterForJwt(ctx)
-	if err != nil {
-		log.WithError(err).Fatal("main -- could not register fo jwt")
-	}
 
 	log.WithField("server http port", cfg.Global.HttpServerPort).
 		Info(" Initiating server operations")

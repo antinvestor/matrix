@@ -527,13 +527,9 @@ func (d *DataUnit) UnmarshalText(text []byte) error {
 
 // DistributedAPI The configuration to enable the use of distributed stores of data
 type DistributedAPI struct {
-	Enabled              bool     `yaml:"enabled"`
-	TokenServiceUri      string   `yaml:"token_service_uri"`
-	TokenServiceUserName string   `yaml:"token_service_username"`
-	TokenServiceSecret   string   `yaml:"token_service_secret"`
-	TokenServiceAudience []string `yaml:"token_service_audience"`
-	ProfileServiceUri    string   `yaml:"profile_service_uri"`
-	PartitionServiceUri  string   `yaml:"partition_service_uri"`
+	Enabled             bool   `yaml:"enabled"`
+	ProfileServiceUri   string `yaml:"profile_service_uri"`
+	PartitionServiceUri string `yaml:"partition_service_uri"`
 }
 
 func (d *DistributedAPI) Defaults() {
