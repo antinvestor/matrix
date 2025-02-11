@@ -5,13 +5,14 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"

@@ -15,11 +15,11 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+	"strings"
+
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"github.com/pitabwire/frame"
-	"strings"
 
 	apis "github.com/antinvestor/apis/go/common"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
@@ -43,19 +43,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/mscs"
 	"github.com/antinvestor/matrix/userapi"
-)
-
-var (
-	unixSocket = flag.String("unix-socket", "",
-		"EXPERIMENTAL(unstable): The HTTP listening unix socket for the server (disables http[s]-bind-address feature)",
-	)
-	unixSocketPermission = flag.String("unix-socket-permission", "755",
-		"EXPERIMENTAL(unstable): The HTTP listening unix socket permission for the server (in chmod format like 755)",
-	)
-	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
-	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
 )
 
 func main() {
@@ -224,7 +211,8 @@ func main() {
 	monolith.AddAllPublicRoutes(processCtx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
 
 	if len(cfg.MSCs.MSCs) > 0 {
-		if err := mscs.Enable(cfg, cm, routers, &monolith, caches); err != nil {
+		err = mscs.Enable(cfg, cm, routers, &monolith, caches)
+		if err != nil {
 			logrus.WithError(err).Fatalf("Failed to enable MSCs")
 		}
 	}
@@ -239,7 +227,11 @@ func main() {
 	upCounter.Add(1)
 	prometheus.MustRegister(upCounter)
 
-	httpOpt, err := basepkg.SetupHTTPOption(processCtx, cfg, routers)
+	var httpOpt frame.Option
+	httpOpt, err = basepkg.SetupHTTPOption(processCtx, cfg, routers)
+	if err != nil {
+		log.WithError(err).Fatal("could not setup Server Routers")
+	}
 
 	serviceOptions := []frame.Option{httpOpt}
 	service.Init(serviceOptions...)

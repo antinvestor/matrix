@@ -19,7 +19,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -28,6 +27,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal"
