@@ -11,11 +11,10 @@ import (
 )
 
 type JetStream struct {
-	Matrix *Global `yaml:"-"`
 
 	// A list of NATS addresses to connect to. If none are specified, an
 	// internal NATS server will be used when running in monolith mode only.
-	Addresses []string `envconfig:"QUEUE_URI" yaml:"addresses"`
+	Addresses []string `env:"QUEUE_URI" yaml:"addresses"`
 	// The prefix to use for stream names for this homeserver - really only
 	// useful if running more than one Dendrite on the same NATS deployment.
 	TopicPrefix string `yaml:"topic_prefix"`
@@ -35,7 +34,7 @@ func (c *JetStream) Durable(name string) string {
 
 func (c *JetStream) LoadEnv() error {
 
-	err := frame.ConfigProcess("", c)
+	err := frame.ConfigFillFromEnv(c)
 	if err != nil {
 		queueUriStr := os.Getenv("QUEUE_URI")
 		c.Addresses = strings.Split(queueUriStr, ",")

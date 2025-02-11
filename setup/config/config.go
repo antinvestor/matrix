@@ -385,7 +385,6 @@ func (config *Dendrite) Verify(configErrs *ConfigErrors) {
 }
 
 func (config *Dendrite) Wiring() {
-	config.Global.JetStream.Matrix = &config.Global
 	config.ClientAPI.Matrix = &config.Global
 	config.FederationAPI.Matrix = &config.Global
 	config.FederationAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString

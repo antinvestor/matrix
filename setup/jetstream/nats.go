@@ -150,9 +150,9 @@ func setupNATS(processCtx *process.ProcessContext, cfg *config.JetStream, nc *na
 		OutputStreamEvent:       {"UserAPISyncAPIStreamEventConsumer"},
 		OutputReadUpdate:        {"UserAPISyncAPIReadUpdateConsumer"},
 	} {
-		streamName := cfg.Matrix.JetStream.Prefixed(stream)
+		streamName := cfg.Prefixed(stream)
 		for _, consumer := range consumers {
-			consumerName := cfg.Matrix.JetStream.Prefixed(consumer) + "Pull"
+			consumerName := cfg.Prefixed(consumer) + "Pull"
 			consumerInfo, err := s.ConsumerInfo(streamName, consumerName)
 			if err != nil || consumerInfo == nil {
 				continue

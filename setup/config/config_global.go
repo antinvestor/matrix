@@ -21,25 +21,25 @@ type Global struct {
 	frame.ConfigurationDefault
 	// Signing identity contains the server name, private key and key ID of
 	// the deployment.
-	fclient.SigningIdentity `yaml:",inline"`
+	fclient.SigningIdentity `env:"-" yaml:",inline"`
 
 	// The secondary server names, used for virtual hosting.
-	VirtualHosts []*VirtualHost `yaml:"-"`
+	VirtualHosts []*VirtualHost `env:"-" yaml:"-"`
 
 	// Path to the private key which will be used to sign requests and events.
-	PrivateKeyPath Path `yaml:"private_key"`
+	PrivateKeyPath Path `env:"-" yaml:"private_key"`
 
 	// Information about old private keys that used to be used to sign requests and
 	// events on this domain. They will not be used but will be advertised to other
 	// servers that ask for them to help verify old events.
-	OldVerifyKeys []*OldVerifyKeys `yaml:"old_private_keys"`
+	OldVerifyKeys []*OldVerifyKeys `env:"-" yaml:"old_private_keys"`
 
 	// How long a remote server can cache our server key for before requesting it again.
 	// Increasing this number will reduce the number of requests made by remote servers
 	// for our key, but increases the period a compromised key will be considered valid
 	// by remote servers.
 	// Defaults to 24 hours.
-	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
+	KeyValidityPeriod time.Duration `env:"-" yaml:"key_validity_period"`
 
 	// Global pool of database connections, which is used only in monolith mode. If a
 	// component does not specify any database options of its own, then this pool of
@@ -117,7 +117,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 }
 
 func (c *Global) LoadEnv() error {
-	err := frame.ConfigProcess("", c)
+	err := frame.ConfigFillFromEnv(c)
 	if err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ func (c *ServerNotices) Verify(errors *ConfigErrors) {}
 
 type CacheOptions struct {
 	// The connection string,
-	ConnectionString DataSource `envconfig:"CACHE_URI" yaml:"connection_string"`
+	ConnectionString DataSource `env:"CACHE_URI" yaml:"connection_string"`
 
 	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
 	MaxAge           time.Duration `yaml:"max_age"`
@@ -340,7 +340,7 @@ type CacheOptions struct {
 
 func (c *CacheOptions) LoadEnv() error {
 
-	err := frame.ConfigProcess("", c)
+	err := frame.ConfigFillFromEnv(c)
 	if err != nil {
 		c.ConnectionString = DataSource(os.Getenv("CACHE_URI"))
 	}
@@ -413,7 +413,7 @@ func (c *Sentry) Verify(configErrs *ConfigErrors) {
 
 type DatabaseOptions struct {
 	// The connection string, file:filename.db or postgres://server....
-	ConnectionString DataSource `envconfig:"DATABASE_URI"  yaml:"connection_string"`
+	ConnectionString DataSource `env:"DATABASE_URI"  yaml:"connection_string"`
 	// Maximum open connections to the DB (0 = use default, negative means unlimited)
 	MaxOpenConnections int `yaml:"max_open_conns"`
 	// Maximum idle connections to the DB (0 = use default, negative means unlimited)
@@ -424,7 +424,7 @@ type DatabaseOptions struct {
 
 func (c *DatabaseOptions) LoadEnv() error {
 
-	err := frame.ConfigProcess("", c)
+	err := frame.ConfigFillFromEnv(c)
 	if err != nil {
 		c.ConnectionString = DataSource(os.Getenv("DATABASE_URI"))
 	}
