@@ -37,12 +37,14 @@ import (
 	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/frame"
 )
 
 // Monolith represents an instantiation of all dependencies required to build
 // all components of Dendrite, for use in monolith mode.
 type Monolith struct {
 	Config    *config.Dendrite
+	Service   *frame.Service
 	KeyRing   *gomatrixserverlib.KeyRing
 	Client    *fclient.Client
 	FedClient fclient.FederationClient

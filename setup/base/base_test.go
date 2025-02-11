@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"fmt"
 	"html/template"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"path"
+	"net/url"
 	"testing"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
@@ -18,7 +20,6 @@ import (
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/httputil"
 	basepkg "github.com/antinvestor/matrix/setup/base"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,19 +35,31 @@ func TestLandingPage_Tcp(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
+	cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
 	defer closeRig()
 
-	routers := httputil.NewRouters()
-
-	// hack: create a server and close it immediately, just to get a random port assigned
+	// Hack to get a free port to use in test
 	s := httptest.NewServer(nil)
 	s.Close()
 
-	// start base with the listener and wait for it to be started
-	address, err := config.HTTPAddress(s.URL)
+	httpUrl, err := url.Parse(s.URL)
+	cfg.Global.HttpServerPort = fmt.Sprintf(":%s", httpUrl.Port())
+
+	ctx, service := frame.NewServiceWithContext(processCtx.Context(), "matrix tests",
+		frame.Config(&cfg.Global))
+	defer service.Stop(ctx)
+
+	routers := httputil.NewRouters()
+
 	assert.NoError(t, err)
-	go basepkg.SetupAndServeHTTP(ctx, cfg, routers, address, nil, nil)
+
+	opt, err := basepkg.SetupHTTPOption(processCtx, cfg, routers)
+	assert.NoError(t, err)
+
+	go func(ctx context.Context, service *frame.Service, opt frame.Option) {
+		service.Init(opt)
+		err = service.Run(ctx, "")
+	}(ctx, service, opt)
 	time.Sleep(time.Millisecond * 10)
 
 	// When hitting /, we should be redirected to /_matrix/static, which should contain the landing page
@@ -65,46 +78,5 @@ func TestLandingPage_Tcp(t *testing.T) {
 
 	// Using .String() for user friendly output
 	assert.Equal(t, expectedRes.String(), buf.String(), "response mismatch")
-}
 
-func TestLandingPage_UnixSocket(t *testing.T) {
-	// generate the expected result
-	tmpl := template.Must(template.ParseFS(staticContent, "static/*.gotmpl"))
-	expectedRes := &bytes.Buffer{}
-	err := tmpl.ExecuteTemplate(expectedRes, "index.gotmpl", map[string]string{
-		"Version": internal.VersionString(),
-	})
-	assert.NoError(t, err)
-
-	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
-	defer closeRig()
-
-	routers := httputil.NewRouters()
-
-	tempDir := t.TempDir()
-	socket := path.Join(tempDir, "socket")
-	// start base with the listener and wait for it to be started
-	address, err := config.UnixSocketAddress(socket, "755")
-	assert.NoError(t, err)
-	go basepkg.SetupAndServeHTTP(ctx, cfg, routers, address, nil, nil)
-	time.Sleep(time.Millisecond * 100)
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", socket)
-			},
-		},
-	}
-	resp, err := client.Get("http://unix/")
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// read the response
-	buf := &bytes.Buffer{}
-	_, err = buf.ReadFrom(resp.Body)
-	assert.NoError(t, err)
-
-	// Using .String() for user friendly output
-	assert.Equal(t, expectedRes.String(), buf.String(), "response mismatch")
 }

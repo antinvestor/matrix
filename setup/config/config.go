@@ -290,7 +290,10 @@ func loadConfig(
 
 	c.MediaAPI.AbsBasePath = Path(absPath(basePath, c.MediaAPI.BasePath))
 
-	c.LoadEnv()
+	err = c.LoadEnv()
+	if err != nil {
+		return nil, err
+	}
 
 	// Generate data from config options
 	err = c.Derive()
@@ -339,8 +342,8 @@ func (config *Dendrite) Derive() error {
 	return nil
 }
 
-func (config *Dendrite) LoadEnv() {
-	config.Global.LoadEnv()
+func (config *Dendrite) LoadEnv() error {
+	return config.Global.LoadEnv()
 }
 
 type DefaultOpts struct {
@@ -382,7 +385,6 @@ func (config *Dendrite) Verify(configErrs *ConfigErrors) {
 }
 
 func (config *Dendrite) Wiring() {
-	config.Global.JetStream.Matrix = &config.Global
 	config.ClientAPI.Matrix = &config.Global
 	config.FederationAPI.Matrix = &config.Global
 	config.FederationAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString

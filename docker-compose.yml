@@ -7,13 +7,6 @@ services:
       POSTGRES_PASSWORD: s3cr3t
       POSTGRES_USER: matrix
       POSTGRES_DATABASE: matrix
-      # Add performance optimizations for testing
-      POSTGRES_MAX_CONNECTIONS: "500"
-      POSTGRES_SHARED_BUFFERS: "512MB"
-      POSTGRES_WORK_MEM: "16MB"
-      POSTGRES_MAINTENANCE_WORK_MEM: "128MB"
-      POSTGRES_EFFECTIVE_CACHE_SIZE: "1GB"
-      POSTGRES_RANDOM_PAGE_COST: "1.1"
       RUST_BACKTRACE: "1"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U matrix" ]

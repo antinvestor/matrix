@@ -8,34 +8,38 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/pitabwire/frame"
 	"golang.org/x/crypto/ed25519"
 )
 
 type Global struct {
+	frame.ConfigurationDefault
 	// Signing identity contains the server name, private key and key ID of
 	// the deployment.
-	fclient.SigningIdentity `yaml:",inline"`
+	fclient.SigningIdentity `env:"-" yaml:",inline"`
 
 	// The secondary server names, used for virtual hosting.
-	VirtualHosts []*VirtualHost `yaml:"-"`
+	VirtualHosts []*VirtualHost `env:"-" yaml:"-"`
 
 	// Path to the private key which will be used to sign requests and events.
-	PrivateKeyPath Path `yaml:"private_key"`
+	PrivateKeyPath Path `env:"-" yaml:"private_key"`
 
 	// Information about old private keys that used to be used to sign requests and
 	// events on this domain. They will not be used but will be advertised to other
 	// servers that ask for them to help verify old events.
-	OldVerifyKeys []*OldVerifyKeys `yaml:"old_private_keys"`
+	OldVerifyKeys []*OldVerifyKeys `env:"-" yaml:"old_private_keys"`
 
 	// How long a remote server can cache our server key for before requesting it again.
 	// Increasing this number will reduce the number of requests made by remote servers
 	// for our key, but increases the period a compromised key will be considered valid
 	// by remote servers.
 	// Defaults to 24 hours.
-	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
+	KeyValidityPeriod time.Duration `env:"-" yaml:"key_validity_period"`
 
 	// Global pool of database connections, which is used only in monolith mode. If a
 	// component does not specify any database options of its own, then this pool of
@@ -112,10 +116,24 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	c.Cache.Defaults(opts)
 }
 
-func (c *Global) LoadEnv() {
-	c.DatabaseOptions.LoadEnv()
-	c.JetStream.LoadEnv()
-	c.Cache.LoadEnv()
+func (c *Global) LoadEnv() error {
+	err := frame.ConfigFillFromEnv(c)
+	if err != nil {
+		return err
+	}
+	err = c.DatabaseOptions.LoadEnv()
+	if err != nil {
+		return err
+	}
+	err = c.JetStream.LoadEnv()
+	if err != nil {
+		return err
+	}
+	err = c.Cache.LoadEnv()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors) {
@@ -313,21 +331,24 @@ func (c *ServerNotices) Verify(errors *ConfigErrors) {}
 
 type CacheOptions struct {
 	// The connection string,
-	ConnectionString DataSource `yaml:"connection_string"`
+	ConnectionString DataSource `env:"CACHE_URI" yaml:"connection_string"`
 
 	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
 	MaxAge           time.Duration `yaml:"max_age"`
 	EnablePrometheus bool          `yaml:"enable_prometheus"`
 }
 
-func (c *CacheOptions) LoadEnv() {
-	cacheUriStr := os.Getenv("CACHE_URI")
-	if cacheUriStr != "" {
-		dsUri := DataSource(cacheUriStr)
-		if dsUri.IsRedis() {
-			c.ConnectionString = dsUri
-		}
+func (c *CacheOptions) LoadEnv() error {
+
+	err := frame.ConfigFillFromEnv(c)
+	if err != nil {
+		c.ConnectionString = DataSource(os.Getenv("CACHE_URI"))
 	}
+
+	if !c.ConnectionString.IsRedis() {
+		log.WithField("cache_uri", c.ConnectionString).Warn("Invalid cache uri in the config")
+	}
+	return nil
 }
 
 func (c *CacheOptions) Defaults(opts DefaultOpts) {
@@ -392,7 +413,7 @@ func (c *Sentry) Verify(configErrs *ConfigErrors) {
 
 type DatabaseOptions struct {
 	// The connection string, file:filename.db or postgres://server....
-	ConnectionString DataSource `yaml:"connection_string"`
+	ConnectionString DataSource `env:"DATABASE_URI"  yaml:"connection_string"`
 	// Maximum open connections to the DB (0 = use default, negative means unlimited)
 	MaxOpenConnections int `yaml:"max_open_conns"`
 	// Maximum idle connections to the DB (0 = use default, negative means unlimited)
@@ -401,14 +422,17 @@ type DatabaseOptions struct {
 	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
 }
 
-func (c *DatabaseOptions) LoadEnv() {
-	databaseUriStr := os.Getenv("DATABASE_URI")
-	if databaseUriStr != "" {
-		dsUri := DataSource(databaseUriStr)
-		if dsUri.IsPostgres() {
-			c.ConnectionString = dsUri
-		}
+func (c *DatabaseOptions) LoadEnv() error {
+
+	err := frame.ConfigFillFromEnv(c)
+	if err != nil {
+		c.ConnectionString = DataSource(os.Getenv("DATABASE_URI"))
 	}
+
+	if !c.ConnectionString.IsPostgres() {
+		log.WithField("db_uri", c.ConnectionString).Warn("Invalid database uri in the config")
+	}
+	return nil
 }
 
 func (c *DatabaseOptions) Defaults(opts DefaultOpts) {
@@ -503,13 +527,9 @@ func (d *DataUnit) UnmarshalText(text []byte) error {
 
 // DistributedAPI The configuration to enable the use of distributed stores of data
 type DistributedAPI struct {
-	Enabled              bool     `yaml:"enabled"`
-	TokenServiceUri      string   `yaml:"token_service_uri"`
-	TokenServiceUserName string   `yaml:"token_service_username"`
-	TokenServiceSecret   string   `yaml:"token_service_secret"`
-	TokenServiceAudience []string `yaml:"token_service_audience"`
-	ProfileServiceUri    string   `yaml:"profile_service_uri"`
-	PartitionServiceUri  string   `yaml:"partition_service_uri"`
+	Enabled             bool   `yaml:"enabled"`
+	ProfileServiceUri   string `yaml:"profile_service_uri"`
+	PartitionServiceUri string `yaml:"partition_service_uri"`
 }
 
 func (d *DistributedAPI) Defaults() {

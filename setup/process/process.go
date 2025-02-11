@@ -25,6 +25,13 @@ func NewProcessContext() *ProcessContext {
 	}
 }
 
+func NewProcessContextFilled(ctx context.Context) *ProcessContext {
+	return &ProcessContext{
+		ctx: ctx,
+		wg:  sync.WaitGroup{},
+	}
+}
+
 func (b *ProcessContext) Context() context.Context {
 	return context.WithValue(b.ctx, "scope", "process") // nolint:staticcheck
 }

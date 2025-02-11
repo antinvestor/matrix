@@ -15,10 +15,11 @@
 package main
 
 import (
-	"flag"
-	"time"
+	"fmt"
+	"strings"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
+	"github.com/pitabwire/frame"
 
 	apis "github.com/antinvestor/apis/go/common"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
@@ -44,41 +45,16 @@ import (
 	"github.com/antinvestor/matrix/userapi"
 )
 
-var (
-	unixSocket = flag.String("unix-socket", "",
-		"EXPERIMENTAL(unstable): The HTTP listening unix socket for the server (disables http[s]-bind-address feature)",
-	)
-	unixSocketPermission = flag.String("unix-socket-permission", "755",
-		"EXPERIMENTAL(unstable): The HTTP listening unix socket permission for the server (in chmod format like 755)",
-	)
-	httpBindAddr  = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
-	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
-	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
-)
-
 func main() {
+
+	serviceName := "service_profile"
+
 	cfg := setup.ParseFlags(true)
-	httpAddr := config.ServerAddress{}
-	httpsAddr := config.ServerAddress{}
-	if *unixSocket == "" {
-		http, err := config.HTTPAddress("http://" + *httpBindAddr)
-		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse http address")
-		}
-		httpAddr = http
-		https, err := config.HTTPAddress("https://" + *httpsBindAddr)
-		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse https address")
-		}
-		httpsAddr = https
-	} else {
-		socket, err := config.UnixSocketAddress(*unixSocket, *unixSocketPermission)
-		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse unix socket")
-		}
-		httpAddr = socket
-	}
+
+	ctx, service := frame.NewService(serviceName, frame.Config(&cfg.Global))
+	defer service.Stop(ctx)
+
+	log := service.L(ctx)
 
 	configErrors := &config.ConfigErrors{}
 	cfg.Verify(configErrors)
@@ -88,7 +64,7 @@ func main() {
 		}
 		logrus.Fatalf("Failed to start due to configuration errors")
 	}
-	processCtx := process.NewProcessContext()
+	processCtx := process.NewProcessContextFilled(ctx)
 
 	internal.SetupStdLogging()
 	internal.SetupHookLogging(cfg.Logging)
@@ -136,14 +112,7 @@ func main() {
 		if err != nil {
 			logrus.WithError(err).Panic("failed to start Sentry")
 		}
-		go func() {
-			processCtx.ComponentStarted()
-			<-processCtx.WaitForShutdown()
-			if !sentry.Flush(time.Second * 5) {
-				logrus.Warnf("failed to flush all Sentry events!")
-			}
-			processCtx.ComponentFinished()
-		}()
+
 	}
 
 	var (
@@ -152,24 +121,38 @@ func main() {
 	)
 
 	if cfg.Global.DistributedAPI.Enabled {
+
+		err = service.RegisterForJwt(ctx)
+		if err != nil {
+			log.WithError(err).Fatal("main -- could not register fo jwt")
+		}
+
+		oauth2ServiceHost := cfg.Global.GetOauth2ServiceURI()
+		oauth2ServiceURL := fmt.Sprintf("%s/oauth2/token", oauth2ServiceHost)
+
+		audienceList := make([]string, 0)
+		oauth2ServiceAudience := cfg.Global.Oauth2ServiceAudience
+		if oauth2ServiceAudience != "" {
+			audienceList = strings.Split(oauth2ServiceAudience, ",")
+		}
+
 		apiConfig := cfg.Global.DistributedAPI
-		ctx := processCtx.Context()
 		profileCli, err = profilev1.NewProfileClient(ctx,
 			apis.WithEndpoint(apiConfig.ProfileServiceUri),
-			apis.WithTokenEndpoint(apiConfig.TokenServiceUri),
-			apis.WithTokenUsername(apiConfig.TokenServiceUserName),
-			apis.WithTokenPassword(apiConfig.TokenServiceSecret),
-			apis.WithAudiences(apiConfig.TokenServiceAudience...))
+			apis.WithTokenEndpoint(oauth2ServiceURL),
+			apis.WithTokenUsername(service.JwtClientID()),
+			apis.WithTokenPassword(service.JwtClientSecret()),
+			apis.WithAudiences(audienceList...))
 		if err != nil {
 			logrus.WithError(err).Panicf("failed to initialise profile api client")
 		}
 
 		partitionCli, err = partitionv1.NewPartitionsClient(ctx,
 			apis.WithEndpoint(apiConfig.ProfileServiceUri),
-			apis.WithTokenEndpoint(apiConfig.TokenServiceUri),
-			apis.WithTokenUsername(apiConfig.TokenServiceUserName),
-			apis.WithTokenPassword(apiConfig.TokenServiceSecret),
-			apis.WithAudiences(apiConfig.TokenServiceAudience...))
+			apis.WithTokenEndpoint(oauth2ServiceURL),
+			apis.WithTokenUsername(service.JwtClientID()),
+			apis.WithTokenPassword(service.JwtClientSecret()),
+			apis.WithAudiences(audienceList...))
 
 		if err != nil {
 			logrus.WithError(err).Panicf("failed to initialise partition api client")
@@ -210,6 +193,7 @@ func main() {
 
 	monolith := setup.Monolith{
 		Config:    cfg,
+		Service:   service,
 		Client:    httpClient,
 		FedClient: federationClient,
 		KeyRing:   keyRing,
@@ -227,7 +211,8 @@ func main() {
 	monolith.AddAllPublicRoutes(processCtx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
 
 	if len(cfg.MSCs.MSCs) > 0 {
-		if err := mscs.Enable(cfg, cm, routers, &monolith, caches); err != nil {
+		err = mscs.Enable(cfg, cm, routers, &monolith, caches)
+		if err != nil {
 			logrus.WithError(err).Fatalf("Failed to enable MSCs")
 		}
 	}
@@ -242,17 +227,21 @@ func main() {
 	upCounter.Add(1)
 	prometheus.MustRegister(upCounter)
 
-	// Expose the matrix APIs directly rather than putting them under a /api path.
-	go func() {
-		basepkg.SetupAndServeHTTP(processCtx, cfg, routers, httpAddr, nil, nil)
-	}()
-	// Handle HTTPS if certificate and key are provided
-	if *unixSocket == "" && *certFile != "" && *keyFile != "" {
-		go func() {
-			basepkg.SetupAndServeHTTP(processCtx, cfg, routers, httpsAddr, certFile, keyFile)
-		}()
+	var httpOpt frame.Option
+	httpOpt, err = basepkg.SetupHTTPOption(processCtx, cfg, routers)
+	if err != nil {
+		log.WithError(err).Fatal("could not setup Server Routers")
 	}
 
-	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
-	basepkg.WaitForShutdown(processCtx)
+	serviceOptions := []frame.Option{httpOpt}
+	service.Init(serviceOptions...)
+
+	log.WithField("server http port", cfg.Global.HttpServerPort).
+		Info(" Initiating server operations")
+	defer monolith.Service.Stop(ctx)
+	err = monolith.Service.Run(ctx, "")
+	if err != nil {
+		log.WithError(err).Fatal("could not run Server ")
+	}
+
 }
