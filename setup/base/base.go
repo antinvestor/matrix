@@ -16,31 +16,25 @@ package base
 
 import (
 	"bytes"
-	"context"
 	"embed"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"html/template"
 	"io/fs"
-	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
-	sentryhttp "github.com/getsentry/sentry-go/http"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/httputil"
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/gorilla/mux"
-	"github.com/kardianos/minwinsvc"
-
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/setup/config"
@@ -118,25 +112,15 @@ func ConfigureAdminEndpoints(processContext *process.ProcessContext, routers htt
 	})
 }
 
-// SetupAndServeHTTP sets up the HTTP server to serve client & federation APIs
+// SetupHTTPOption sets up the HTTP server to serve client & federation APIs
 // and adds a prometheus handler under /_dendrite/metrics.
-func SetupAndServeHTTP(
+func SetupHTTPOption(
 	processContext *process.ProcessContext,
 	cfg *config.Dendrite,
 	routers httputil.Routers,
-	externalHTTPAddr config.ServerAddress,
-	certFile, keyFile *string,
-) {
-	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 
-	externalServ := &http.Server{
-		Addr:         externalHTTPAddr.Address,
-		WriteTimeout: HTTPServerTimeout,
-		Handler:      externalRouter,
-		BaseContext: func(_ net.Listener) context.Context {
-			return processContext.Context()
-		},
-	}
+) (frame.Option, error) {
+	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 
 	//Redirect for Landing Page
 	externalRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +139,8 @@ func SetupAndServeHTTP(
 	if err := tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
 		"Version": internal.VersionString(),
 	}); err != nil {
-		logrus.WithError(err).Fatal("failed to execute landing page template")
+		logrus.WithError(err).Error("failed to execute landing page template")
+		return nil, err
 	}
 
 	routers.Static.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -200,60 +185,8 @@ func SetupAndServeHTTP(
 	externalRouter.NotFoundHandler = httputil.NotFoundCORSHandler
 	externalRouter.MethodNotAllowedHandler = httputil.NotAllowedHandler
 
-	if externalHTTPAddr.Enabled() {
-		go func() {
-			var externalShutdown atomic.Bool // RegisterOnShutdown can be called more than once
-			logrus.Infof("Starting external listener on %s", externalServ.Addr)
-			processContext.ComponentStarted()
-			externalServ.RegisterOnShutdown(func() {
-				if externalShutdown.CompareAndSwap(false, true) {
-					processContext.ComponentFinished()
-					logrus.Infof("Stopped external HTTP listener")
-				}
-			})
-			if certFile != nil && keyFile != nil {
-				if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
-					if err != http.ErrServerClosed {
-						logrus.WithError(err).Fatal("failed to serve HTTPS")
-					}
-				}
-			} else {
-				if externalHTTPAddr.IsUnixSocket() {
-					err := os.Remove(externalHTTPAddr.Address)
-					if err != nil && !errors.Is(err, fs.ErrNotExist) {
-						logrus.WithError(err).Fatal("failed to remove existing unix socket")
-					}
-					listener, err := net.Listen(externalHTTPAddr.Network(), externalHTTPAddr.Address)
-					if err != nil {
-						logrus.WithError(err).Fatal("failed to serve unix socket")
-					}
-					err = os.Chmod(externalHTTPAddr.Address, externalHTTPAddr.UnixSocketPermission)
-					if err != nil {
-						logrus.WithError(err).Fatal("failed to set unix socket permissions")
-					}
-					if err := externalServ.Serve(listener); err != nil {
-						if err != http.ErrServerClosed {
-							logrus.WithError(err).Fatal("failed to serve unix socket")
-						}
-					}
-				} else {
-					if err := externalServ.ListenAndServe(); err != nil {
-						if err != http.ErrServerClosed {
-							logrus.WithError(err).Fatal("failed to serve HTTP")
-						}
-					}
-				}
-			}
-			logrus.Infof("Stopped external listener on %s", externalServ.Addr)
-		}()
-	}
+	return frame.HttpHandler(externalRouter), nil
 
-	minwinsvc.SetOnExit(processContext.ShutdownDendrite)
-	<-processContext.WaitForShutdown()
-
-	logrus.Infof("Stopping HTTP listeners")
-	_ = externalServ.Shutdown(context.Background())
-	logrus.Infof("Stopped HTTP listeners")
 }
 
 func WaitForShutdown(processCtx *process.ProcessContext) {

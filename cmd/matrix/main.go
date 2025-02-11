@@ -16,6 +16,7 @@ package main
 
 import (
 	"flag"
+	"github.com/pitabwire/frame"
 	"time"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
@@ -58,27 +59,15 @@ var (
 )
 
 func main() {
+
+	serviceName := "service_profile"
+
 	cfg := setup.ParseFlags(true)
-	httpAddr := config.ServerAddress{}
-	httpsAddr := config.ServerAddress{}
-	if *unixSocket == "" {
-		http, err := config.HTTPAddress("http://" + *httpBindAddr)
-		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse http address")
-		}
-		httpAddr = http
-		https, err := config.HTTPAddress("https://" + *httpsBindAddr)
-		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse https address")
-		}
-		httpsAddr = https
-	} else {
-		socket, err := config.UnixSocketAddress(*unixSocket, *unixSocketPermission)
-		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to parse unix socket")
-		}
-		httpAddr = socket
-	}
+
+	ctx, service := frame.NewService(serviceName, frame.Config(&cfg.Global))
+	defer service.Stop(ctx)
+
+	log := service.L(ctx)
 
 	configErrors := &config.ConfigErrors{}
 	cfg.Verify(configErrors)
@@ -210,6 +199,7 @@ func main() {
 
 	monolith := setup.Monolith{
 		Config:    cfg,
+		Service:   service,
 		Client:    httpClient,
 		FedClient: federationClient,
 		KeyRing:   keyRing,
@@ -242,17 +232,22 @@ func main() {
 	upCounter.Add(1)
 	prometheus.MustRegister(upCounter)
 
-	// Expose the matrix APIs directly rather than putting them under a /api path.
-	go func() {
-		basepkg.SetupAndServeHTTP(processCtx, cfg, routers, httpAddr, nil, nil)
-	}()
-	// Handle HTTPS if certificate and key are provided
-	if *unixSocket == "" && *certFile != "" && *keyFile != "" {
-		go func() {
-			basepkg.SetupAndServeHTTP(processCtx, cfg, routers, httpsAddr, certFile, keyFile)
-		}()
+	httpOpt, err := basepkg.SetupHTTPOption(processCtx, cfg, routers)
+
+	serviceOptions := []frame.Option{httpOpt}
+	service.Init(serviceOptions...)
+
+	err = service.RegisterForJwt(ctx)
+	if err != nil {
+		log.WithError(err).Fatal("main -- could not register fo jwt")
 	}
 
-	// We want to block forever to let the HTTP and HTTPS handler serve the APIs
-	basepkg.WaitForShutdown(processCtx)
+	log.WithField("server http port", cfg.Global.HttpServerPort).
+		Info(" Initiating server operations")
+	defer monolith.Service.Stop(ctx)
+	err = monolith.Service.Run(ctx, "")
+	if err != nil {
+		log.WithError(err).Fatal("could not run Server ")
+	}
+
 }
