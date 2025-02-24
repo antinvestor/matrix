@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_PASSWORD: s3cr3t
       POSTGRES_USER: matrix
-      POSTGRES_DATABASE: matrix
+      POSTGRES_DB: matrix
       RUST_BACKTRACE: "1"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U matrix" ]
