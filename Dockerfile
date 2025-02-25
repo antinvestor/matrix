@@ -14,11 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #
 FROM --platform=${BUILDPLATFORM} base AS build
 WORKDIR /src
+ARG VERSION
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     GOOS=linux CGO_ENABLED=0 \
-    go build -v -trimpath -o /out/ ./cmd/...
+    go build -ldflags "-X github.com/antinvestor/matrix/internal.versionTag=${VERSION}" -v -trimpath -o /out/ ./cmd/...
 
 
 #

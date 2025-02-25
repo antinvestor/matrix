@@ -223,10 +223,23 @@ func loadConfig(
 	var c Dendrite
 	c.Defaults(DefaultOpts{})
 
-	var err error
-	if err = yaml.Unmarshal(configData, &c); err != nil {
+	err := yaml.Unmarshal(configData, &c)
+	if err != nil {
 		return nil, err
 	}
+
+	err = c.LoadEnv()
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate data from config options
+	err = c.Derive()
+	if err != nil {
+		return nil, err
+	}
+
+	c.Wiring()
 
 	if err = c.check(); err != nil {
 		return nil, err
@@ -290,18 +303,6 @@ func loadConfig(
 
 	c.MediaAPI.AbsBasePath = Path(absPath(basePath, c.MediaAPI.BasePath))
 
-	err = c.LoadEnv()
-	if err != nil {
-		return nil, err
-	}
-
-	// Generate data from config options
-	err = c.Derive()
-	if err != nil {
-		return nil, err
-	}
-
-	c.Wiring()
 	return &c, nil
 }
 

@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"runtime/debug"
 	"strings"
 )
@@ -15,12 +14,10 @@ var branch string
 // -ldflags "-X github.com/antinvestor/matrix/internal.build=alpha"
 var build string
 
-const (
-	VersionMajor = 0
-	VersionMinor = 2
-	VersionPatch = 7
-	VersionTag   = "" // example: "rc1"
+// -ldflags "-X github.com/antinvestor/matrix/internal.versionTag=v0.6.3"
+var versionTag = "v0.0.0"
 
+const (
 	gitRevLen = 7 // 7 matches the displayed characters on github.com
 )
 
@@ -29,10 +26,8 @@ func VersionString() string {
 }
 
 func init() {
-	version = fmt.Sprintf("%d.%d.%d", VersionMajor, VersionMinor, VersionPatch)
-	if VersionTag != "" {
-		version += "-" + VersionTag
-	}
+
+	version = versionTag
 	var parts []string
 	if build != "" {
 		parts = append(parts, build)

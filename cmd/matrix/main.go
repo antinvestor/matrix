@@ -33,7 +33,6 @@ import (
 	"github.com/antinvestor/matrix/setup/process"
 	"github.com/getsentry/sentry-go"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/appservice"
 	"github.com/antinvestor/matrix/federationapi"
@@ -47,22 +46,29 @@ import (
 
 func main() {
 
-	serviceName := "service_profile"
+	serviceName := "service_matrix"
 
 	cfg := setup.ParseFlags(true)
+	globalCfg := cfg.Global
 
-	ctx, service := frame.NewService(serviceName, frame.Config(&cfg.Global))
+	ctx, service := frame.NewService(serviceName, frame.Config(&globalCfg))
 	defer service.Stop(ctx)
 
 	log := service.L(ctx)
+
+	log.
+		WithField("oauth2 service uri", globalCfg.Oauth2ServiceURI).
+		WithField("well known server name", globalCfg.WellKnownServerName).
+		WithField("debug", globalCfg.LoggingLevel()).
+		Info("debug configuration values")
 
 	configErrors := &config.ConfigErrors{}
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			logrus.Errorf("Configuration error: %s", err)
+			log.Errorf("Configuration error: %s", err)
 		}
-		logrus.Fatalf("Failed to start due to configuration errors")
+		log.Fatalf("Failed to start due to configuration errors")
 	}
 	processCtx := process.NewProcessContextFilled(ctx)
 
@@ -72,45 +78,45 @@ func main() {
 
 	basepkg.PlatformSanityChecks()
 
-	logrus.Infof("Matrix version %s", internal.VersionString())
+	log.Infof("Matrix version %s", internal.VersionString())
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
-		logrus.Warn("Open registration is enabled")
+		log.Warn("Open registration is enabled")
 	}
 
 	// create DNS cache
 	var dnsCache *fclient.DNSCache
-	if cfg.Global.DNSCache.Enabled {
+	if globalCfg.DNSCache.Enabled {
 		dnsCache = fclient.NewDNSCache(
-			cfg.Global.DNSCache.CacheSize,
-			cfg.Global.DNSCache.CacheLifetime,
+			globalCfg.DNSCache.CacheSize,
+			globalCfg.DNSCache.CacheLifetime,
 		)
-		logrus.Infof(
+		log.Infof(
 			"DNS cache enabled (size %d, lifetime %s)",
-			cfg.Global.DNSCache.CacheSize,
-			cfg.Global.DNSCache.CacheLifetime,
+			globalCfg.DNSCache.CacheSize,
+			globalCfg.DNSCache.CacheLifetime,
 		)
 	}
 
 	// setup tracing
 	closer, err := cfg.SetupTracing()
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start opentracing")
+		log.WithError(err).Panicf("failed to start opentracing")
 	}
 	defer closer.Close() // nolint: errcheck
 
 	// setup sentry
-	if cfg.Global.Sentry.Enabled {
-		logrus.Info("Setting up Sentry for debugging...")
+	if globalCfg.Sentry.Enabled {
+		log.Info("Setting up Sentry for debugging...")
 		err = sentry.Init(sentry.ClientOptions{
-			Dsn:              cfg.Global.Sentry.DSN,
-			Environment:      cfg.Global.Sentry.Environment,
+			Dsn:              globalCfg.Sentry.DSN,
+			Environment:      globalCfg.Sentry.Environment,
 			Debug:            true,
-			ServerName:       string(cfg.Global.ServerName),
+			ServerName:       string(globalCfg.ServerName),
 			Release:          "matrix@" + internal.VersionString(),
 			AttachStacktrace: true,
 		})
 		if err != nil {
-			logrus.WithError(err).Panic("failed to start Sentry")
+			log.WithError(err).Panic("failed to start Sentry")
 		}
 
 	}
@@ -120,23 +126,31 @@ func main() {
 		partitionCli *partitionv1.PartitionClient
 	)
 
-	if cfg.Global.DistributedAPI.Enabled {
+	log.
+		WithField("enabled", globalCfg.DistributedAPI.Enabled).
+		Info("distributed apis")
+	if globalCfg.DistributedAPI.Enabled {
 
 		err = service.RegisterForJwt(ctx)
 		if err != nil {
 			log.WithError(err).Fatal("main -- could not register fo jwt")
 		}
 
-		oauth2ServiceHost := cfg.Global.GetOauth2ServiceURI()
-		oauth2ServiceURL := fmt.Sprintf("%s/oauth2/token", oauth2ServiceHost)
+		log.
+			WithField("oauth2 service uri", globalCfg.Oauth2ServiceURI).
+			WithField("client_id", service.JwtClientID()).
+			WithField("client_secret", service.JwtClientSecret()).
+			Info("distributed apis token configuration")
+
+		oauth2ServiceURL := fmt.Sprintf("%s/oauth2/token", globalCfg.Oauth2ServiceURI)
 
 		audienceList := make([]string, 0)
-		oauth2ServiceAudience := cfg.Global.Oauth2ServiceAudience
+		oauth2ServiceAudience := globalCfg.Oauth2ServiceAudience
 		if oauth2ServiceAudience != "" {
 			audienceList = strings.Split(oauth2ServiceAudience, ",")
 		}
 
-		apiConfig := cfg.Global.DistributedAPI
+		apiConfig := globalCfg.DistributedAPI
 		profileCli, err = profilev1.NewProfileClient(ctx,
 			apis.WithEndpoint(apiConfig.ProfileServiceUri),
 			apis.WithTokenEndpoint(oauth2ServiceURL),
@@ -144,7 +158,7 @@ func main() {
 			apis.WithTokenPassword(service.JwtClientSecret()),
 			apis.WithAudiences(audienceList...))
 		if err != nil {
-			logrus.WithError(err).Panicf("failed to initialise profile api client")
+			log.WithError(err).Panicf("failed to initialise profile api client")
 		}
 
 		partitionCli, err = partitionv1.NewPartitionsClient(ctx,
@@ -155,7 +169,7 @@ func main() {
 			apis.WithAudiences(audienceList...))
 
 		if err != nil {
-			logrus.WithError(err).Panicf("failed to initialise partition api client")
+			log.WithError(err).Panicf("failed to initialise partition api client")
 		}
 	}
 
@@ -163,13 +177,13 @@ func main() {
 	httpClient := basepkg.CreateClient(cfg, dnsCache)
 
 	// prepare required dependencies
-	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(processCtx, globalCfg.DatabaseOptions)
 	routers := httputil.NewRouters()
 
-	cfg.Global.Cache.EnablePrometheus = caching.EnableMetrics
-	caches, err := caching.NewCache(&cfg.Global.Cache)
+	globalCfg.Cache.EnablePrometheus = caching.EnableMetrics
+	caches, err := caching.NewCache(&globalCfg.Cache)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to create cache")
+		log.WithError(err).Panicf("failed to create cache")
 	}
 
 	natsInstance := jetstream.NATSInstance{}
@@ -213,7 +227,7 @@ func main() {
 	if len(cfg.MSCs.MSCs) > 0 {
 		err = mscs.Enable(cfg, cm, routers, &monolith, caches)
 		if err != nil {
-			logrus.WithError(err).Fatalf("Failed to enable MSCs")
+			log.WithError(err).Fatalf("Failed to enable MSCs")
 		}
 	}
 
@@ -236,7 +250,7 @@ func main() {
 	serviceOptions := []frame.Option{httpOpt}
 	service.Init(serviceOptions...)
 
-	log.WithField("server http port", cfg.Global.HttpServerPort).
+	log.WithField("server http port", globalCfg.HttpServerPort).
 		Info(" Initiating server operations")
 	defer monolith.Service.Stop(ctx)
 	err = monolith.Service.Run(ctx, "")

@@ -60,7 +60,10 @@ services:
 
   matrix:
     hostname: matrix
-    build: .
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION}
     ports:
       - "8008:8008"
       - "8448:8448"
@@ -118,7 +121,7 @@ configs:
       
         # The server name to delegate server-server communications to, with optional port
         # e.g. localhost:443
-        well_known_server_name: ""
+        well_known_server_name: "docker.compose:8008"
       
         # The base URL to delegate client-server communications to e.g. https://localhost
         well_known_client_name: ""
@@ -130,8 +133,19 @@ configs:
           # The prefix to use for stream names for this homeserver - really only useful
           # if you are running more than one Dendrite server on the same NATS deployment.
           topic_prefix: Dendrite
-      
-      
+        
+        distributed_api:
+          enabled: false
+          profile_service_uri: "service-profile.core:50051"
+          partition_service_uri: "service-partition.core:50051"
+        embedded_config:
+          oauth2_service_uri: https://oauth2.chamamobile.com
+          oauth2_well_known_jwk: https://oauth2.chamamobile.com/.well-known/jwks.json
+          oauth2_service_admin_uri: http://auth-oauth2-hydra-admin.core:4445
+          oauth2_service_client_secret: b1QQBzBM04CDvEX9heDx
+          oauth2_service_audience: service_profile,service_partition,service_files,service_notification,service_payment,service_stawi
+          oauth2_jwt_verify_audience: service_matrix
+          oauth2_jwt_verify_issuer: https://oauth2.chamamobile.com/
       # Configuration for the Client API.
       client_api:
         registration_disabled: true
@@ -162,26 +176,6 @@ configs:
           # will be visible to clients!
           # turn_username: ""
           # turn_password: ""
-      
-      
-      # Configuration for the Federation API.
-      federation_api:
-        send_max_retries: 16
-      
-        disable_tls_validation: false
-        disable_http_keepalives: false
-        key_perspectives:
-          - server_name: matrix.org
-            keys:
-              - key_id: ed25519:auto
-                public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
-              - key_id: ed25519:a_RXGa
-                public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
-      
-        # This option will control whether Dendrite will prefer to look up keys directly
-        # or whether it should try perspective servers first, using direct fetches as a
-        # last resort.
-        prefer_direct_fetch: false
       
       # Configuration for the Media API.
       media_api:
@@ -246,7 +240,7 @@ configs:
           serviceName: ""
           disabled: false
           rpc_metrics: false
-          tags: [ ]
+          tags: []
           sampler: null
           reporter: null
           headers: null

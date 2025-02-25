@@ -18,7 +18,7 @@ import (
 )
 
 type Global struct {
-	frame.ConfigurationDefault
+	frame.ConfigurationDefault `yaml:"embedded_config"`
 	// Signing identity contains the server name, private key and key ID of
 	// the deployment.
 	fclient.SigningIdentity `env:"-" yaml:",inline"`
@@ -114,6 +114,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	c.ServerNotices.Defaults(opts)
 	c.ReportStats.Defaults()
 	c.Cache.Defaults(opts)
+	c.DistributedAPI.Defaults()
 }
 
 func (c *Global) LoadEnv() error {
