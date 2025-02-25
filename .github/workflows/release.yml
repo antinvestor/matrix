@@ -20,6 +20,7 @@ jobs:
     name: Monolith image
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       packages: write
       security-events: write # To upload Trivy sarif files
