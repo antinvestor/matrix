@@ -162,7 +162,7 @@ func main() {
 		}
 
 		partitionCli, err = partitionv1.NewPartitionsClient(ctx,
-			apis.WithEndpoint(apiConfig.ProfileServiceUri),
+			apis.WithEndpoint(apiConfig.PartitionServiceUri),
 			apis.WithTokenEndpoint(oauth2ServiceURL),
 			apis.WithTokenUsername(service.JwtClientID()),
 			apis.WithTokenPassword(service.JwtClientSecret()),
