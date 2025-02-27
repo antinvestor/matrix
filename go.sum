@@ -413,8 +413,6 @@ github.com/pierrec/lz4 v1.0.2-0.20190131084431-473cd7ce01a1/go.mod h1:3/3N9NVKO0
 github.com/pierrec/lz4 v2.0.5+incompatible/go.mod h1:pdkljMzZIN41W+lC3N2tnIh5sFi+IEE17M5jbnwPHcY=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
 github.com/pingcap/errors v0.11.4/go.mod h1:Oi8TUi2kEtXXLMJk9l1cGmz20kV3TaQ0usTwv5KuLY8=
-github.com/pitabwire/frame v1.29.3 h1:/AXbayb7aQfOZfQzJB9HkGHSkvN8eER156ZJMLEhreY=
-github.com/pitabwire/frame v1.29.3/go.mod h1:2g1uU2JyvvKyBc7mvt8P5aRLb3KNZJL7vpWWCUgcxmw=
 github.com/pitabwire/frame v1.30.0 h1:vtajLhjIpuiXcj1VUA43rNEGTGGrafRJOGrySOsiUs4=
 github.com/pitabwire/frame v1.30.0/go.mod h1:2g1uU2JyvvKyBc7mvt8P5aRLb3KNZJL7vpWWCUgcxmw=
 github.com/pitabwire/natspubsub v0.1.8 h1:+pOhUNH+mkdcGzQFZMiNzjjgK4lDX1j0QYJgQwcwFc4=
