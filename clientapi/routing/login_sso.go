@@ -112,7 +112,7 @@ func SSORedirect(
 	nonceCookie := &http.Cookie{
 		Name:     "sso_nonce",
 		Value:    nonce,
-		Path:     path.Dir(req.URL.Path),
+		Path:     path.Dir(callbackURL.Path),
 		Expires:  time.Now().Add(10 * time.Minute),
 		Secure:   redirectURL.Scheme == "https",
 		SameSite: http.SameSiteNoneMode,
@@ -126,7 +126,7 @@ func SSORedirect(
 	codeVerifierCookie := &http.Cookie{
 		Name:     "sso_code_verifier",
 		Value:    codeVerifier,
-		Path:     path.Dir(req.URL.Path),
+		Path:     path.Dir(callbackURL.Path),
 		Expires:  time.Now().Add(10 * time.Minute),
 		Secure:   redirectURL.Scheme == "https",
 		SameSite: http.SameSiteNoneMode,

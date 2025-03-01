@@ -91,19 +91,20 @@ func (auth *Authenticator) GetProvider(ctx context.Context, providerID string) (
 		return nil, err
 	}
 
-	partitionClientID, ok := resp.GetProperties()[partitionPropertyClientIDKey]
+	partitionProperties := resp.GetProperties()
+	partitionClientID, ok := partitionProperties[partitionPropertyClientIDKey]
 	if !ok {
-		return nil, fmt.Errorf("no client_id in partition response")
+		return nil, fmt.Errorf("no client_id in partition properties :%v", partitionProperties)
 	}
 
 	partitionClientSecret, ok := resp.GetProperties()[partitionPropertyClientSecretKey]
 	if !ok {
-		return nil, fmt.Errorf("no client_secret in partition response")
+		return nil, fmt.Errorf("no client_secret in partition properties :%v", partitionProperties)
 	}
 
 	partitionDiscoveryUri, ok := resp.GetProperties()[partitionPropertyDiscoveryUriKey]
 	if !ok {
-		return nil, fmt.Errorf("no discovery uri in partition response")
+		return nil, fmt.Errorf("no discovery uri in partition properties :%v", partitionProperties)
 	}
 
 	idp := config.IdentityProvider{
