@@ -37,7 +37,7 @@ require (
 	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7
 	golang.org/x/image v0.24.0
 	golang.org/x/oauth2 v0.27.0
-	golang.org/x/sync v0.11.0
+	golang.org/x/sync v0.12.0
 	golang.org/x/term v0.29.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v3 v3.0.1
