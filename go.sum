@@ -413,6 +413,8 @@ github.com/pborman/uuid v1.2.0/go.mod h1:X/NO0urCmaxf9VXbdlT7C2Yzkj2IKimNn4k+gtP
 github.com/performancecopilot/speed v3.0.0+incompatible/go.mod h1:/CLtqpZ5gBg1M9iaPbIdPPGyKcA8hKdoy6hAWba7Yac=
 github.com/petermattis/goid v0.0.0-20250211185408-f2b9d978cd7a h1:ckxP/kGzsxvxXo8jO6E/0QJ8MMmwI7IRj4Fys9QbAZA=
 github.com/petermattis/goid v0.0.0-20250211185408-f2b9d978cd7a/go.mod h1:pxMtw7cyUw6B2bRH0ZBANSPg+AoSud1I1iyJHI69jH4=
+github.com/petermattis/goid v0.0.0-20250303134427-723919f7f203 h1:E7Kmf11E4K7B5hDti2K2NqPb1nlYlGYsu02S1JNd/Bs=
+github.com/petermattis/goid v0.0.0-20250303134427-723919f7f203/go.mod h1:pxMtw7cyUw6B2bRH0ZBANSPg+AoSud1I1iyJHI69jH4=
 github.com/pierrec/lz4 v1.0.2-0.20190131084431-473cd7ce01a1/go.mod h1:3/3N9NVKO0jef7pBehbT1qWhCMrIgbYNnFAZCqQ5LRc=
 github.com/pierrec/lz4 v2.0.5+incompatible/go.mod h1:pdkljMzZIN41W+lC3N2tnIh5sFi+IEE17M5jbnwPHcY=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
@@ -544,6 +546,8 @@ go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738/go.mod h1:dnLIgRNXwCJa5e+c6mIZCrds/GIG4ncV9HhK5PX7jPg=
 go.mau.fi/util v0.8.5 h1:PwCAAtcfK0XxZ4sdErJyfBMkTEWoQU33aB7QqDDzQRI=
 go.mau.fi/util v0.8.5/go.mod h1:Ycug9mrbztlahHPEJ6H5r8Nu/xqZaWbE5vPHVWmfz6M=
+go.mau.fi/util v0.8.6 h1:AEK13rfgtiZJL2YsNK+W4ihhYCuukcRom8WPP/w/L54=
+go.mau.fi/util v0.8.6/go.mod h1:uNB3UTXFbkpp7xL1M/WvQks90B/L4gvbLpbS0603KOE=
 go.opencensus.io v0.20.1/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
 go.opencensus.io v0.20.2/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
@@ -857,6 +861,8 @@ honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWh
 honnef.co/go/tools v0.0.1-2019.2.3/go.mod h1:a3bituU0lyd329TUQxRnasdCoJDkEUEAqEt0JzvZhAg=
 maunium.net/go/mautrix v0.23.1 h1:xZtX43YZF3WRxkdR+oMUrpiQe+jbjc+LeXLxHuXP5IM=
 maunium.net/go/mautrix v0.23.1/go.mod h1:kldoZQDneV/jquIhwG1MmMw5j2A2M/MnQYRSWt863cY=
+maunium.net/go/mautrix v0.23.2 h1:Bo3tPrQJwkxyL7aMmy/T+d2tqIrypZjHqeHe8fyeAOg=
+maunium.net/go/mautrix v0.23.2/go.mod h1:pCYLHmo02Jauak/9VlTkbGPrBMvLXsGqTGMNOx+L2PE=
 nhooyr.io/websocket v1.8.6/go.mod h1:B70DZP8IakI65RVQ51MsWP/8jndNma26DVA/nFSCgW0=
 nhooyr.io/websocket v1.8.7 h1:usjR2uOr/zjjkVMy0lW+PPohFok7PCow5sDjLgX4P4g=
 nhooyr.io/websocket v1.8.7/go.mod h1:B70DZP8IakI65RVQ51MsWP/8jndNma26DVA/nFSCgW0=
