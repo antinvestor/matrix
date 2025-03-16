@@ -42,7 +42,7 @@ require (
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
-	maunium.net/go/mautrix v0.23.1
+	maunium.net/go/mautrix v0.23.2
 )
 
 require (
@@ -81,7 +81,7 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/panjf2000/ants/v2 v2.11.2 // indirect
-	github.com/petermattis/goid v0.0.0-20250211185408-f2b9d978cd7a // indirect
+	github.com/petermattis/goid v0.0.0-20250303134427-723919f7f203 // indirect
 	github.com/pitabwire/natspubsub v0.1.8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
@@ -92,7 +92,7 @@ require (
 	github.com/rs/zerolog v1.33.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
-	go.mau.fi/util v0.8.5 // indirect
+	go.mau.fi/util v0.8.6 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel v1.35.0 // indirect
