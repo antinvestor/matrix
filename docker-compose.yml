@@ -46,7 +46,7 @@ services:
 
   queuestore:
     hostname: queue
-    image: nats:2.10
+    image: nats:2.11
     restart: always
     networks:
       - internal
