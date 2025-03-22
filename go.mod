@@ -12,7 +12,7 @@ require (
 	github.com/antinvestor/gomatrix v0.1.2
 	github.com/antinvestor/gomatrixserverlib v0.1.2
 	github.com/getsentry/sentry-go v0.31.1
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
