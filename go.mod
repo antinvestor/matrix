@@ -11,7 +11,7 @@ require (
 	github.com/antinvestor/apis/go/profile v1.33.1
 	github.com/antinvestor/gomatrix v0.1.2
 	github.com/antinvestor/gomatrixserverlib v0.1.2
-	github.com/getsentry/sentry-go v0.31.1
+	github.com/getsentry/sentry-go v0.32.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
