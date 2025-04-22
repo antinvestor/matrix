@@ -631,7 +631,7 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 		return true
 	}
 
-	outputPresenceEventTopic := cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent)
+	outputPresenceEventTopic := cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent)
 	eventTopicDurable := cfg.Global.JetStream.Durable("TestPresence")
 
 	err = jetstream.Consumer(
@@ -651,7 +651,7 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 		}
 		return poll.Continue("waiting for events to be processed")
 	}
-	poll.WaitOn(t, check, poll.WithTimeout(10*time.Second), poll.WithDelay(10*time.Millisecond))
+	poll.WaitOn(t, check, poll.WithTimeout(2*time.Second), poll.WithDelay(10*time.Millisecond))
 }
 
 func TestProcessTransactionRequestEDUUnhandled(t *testing.T) {
