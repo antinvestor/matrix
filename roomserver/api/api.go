@@ -71,7 +71,7 @@ type RoomserverInternalAPI interface {
 	UserRoomPrivateKeyCreator
 	DefaultRoomVersionAPI
 
-	// needed to avoid chicken and egg scenario when setting up the
+	// SetFederationAPI needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
 	SetFederationAPI(ctx context.Context, fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing)
 	SetAppserviceAPI(ctx context.Context, asAPI asAPI.AppServiceInternalAPI)

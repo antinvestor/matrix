@@ -265,14 +265,15 @@ func (r *Inputer) Start(ctx context.Context) error {
 // by the actor embedded into the worker.
 func (w *worker) _next(ctx context.Context) {
 	// Look up what the next event is that's waiting to be processed.
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	fetchCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	w.sentryHub.ConfigureScope(func(scope *sentry.Scope) {
 		scope.SetTag("room_id", w.roomID)
 	})
-	msgs, err := w.subscription.Fetch(1, nats.Context(ctx))
-	switch err {
-	case nil:
+	msgs, err := w.subscription.Fetch(1, nats.Context(fetchCtx))
+
+	switch {
+	case err == nil:
 		// Make sure that once we're done here, we queue up another call
 		// to _next in the inbox.
 		defer w.Act(nil, func() { w._next(ctx) })
@@ -282,8 +283,7 @@ func (w *worker) _next(ctx context.Context) {
 		if len(msgs) != 1 {
 			return
 		}
-
-	case context.DeadlineExceeded, context.Canceled:
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		// The context exceeded, so we've been waiting for more than a
 		// minute for activity in this room. At this point we will shut
 		// down the subscriber to free up resources. It'll get started
@@ -295,7 +295,6 @@ func (w *worker) _next(ctx context.Context) {
 		w.subscription = nil
 		w.Unlock()
 		return
-
 	default:
 		// Something went wrong while trying to fetch the next event
 		// from the queue. In which case, we'll shut down the subscriber
@@ -339,8 +338,9 @@ func (w *worker) _next(ctx context.Context) {
 		spec.ServerName(msg.Header.Get("virtual_host")),
 		&inputRoomEvent,
 	); err != nil {
-		switch err.(type) {
-		case types.RejectedError:
+		var rejectedError types.RejectedError
+		switch {
+		case errors.As(err, &rejectedError):
 			// Don't send events that were rejected to Sentry
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"room_id":  w.roomID,
@@ -413,6 +413,7 @@ func (r *Inputer) queueInputRoomEvents(
 	// For each event, marshal the input room event and then
 	// send it into the input queue.
 	for _, e := range request.InputRoomEvents {
+
 		roomID := e.Event.RoomID().String()
 		subj := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEventSubj(roomID))
 		msg := &nats.Msg{
@@ -476,6 +477,7 @@ func (r *Inputer) InputRoomEvents(
 		if len(msg.Data) > 0 {
 			response.ErrMsg = string(msg.Data)
 		}
+
 	}
 }
 

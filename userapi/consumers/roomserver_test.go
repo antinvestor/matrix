@@ -145,8 +145,8 @@ func Test_evaluatePushRules(t *testing.T) {
 
 func TestLocalRoomMembers(t *testing.T) {
 	alice := test.NewUser(t)
-	_, sk, err := ed25519.GenerateKey(nil)
-	assert.NoError(t, err)
+	_, sk, err0 := ed25519.GenerateKey(nil)
+	assert.NoError(t, err0)
 	bob := test.NewUser(t, test.WithSigningServer("notlocalhost", "ed25519:abc", sk))
 	charlie := test.NewUser(t, test.WithSigningServer("notlocalhost", "ed25519:abc", sk))
 
@@ -161,6 +161,7 @@ func TestLocalRoomMembers(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		natsInstance := &jetstream.NATSInstance{}
+
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)

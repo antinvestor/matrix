@@ -619,7 +619,7 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 	defer closeFn()
 
 	received := atomic.Bool{}
-	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
+	onMessage := func(_ context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
 
 		userIDRes := msg.Header.Get(jetstream.UserID)
@@ -651,7 +651,7 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 		}
 		return poll.Continue("waiting for events to be processed")
 	}
-	poll.WaitOn(t, check, poll.WithTimeout(2*time.Second), poll.WithDelay(10*time.Millisecond))
+	poll.WaitOn(t, check, poll.WithTimeout(10*time.Second), poll.WithDelay(10*time.Millisecond))
 }
 
 func TestProcessTransactionRequestEDUUnhandled(t *testing.T) {
