@@ -60,7 +60,7 @@ type accountDataStatements struct {
 	selectAccountDataByTypeStmt *sql.Stmt
 }
 
-func NewPostgresAccountDataTable(db *sql.DB) (tables.AccountDataTable, error) {
+func NewPostgresAccountDataTable(ctx context.Context, db *sql.DB) (tables.AccountDataTable, error) {
 	s := &accountDataStatements{}
 	_, err := db.Exec(accountDataSchema)
 	if err != nil {
@@ -93,8 +93,8 @@ func (s *accountDataStatements) SelectAccountData(
 	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 ) (
-	/* global */ map[string]json.RawMessage,
-	/* rooms */ map[string]map[string]json.RawMessage,
+/* global */ map[string]json.RawMessage,
+/* rooms */ map[string]map[string]json.RawMessage,
 	error,
 ) {
 	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart, serverName)

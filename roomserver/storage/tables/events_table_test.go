@@ -3,6 +3,7 @@ package tables_test
 import (
 	"context"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -14,10 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventsTable(t *testing.T, _ test.DependancyOption) (tables.Events, func()) {
+func mustCreateEventsTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tables.Events, func()) {
 	t.Helper()
 
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -28,9 +28,9 @@ func mustCreateEventsTable(t *testing.T, _ test.DependancyOption) (tables.Events
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.Events
-	err = postgres.CreateEventsTable(db)
+	err = postgres.CreateEventsTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PrepareEventsTable(db)
+	tab, err = postgres.PrepareEventsTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -40,9 +40,10 @@ func mustCreateEventsTable(t *testing.T, _ test.DependancyOption) (tables.Events
 func Test_EventsTable(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDb := mustCreateEventsTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		tab, closeDb := mustCreateEventsTable(ctx, t, testOpts)
 		defer closeDb()
 		// create some dummy data
 		eventIDs := make([]string, 0, len(room.Events()))
@@ -151,13 +152,14 @@ func Test_EventsTable(t *testing.T) {
 func TestRoomsWithACL(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		eventStateKeys, closeEventStateKeys := mustCreateEventTypesTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+
+		eventStateKeys, closeEventStateKeys := mustCreateEventTypesTable(ctx, t, testOpts)
 		defer closeEventStateKeys()
 
-		eventsTable, closeEventsTable := mustCreateEventsTable(t, testOpts)
+		eventsTable, closeEventsTable := mustCreateEventsTable(ctx, t, testOpts)
 		defer closeEventsTable()
-
-		ctx := context.Background()
 
 		// insert the m.room.server_acl event type
 		eventTypeNID, err := eventStateKeys.InsertEventTypeNID(ctx, nil, "m.room.server_acl")

@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -24,7 +25,6 @@ import (
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -51,6 +51,7 @@ func (t *testFedClient) ClaimKeys(ctx context.Context, origin, s spec.ServerName
 }
 
 func TestFederationClientQueryKeys(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
@@ -63,7 +64,7 @@ func TestFederationClientQueryKeys(t *testing.T) {
 	fedClient := &testFedClient{}
 	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
-		testDB, process.NewProcessContext(),
+		ctx, testDB,
 		false,
 		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
@@ -75,14 +76,17 @@ func TestFederationClientQueryKeys(t *testing.T) {
 		federation: fedClient,
 		queues:     queues,
 	}
-	_, err := fedapi.QueryKeys(context.Background(), "origin", "server", nil)
+	_, err := fedapi.QueryKeys(ctx, "origin", "server", nil)
 	assert.Nil(t, err)
 	assert.True(t, fedClient.queryKeysCalled)
 }
 
 func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryFederationDatabase()
-	testDB.AddServerToBlacklist("server")
+	err := testDB.AddServerToBlacklist(ctx, "server")
+	assert.Nil(t, err)
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
@@ -94,7 +98,7 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 	fedClient := &testFedClient{}
 	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
-		testDB, process.NewProcessContext(),
+		ctx, testDB,
 		false,
 		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
@@ -106,12 +110,13 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 		federation: fedClient,
 		queues:     queues,
 	}
-	_, err := fedapi.QueryKeys(context.Background(), "origin", "server", nil)
+	_, err = fedapi.QueryKeys(ctx, "origin", "server", nil)
 	assert.NotNil(t, err)
 	assert.False(t, fedClient.queryKeysCalled)
 }
 
 func TestFederationClientQueryKeysFailure(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
@@ -124,7 +129,7 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 	fedClient := &testFedClient{shouldFail: true}
 	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
-		testDB, process.NewProcessContext(),
+		ctx, testDB,
 		false,
 		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
@@ -136,12 +141,14 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 		federation: fedClient,
 		queues:     queues,
 	}
-	_, err := fedapi.QueryKeys(context.Background(), "origin", "server", nil)
+	_, err := fedapi.QueryKeys(ctx, "origin", "server", nil)
 	assert.NotNil(t, err)
 	assert.True(t, fedClient.queryKeysCalled)
 }
 
 func TestFederationClientClaimKeys(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
@@ -154,7 +161,7 @@ func TestFederationClientClaimKeys(t *testing.T) {
 	fedClient := &testFedClient{}
 	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
-		testDB, process.NewProcessContext(),
+		ctx, testDB,
 		false,
 		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
@@ -166,14 +173,16 @@ func TestFederationClientClaimKeys(t *testing.T) {
 		federation: fedClient,
 		queues:     queues,
 	}
-	_, err := fedapi.ClaimKeys(context.Background(), "origin", "server", nil)
+	_, err := fedapi.ClaimKeys(ctx, "origin", "server", nil)
 	assert.Nil(t, err)
 	assert.True(t, fedClient.claimKeysCalled)
 }
 
 func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryFederationDatabase()
-	testDB.AddServerToBlacklist("server")
+	err := testDB.AddServerToBlacklist(ctx, "server")
+	assert.Nil(t, err)
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
@@ -185,7 +194,7 @@ func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
 	fedClient := &testFedClient{}
 	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
-		testDB, process.NewProcessContext(),
+		ctx, testDB,
 		false,
 		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
@@ -197,7 +206,7 @@ func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
 		federation: fedClient,
 		queues:     queues,
 	}
-	_, err := fedapi.ClaimKeys(context.Background(), "origin", "server", nil)
+	_, err = fedapi.ClaimKeys(ctx, "origin", "server", nil)
 	assert.NotNil(t, err)
 	assert.False(t, fedClient.claimKeysCalled)
 }

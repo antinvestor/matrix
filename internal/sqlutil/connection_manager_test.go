@@ -8,7 +8,6 @@ import (
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/test"
 )
 
@@ -17,18 +16,16 @@ func TestConnectionManager(t *testing.T) {
 	t.Run("component defined connection string", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-			processCtx := process.NewProcessContext()
-			ctx := processCtx.Context()
-
+			ctx := testrig.NewContext(t)
 			conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 			if err != nil {
 				t.Fatalf("failed to open database: %s", err)
 			}
 			t.Cleanup(closeDb)
-			cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: conStr})
+			cm := sqlutil.NewConnectionManager(t.Context(), config.DatabaseOptions{ConnectionString: conStr})
 
 			dbProps := &config.DatabaseOptions{ConnectionString: conStr}
-			db, writer, err := cm.Connection(dbProps)
+			db, writer, err := cm.Connection(ctx, dbProps)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -39,7 +36,7 @@ func TestConnectionManager(t *testing.T) {
 			}
 
 			// reuse existing connection
-			db2, writer2, err := cm.Connection(dbProps)
+			db2, writer2, err := cm.Connection(ctx, dbProps)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -54,19 +51,16 @@ func TestConnectionManager(t *testing.T) {
 
 	t.Run("global connection pool", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-
-			processCtx := process.NewProcessContext()
-			ctx := processCtx.Context()
-
+			ctx := testrig.NewContext(t)
 			conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 			if err != nil {
 				t.Fatalf("failed to open database: %s", err)
 			}
 			t.Cleanup(closeDb)
-			cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: conStr})
+			cm := sqlutil.NewConnectionManager(t.Context(), config.DatabaseOptions{ConnectionString: conStr})
 
 			dbProps := &config.DatabaseOptions{ConnectionString: conStr}
-			db, writer, err := cm.Connection(dbProps)
+			db, writer, err := cm.Connection(ctx, dbProps)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -80,7 +74,7 @@ func TestConnectionManager(t *testing.T) {
 			}
 
 			// reuse existing connection
-			db2, writer2, err := cm.Connection(dbProps)
+			db2, writer2, err := cm.Connection(ctx, dbProps)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -96,13 +90,14 @@ func TestConnectionManager(t *testing.T) {
 	t.Run("shutdown", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-			cfg, ctx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
+			ctx := testrig.NewContext(t)
+			cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 			defer closeRig()
 
 			cm := sqlutil.NewConnectionManager(ctx,
 				config.DatabaseOptions{ConnectionString: cfg.Global.DatabaseOptions.ConnectionString})
 
-			_, _, err := cm.Connection(&cfg.Global.DatabaseOptions)
+			_, _, err := cm.Connection(ctx, &cfg.Global.DatabaseOptions)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -110,15 +105,16 @@ func TestConnectionManager(t *testing.T) {
 		})
 	})
 
+	ctx := testrig.NewContext(t)
 	// test invalid connection string configured
-	cm2 := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{})
-	_, _, err := cm2.Connection(&config.DatabaseOptions{ConnectionString: "http://"})
+	cm2 := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{})
+	_, _, err := cm2.Connection(ctx, &config.DatabaseOptions{ConnectionString: "http://"})
 	if err == nil {
 		t.Fatal("expected an error but got none")
 	}
 
 	// empty connection string is not allowed
-	_, _, err = cm2.Connection(&config.DatabaseOptions{})
+	_, _, err = cm2.Connection(ctx, &config.DatabaseOptions{})
 	if err == nil {
 		t.Fatal("expected an error but got none")
 	}

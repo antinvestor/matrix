@@ -1,7 +1,7 @@
 package tables_test
 
 import (
-	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -15,7 +15,7 @@ import (
 )
 
 func mustCreateTable(t *testing.T, _ test.DependancyOption) (tab tables.StaleDeviceLists, closeDb func()) {
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -27,7 +27,7 @@ func mustCreateTable(t *testing.T, _ test.DependancyOption) (tab tables.StaleDev
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
-	tab, err = postgres.NewPostgresStaleDeviceListsTable(db)
+	tab, err = postgres.NewPostgresStaleDeviceListsTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to create new table: %s", err)
@@ -39,7 +39,7 @@ func TestStaleDeviceLists(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 	charlie := "@charlie:localhost"
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		tab, closeDB := mustCreateTable(t, testOpts)

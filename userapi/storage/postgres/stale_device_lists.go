@@ -63,7 +63,7 @@ type staleDeviceListsStatements struct {
 	deleteStaleDeviceListsStmt            *sql.Stmt
 }
 
-func NewPostgresStaleDeviceListsTable(db *sql.DB) (tables.StaleDeviceLists, error) {
+func NewPostgresStaleDeviceListsTable(ctx context.Context, db *sql.DB) (tables.StaleDeviceLists, error) {
 	s := &staleDeviceListsStatements{}
 	_, err := db.Exec(staleDeviceListsSchema)
 	if err != nil {

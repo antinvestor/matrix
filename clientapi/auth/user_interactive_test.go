@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -14,7 +15,6 @@ import (
 )
 
 var (
-	ctx        = context.Background()
 	serverName = spec.ServerName("example.com")
 	// space separated localpart+password -> account
 	lookup = make(map[string]*api.Account)
@@ -57,6 +57,8 @@ func setup() *UserInteractive {
 }
 
 func TestUserInteractiveChallenge(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	uia := setup()
 	// no auth key results in a challenge
 	_, errRes := uia.Verify(ctx, []byte(`{}`), device)
@@ -70,6 +72,8 @@ func TestUserInteractiveChallenge(t *testing.T) {
 }
 
 func TestUserInteractivePasswordLogin(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	uia := setup()
 	// valid password login succeeds when an account exists
 	lookup["alice herpassword"] = &api.Account{
@@ -108,6 +112,8 @@ func TestUserInteractivePasswordLogin(t *testing.T) {
 }
 
 func TestUserInteractivePasswordBadLogin(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	uia := setup()
 	// password login fails when an account exists but is specced wrong
 	lookup["bob hispassword"] = &api.Account{
@@ -193,6 +199,8 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 }
 
 func TestUserInteractive_AddCompletedStage(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	tests := []struct {
 		name      string
 		sessionID string
@@ -211,7 +219,7 @@ func TestUserInteractive_AddCompletedStage(t *testing.T) {
 		},
 	}
 	u := setup()
-	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, resp := u.Verify(ctx, []byte("{}"), nil)

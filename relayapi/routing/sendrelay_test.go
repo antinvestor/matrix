@@ -15,8 +15,8 @@
 package routing_test
 
 import (
-	"context"
 	"encoding/json"
+	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"testing"
 
@@ -180,6 +180,8 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 }
 
 func TestUniqueTransactionStoredInDatabase(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -199,10 +201,10 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 
 	response := routing.SendTransactionToRelay(
 		httpReq, &request, relayAPI, txn.TransactionID, *userID)
-	transaction, _, err := db.GetTransaction(context.Background(), *userID)
+	transaction, _, err := db.GetTransaction(ctx, *userID)
 	assert.NoError(t, err, "Failed retrieving transaction")
 
-	transactionCount, err := db.GetTransactionCount(context.Background(), *userID)
+	transactionCount, err := db.GetTransactionCount(ctx, *userID)
 	assert.NoError(t, err, "Failed retrieving transaction count")
 
 	assert.Equal(t, 200, response.Code)

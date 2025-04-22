@@ -52,10 +52,10 @@ type Database interface {
 	GetPendingEDUServerNames(ctx context.Context) ([]spec.ServerName, error)
 
 	// these don't have contexts passed in as we want things to happen regardless of the request context
-	AddServerToBlacklist(serverName spec.ServerName) error
-	RemoveServerFromBlacklist(serverName spec.ServerName) error
-	RemoveAllServersFromBlacklist() error
-	IsServerBlacklisted(serverName spec.ServerName) (bool, error)
+	AddServerToBlacklist(ctx context.Context, serverName spec.ServerName) error
+	RemoveServerFromBlacklist(ctx context.Context, serverName spec.ServerName) error
+	RemoveAllServersFromBlacklist(ctx context.Context) error
+	IsServerBlacklisted(ctx context.Context, serverName spec.ServerName) (bool, error)
 
 	// Adds the server to the list of assumed offline servers.
 	// If the server already exists in the table, nothing happens and returns success.

@@ -70,7 +70,7 @@ type relayQueueStatements struct {
 }
 
 func NewPostgresRelayQueueTable(
-	db *sql.DB,
+	_ context.Context, db *sql.DB,
 ) (s *relayQueueStatements, err error) {
 	s = &relayQueueStatements{
 		db: db,

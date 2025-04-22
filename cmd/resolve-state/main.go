@@ -20,7 +20,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 )
 
 // This is a utility for inspecting state snapshots and running state resolution
@@ -69,8 +68,7 @@ func main() {
 		}
 	}
 
-	processCtx := process.NewProcessContext()
-	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 
 	dbOpts := cfg.RoomServer.Database
 	if dbOpts.ConnectionString == "" {
@@ -84,7 +82,7 @@ func main() {
 	}
 
 	fmt.Println("Opening database")
-	roomserverDB, err := storage.Open(processCtx.Context(), cm, &dbOpts, caches)
+	roomserverDB, err := storage.Open(ctx, cm, &dbOpts, caches)
 	if err != nil {
 		panic(err)
 	}

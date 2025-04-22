@@ -3,6 +3,7 @@ package shared_test
 import (
 	"context"
 	"crypto/ed25519"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -19,10 +20,10 @@ import (
 	ed255192 "golang.org/x/crypto/ed25519"
 )
 
-func mustCreateRoomServerDatabase(t *testing.T, _ test.DependancyOption) (*shared.Database, func()) {
+func mustCreateRoomServerDatabase(t *testing.T, _ test.DependancyOption) (context.Context, *shared.Database, func()) {
 	t.Helper()
 
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, clearDB, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -49,27 +50,27 @@ func mustCreateRoomServerDatabase(t *testing.T, _ test.DependancyOption) (*share
 	var stateKeyTable tables.EventStateKeys
 	var userRoomKeys tables.UserRoomKeys
 	var roomsTable tables.Rooms
-	err = postgres.CreateRoomsTable(db)
+	err = postgres.CreateRoomsTable(ctx, db)
 	assert.NoError(t, err)
-	err = postgres.CreateEventStateKeysTable(db)
+	err = postgres.CreateEventStateKeysTable(ctx, db)
 	assert.NoError(t, err)
-	err = postgres.CreateMembershipTable(db)
+	err = postgres.CreateMembershipTable(ctx, db)
 	assert.NoError(t, err)
-	err = postgres.CreateUserRoomKeysTable(db)
+	err = postgres.CreateUserRoomKeysTable(ctx, db)
 	assert.NoError(t, err)
-	roomsTable, err = postgres.PrepareRoomsTable(db)
+	roomsTable, err = postgres.PrepareRoomsTable(ctx, db)
 	assert.NoError(t, err)
-	membershipTable, err = postgres.PrepareMembershipTable(db)
+	membershipTable, err = postgres.PrepareMembershipTable(ctx, db)
 	assert.NoError(t, err)
-	stateKeyTable, err = postgres.PrepareEventStateKeysTable(db)
+	stateKeyTable, err = postgres.PrepareEventStateKeysTable(ctx, db)
 	assert.NoError(t, err)
-	userRoomKeys, err = postgres.PrepareUserRoomKeysTable(db)
+	userRoomKeys, err = postgres.PrepareUserRoomKeysTable(ctx, db)
 
 	assert.NoError(t, err)
 
 	evDb := shared.EventDatabase{EventStateKeysTable: stateKeyTable, Cache: cache, Writer: writer}
 
-	return &shared.Database{
+	return ctx, &shared.Database{
 			DB:               db,
 			EventDatabase:    evDb,
 			MembershipTable:  membershipTable,
@@ -90,9 +91,8 @@ func Test_GetLeftUsers(t *testing.T) {
 	bob := test.NewUser(t)
 	charlie := test.NewUser(t)
 
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateRoomServerDatabase(t, testOpts)
+		ctx, db, closeDb := mustCreateRoomServerDatabase(t, testOpts)
 		defer closeDb()
 
 		// Create dummy entries
@@ -112,14 +112,13 @@ func Test_GetLeftUsers(t *testing.T) {
 
 		// Now try to get the left users, this should be Bob and Charlie, since they have a "leave" membership
 		expectedUserIDs := []string{bob.ID, charlie.ID}
-		leftUsers, err := db.GetLeftUsers(context.Background(), []string{alice.ID, bob.ID, charlie.ID})
+		leftUsers, err := db.GetLeftUsers(ctx, []string{alice.ID, bob.ID, charlie.ID})
 		assert.NoError(t, err)
 		assert.ElementsMatch(t, expectedUserIDs, leftUsers)
 	})
 }
 
 func TestUserRoomKeys(t *testing.T) {
-	ctx := context.Background()
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
@@ -129,7 +128,7 @@ func TestUserRoomKeys(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateRoomServerDatabase(t, testOpts)
+		ctx, db, closeDb := mustCreateRoomServerDatabase(t, testOpts)
 		defer closeDb()
 
 		// create a room NID so we can query the room
@@ -154,18 +153,18 @@ func TestUserRoomKeys(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, gotKey, key)
 
-		gotKey, err = db.SelectUserRoomPrivateKey(context.Background(), *userID, *roomID)
+		gotKey, err = db.SelectUserRoomPrivateKey(ctx, *userID, *roomID)
 		assert.NoError(t, err)
 		assert.Equal(t, key, gotKey)
-		pubKey, err := db.SelectUserRoomPublicKey(context.Background(), *userID, *roomID)
+		pubKey, err := db.SelectUserRoomPublicKey(ctx, *userID, *roomID)
 		assert.NoError(t, err)
 		assert.Equal(t, key.Public(), pubKey)
 
 		// Key doesn't exist, we shouldn't get anything back
-		gotKey, err = db.SelectUserRoomPrivateKey(context.Background(), *userID, *doesNotExist)
+		gotKey, err = db.SelectUserRoomPrivateKey(ctx, *userID, *doesNotExist)
 		assert.NoError(t, err)
 		assert.Nil(t, gotKey)
-		pubKey, err = db.SelectUserRoomPublicKey(context.Background(), *userID, *doesNotExist)
+		pubKey, err = db.SelectUserRoomPublicKey(ctx, *userID, *doesNotExist)
 		assert.NoError(t, err)
 		assert.Nil(t, pubKey)
 
@@ -186,22 +185,21 @@ func TestUserRoomKeys(t *testing.T) {
 		var gotPublicKey, key4 ed255192.PublicKey
 		key4, _, err = ed25519.GenerateKey(nil)
 		assert.NoError(t, err)
-		gotPublicKey, err = db.InsertUserRoomPublicKey(context.Background(), *userID, *doesNotExist, key4)
+		gotPublicKey, err = db.InsertUserRoomPublicKey(ctx, *userID, *doesNotExist, key4)
 		assert.NoError(t, err)
 		assert.Equal(t, key4, gotPublicKey)
 
 		// test invalid room
 		reallyDoesNotExist, err := spec.NewRoomID("!reallydoesnotexist:localhost")
 		assert.NoError(t, err)
-		_, err = db.InsertUserRoomPublicKey(context.Background(), *userID, *reallyDoesNotExist, key4)
+		_, err = db.InsertUserRoomPublicKey(ctx, *userID, *reallyDoesNotExist, key4)
 		assert.Error(t, err)
-		_, err = db.InsertUserRoomPrivatePublicKey(context.Background(), *userID, *reallyDoesNotExist, key)
+		_, err = db.InsertUserRoomPrivatePublicKey(ctx, *userID, *reallyDoesNotExist, key)
 		assert.Error(t, err)
 	})
 }
 
 func TestAssignRoomNID(t *testing.T) {
-	ctx := context.Background()
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
@@ -209,7 +207,7 @@ func TestAssignRoomNID(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateRoomServerDatabase(t, testOpts)
+		ctx, db, closeDb := mustCreateRoomServerDatabase(t, testOpts)
 		defer closeDb()
 
 		nid, err := db.AssignRoomNID(ctx, *roomID, room.Version)

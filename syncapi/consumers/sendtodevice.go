@@ -28,7 +28,6 @@ import (
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -38,7 +37,6 @@ import (
 
 // OutputSendToDeviceEventConsumer consumes events that originated in the EDU server.
 type OutputSendToDeviceEventConsumer struct {
-	ctx               context.Context
 	jetstream         nats.JetStreamContext
 	durable           string
 	topic             string
@@ -52,7 +50,7 @@ type OutputSendToDeviceEventConsumer struct {
 // NewOutputSendToDeviceEventConsumer creates a new OutputSendToDeviceEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputSendToDeviceEventConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
 	store storage.Database,
@@ -61,7 +59,6 @@ func NewOutputSendToDeviceEventConsumer(
 	stream streams.StreamProvider,
 ) *OutputSendToDeviceEventConsumer {
 	return &OutputSendToDeviceEventConsumer{
-		ctx:               process.Context(),
 		jetstream:         js,
 		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		durable:           cfg.Matrix.JetStream.Durable("SyncAPISendToDeviceConsumer"),
@@ -74,9 +71,9 @@ func NewOutputSendToDeviceEventConsumer(
 }
 
 // Start consuming send-to-device events.
-func (s *OutputSendToDeviceEventConsumer) Start() error {
+func (s *OutputSendToDeviceEventConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
@@ -103,7 +100,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 		return true
 	}
 
-	logger := util.GetLogger(context.TODO()).WithFields(log.Fields{
+	logger := util.GetLogger(ctx).WithFields(log.Fields{
 		"sender":     output.Sender,
 		"user_id":    output.UserID,
 		"device_id":  output.DeviceID,
@@ -127,7 +124,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 	}
 
 	streamPos, err := s.db.StoreNewSendForDeviceMessage(
-		s.ctx, output.UserID, output.DeviceID, output.SendToDeviceEvent,
+		ctx, output.UserID, output.DeviceID, output.SendToDeviceEvent,
 	)
 	if err != nil {
 		sentry.CaptureException(err)

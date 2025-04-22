@@ -21,7 +21,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -31,9 +30,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// OutputTypingEventConsumer consumes events that originated in the EDU server.
+// PresenceConsumer consumes presence events that originated in the EDU server.
 type PresenceConsumer struct {
-	ctx           context.Context
 	jetstream     nats.JetStreamContext
 	nats          *nats.Conn
 	durable       string
@@ -49,7 +47,7 @@ type PresenceConsumer struct {
 // NewPresenceConsumer creates a new PresenceConsumer.
 // Call Start() to begin consuming events.
 func NewPresenceConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
 	nats *nats.Conn,
@@ -59,7 +57,6 @@ func NewPresenceConsumer(
 	deviceAPI api.SyncUserAPI,
 ) *PresenceConsumer {
 	return &PresenceConsumer{
-		ctx:           process.Context(),
 		nats:          nats,
 		jetstream:     js,
 		durable:       cfg.Matrix.JetStream.Durable("SyncAPIPresenceConsumer"),
@@ -74,11 +71,11 @@ func NewPresenceConsumer(
 }
 
 // Start consuming typing events.
-func (s *PresenceConsumer) Start() error {
+func (s *PresenceConsumer) Start(ctx context.Context) error {
 	// Normal NATS subscription, used by Request/Reply
 	_, err := s.nats.Subscribe(s.requestTopic, func(msg *nats.Msg) {
 		userID := msg.Header.Get(jetstream.UserID)
-		presences, err := s.db.GetPresences(context.Background(), []string{userID})
+		presences, err := s.db.GetPresences(ctx, []string{userID})
 		m := &nats.Msg{
 			Header: nats.Header{},
 		}
@@ -98,7 +95,7 @@ func (s *PresenceConsumer) Start() error {
 		}
 
 		deviceRes := api.QueryDevicesResponse{}
-		if err = s.deviceAPI.QueryDevices(s.ctx, &api.QueryDevicesRequest{UserID: userID}, &deviceRes); err != nil {
+		if err = s.deviceAPI.QueryDevices(ctx, &api.QueryDevicesRequest{UserID: userID}, &deviceRes); err != nil {
 			m.Header.Set("error", err.Error())
 			if err = msg.RespondMsg(m); err != nil {
 				logrus.WithError(err).Error("Unable to respond to messages")
@@ -131,7 +128,7 @@ func (s *PresenceConsumer) Start() error {
 		return nil
 	}
 	return jetstream.Consumer(
-		s.ctx, s.jetstream, s.presenceTopic, s.durable, 1, s.onMessage,
+		ctx, s.jetstream, s.presenceTopic, s.durable, 1, s.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)
 }

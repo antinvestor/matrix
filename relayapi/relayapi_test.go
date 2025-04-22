@@ -22,9 +22,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -32,6 +29,7 @@ import (
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/signing"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
@@ -41,7 +39,8 @@ import (
 
 func TestCreateNewRelayInternalAPI(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -49,8 +48,8 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		relayAPI := relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, true, caches)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		relayAPI := relayapi.NewRelayInternalAPI(ctx, cfg, cm, nil, nil, nil, nil, true, caches)
 		assert.NotNil(t, relayAPI)
 	})
 }
@@ -60,18 +59,19 @@ func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 
 		var cfg config.Dendrite
 		cfg.Defaults(config.DefaultOpts{})
-		processCtx := process.NewProcessContext()
+		ctx := testrig.NewContext(t)
 
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		assert.Panics(t, func() {
-			relayapi.NewRelayInternalAPI(&cfg, cm, nil, nil, nil, nil, true, nil)
+			relayapi.NewRelayInternalAPI(ctx, &cfg, cm, nil, nil, nil, nil, true, nil)
 		})
 	})
 }
 
 func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, _, closeRig := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 		defer closeRig()
 		routers := httputil.NewRouters()
 		assert.Panics(t, func() {
@@ -117,7 +117,8 @@ func createSendRelayTxnHTTPRequest(serverName spec.ServerName, txnID string, use
 
 func TestCreateRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
 		routers := httputil.NewRouters()
@@ -126,9 +127,9 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 
-		relayAPI := relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, true, caches)
+		relayAPI := relayapi.NewRelayInternalAPI(ctx, cfg, cm, nil, nil, nil, nil, true, caches)
 		assert.NotNil(t, relayAPI)
 
 		serverKeyAPI := &signing.YggdrasilKeys{}
@@ -174,7 +175,8 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 
 func TestDisableRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
 		routers := httputil.NewRouters()
@@ -183,9 +185,9 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 
-		relayAPI := relayapi.NewRelayInternalAPI(cfg, cm, nil, nil, nil, nil, false, caches)
+		relayAPI := relayapi.NewRelayInternalAPI(ctx, cfg, cm, nil, nil, nil, nil, false, caches)
 		assert.NotNil(t, relayAPI)
 
 		serverKeyAPI := &signing.YggdrasilKeys{}

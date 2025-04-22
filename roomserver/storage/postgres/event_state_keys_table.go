@@ -76,12 +76,12 @@ type eventStateKeyStatements struct {
 	bulkSelectEventStateKeyStmt    *sql.Stmt
 }
 
-func CreateEventStateKeysTable(db *sql.DB) error {
+func CreateEventStateKeysTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(eventStateKeysSchema)
 	return err
 }
 
-func PrepareEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
+func PrepareEventStateKeysTable(ctx context.Context, db *sql.DB) (tables.EventStateKeys, error) {
 	s := &eventStateKeyStatements{}
 
 	return s, sqlutil.StatementList{

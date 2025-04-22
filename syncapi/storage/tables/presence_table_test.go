@@ -1,8 +1,8 @@
 package tables_test
 
 import (
-	"context"
 	"database/sql"
+	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
 	"time"
@@ -19,7 +19,7 @@ import (
 
 func mustPresenceTable(t *testing.T, _ test.DependancyOption) (tables.Presence, func()) {
 	t.Helper()
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -33,7 +33,7 @@ func mustPresenceTable(t *testing.T, _ test.DependancyOption) (tables.Presence, 
 	}
 
 	var tab tables.Presence
-	tab, err = postgres.NewPostgresPresenceTable(db)
+	tab, err = postgres.NewPostgresPresenceTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -44,7 +44,7 @@ func mustPresenceTable(t *testing.T, _ test.DependancyOption) (tables.Presence, 
 func TestPresence(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	statusMsg := "Hello World!"
 	timestamp := spec.AsTimestamp(time.Now())

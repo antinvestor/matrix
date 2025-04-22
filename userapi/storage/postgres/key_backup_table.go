@@ -73,7 +73,7 @@ type keyBackupStatements struct {
 	selectKeysByRoomIDAndSessionIDStmt *sql.Stmt
 }
 
-func NewPostgresKeyBackupTable(db *sql.DB) (tables.KeyBackupTable, error) {
+func NewPostgresKeyBackupTable(ctx context.Context, db *sql.DB) (tables.KeyBackupTable, error) {
 	s := &keyBackupStatements{}
 	_, err := db.Exec(keyBackupTableSchema)
 	if err != nil {

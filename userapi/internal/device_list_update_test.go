@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"io"
 	"net/http"
 	"net/url"
@@ -37,21 +38,16 @@ import (
 
 	roomserver "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
-)
-
-var (
-	ctx = context.Background()
 )
 
 type mockKeyChangeProducer struct {
 	events []api.DeviceMessage
 }
 
-func (p *mockKeyChangeProducer) ProduceKeyChanges(keys []api.DeviceMessage) error {
+func (p *mockKeyChangeProducer) ProduceKeyChanges(_ context.Context, keys []api.DeviceMessage) error {
 	p.events = append(p.events, keys...)
 	return nil
 }
@@ -131,7 +127,7 @@ type mockDeviceListUpdaterAPI struct {
 func (d *mockDeviceListUpdaterAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) {
 }
 
-var testIsBlacklistedOrBackingOff = func(s spec.ServerName) (*statistics.ServerStatistics, error) {
+var testIsBlacklistedOrBackingOff = func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error) {
 	return &statistics.ServerStatistics{}, nil
 }
 
@@ -160,6 +156,9 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) fclient.F
 
 // Test that the device keys get persisted and emitted if we have the previous IDs.
 func TestUpdateHavePrevID(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
 		prevIDsExist: func(string, []int64) bool {
@@ -168,7 +167,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 	}
 	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, nil, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+	updater := NewDeviceListUpdater(ctx, db, ap, producer, nil, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 	event := gomatrixserverlib.DeviceListUpdateEvent{
 		DeviceDisplayName: "Foo Bar",
 		Deleted:           false,
@@ -206,6 +205,9 @@ func TestUpdateHavePrevID(t *testing.T) {
 // Test that device keys are fetched from the remote server if we are missing prev IDs
 // and that the user's devices are marked as stale until it succeeds.
 func TestUpdateNoPrevID(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
 		prevIDsExist: func(string, []int64) bool {
@@ -240,8 +242,8 @@ func TestUpdateNoPrevID(t *testing.T) {
 			`)),
 		}, nil
 	})
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 2, nil, "example.test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-	if err := updater.Start(); err != nil {
+	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 2, nil, "example.test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+	if err := updater.Start(ctx); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
 	event := gomatrixserverlib.DeviceListUpdateEvent{
@@ -289,6 +291,9 @@ func TestUpdateNoPrevID(t *testing.T) {
 // Test that if we make N calls to ManualUpdate for the same user, we only do it once, assuming the
 // update is still ongoing.
 func TestDebounce(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	t.Skipf("panic on closed channel on GHA")
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
@@ -310,8 +315,8 @@ func TestDebounce(t *testing.T) {
 		close(incomingFedReq)
 		return <-fedCh, nil
 	})
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-	if err := updater.Start(); err != nil {
+	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+	if err := updater.Start(ctx); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
 
@@ -321,7 +326,7 @@ func TestDebounce(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		go func() {
 			defer wg.Done()
-			if err := updater.ManualUpdate(context.Background(), srv, userID); err != nil {
+			if err := updater.ManualUpdate(ctx, srv, userID); err != nil {
 				t.Errorf("ManualUpdate: %s", err)
 			}
 		}()
@@ -366,7 +371,7 @@ func TestDebounce(t *testing.T) {
 	}
 }
 
-func mustCreateKeyserverDB(t *testing.T, _ test.DependancyOption) (storage.KeyDatabase, func()) {
+func mustCreateKeyserverDB(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.KeyDatabase, func()) {
 	t.Helper()
 
 	connStr, clearDB, err := test.PrepareDatabaseDSConnection(ctx)
@@ -374,7 +379,7 @@ func mustCreateKeyserverDB(t *testing.T, _ test.DependancyOption) (storage.KeyDa
 		t.Fatalf("failed to open database: %s", err)
 	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewKeyDatabase(cm, &config.DatabaseOptions{ConnectionString: connStr})
+	db, err := storage.NewKeyDatabase(ctx, cm, &config.DatabaseOptions{ConnectionString: connStr})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,7 +397,6 @@ func (m *mockKeyserverRoomserverAPI) QueryLeftUsers(ctx context.Context, req *ro
 }
 
 func TestDeviceListUpdater_CleanUp(t *testing.T) {
-	processCtx := process.NewProcessContext()
 
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
@@ -401,23 +405,25 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 	rsAPI := &mockKeyserverRoomserverAPI{leftUsers: []string{bob.ID}}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, clearDB := mustCreateKeyserverDB(t, testOpts)
+		ctx := testrig.NewContext(t)
+
+		db, clearDB := mustCreateKeyserverDB(ctx, t, testOpts)
 		defer clearDB()
 
 		// This should not get deleted
-		if err := db.MarkDeviceListStale(processCtx.Context(), alice.ID, true); err != nil {
+		if err := db.MarkDeviceListStale(ctx, alice.ID, true); err != nil {
 			t.Error(err)
 		}
 
 		// this one should get deleted
-		if err := db.MarkDeviceListStale(processCtx.Context(), bob.ID, true); err != nil {
+		if err := db.MarkDeviceListStale(ctx, bob.ID, true); err != nil {
 			t.Error(err)
 		}
 
-		updater := NewDeviceListUpdater(processCtx, db, nil,
+		updater := NewDeviceListUpdater(ctx, db, nil,
 			nil, nil,
 			0, rsAPI, "test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-		if err := updater.CleanUp(); err != nil {
+		if err := updater.CleanUp(ctx); err != nil {
 			t.Error(err)
 		}
 
@@ -486,11 +492,14 @@ func Test_dedupeStateList(t *testing.T) {
 }
 
 func TestDeviceListUpdaterIgnoreBlacklisted(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	unreachableServer := spec.ServerName("notlocalhost")
 
 	updater := DeviceListUpdater{
 		workerChans: make([]chan spec.ServerName, 1),
-		isBlacklistedOrBackingOffFn: func(s spec.ServerName) (*statistics.ServerStatistics, error) {
+		isBlacklistedOrBackingOffFn: func(_ context.Context, s spec.ServerName) (*statistics.ServerStatistics, error) {
 			switch s {
 			case unreachableServer:
 				return nil, &api2.FederationClientError{Blacklisted: true}
@@ -537,9 +546,9 @@ func TestDeviceListUpdaterIgnoreBlacklisted(t *testing.T) {
 	}()
 
 	// alice is not blacklisted
-	updater.notifyWorkers(alice)
+	updater.notifyWorkers(ctx, alice)
 	// bob is blacklisted
-	updater.notifyWorkers(string(bob))
+	updater.notifyWorkers(ctx, string(bob))
 
 	for server := range expectedServers {
 		t.Errorf("Server still in expectedServers map: %s", server)

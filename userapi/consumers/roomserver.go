@@ -2,10 +2,10 @@ package consumers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"sync"
 	"time"
@@ -14,9 +14,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/pushrules"
@@ -24,7 +21,6 @@ import (
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
@@ -36,7 +32,6 @@ import (
 )
 
 type OutputRoomEventConsumer struct {
-	ctx          context.Context
 	cfg          *config.UserAPI
 	rsAPI        rsapi.UserRoomserverAPI
 	jetstream    nats.JetStreamContext
@@ -53,7 +48,7 @@ type OutputRoomEventConsumer struct {
 }
 
 func NewOutputRoomEventConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.UserAPI,
 	js nats.JetStreamContext,
 	store storage.UserDatabase,
@@ -62,7 +57,6 @@ func NewOutputRoomEventConsumer(
 	syncProducer *producers.SyncAPI,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
-		ctx:          process.Context(),
 		cfg:          cfg,
 		jetstream:    js,
 		db:           store,
@@ -79,9 +73,9 @@ func NewOutputRoomEventConsumer(
 	}
 }
 
-func (s *OutputRoomEventConsumer) Start() error {
+func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 	if err := jetstream.Consumer(
-		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	); err != nil {
 		return err
@@ -296,7 +290,7 @@ func (s *OutputRoomEventConsumer) updateMDirect(ctx context.Context, oldRoomID, 
 
 func (s *OutputRoomEventConsumer) copyTags(ctx context.Context, oldRoomID, newRoomID, localpart string, serverName spec.ServerName) error {
 	tag, err := s.db.GetAccountDataByType(ctx, localpart, serverName, oldRoomID, "m.tag")
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
 		return err
 	}
 	if tag == nil {
@@ -604,7 +598,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	// ordering guarantees we must provide.
 	go func() {
 		// This background processing cannot be tied to a request.
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
 		var rejected []*pushgateway.Device

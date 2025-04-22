@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"sync"
 	"testing"
 	"time"
@@ -126,6 +127,8 @@ func TestImmediateNotification(t *testing.T) {
 
 // Test that new events to a joined room unblocks the request.
 func TestNewEventAndJoinedToRoom(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	n := NewNotifier(&TestRoomServer{})
 	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
@@ -146,7 +149,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 1)
 
-	n.OnNewEvent(&randomMessageEvent, "", nil, syncPositionAfter)
+	n.OnNewEvent(ctx, &randomMessageEvent, "", nil, syncPositionAfter)
 
 	wg.Wait()
 }
@@ -192,6 +195,8 @@ func TestCorrectStreamWakeup(t *testing.T) {
 
 // Test that an invite unblocks the request
 func TestNewInviteEventForUser(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	n := NewNotifier(&TestRoomServer{})
 	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
@@ -212,7 +217,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 1)
 
-	n.OnNewEvent(&aliceInviteBobEvent, "", nil, syncPositionAfter)
+	n.OnNewEvent(ctx, &aliceInviteBobEvent, "", nil, syncPositionAfter)
 
 	wg.Wait()
 }
@@ -249,6 +254,8 @@ func TestEDUWakeup(t *testing.T) {
 
 // Test that all blocked requests get woken up on a new event.
 func TestMultipleRequestWakeup(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	n := NewNotifier(&TestRoomServer{})
 	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
@@ -272,7 +279,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	stream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(stream, 3)
 
-	n.OnNewEvent(&randomMessageEvent, "", nil, syncPositionAfter)
+	n.OnNewEvent(ctx, &randomMessageEvent, "", nil, syncPositionAfter)
 
 	wg.Wait()
 
@@ -284,6 +291,9 @@ func TestMultipleRequestWakeup(t *testing.T) {
 
 // Test that you stop getting woken up when you leave a room.
 func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	// listen as bob. Make bob leave room. Make alice send event to room.
 	// Make sure alice gets woken up only and not bob as well.
 	n := NewNotifier(&TestRoomServer{})
@@ -306,7 +316,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	}()
 	bobStream := lockedFetchUserStream(n, bob, bobDev)
 	waitForBlocking(bobStream, 1)
-	n.OnNewEvent(&bobLeaveEvent, "", nil, syncPositionAfter)
+	n.OnNewEvent(ctx, &bobLeaveEvent, "", nil, syncPositionAfter)
 	leaveWG.Wait()
 
 	// send an event into the room. Make sure alice gets it. Bob should not.
@@ -333,7 +343,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	waitForBlocking(aliceStream, 1)
 	waitForBlocking(bobStream, 1)
 
-	n.OnNewEvent(&randomMessageEvent, "", nil, syncPositionAfter2)
+	n.OnNewEvent(ctx, &randomMessageEvent, "", nil, syncPositionAfter2)
 	aliceWG.Wait()
 
 	// it's possible that at this point alice has been informed and bob is about to be informed, so wait

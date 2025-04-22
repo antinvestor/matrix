@@ -81,7 +81,7 @@ type accountsStatements struct {
 	serverName                    spec.ServerName
 }
 
-func NewPostgresAccountsTable(db *sql.DB, serverName spec.ServerName) (tables.AccountsTable, error) {
+func NewPostgresAccountsTable(ctx context.Context, db *sql.DB, serverName spec.ServerName) (tables.AccountsTable, error) {
 	s := &accountsStatements{
 		serverName: serverName,
 	}
@@ -90,7 +90,7 @@ func NewPostgresAccountsTable(db *sql.DB, serverName spec.ServerName) (tables.Ac
 		return nil, err
 	}
 	m := sqlutil.NewMigrator(db)
-	err = m.Up(context.Background())
+	err = m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}

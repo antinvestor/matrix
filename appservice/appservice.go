@@ -20,7 +20,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/sirupsen/logrus"
 
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
@@ -34,7 +33,7 @@ import (
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	processContext *process.ProcessContext,
+	ctx context.Context,
 	cfg *config.Dendrite,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.AppserviceUserAPI,
@@ -58,7 +57,7 @@ func NewInternalAPI(
 	// events to be sent out.
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		// Create bot account for this AS if it doesn't already exist
-		if err := generateAppServiceAccount(userAPI, appservice, cfg.Global.ServerName); err != nil {
+		if err := generateAppServiceAccount(ctx, userAPI, appservice, cfg.Global.ServerName); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"appservice": appservice.ID,
 			}).WithError(err).Panicf("failed to generate bot account for appservice")
@@ -67,12 +66,12 @@ func NewInternalAPI(
 
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
 	// We can't add ASes at runtime so this is safe to do.
-	js, _ := natsInstance.Prepare(processContext, &cfg.Global.JetStream)
+	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 	consumer := consumers.NewOutputRoomEventConsumer(
-		processContext, &cfg.AppServiceAPI,
+		ctx, &cfg.AppServiceAPI,
 		js, rsAPI,
 	)
-	if err := consumer.Start(); err != nil {
+	if err := consumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
 	}
 
@@ -82,13 +81,13 @@ func NewInternalAPI(
 // generateAppServiceAccounts creates a dummy account based off the
 // `sender_localpart` field of each application service if it doesn't
 // exist already
-func generateAppServiceAccount(
+func generateAppServiceAccount(ctx context.Context,
 	userAPI userapi.AppserviceUserAPI,
 	as config.ApplicationService,
 	serverName spec.ServerName,
 ) error {
 	var accRes userapi.PerformAccountCreationResponse
-	err := userAPI.PerformAccountCreation(context.Background(), &userapi.PerformAccountCreationRequest{
+	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
 		AccountType:  userapi.AccountTypeAppService,
 		Localpart:    as.SenderLocalpart,
 		ServerName:   serverName,
@@ -99,7 +98,7 @@ func generateAppServiceAccount(
 		return err
 	}
 	var devRes userapi.PerformDeviceCreationResponse
-	err = userAPI.PerformDeviceCreation(context.Background(), &userapi.PerformDeviceCreationRequest{
+	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
 		Localpart:          as.SenderLocalpart,
 		ServerName:         serverName,
 		AccessToken:        as.ASToken,

@@ -249,7 +249,7 @@ func (r *Inviter) PerformInvite(
 		},
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
+	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
 	if err := inputRes.Err(); err != nil {
 		util.GetLogger(ctx).WithField("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
 		return api.ErrNotAllowed{Err: err}

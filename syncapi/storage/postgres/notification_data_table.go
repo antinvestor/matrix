@@ -27,7 +27,7 @@ import (
 	"github.com/antinvestor/matrix/syncapi/types"
 )
 
-func NewPostgresNotificationDataTable(db *sql.DB) (tables.NotificationData, error) {
+func NewPostgresNotificationDataTable(ctx context.Context, db *sql.DB) (tables.NotificationData, error) {
 	_, err := db.Exec(notificationDataSchema)
 	if err != nil {
 		return nil, err

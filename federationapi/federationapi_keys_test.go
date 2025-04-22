@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"io"
 	"net/http"
 	"os"
@@ -18,13 +19,12 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 
 	"github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/routing"
 	"github.com/antinvestor/matrix/internal/caching"
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 type server struct {
@@ -63,18 +63,15 @@ func TestMain(m *testing.M) {
 	// will use in our tests.
 	os.Exit(func() int {
 
-		processCtx := process.NewProcessContext()
-		ctx := processCtx.Context()
+		ctx := context.TODO()
 
 		defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx)
 		if err != nil {
-			panic(fmt.Errorf("Could not create default connections %s", err))
+			panic(fmt.Errorf("could not create default connections %s", err))
 		}
 		defer closeDSConns()
 
 		for _, s := range servers {
-
-			natsInstance := jetstream.NATSInstance{}
 
 			// Draw up just enough Dendrite config for the server key
 			// API to work.
@@ -103,6 +100,8 @@ func TestMain(m *testing.M) {
 				panic("can't create cache : " + err.Error())
 			}
 
+			natsInstance := jetstream.NATSInstance{}
+
 			// Create a transport which redirects federation requests to
 			// the mock round tripper. Since we're not *really* listening for
 			// federation requests then this will return the key instead.
@@ -117,8 +116,8 @@ func TestMain(m *testing.M) {
 
 			// Finally, build the server key APIs.
 
-			cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-			s.api = NewInternalAPI(processCtx, cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)
+			cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+			s.api = NewInternalAPI(ctx, cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)
 		}
 
 		// Now that we have built our server key APIs, start the
@@ -162,6 +161,7 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 func TestServersRequestOwnKeys(t *testing.T) {
 	// Each server will request its own keys. There's no reason
 	// for this to fail as each server should know its own keys.
+	ctx := testrig.NewContext(t)
 
 	for name, s := range servers {
 		req := gomatrixserverlib.PublicKeyLookupRequest{
@@ -169,7 +169,7 @@ func TestServersRequestOwnKeys(t *testing.T) {
 			KeyID:      serverKeyID,
 		}
 		res, err := s.api.FetchKeys(
-			context.Background(),
+			ctx,
 			map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp{
 				req: spec.AsTimestamp(time.Now()),
 			},
@@ -188,6 +188,7 @@ func TestRenewalBehaviour(t *testing.T) {
 	// Server A will request Server C's key but their validity period
 	// is an hour in the past. We'll retrieve the key as, even though it's
 	// past its validity, it will be able to verify past events.
+	ctx := testrig.NewContext(t)
 
 	req := gomatrixserverlib.PublicKeyLookupRequest{
 		ServerName: serverC.name,
@@ -195,7 +196,7 @@ func TestRenewalBehaviour(t *testing.T) {
 	}
 
 	res, err := serverA.api.FetchKeys(
-		context.Background(),
+		ctx,
 		map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp{
 			req: spec.AsTimestamp(time.Now()),
 		},
@@ -219,7 +220,7 @@ func TestRenewalBehaviour(t *testing.T) {
 	serverC.renew()
 
 	res, err = serverA.api.FetchKeys(
-		context.Background(),
+		ctx,
 		map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp{
 			req: spec.AsTimestamp(time.Now()),
 		},

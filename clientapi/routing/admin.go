@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -313,12 +312,15 @@ func AdminEvacuateUser(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 }
 
 func AdminPurgeRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+
+	ctx := req.Context()
+
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
 
-	if err = rsAPI.PerformAdminPurgeRoom(context.Background(), vars["roomID"]); err != nil {
+	if err = rsAPI.PerformAdminPurgeRoom(ctx, vars["roomID"]); err != nil {
 		return util.ErrorResponse(err)
 	}
 

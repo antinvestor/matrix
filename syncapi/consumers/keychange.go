@@ -21,7 +21,6 @@ import (
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -34,7 +33,6 @@ import (
 
 // OutputKeyChangeEventConsumer consumes events that originated in the key server.
 type OutputKeyChangeEventConsumer struct {
-	ctx       context.Context
 	jetstream nats.JetStreamContext
 	durable   string
 	topic     string
@@ -47,7 +45,7 @@ type OutputKeyChangeEventConsumer struct {
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.
 // Call Start() to begin consuming from the key server.
 func NewOutputKeyChangeEventConsumer(
-	process *process.ProcessContext,
+	ctx context.Context,
 	cfg *config.SyncAPI,
 	topic string,
 	js nats.JetStreamContext,
@@ -57,7 +55,6 @@ func NewOutputKeyChangeEventConsumer(
 	stream streams.StreamProvider,
 ) *OutputKeyChangeEventConsumer {
 	s := &OutputKeyChangeEventConsumer{
-		ctx:       process.Context(),
 		jetstream: js,
 		durable:   cfg.Matrix.JetStream.Durable("SyncAPIKeyChangeConsumer"),
 		topic:     topic,
@@ -71,9 +68,9 @@ func NewOutputKeyChangeEventConsumer(
 }
 
 // Start consuming from the key server
-func (s *OutputKeyChangeEventConsumer) Start() error {
+func (s *OutputKeyChangeEventConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
@@ -92,22 +89,22 @@ func (s *OutputKeyChangeEventConsumer) onMessage(ctx context.Context, msgs []*na
 	}
 	switch m.Type {
 	case api.TypeCrossSigningUpdate:
-		return s.onCrossSigningMessage(m, m.DeviceChangeID)
+		return s.onCrossSigningMessage(ctx, m, m.DeviceChangeID)
 	case api.TypeDeviceKeyUpdate:
 		fallthrough
 	default:
-		return s.onDeviceKeyMessage(m, m.DeviceChangeID)
+		return s.onDeviceKeyMessage(ctx, m, m.DeviceChangeID)
 	}
 }
 
-func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, deviceChangeID int64) bool {
+func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(ctx context.Context, m api.DeviceMessage, deviceChangeID int64) bool {
 	if m.DeviceKeys == nil {
 		return true
 	}
 	output := m.DeviceKeys
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
-	err := s.rsAPI.QuerySharedUsers(s.ctx, &roomserverAPI.QuerySharedUsersRequest{
+	err := s.rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
 		UserID:    output.UserID,
 		LocalOnly: true,
 	}, &queryRes)
@@ -128,11 +125,11 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, d
 	return true
 }
 
-func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage, deviceChangeID int64) bool {
+func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(ctx context.Context, m api.DeviceMessage, deviceChangeID int64) bool {
 	output := m.CrossSigningKeyUpdate
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
-	err := s.rsAPI.QuerySharedUsers(s.ctx, &roomserverAPI.QuerySharedUsersRequest{
+	err := s.rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
 		UserID:    output.UserID,
 		LocalOnly: true,
 	}, &queryRes)

@@ -61,7 +61,7 @@ type loginTokenStatements struct {
 	selectStmt *sql.Stmt
 }
 
-func NewPostgresLoginTokenTable(db *sql.DB) (tables.LoginTokenTable, error) {
+func NewPostgresLoginTokenTable(ctx context.Context, db *sql.DB) (tables.LoginTokenTable, error) {
 	s := &loginTokenStatements{}
 	_, err := db.Exec(loginTokenSchema)
 	if err != nil {

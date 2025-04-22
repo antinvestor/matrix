@@ -13,12 +13,12 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 )
 
-func newSyncDB(t *testing.T, testOpts test.DependancyOption) (storage.Database, func()) {
+func newSyncDB(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (storage.Database, func()) {
 	t.Helper()
 
-	cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
-	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	syncDB, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
+	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	syncDB, err := storage.NewSyncServerDatasource(ctx, cm, &cfg.SyncAPI.Database)
 	if err != nil {
 		t.Fatalf("failed to create sync DB: %s", err)
 	}
@@ -28,18 +28,20 @@ func newSyncDB(t *testing.T, testOpts test.DependancyOption) (storage.Database, 
 
 func TestFilterTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDB := newSyncDB(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		tab, closeDB := newSyncDB(ctx, t, testOpts)
 		defer closeDB()
 
 		// initially create a filter
 		filter := &synctypes.Filter{}
-		filterID, err := tab.PutFilter(context.Background(), "alice", filter)
+		filterID, err := tab.PutFilter(ctx, "alice", filter)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// create the same filter again, we should receive the existing filter
-		secondFilterID, err := tab.PutFilter(context.Background(), "alice", filter)
+		secondFilterID, err := tab.PutFilter(ctx, "alice", filter)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -50,7 +52,7 @@ func TestFilterTable(t *testing.T) {
 
 		// query the filter again
 		targetFilter := &synctypes.Filter{}
-		if err = tab.GetFilter(context.Background(), targetFilter, "alice", filterID); err != nil {
+		if err = tab.GetFilter(ctx, targetFilter, "alice", filterID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -59,7 +61,7 @@ func TestFilterTable(t *testing.T) {
 		}
 
 		// query non-existent filter
-		if err = tab.GetFilter(context.Background(), targetFilter, "bob", filterID); err == nil {
+		if err = tab.GetFilter(ctx, targetFilter, "bob", filterID); err == nil {
 			t.Fatalf("expected filter to not exist, but it does exist: %v", targetFilter)
 		}
 	})
@@ -69,10 +71,12 @@ func TestIgnores(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		syncDB, closeDB := newSyncDB(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		syncDB, closeDB := newSyncDB(ctx, t, testOpts)
 		defer closeDB()
 
-		tab, err := syncDB.NewDatabaseTransaction(context.Background())
+		tab, err := syncDB.NewDatabaseTransaction(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,11 +85,11 @@ func TestIgnores(t *testing.T) {
 		ignoredUsers := &types.IgnoredUsers{List: map[string]interface{}{
 			bob.ID: "",
 		}}
-		if err = tab.UpdateIgnoresForUser(context.Background(), alice.ID, ignoredUsers); err != nil {
+		if err = tab.UpdateIgnoresForUser(ctx, alice.ID, ignoredUsers); err != nil {
 			t.Fatal(err)
 		}
 
-		gotIgnoredUsers, err := tab.IgnoresForUser(context.Background(), alice.ID)
+		gotIgnoredUsers, err := tab.IgnoresForUser(ctx, alice.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +100,7 @@ func TestIgnores(t *testing.T) {
 		}
 
 		// Bob doesn't have any ignored users, so should receive sql.ErrNoRows
-		if _, err = tab.IgnoresForUser(context.Background(), bob.ID); err == nil {
+		if _, err = tab.IgnoresForUser(ctx, bob.ID); err == nil {
 			t.Fatalf("expected an error but got none")
 		}
 	})

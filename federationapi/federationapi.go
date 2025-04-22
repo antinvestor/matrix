@@ -15,13 +15,14 @@
 package federationapi
 
 import (
+	"context"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
+	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/sirupsen/logrus"
 
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
@@ -33,8 +34,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/internal/caching"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/jetstream"
-	userapi "github.com/antinvestor/matrix/userapi/api"
+	userAPI "github.com/antinvestor/matrix/userapi/api"
 
 	"github.com/antinvestor/gomatrixserverlib"
 
@@ -43,11 +43,11 @@ import (
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
-	processContext *process.ProcessContext,
+	ctx context.Context,
 	routers httputil.Routers,
 	dendriteConfig *config.Dendrite,
 	natsInstance *jetstream.NATSInstance,
-	userAPI userapi.FederationUserAPI,
+	userAPI userAPI.FederationUserAPI,
 	federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
@@ -56,7 +56,7 @@ func AddPublicRoutes(
 ) {
 	cfg := &dendriteConfig.FederationAPI
 	mscCfg := &dendriteConfig.MSCs
-	js, _ := natsInstance.Prepare(processContext, &cfg.Matrix.JetStream)
+	js, _ := natsInstance.Prepare(ctx, &cfg.Matrix.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
 		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
@@ -92,7 +92,7 @@ func AddPublicRoutes(
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	processContext *process.ProcessContext,
+	ctx context.Context,
 	dendriteCfg *config.Dendrite,
 	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
@@ -104,71 +104,70 @@ func NewInternalAPI(
 ) *internal.FederationInternalAPI {
 	cfg := &dendriteCfg.FederationAPI
 
-	federationDB, err := storage.NewDatabase(processContext.Context(), cm, &cfg.Database, caches, dendriteCfg.Global.IsLocalServerName)
+	federationDB, err := storage.NewDatabase(ctx, cm, &cfg.Database, caches, dendriteCfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
 	if resetBlacklist {
-		_ = federationDB.RemoveAllServersFromBlacklist()
+		_ = federationDB.RemoveAllServersFromBlacklist(ctx)
 	}
 
 	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1, cfg.P2PFederationRetriesUntilAssumedOffline+1, cfg.EnableRelays)
 
-	js, nats := natsInstance.Prepare(processContext, &cfg.Matrix.JetStream)
+	js, nats := natsInstance.Prepare(ctx, &cfg.Matrix.JetStream)
 
 	signingInfo := dendriteCfg.Global.SigningIdentities()
 
-	queues := queue.NewOutgoingQueues(
-		federationDB, processContext,
+	queues := queue.NewOutgoingQueues(ctx,
+		federationDB,
 		cfg.Matrix.DisableFederation,
 		cfg.Matrix.ServerName, federation, &stats,
 		signingInfo,
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		processContext, cfg, js, nats, queues,
-		federationDB, rsAPI,
+		ctx, cfg, js, nats, queues, federationDB, rsAPI,
 	)
-	if err = rsConsumer.Start(); err != nil {
+	if err = rsConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
 	}
 	tsConsumer := consumers.NewOutputSendToDeviceConsumer(
-		processContext, cfg, js, queues, federationDB,
+		ctx, cfg, js, queues, federationDB,
 	)
-	if err = tsConsumer.Start(); err != nil {
+	if err = tsConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start send-to-device consumer")
 	}
 	receiptConsumer := consumers.NewOutputReceiptConsumer(
-		processContext, cfg, js, queues, federationDB,
+		ctx, cfg, js, queues, federationDB,
 	)
-	if err = receiptConsumer.Start(); err != nil {
+	if err = receiptConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start receipt consumer")
 	}
 	typingConsumer := consumers.NewOutputTypingConsumer(
-		processContext, cfg, js, queues, federationDB,
+		ctx, cfg, js, queues, federationDB,
 	)
-	if err = typingConsumer.Start(); err != nil {
+	if err = typingConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start typing consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
-		processContext, &dendriteCfg.KeyServer, js, queues, federationDB, rsAPI,
+		ctx, &dendriteCfg.KeyServer, js, queues, federationDB, rsAPI,
 	)
-	if err = keyConsumer.Start(); err != nil {
+	if err = keyConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")
 	}
 
 	presenceConsumer := consumers.NewOutputPresenceConsumer(
-		processContext, cfg, js, queues, federationDB, rsAPI,
+		ctx, cfg, js, queues, federationDB, rsAPI,
 	)
-	if err = presenceConsumer.Start(); err != nil {
+	if err = presenceConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start presence consumer")
 	}
 
 	var cleanExpiredEDUs func()
 	cleanExpiredEDUs = func() {
 		logrus.Infof("Cleaning expired EDUs")
-		if err := federationDB.DeleteExpiredEDUs(processContext.Context()); err != nil {
+		if err := federationDB.DeleteExpiredEDUs(ctx); err != nil {
 			logrus.WithError(err).Error("Failed to clean expired EDUs")
 		}
 		time.AfterFunc(time.Hour, cleanExpiredEDUs)

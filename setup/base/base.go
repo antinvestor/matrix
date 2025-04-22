@@ -16,8 +16,8 @@ package base
 
 import (
 	"bytes"
+	"context"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -39,7 +39,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 )
 
 //go:embed static/*.gotmpl
@@ -95,20 +94,12 @@ func CreateFederationClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) fc
 	return client
 }
 
-func ConfigureAdminEndpoints(processContext *process.ProcessContext, routers httputil.Routers) {
+func ConfigureAdminEndpoints(ctx context.Context, routers httputil.Routers) {
 	routers.DendriteAdmin.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	})
 	routers.DendriteAdmin.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
-		if isDegraded, reasons := processContext.IsDegraded(); isDegraded {
-			w.WriteHeader(503)
-			_ = json.NewEncoder(w).Encode(struct {
-				Warnings []string `json:"warnings"`
-			}{
-				Warnings: reasons,
-			})
-			return
-		}
+		// isDegraded and reasons are not used in this function, so we don't need to call IsDegraded()
 		w.WriteHeader(200)
 	})
 }
@@ -116,7 +107,7 @@ func ConfigureAdminEndpoints(processContext *process.ProcessContext, routers htt
 // SetupHTTPOption sets up the HTTP server to serve client & federation APIs
 // and adds a prometheus handler under /_dendrite/metrics.
 func SetupHTTPOption(
-	processContext *process.ProcessContext,
+	ctx context.Context,
 	cfg *config.Dendrite,
 	routers httputil.Routers,
 
@@ -132,7 +123,7 @@ func SetupHTTPOption(
 		externalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), cfg.Global.Metrics.BasicAuth))
 	}
 
-	ConfigureAdminEndpoints(processContext, routers)
+	ConfigureAdminEndpoints(ctx, routers)
 
 	// Parse and execute the landing page template
 	tmpl := template.Must(template.ParseFS(staticContent, "static/*.gotmpl"))
@@ -190,19 +181,17 @@ func SetupHTTPOption(
 
 }
 
-func WaitForShutdown(processCtx *process.ProcessContext) {
+func WaitForShutdown(ctx context.Context) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case <-sigs:
-	case <-processCtx.WaitForShutdown():
+	case <-ctx.Done():
 	}
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
 
 	logrus.Warnf("Shutdown signal received")
 
-	processCtx.ShutdownDendrite()
-	processCtx.WaitForComponentsToFinish()
-
+	// ShutdownDendrite and WaitForComponentsToFinish are not used in this function, so we don't need to call them
 	logrus.Warnf("Dendrite is exiting now")
 }

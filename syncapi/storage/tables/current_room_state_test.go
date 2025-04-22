@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -18,7 +19,7 @@ import (
 
 func newCurrentRoomStateTable(t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, *sql.DB, func()) {
 	t.Helper()
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -32,7 +33,7 @@ func newCurrentRoomStateTable(t *testing.T, _ test.DependancyOption) (tables.Cur
 	}
 
 	var tab tables.CurrentRoomState
-	tab, err = postgres.NewPostgresCurrentRoomStateTable(db)
+	tab, err = postgres.NewPostgresCurrentRoomStateTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -41,7 +42,7 @@ func newCurrentRoomStateTable(t *testing.T, _ test.DependancyOption) (tables.Cur
 }
 
 func TestCurrentRoomStateTable(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {

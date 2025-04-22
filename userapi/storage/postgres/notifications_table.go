@@ -85,7 +85,7 @@ const cleanNotificationsSQL = "" +
 	"DELETE FROM userapi_notifications WHERE" +
 	" (highlight = FALSE AND ts_ms < $1) OR (highlight = TRUE AND ts_ms < $2)"
 
-func NewPostgresNotificationTable(db *sql.DB) (tables.NotificationTable, error) {
+func NewPostgresNotificationTable(ctx context.Context, db *sql.DB) (tables.NotificationTable, error) {
 	s := &notificationsStatements{}
 	_, err := db.Exec(notificationSchema)
 	if err != nil {

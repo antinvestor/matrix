@@ -71,7 +71,7 @@ const deletePusherSQL = "" +
 const deletePushersByAppIdAndPushKeySQL = "" +
 	"DELETE FROM userapi_pushers WHERE app_id = $1 AND pushkey = $2"
 
-func NewPostgresPusherTable(db *sql.DB) (tables.PusherTable, error) {
+func NewPostgresPusherTable(ctx context.Context, db *sql.DB) (tables.PusherTable, error) {
 	s := &pushersStatements{}
 	_, err := db.Exec(pushersSchema)
 	if err != nil {

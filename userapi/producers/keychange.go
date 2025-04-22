@@ -33,10 +33,10 @@ type KeyChange struct {
 }
 
 // ProduceKeyChanges creates new change events for each key
-func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
+func (p *KeyChange) ProduceKeyChanges(ctx context.Context, keys []api.DeviceMessage) error {
 	userToDeviceCount := make(map[string]int)
 	for _, key := range keys {
-		id, err := p.DB.StoreKeyChange(context.Background(), key.UserID)
+		id, err := p.DB.StoreKeyChange(ctx, key.UserID)
 		if err != nil {
 			return err
 		}
@@ -69,7 +69,7 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
 	return nil
 }
 
-func (p *KeyChange) ProduceSigningKeyUpdate(key api.CrossSigningKeyUpdate) error {
+func (p *KeyChange) ProduceSigningKeyUpdate(ctx context.Context, key api.CrossSigningKeyUpdate) error {
 	output := &api.DeviceMessage{
 		Type: api.TypeCrossSigningUpdate,
 		OutputCrossSigningKeyUpdate: &api.OutputCrossSigningKeyUpdate{
@@ -77,7 +77,7 @@ func (p *KeyChange) ProduceSigningKeyUpdate(key api.CrossSigningKeyUpdate) error
 		},
 	}
 
-	id, err := p.DB.StoreKeyChange(context.Background(), key.UserID)
+	id, err := p.DB.StoreKeyChange(ctx, key.UserID)
 	if err != nil {
 		return err
 	}

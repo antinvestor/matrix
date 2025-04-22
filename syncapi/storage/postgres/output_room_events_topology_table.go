@@ -85,7 +85,7 @@ type outputRoomEventsTopologyStatements struct {
 	purgeEventsTopologyStmt                   *sql.Stmt
 }
 
-func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
+func NewPostgresTopologyTable(ctx context.Context, db *sql.DB) (tables.Topology, error) {
 	s := &outputRoomEventsTopologyStatements{}
 	_, err := db.Exec(outputRoomEventsTopologySchema)
 	if err != nil {

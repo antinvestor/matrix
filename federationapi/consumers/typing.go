@@ -25,14 +25,12 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
 // OutputTypingConsumer consumes events that originate in the clientapi.
 type OutputTypingConsumer struct {
-	ctx               context.Context
 	jetstream         nats.JetStreamContext
 	durable           string
 	db                storage.Database
@@ -43,14 +41,13 @@ type OutputTypingConsumer struct {
 
 // NewOutputTypingConsumer creates a new OutputTypingConsumer. Call Start() to begin consuming typing events.
 func NewOutputTypingConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.FederationAPI,
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 ) *OutputTypingConsumer {
 	return &OutputTypingConsumer{
-		ctx:               process.Context(),
 		jetstream:         js,
 		queues:            queues,
 		db:                store,
@@ -61,9 +58,9 @@ func NewOutputTypingConsumer(
 }
 
 // Start consuming from the clientapi
-func (t *OutputTypingConsumer) Start() error {
+func (t *OutputTypingConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		t.ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
+		ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)
 }
@@ -112,7 +109,7 @@ func (t *OutputTypingConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) 
 		log.WithError(err).Error("failed to marshal EDU JSON")
 		return true
 	}
-	if err := t.queues.SendEDU(edu, typingServerName, names); err != nil {
+	if err := t.queues.SendEDU(ctx, edu, typingServerName, names); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
 	}

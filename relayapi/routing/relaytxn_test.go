@@ -15,7 +15,7 @@
 package routing_test
 
 import (
-	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"testing"
 
@@ -43,6 +43,7 @@ func createQuery(
 }
 
 func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -55,7 +56,7 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 
 	transaction := createTransaction()
 
-	_, err = db.StoreTransaction(context.Background(), transaction)
+	_, err = db.StoreTransaction(ctx, transaction)
 	assert.NoError(t, err, "Failed to store transaction")
 
 	relayAPI := internal.NewRelayInternalAPI(
@@ -70,12 +71,13 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 	assert.Equal(t, false, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 
-	count, err := db.GetTransactionCount(context.Background(), *userID)
+	count, err := db.GetTransactionCount(ctx, *userID)
 	assert.NoError(t, err)
 	assert.Zero(t, count)
 }
 
 func TestGetInvalidPrevEntryFails(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -88,7 +90,7 @@ func TestGetInvalidPrevEntryFails(t *testing.T) {
 
 	transaction := createTransaction()
 
-	_, err = db.StoreTransaction(context.Background(), transaction)
+	_, err = db.StoreTransaction(ctx, transaction)
 	assert.NoError(t, err, "Failed to store transaction")
 
 	relayAPI := internal.NewRelayInternalAPI(
@@ -101,6 +103,7 @@ func TestGetInvalidPrevEntryFails(t *testing.T) {
 }
 
 func TestGetReturnsSavedTransaction(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -112,11 +115,11 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 	assert.NoError(t, err, "Invalid userID")
 
 	transaction := createTransaction()
-	receipt, err := db.StoreTransaction(context.Background(), transaction)
+	receipt, err := db.StoreTransaction(ctx, transaction)
 	assert.NoError(t, err, "Failed to store transaction")
 
 	err = db.AssociateTransactionWithDestinations(
-		context.Background(),
+		ctx,
 		map[spec.UserID]struct{}{
 			*userID: {},
 		},
@@ -145,12 +148,13 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 	assert.False(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 
-	count, err := db.GetTransactionCount(context.Background(), *userID)
+	count, err := db.GetTransactionCount(ctx, *userID)
 	assert.NoError(t, err)
 	assert.Zero(t, count)
 }
 
 func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -162,11 +166,11 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.NoError(t, err, "Invalid userID")
 
 	transaction := createTransaction()
-	receipt, err := db.StoreTransaction(context.Background(), transaction)
+	receipt, err := db.StoreTransaction(ctx, transaction)
 	assert.NoError(t, err, "Failed to store transaction")
 
 	err = db.AssociateTransactionWithDestinations(
-		context.Background(),
+		ctx,
 		map[spec.UserID]struct{}{
 			*userID: {},
 		},
@@ -175,11 +179,11 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.NoError(t, err, "Failed to associate transaction with user")
 
 	transaction2 := createTransaction()
-	receipt2, err := db.StoreTransaction(context.Background(), transaction2)
+	receipt2, err := db.StoreTransaction(ctx, transaction2)
 	assert.NoError(t, err, "Failed to store transaction")
 
 	err = db.AssociateTransactionWithDestinations(
-		context.Background(),
+		ctx,
 		map[spec.UserID]struct{}{
 			*userID: {},
 		},
@@ -216,7 +220,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.False(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 
-	count, err := db.GetTransactionCount(context.Background(), *userID)
+	count, err := db.GetTransactionCount(ctx, *userID)
 	assert.NoError(t, err)
 	assert.Zero(t, count)
 }

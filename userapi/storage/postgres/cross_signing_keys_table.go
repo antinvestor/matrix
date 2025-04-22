@@ -51,7 +51,7 @@ type crossSigningKeysStatements struct {
 	upsertCrossSigningKeysForUserStmt *sql.Stmt
 }
 
-func NewPostgresCrossSigningKeysTable(db *sql.DB) (tables.CrossSigningKeys, error) {
+func NewPostgresCrossSigningKeysTable(ctx context.Context, db *sql.DB) (tables.CrossSigningKeys, error) {
 	s := &crossSigningKeysStatements{
 		db: db,
 	}

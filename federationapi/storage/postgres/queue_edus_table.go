@@ -83,7 +83,7 @@ type queueEDUsStatements struct {
 	deleteExpiredEDUsStmt                *sql.Stmt
 }
 
-func NewPostgresQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
+func NewPostgresQueueEDUsTable(ctx context.Context, db *sql.DB) (s *queueEDUsStatements, err error) {
 	s = &queueEDUsStatements{
 		db: db,
 	}
@@ -99,7 +99,7 @@ func NewPostgresQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 			Up:      deltas.UpAddexpiresat,
 		},
 	)
-	if err := m.Up(context.Background()); err != nil {
+	if err := m.Up(ctx); err != nil {
 		return s, err
 	}
 

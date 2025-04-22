@@ -63,7 +63,7 @@ type threepidStatements struct {
 	deleteThreePIDStmt              *sql.Stmt
 }
 
-func NewPostgresThreePIDTable(db *sql.DB) (tables.ThreePIDTable, error) {
+func NewPostgresThreePIDTable(ctx context.Context, db *sql.DB) (tables.ThreePIDTable, error) {
 	s := &threepidStatements{}
 	_, err := db.Exec(threepidSchema)
 	if err != nil {

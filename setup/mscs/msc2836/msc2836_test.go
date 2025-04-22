@@ -561,7 +561,8 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
 	t.Helper()
 
-	cfg, ctx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
+	ctx := testrig.NewContext(t)
+	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	t.Cleanup(closeRig)
 
 	cfg.Global.ServerName = "localhost"
@@ -569,7 +570,7 @@ func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserve
 
 	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 	routers := httputil.NewRouters()
-	err := msc2836.Enable(cfg, cm, routers, rsAPI, nil, userAPI, nil)
+	err := msc2836.Enable(ctx, cfg, cm, routers, rsAPI, nil, userAPI, nil)
 	if err != nil {
 		t.Fatalf("failed to enable MSC2836: %s", err)
 	}

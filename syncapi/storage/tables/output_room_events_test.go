@@ -1,9 +1,9 @@
 package tables_test
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
 
@@ -20,7 +20,7 @@ import (
 func newOutputRoomEventsTable(t *testing.T, _ test.DependancyOption) (tables.Events, *sql.DB, func()) {
 	t.Helper()
 
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -34,7 +34,7 @@ func newOutputRoomEventsTable(t *testing.T, _ test.DependancyOption) (tables.Eve
 	}
 
 	var tab tables.Events
-	tab, err = postgres.NewPostgresEventsTable(db)
+	tab, err = postgres.NewPostgresEventsTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -43,7 +43,7 @@ func newOutputRoomEventsTable(t *testing.T, _ test.DependancyOption) (tables.Eve
 }
 
 func TestOutputRoomEventsTable(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
@@ -104,7 +104,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 }
 
 func TestReindex(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 

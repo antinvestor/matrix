@@ -42,7 +42,7 @@ func mustCreateUserDatabase(t *testing.T, _ test.DependancyOption) (storage.User
 		t.Fatalf("failed to open database: %s", err)
 	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewUserDatabase(context.Background(), nil, cm, &config.DatabaseOptions{
+	db, err := storage.NewUserDatabase(ctx, nil, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
@@ -581,9 +581,10 @@ func Test_Notification(t *testing.T) {
 }
 
 func mustCreateKeyDatabase(t *testing.T, testOpts test.DependancyOption) (storage.KeyDatabase, func()) {
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
-	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-	db, err := storage.NewKeyDatabase(cm, &cfg.KeyServer.Database)
+	ctx := testrig.NewContext(t)
+	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	db, err := storage.NewKeyDatabase(ctx, cm, &cfg.KeyServer.Database)
 	if err != nil {
 		t.Fatalf("failed to create new database: %v", err)
 	}

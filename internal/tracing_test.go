@@ -1,19 +1,19 @@
 package internal
 
 import (
-	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTracing(t *testing.T) {
-	inCtx := context.Background()
+	inctx := testrig.NewContext(t)
 
-	task, ctx := StartTask(inCtx, "testing")
+	task, ctx := StartTask(inctx, "testing")
 	assert.NotNil(t, ctx)
 	assert.NotNil(t, task)
-	assert.NotEqual(t, inCtx, ctx)
+	assert.NotEqual(t, inctx, ctx)
 	task.SetTag("key", "value")
 
 	region, ctx2 := StartRegion(ctx, "testing")

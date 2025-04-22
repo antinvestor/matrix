@@ -27,12 +27,10 @@ import (
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 )
 
 // DeviceListUpdateConsumer consumes device list updates that came in over federation.
 type DeviceListUpdateConsumer struct {
-	ctx               context.Context
 	jetstream         nats.JetStreamContext
 	durable           string
 	topic             string
@@ -42,13 +40,12 @@ type DeviceListUpdateConsumer struct {
 
 // NewDeviceListUpdateConsumer creates a new DeviceListConsumer. Call Start() to begin consuming from key servers.
 func NewDeviceListUpdateConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.UserAPI,
 	js nats.JetStreamContext,
 	updater *internal.DeviceListUpdater,
 ) *DeviceListUpdateConsumer {
 	return &DeviceListUpdateConsumer{
-		ctx:               process.Context(),
 		jetstream:         js,
 		durable:           cfg.Matrix.JetStream.Prefixed("KeyServerInputDeviceListConsumer"),
 		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
@@ -58,9 +55,9 @@ func NewDeviceListUpdateConsumer(
 }
 
 // Start consuming from key servers
-func (t *DeviceListUpdateConsumer) Start() error {
+func (t *DeviceListUpdateConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		t.ctx, t.jetstream, t.topic, t.durable, 1,
+		ctx, t.jetstream, t.topic, t.durable, 1,
 		t.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }

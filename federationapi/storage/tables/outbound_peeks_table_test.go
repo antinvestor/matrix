@@ -1,7 +1,7 @@
 package tables_test
 
 import (
-	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
 
@@ -16,7 +16,7 @@ import (
 )
 
 func mustCreateOutboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.FederationOutboundPeeks, func()) {
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -29,7 +29,7 @@ func mustCreateOutboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables
 		t.Fatalf("failed to open database: %s", err)
 	}
 	var tab tables.FederationOutboundPeeks
-	tab, err = postgres.NewPostgresOutboundPeeksTable(db)
+	tab, err = postgres.NewPostgresOutboundPeeksTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)
@@ -38,7 +38,7 @@ func mustCreateOutboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables
 }
 
 func TestOutboundPeeksTable(t *testing.T) {
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)

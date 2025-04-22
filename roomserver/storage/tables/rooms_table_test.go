@@ -2,6 +2,7 @@ package tables_test
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -14,10 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRoomsTable(t *testing.T, _ test.DependancyOption) (tab tables.Rooms, close func()) {
+func mustCreateRoomsTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tab tables.Rooms, close func()) {
 	t.Helper()
 
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -27,9 +27,9 @@ func mustCreateRoomsTable(t *testing.T, _ test.DependancyOption) (tab tables.Roo
 		MaxOpenConnections: 10,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	err = postgres.CreateRoomsTable(db)
+	err = postgres.CreateRoomsTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PrepareRoomsTable(db)
+	tab, err = postgres.PrepareRoomsTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -39,9 +39,10 @@ func mustCreateRoomsTable(t *testing.T, _ test.DependancyOption) (tab tables.Roo
 func TestRoomsTable(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeFn := mustCreateRoomsTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		tab, closeFn := mustCreateRoomsTable(ctx, t, testOpts)
 		defer closeFn()
 
 		wantRoomNID, err := tab.InsertRoomNID(ctx, nil, room.ID, room.Version)

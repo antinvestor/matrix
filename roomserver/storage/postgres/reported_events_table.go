@@ -91,12 +91,12 @@ type reportedEventsStatements struct {
 	deleteReportedEventStmt      *sql.Stmt
 }
 
-func CreateReportedEventsTable(db *sql.DB) error {
+func CreateReportedEventsTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(reportedEventsScheme)
 	return err
 }
 
-func PrepareReportedEventsTable(db *sql.DB) (tables.ReportedEvents, error) {
+func PrepareReportedEventsTable(ctx context.Context, db *sql.DB) (tables.ReportedEvents, error) {
 	s := &reportedEventsStatements{}
 
 	return s, sqlutil.StatementList{

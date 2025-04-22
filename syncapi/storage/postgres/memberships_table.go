@@ -85,7 +85,7 @@ type membershipsStatements struct {
 	selectMembersStmt           *sql.Stmt
 }
 
-func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
+func NewPostgresMembershipsTable(ctx context.Context, db *sql.DB) (tables.Memberships, error) {
 	s := &membershipsStatements{}
 	_, err := db.Exec(membershipsSchema)
 	if err != nil {

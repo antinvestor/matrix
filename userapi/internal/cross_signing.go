@@ -260,7 +260,7 @@ func (a *UserInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.
 	if update.MasterKey == nil && update.SelfSigningKey == nil {
 		return
 	}
-	if err := a.KeyChangeProducer.ProduceSigningKeyUpdate(update); err != nil {
+	if err := a.KeyChangeProducer.ProduceSigningKeyUpdate(ctx, update); err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("a.Producer.ProduceSigningKeyUpdate: %s", err),
 		}
@@ -343,7 +343,7 @@ func (a *UserInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req
 			MasterKey:      &masterKey,
 			SelfSigningKey: &selfSigningKey,
 		}
-		if err := a.KeyChangeProducer.ProduceSigningKeyUpdate(update); err != nil {
+		if err := a.KeyChangeProducer.ProduceSigningKeyUpdate(ctx, update); err != nil {
 			res.Error = &api.KeyError{
 				Err: fmt.Sprintf("a.Producer.ProduceSigningKeyUpdate: %s", err),
 			}

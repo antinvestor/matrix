@@ -339,7 +339,7 @@ func (r *uploadRequest) storeFileAndMetadata(
 		}
 
 		busy, err := thumbnailer.GenerateThumbnails(
-			context.Background(), finalPath, thumbnailSizes, r.MediaMetadata,
+			ctx, finalPath, thumbnailSizes, r.MediaMetadata,
 			activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger,
 		)
 		if err != nil {

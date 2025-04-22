@@ -66,7 +66,7 @@ type inboundPeeksStatements struct {
 	deleteInboundPeeksStmt *sql.Stmt
 }
 
-func NewPostgresInboundPeeksTable(db *sql.DB) (s *inboundPeeksStatements, err error) {
+func NewPostgresInboundPeeksTable(ctx context.Context, db *sql.DB) (s *inboundPeeksStatements, err error) {
 	s = &inboundPeeksStatements{
 		db: db,
 	}

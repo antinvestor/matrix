@@ -2,6 +2,7 @@ package tables_test
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/pitabwire/util"
@@ -15,9 +16,9 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateInviteTable(t *testing.T, _ test.DependancyOption) (tables.Invites, func()) {
+func mustCreateInviteTable(t *testing.T, ctx context.Context, _ test.DependancyOption) (tables.Invites, func()) {
 	t.Helper()
-	ctx := context.TODO()
+
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -28,9 +29,9 @@ func mustCreateInviteTable(t *testing.T, _ test.DependancyOption) (tables.Invite
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.Invites
-	err = postgres.CreateInvitesTable(db)
+	err = postgres.CreateInvitesTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PrepareInvitesTable(db)
+	tab, err = postgres.PrepareInvitesTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -38,9 +39,10 @@ func mustCreateInviteTable(t *testing.T, _ test.DependancyOption) (tables.Invite
 }
 
 func TestInviteTable(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeFn := mustCreateInviteTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		tab, closeFn := mustCreateInviteTable(t, ctx, testOpts)
 		defer closeFn()
 		eventID1 := util.RandomString(16)
 		roomNID := types.RoomNID(1)

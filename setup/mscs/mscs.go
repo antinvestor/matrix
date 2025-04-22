@@ -29,20 +29,20 @@ import (
 )
 
 // Enable MSCs - returns an error on unknown MSCs
-func Enable(cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, caches *caching.Caches) error {
+func Enable(ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, caches *caching.Caches) error {
 	for _, msc := range cfg.MSCs.MSCs {
-		util.GetLogger(context.Background()).WithField("msc", msc).Info("Enabling MSC")
-		if err := EnableMSC(cfg, cm, routers, monolith, msc, caches); err != nil {
+		util.GetLogger(ctx).WithField("msc", msc).Info("Enabling MSC")
+		if err := EnableMSC(ctx, cfg, cm, routers, monolith, msc, caches); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func EnableMSC(cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, msc string, caches *caching.Caches) error {
+func EnableMSC(ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, msc string, caches *caching.Caches) error {
 	switch msc {
 	case "msc2836":
-		return msc2836.Enable(cfg, cm, routers, monolith.RoomserverAPI, monolith.FederationAPI, monolith.UserAPI, monolith.KeyRing)
+		return msc2836.Enable(ctx, cfg, cm, routers, monolith.RoomserverAPI, monolith.FederationAPI, monolith.UserAPI, monolith.KeyRing)
 	case "msc2444": // enabled inside federationapi
 	case "msc2753": // enabled inside clientapi
 	default:

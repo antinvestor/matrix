@@ -26,13 +26,11 @@ import (
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/userapi/api"
 )
 
 // SigningKeyUpdateConsumer consumes signing key updates that came in over federation.
 type SigningKeyUpdateConsumer struct {
-	ctx               context.Context
 	jetstream         nats.JetStreamContext
 	durable           string
 	topic             string
@@ -43,13 +41,12 @@ type SigningKeyUpdateConsumer struct {
 
 // NewSigningKeyUpdateConsumer creates a new SigningKeyUpdateConsumer. Call Start() to begin consuming from key servers.
 func NewSigningKeyUpdateConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.UserAPI,
 	js nats.JetStreamContext,
 	userAPI api.UploadDeviceKeysAPI,
 ) *SigningKeyUpdateConsumer {
 	return &SigningKeyUpdateConsumer{
-		ctx:               process.Context(),
 		jetstream:         js,
 		durable:           cfg.Matrix.JetStream.Prefixed("KeyServerSigningKeyConsumer"),
 		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
@@ -60,9 +57,9 @@ func NewSigningKeyUpdateConsumer(
 }
 
 // Start consuming from key servers
-func (t *SigningKeyUpdateConsumer) Start() error {
+func (t *SigningKeyUpdateConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		t.ctx, t.jetstream, t.topic, t.durable, 1,
+		ctx, t.jetstream, t.topic, t.durable, 1,
 		t.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }

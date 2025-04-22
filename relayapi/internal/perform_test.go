@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -61,6 +62,7 @@ func (f *testFedClient) P2PGetTransactionFromRelay(
 }
 
 func TestPerformRelayServerSync(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -76,11 +78,12 @@ func TestPerformRelayServerSync(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
-	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, "relay")
+	err = relayAPI.PerformRelayServerSync(ctx, *userID, "relay")
 	assert.NoError(t, err)
 }
 
 func TestPerformRelayServerSyncFedError(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -96,11 +99,12 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
-	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, "relay")
+	err = relayAPI.PerformRelayServerSync(ctx, *userID, "relay")
 	assert.Error(t, err)
 }
 
 func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -116,7 +120,7 @@ func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
-	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, "relay")
+	err = relayAPI.PerformRelayServerSync(ctx, *userID, "relay")
 	assert.NoError(t, err)
 	assert.Equal(t, uint(3), fedClient.queryCount)
 }

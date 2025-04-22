@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -51,12 +52,12 @@ type RelayQueueJSONDatabase struct {
 }
 
 func mustCreateQueueJSONTable(
+	ctx context.Context,
 	t *testing.T,
 	_ test.DependancyOption,
 ) (database RelayQueueJSONDatabase, closeDb func()) {
 	t.Helper()
 
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -67,7 +68,7 @@ func mustCreateQueueJSONTable(
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.RelayQueueJSON
-	tab, err = postgres.NewPostgresRelayQueueJSONTable(db)
+	tab, err = postgres.NewPostgresRelayQueueJSONTable(ctx, db)
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
@@ -81,9 +82,9 @@ func mustCreateQueueJSONTable(
 }
 
 func TestShoudInsertTransaction(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateQueueJSONTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
 		defer closeDb()
 
 		transaction := mustCreateTransaction()
@@ -100,9 +101,9 @@ func TestShoudInsertTransaction(t *testing.T) {
 }
 
 func TestShouldRetrieveInsertedTransaction(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateQueueJSONTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
 		defer closeDb()
 
 		transaction := mustCreateTransaction()
@@ -138,9 +139,9 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 }
 
 func TestShouldDeleteTransaction(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateQueueJSONTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
 		defer closeDb()
 
 		transaction := mustCreateTransaction()

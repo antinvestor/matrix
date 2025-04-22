@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"testing"
 
@@ -131,7 +132,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 	}
 
 	t.Run("request simple state key", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := testrig.NewContext(t)
 
 		rsAPI := stateTestRoomserverAPI{
 			roomVersion: defaultRoomVersion,
@@ -156,7 +157,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 	})
 
 	t.Run("user ID key translated to room key in pseudo ID rooms", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := testrig.NewContext(t)
 
 		stateSenderUserID := "@sender:domain"
 		stateSenderRoomKey := "testsenderkey"
@@ -193,7 +194,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 	})
 
 	t.Run("user ID key not translated to room key in non-pseudo ID rooms", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := testrig.NewContext(t)
 
 		stateSenderUserID := "@sender:domain"
 		stateSenderRoomKey := "testsenderkey"

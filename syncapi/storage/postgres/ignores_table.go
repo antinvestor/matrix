@@ -46,7 +46,7 @@ type ignoresStatements struct {
 	upsertIgnoresStmt *sql.Stmt
 }
 
-func NewPostgresIgnoresTable(db *sql.DB) (tables.Ignores, error) {
+func NewPostgresIgnoresTable(ctx context.Context, db *sql.DB) (tables.Ignores, error) {
 	_, err := db.Exec(ignoresSchema)
 	if err != nil {
 		return nil, err

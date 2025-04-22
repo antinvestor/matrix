@@ -30,13 +30,11 @@ import (
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/userapi/api"
 )
 
 // KeyChangeConsumer consumes events that originate in key server.
 type KeyChangeConsumer struct {
-	ctx               context.Context
 	jetstream         nats.JetStreamContext
 	durable           string
 	db                storage.Database
@@ -48,7 +46,7 @@ type KeyChangeConsumer struct {
 
 // NewKeyChangeConsumer creates a new KeyChangeConsumer. Call Start() to begin consuming from key servers.
 func NewKeyChangeConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.KeyServer,
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
@@ -56,7 +54,6 @@ func NewKeyChangeConsumer(
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 ) *KeyChangeConsumer {
 	return &KeyChangeConsumer{
-		ctx:               process.Context(),
 		jetstream:         js,
 		durable:           cfg.Matrix.JetStream.Prefixed("FederationAPIKeyChangeConsumer"),
 		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
@@ -68,9 +65,9 @@ func NewKeyChangeConsumer(
 }
 
 // Start consuming from key servers
-func (t *KeyChangeConsumer) Start() error {
+func (t *KeyChangeConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		t.ctx, t.jetstream, t.topic, t.durable, 1,
+		ctx, t.jetstream, t.topic, t.durable, 1,
 		t.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
@@ -92,15 +89,15 @@ func (t *KeyChangeConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) boo
 	}
 	switch m.Type {
 	case api.TypeCrossSigningUpdate:
-		return t.onCrossSigningMessage(m)
+		return t.onCrossSigningMessage(ctx, m)
 	case api.TypeDeviceKeyUpdate:
 		fallthrough
 	default:
-		return t.onDeviceKeyMessage(m)
+		return t.onDeviceKeyMessage(ctx, m)
 	}
 }
 
-func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
+func (t *KeyChangeConsumer) onDeviceKeyMessage(ctx context.Context, m api.DeviceMessage) bool {
 	if m.DeviceKeys == nil {
 		return true
 	}
@@ -124,7 +121,7 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 		return true
 	}
 
-	roomIDs, err := t.rsAPI.QueryRoomsForUser(t.ctx, *userID, "join")
+	roomIDs, err := t.rsAPI.QueryRoomsForUser(ctx, *userID, "join")
 	if err != nil {
 		sentry.CaptureException(err)
 		logger.WithError(err).Error("failed to calculate joined rooms for user")
@@ -137,7 +134,7 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 	}
 
 	// send this key change to all servers who share rooms with this user.
-	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, roomIDStrs, true, true)
+	destinations, err := t.db.GetJoinedHostsForRooms(ctx, roomIDStrs, true, true)
 	if err != nil {
 		sentry.CaptureException(err)
 		logger.WithError(err).Error("failed to calculate joined hosts for rooms user is in")
@@ -168,11 +165,11 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 	}
 
 	logger.Debugf("Sending device list update message to %q", destinations)
-	err = t.queues.SendEDU(edu, originServerName, destinations)
+	err = t.queues.SendEDU(ctx, edu, originServerName, destinations)
 	return err == nil
 }
 
-func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
+func (t *KeyChangeConsumer) onCrossSigningMessage(ctx context.Context, m api.DeviceMessage) bool {
 	output := m.CrossSigningKeyUpdate
 	_, host, err := gomatrixserverlib.SplitID('@', output.UserID)
 	if err != nil {
@@ -194,7 +191,7 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 		return true
 	}
 
-	rooms, err := t.rsAPI.QueryRoomsForUser(t.ctx, *outputUserID, "join")
+	rooms, err := t.rsAPI.QueryRoomsForUser(ctx, *outputUserID, "join")
 	if err != nil {
 		sentry.CaptureException(err)
 		logger.WithError(err).Error("fedsender key change consumer: failed to calculate joined rooms for user")
@@ -207,7 +204,7 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 	}
 
 	// send this key change to all servers who share rooms with this user.
-	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, roomIDStrs, true, true)
+	destinations, err := t.db.GetJoinedHostsForRooms(ctx, roomIDStrs, true, true)
 	if err != nil {
 		sentry.CaptureException(err)
 		logger.WithError(err).Error("fedsender key change consumer: failed to calculate joined hosts for rooms user is in")
@@ -230,7 +227,7 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 	}
 
 	logger.Debugf("Sending cross-signing update message to %q", destinations)
-	err = t.queues.SendEDU(edu, host, destinations)
+	err = t.queues.SendEDU(ctx, edu, host, destinations)
 	return err == nil
 }
 

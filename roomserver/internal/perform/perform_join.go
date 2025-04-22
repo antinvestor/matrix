@@ -64,7 +64,7 @@ func (r *Joiner) PerformJoin(
 		"servers": req.ServerNames,
 	})
 	logger.Info("User requested to room join")
-	roomID, joinedVia, err = r.performJoin(context.Background(), req)
+	roomID, joinedVia, err = r.performJoin(ctx, req)
 	if err != nil {
 		logger.WithError(err).Error("Failed to join room")
 		sentry.CaptureException(err)

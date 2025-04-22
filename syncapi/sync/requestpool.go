@@ -66,6 +66,7 @@ type PresenceConsumer interface {
 
 // NewRequestPool makes a new RequestPool
 func NewRequestPool(
+	ctx context.Context,
 	db storage.Database, cfg *config.SyncAPI,
 	userAPI userapi.SyncUserAPI,
 	rsAPI roomserverAPI.SyncRoomserverAPI,
@@ -90,7 +91,7 @@ func NewRequestPool(
 		consumer: consumer,
 	}
 	go rp.cleanLastSeen()
-	go rp.cleanPresence(db, time.Minute*5)
+	go rp.cleanPresence(ctx, db, time.Minute*5)
 	return rp
 }
 
@@ -104,7 +105,7 @@ func (rp *RequestPool) cleanLastSeen() {
 	}
 }
 
-func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Duration) {
+func (rp *RequestPool) cleanPresence(ctx context.Context, db storage.Presence, cleanupTime time.Duration) {
 	if !rp.cfg.Matrix.Presence.EnableOutbound {
 		return
 	}
@@ -112,7 +113,7 @@ func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Durat
 		rp.presence.Range(func(key interface{}, v interface{}) bool {
 			p := v.(types.PresenceInternal)
 			if time.Since(p.LastActiveTS.Time()) > cleanupTime {
-				rp.updatePresence(db, types.PresenceUnavailable.String(), p.UserID)
+				rp.updatePresence(ctx, db, types.PresenceUnavailable.String(), p.UserID)
 				rp.presence.Delete(key)
 			}
 			return true
@@ -135,12 +136,12 @@ var lastPresence PresenceMap
 const presenceTimeout = time.Second * 10
 
 // updatePresence sends presence updates to the SyncAPI and FederationAPI
-func (rp *RequestPool) updatePresence(db storage.Presence, presence string, userID string) {
+func (rp *RequestPool) updatePresence(ctx context.Context, db storage.Presence, presence string, userID string) {
 	// allow checking back on presence to set offline if needed
-	rp.updatePresenceInternal(db, presence, userID, true)
+	rp.updatePresenceInternal(ctx, db, presence, userID, true)
 }
 
-func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence string, userID string, checkAgain bool) {
+func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Presence, presence string, userID string, checkAgain bool) {
 	if !rp.cfg.Matrix.Presence.EnableOutbound {
 		return
 	}
@@ -194,13 +195,13 @@ func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence stri
 		if checkAgain {
 			// after a timeout, check presence again to make sure it gets set as offline sooner or later
 			time.AfterFunc(presenceTimeout, func() {
-				rp.updatePresenceInternal(db, types.PresenceOffline.String(), userID, false)
+				rp.updatePresenceInternal(ctx, db, types.PresenceOffline.String(), userID, false)
 			})
 		}
 	}
 
 	// ensure we also send the current status_msg to federated servers and not nil
-	dbPresence, err := db.GetPresences(context.Background(), []string{userID})
+	dbPresence, err := db.GetPresences(ctx, []string{userID})
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return
 	}
@@ -227,7 +228,7 @@ func (rp *RequestPool) updatePresenceInternal(db storage.Presence, presence stri
 	// now synchronously update our view of the world. It's critical we do this before calculating
 	// the /sync response else we may not return presence: online immediately.
 	rp.consumer.EmitPresence(
-		context.Background(), userID, presenceToSet, newPresence.ClientFields.StatusMsg,
+		ctx, userID, presenceToSet, newPresence.ClientFields.StatusMsg,
 		spec.AsTimestamp(time.Now()), true,
 	)
 
@@ -285,6 +286,9 @@ var waitingSyncRequests = prometheus.NewGauge(
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
 func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.Device) util.JSONResponse {
+
+	ctx := req.Context()
+
 	// Extract values from request
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
@@ -304,7 +308,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	defer activeSyncRequests.Dec()
 
 	rp.updateLastSeen(req, device)
-	rp.updatePresence(rp.db, req.FormValue("set_presence"), device.UserID)
+	rp.updatePresence(ctx, rp.db, req.FormValue("set_presence"), device.UserID)
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()

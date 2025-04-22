@@ -85,7 +85,7 @@ type notaryServerKeysMetadataStatements struct {
 	deleteUnusedServerKeysJSONStmt         *sql.Stmt
 }
 
-func NewPostgresNotaryServerKeysMetadataTable(db *sql.DB) (s *notaryServerKeysMetadataStatements, err error) {
+func NewPostgresNotaryServerKeysMetadataTable(ctx context.Context, db *sql.DB) (s *notaryServerKeysMetadataStatements, err error) {
 	s = &notaryServerKeysMetadataStatements{
 		db: db,
 	}

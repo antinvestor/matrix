@@ -51,7 +51,7 @@ func NewRequest(t *testing.T, method, path string, opts ...HTTPRequestOpt) *http
 
 // ListenAndServe will listen on a random high-numbered port and attach the given router.
 // Returns the base URL to send requests to. Call `cancel` to shutdown the server, which will block until it has closed.
-func ListenAndServe(t *testing.T, router http.Handler, withTLS bool) (apiURL string, cancel func()) {
+func ListenAndServe(ctx context.Context, t *testing.T, router http.Handler, withTLS bool) (apiURL string, cancel func()) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to listen: %s", err)
@@ -86,7 +86,7 @@ func ListenAndServe(t *testing.T, router http.Handler, withTLS bool) (apiURL str
 		s = "s"
 	}
 	return fmt.Sprintf("http%s://localhost:%d", s, port), func() {
-		_ = srv.Shutdown(context.Background())
+		_ = srv.Shutdown(ctx)
 		wg.Wait()
 	}
 }

@@ -79,7 +79,7 @@ type peekStatements struct {
 	purgePeeksStmt           *sql.Stmt
 }
 
-func NewPostgresPeeksTable(db *sql.DB) (tables.Peeks, error) {
+func NewPostgresPeeksTable(ctx context.Context, db *sql.DB) (tables.Peeks, error) {
 	_, err := db.Exec(peeksSchema)
 	if err != nil {
 		return nil, err

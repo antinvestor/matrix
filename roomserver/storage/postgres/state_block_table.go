@@ -70,12 +70,12 @@ type stateBlockStatements struct {
 	bulkSelectStateBlockEntriesStmt *sql.Stmt
 }
 
-func CreateStateBlockTable(db *sql.DB) error {
+func CreateStateBlockTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(stateDataSchema)
 	return err
 }
 
-func PrepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+func PrepareStateBlockTable(ctx context.Context, db *sql.DB) (tables.StateBlock, error) {
 	s := &stateBlockStatements{}
 
 	return s, sqlutil.StatementList{

@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"crypto/ed25519"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -25,7 +26,6 @@ import (
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,15 +42,17 @@ func (t *testFedClient) LookupRoomAlias(ctx context.Context, origin, s spec.Serv
 }
 
 func TestPerformWakeupServers(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryFederationDatabase()
 
 	server := spec.ServerName("wakeup")
-	testDB.AddServerToBlacklist(server)
-	testDB.SetServerAssumedOffline(context.Background(), server)
-	blacklisted, err := testDB.IsServerBlacklisted(server)
+	testDB.AddServerToBlacklist(ctx, server)
+	testDB.SetServerAssumedOffline(ctx, server)
+	blacklisted, err := testDB.IsServerBlacklisted(ctx, server)
 	assert.NoError(t, err)
 	assert.True(t, blacklisted)
-	offline, err := testDB.IsServerAssumedOffline(context.Background(), server)
+	offline, err := testDB.IsServerAssumedOffline(ctx, server)
 	assert.NoError(t, err)
 	assert.True(t, offline)
 
@@ -68,7 +70,7 @@ func TestPerformWakeupServers(t *testing.T) {
 	fedClient := &testFedClient{}
 	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, true)
 	queues := queue.NewOutgoingQueues(
-		testDB, process.NewProcessContext(),
+		ctx, testDB,
 		false,
 		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
@@ -81,23 +83,25 @@ func TestPerformWakeupServers(t *testing.T) {
 		ServerNames: []spec.ServerName{server},
 	}
 	res := api.PerformWakeupServersResponse{}
-	err = fedAPI.PerformWakeupServers(context.Background(), &req, &res)
+	err = fedAPI.PerformWakeupServers(ctx, &req, &res)
 	assert.NoError(t, err)
 
-	blacklisted, err = testDB.IsServerBlacklisted(server)
+	blacklisted, err = testDB.IsServerBlacklisted(ctx, server)
 	assert.NoError(t, err)
 	assert.False(t, blacklisted)
-	offline, err = testDB.IsServerAssumedOffline(context.Background(), server)
+	offline, err = testDB.IsServerAssumedOffline(ctx, server)
 	assert.NoError(t, err)
 	assert.False(t, offline)
 }
 
 func TestQueryRelayServers(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	testDB := test.NewInMemoryFederationDatabase()
 
 	server := spec.ServerName("wakeup")
 	relayServers := []spec.ServerName{"relay1", "relay2"}
-	err := testDB.P2PAddRelayServersForServer(context.Background(), server, relayServers)
+	err := testDB.P2PAddRelayServersForServer(ctx, server, relayServers)
 	assert.NoError(t, err)
 
 	_, key, err := ed25519.GenerateKey(nil)
@@ -114,7 +118,7 @@ func TestQueryRelayServers(t *testing.T) {
 	fedClient := &testFedClient{}
 	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
-		testDB, process.NewProcessContext(),
+		ctx, testDB,
 		false,
 		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
@@ -127,18 +131,21 @@ func TestQueryRelayServers(t *testing.T) {
 		Server: server,
 	}
 	res := api.P2PQueryRelayServersResponse{}
-	err = fedAPI.P2PQueryRelayServers(context.Background(), &req, &res)
+	err = fedAPI.P2PQueryRelayServers(ctx, &req, &res)
 	assert.NoError(t, err)
 
 	assert.Equal(t, len(relayServers), len(res.RelayServers))
 }
 
 func TestRemoveRelayServers(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	testDB := test.NewInMemoryFederationDatabase()
 
 	server := spec.ServerName("wakeup")
 	relayServers := []spec.ServerName{"relay1", "relay2"}
-	err := testDB.P2PAddRelayServersForServer(context.Background(), server, relayServers)
+	err := testDB.P2PAddRelayServersForServer(ctx, server, relayServers)
 	assert.NoError(t, err)
 
 	_, key, err := ed25519.GenerateKey(nil)
@@ -155,7 +162,7 @@ func TestRemoveRelayServers(t *testing.T) {
 	fedClient := &testFedClient{}
 	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
-		testDB, process.NewProcessContext(),
+		ctx, testDB,
 		false,
 		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
@@ -169,16 +176,19 @@ func TestRemoveRelayServers(t *testing.T) {
 		RelayServers: []spec.ServerName{"relay1"},
 	}
 	res := api.P2PRemoveRelayServersResponse{}
-	err = fedAPI.P2PRemoveRelayServers(context.Background(), &req, &res)
+	err = fedAPI.P2PRemoveRelayServers(ctx, &req, &res)
 	assert.NoError(t, err)
 
-	finalRelays, err := testDB.P2PGetRelayServersForServer(context.Background(), server)
+	finalRelays, err := testDB.P2PGetRelayServersForServer(ctx, server)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(finalRelays))
 	assert.Equal(t, spec.ServerName("relay2"), finalRelays[0])
 }
 
 func TestPerformDirectoryLookup(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	testDB := test.NewInMemoryFederationDatabase()
 
 	_, key, err := ed25519.GenerateKey(nil)
@@ -195,7 +205,7 @@ func TestPerformDirectoryLookup(t *testing.T) {
 	fedClient := &testFedClient{}
 	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	queues := queue.NewOutgoingQueues(
-		testDB, process.NewProcessContext(),
+		ctx, testDB,
 		false,
 		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
@@ -209,16 +219,19 @@ func TestPerformDirectoryLookup(t *testing.T) {
 		ServerName: "server",
 	}
 	res := api.PerformDirectoryLookupResponse{}
-	err = fedAPI.PerformDirectoryLookup(context.Background(), &req, &res)
+	err = fedAPI.PerformDirectoryLookup(ctx, &req, &res)
 	assert.NoError(t, err)
 }
 
 func TestPerformDirectoryLookupRelaying(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	testDB := test.NewInMemoryFederationDatabase()
 
 	server := spec.ServerName("wakeup")
-	testDB.SetServerAssumedOffline(context.Background(), server)
-	testDB.P2PAddRelayServersForServer(context.Background(), server, []spec.ServerName{"relay"})
+	testDB.SetServerAssumedOffline(ctx, server)
+	testDB.P2PAddRelayServersForServer(ctx, server, []spec.ServerName{"relay"})
 
 	_, key, err := ed25519.GenerateKey(nil)
 	assert.NoError(t, err)
@@ -234,7 +247,7 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 	fedClient := &testFedClient{}
 	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline, true)
 	queues := queue.NewOutgoingQueues(
-		testDB, process.NewProcessContext(),
+		ctx, testDB,
 		false,
 		cfg.Matrix.ServerName, fedClient, &stats,
 		nil,
@@ -248,6 +261,6 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 		ServerName: server,
 	}
 	res := api.PerformDirectoryLookupResponse{}
-	err = fedAPI.PerformDirectoryLookup(context.Background(), &req, &res)
+	err = fedAPI.PerformDirectoryLookup(ctx, &req, &res)
 	assert.Error(t, err)
 }

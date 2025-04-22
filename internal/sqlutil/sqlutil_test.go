@@ -1,9 +1,9 @@
 package sqlutil
 
 import (
-	"context"
 	"database/sql"
 	"errors"
+	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
 
@@ -29,7 +29,7 @@ func TestShouldReturnCorrectAmountOfResulstIfFewerVariablesThanLimit(t *testing.
 		iKeyIDs[i] = d
 	}
 
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	var result = make([]int, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -66,7 +66,7 @@ func TestShouldReturnCorrectAmountOfResulstIfEqualVariablesAsLimit(t *testing.T)
 		iKeyIDs[i] = d
 	}
 
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	var result = make([]int, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -107,7 +107,7 @@ func TestShouldReturnCorrectAmountOfResultsIfMoreVariablesThanLimit(t *testing.T
 		iKeyIDs[i] = d
 	}
 
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	var result = make([]int, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -147,7 +147,7 @@ func TestShouldReturnErrorIfRowsScanReturnsError(t *testing.T) {
 		iKeyIDs[i] = d
 	}
 
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	var result = make([]uint, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -166,6 +166,9 @@ func TestShouldReturnErrorIfRowsScanReturnsError(t *testing.T) {
 }
 
 func TestRunLimitedVariablesExec(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	db, mock, err := sqlmock.New()
 	assertNoError(t, err, "Failed to make DB")
 
@@ -181,7 +184,7 @@ func TestRunLimitedVariablesExec(t *testing.T) {
 
 	query := "DELETE FROM WHERE id IN ($1)"
 
-	if err = RunLimitedVariablesExec(context.Background(), query, db, variables, 2); err != nil {
+	if err = RunLimitedVariablesExec(ctx, query, db, variables, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -191,7 +194,7 @@ func TestRunLimitedVariablesExec(t *testing.T) {
 	mock.ExpectExec(`DELETE FROM WHERE id IN \(\$1\)`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	if err = RunLimitedVariablesExec(context.Background(), query, db, variables[:3], 2); err != nil {
+	if err = RunLimitedVariablesExec(ctx, query, db, variables[:3], 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -199,7 +202,7 @@ func TestRunLimitedVariablesExec(t *testing.T) {
 	mock.ExpectExec(`DELETE FROM WHERE id IN \(\$1\, \$2\)`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	if err = RunLimitedVariablesExec(context.Background(), query, db, variables[:2], 2); err != nil {
+	if err = RunLimitedVariablesExec(ctx, query, db, variables[:2], 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -208,7 +211,7 @@ func TestRunLimitedVariablesExec(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 0)).
 		WillReturnError(errors.New("typo in query"))
 
-	if err = RunLimitedVariablesExec(context.Background(), "DELTE FROM", db, variables[:2], 2); err == nil {
+	if err = RunLimitedVariablesExec(ctx, "DELTE FROM", db, variables[:2], 2); err == nil {
 		t.Fatal("expected an error, but got none")
 	}
 }

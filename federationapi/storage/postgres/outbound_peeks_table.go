@@ -66,7 +66,7 @@ type outboundPeeksStatements struct {
 	deleteOutboundPeeksStmt *sql.Stmt
 }
 
-func NewPostgresOutboundPeeksTable(db *sql.DB) (s *outboundPeeksStatements, err error) {
+func NewPostgresOutboundPeeksTable(ctx context.Context, db *sql.DB) (s *outboundPeeksStatements, err error) {
 	s = &outboundPeeksStatements{
 		db: db,
 	}

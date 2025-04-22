@@ -18,7 +18,9 @@ import (
 func Test_AuthFallback(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, _, closeRig := testrig.CreateConfig(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
 		for _, useHCaptcha := range []bool{false, true} {

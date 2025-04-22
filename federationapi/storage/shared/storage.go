@@ -149,31 +149,31 @@ func (d *Database) StoreJSON(
 }
 
 func (d *Database) AddServerToBlacklist(
-	serverName spec.ServerName,
+	ctx context.Context, serverName spec.ServerName,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationBlacklist.InsertBlacklist(context.TODO(), txn, serverName)
+		return d.FederationBlacklist.InsertBlacklist(ctx, txn, serverName)
 	})
 }
 
 func (d *Database) RemoveServerFromBlacklist(
-	serverName spec.ServerName,
+	ctx context.Context, serverName spec.ServerName,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationBlacklist.DeleteBlacklist(context.TODO(), txn, serverName)
+		return d.FederationBlacklist.DeleteBlacklist(ctx, txn, serverName)
 	})
 }
 
-func (d *Database) RemoveAllServersFromBlacklist() error {
+func (d *Database) RemoveAllServersFromBlacklist(ctx context.Context) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationBlacklist.DeleteAllBlacklist(context.TODO(), txn)
+		return d.FederationBlacklist.DeleteAllBlacklist(ctx, txn)
 	})
 }
 
 func (d *Database) IsServerBlacklisted(
-	serverName spec.ServerName,
+	ctx context.Context, serverName spec.ServerName,
 ) (bool, error) {
-	return d.FederationBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
+	return d.FederationBlacklist.SelectBlacklist(ctx, nil, serverName)
 }
 
 func (d *Database) SetServerAssumedOffline(

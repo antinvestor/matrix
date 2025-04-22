@@ -1,8 +1,8 @@
 package auth
 
 import (
-	"context"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,7 +14,7 @@ import (
 )
 
 func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/discovery", func(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +73,7 @@ func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
 }
 
 func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	const callbackURL = "https://matrix.example.com/continue"
 
@@ -142,7 +142,7 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 }
 
 func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	idp := &oidcIdentityProvider{
 		cfg: &config.IdentityProvider{
@@ -172,7 +172,7 @@ func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
 }
 
 func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	const callbackURL = "https://matrix.example.com/continue"
 
@@ -251,7 +251,7 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 }
 
 func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	mux := http.NewServeMux()
 	var gotHeader http.Header

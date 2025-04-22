@@ -16,6 +16,7 @@
 package postgres
 
 import (
+	"context"
 	// Import the postgres database driver.
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/shared"
@@ -24,16 +25,16 @@ import (
 )
 
 // NewDatabase opens a postgres database.
-func NewDatabase(conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
-	db, writer, err := conMan.Connection(dbProperties)
+func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
+	db, writer, err := conMan.Connection(ctx, dbProperties)
 	if err != nil {
 		return nil, err
 	}
-	mediaRepo, err := NewPostgresMediaRepositoryTable(db)
+	mediaRepo, err := NewPostgresMediaRepositoryTable(ctx, db)
 	if err != nil {
 		return nil, err
 	}
-	thumbnails, err := NewPostgresThumbnailsTable(db)
+	thumbnails, err := NewPostgresThumbnailsTable(ctx, db)
 	if err != nil {
 		return nil, err
 	}

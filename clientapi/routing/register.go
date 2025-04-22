@@ -1071,8 +1071,8 @@ func RegisterAvailable(
 	}
 }
 
-func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.ClientUserAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
-	ssrr, err := NewSharedSecretRegistrationRequest(req.Body)
+func handleSharedSecretRegistration(ctx context.Context, cfg *config.ClientAPI, userAPI userapi.ClientUserAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
+	ssrr, err := NewSharedSecretRegistrationRequest(ctx, req.Body)
 	if err != nil {
 		return util.JSONResponse{
 			Code: 400,

@@ -29,13 +29,11 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
-	syncTypes "github.com/antinvestor/matrix/syncapi/types"
+	"github.com/antinvestor/matrix/syncapi/types"
 )
 
 // OutputSendToDeviceConsumer consumes events that originate in the clientapi.
 type OutputSendToDeviceConsumer struct {
-	ctx               context.Context
 	jetstream         nats.JetStreamContext
 	durable           string
 	db                storage.Database
@@ -46,14 +44,13 @@ type OutputSendToDeviceConsumer struct {
 
 // NewOutputSendToDeviceConsumer creates a new OutputSendToDeviceConsumer. Call Start() to begin consuming send-to-device events.
 func NewOutputSendToDeviceConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.FederationAPI,
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 ) *OutputSendToDeviceConsumer {
 	return &OutputSendToDeviceConsumer{
-		ctx:               process.Context(),
 		jetstream:         js,
 		queues:            queues,
 		db:                store,
@@ -64,9 +61,9 @@ func NewOutputSendToDeviceConsumer(
 }
 
 // Start consuming from the client api
-func (t *OutputSendToDeviceConsumer) Start() error {
+func (t *OutputSendToDeviceConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		t.ctx, t.jetstream, t.topic, t.durable, 1,
+		ctx, t.jetstream, t.topic, t.durable, 1,
 		t.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
@@ -87,7 +84,7 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 		return true
 	}
 	// Extract the send-to-device event from msg.
-	var ote syncTypes.OutputSendToDeviceEvent
+	var ote types.OutputSendToDeviceEvent
 	if err = json.Unmarshal(msg.Data, &ote); err != nil {
 		sentry.CaptureException(err)
 		log.WithError(err).Errorf("output log: message parse failed (expected send-to-device)")
@@ -128,7 +125,7 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 	}
 
 	log.Debugf("Sending send-to-device message into %q destination queue", destServerName)
-	if err := t.queues.SendEDU(edu, originServerName, []spec.ServerName{destServerName}); err != nil {
+	if err := t.queues.SendEDU(ctx, edu, originServerName, []spec.ServerName{destServerName}); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
 	}

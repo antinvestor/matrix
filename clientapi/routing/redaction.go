@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -48,6 +47,9 @@ func SendRedaction(
 	txnID *string,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
+
+	ctx := req.Context()
+
 	deviceUserID, userIDErr := spec.NewUserID(device.UserID, true)
 	if userIDErr != nil {
 		return util.JSONResponse{
@@ -183,7 +185,7 @@ func SendRedaction(
 		}
 	}
 	domain := device.UserDomain()
-	if err = roomserverAPI.SendEvents(context.Background(), rsAPI, roomserverAPI.KindNew, []*types.HeaderedEvent{e}, device.UserDomain(), domain, domain, nil, false); err != nil {
+	if err = roomserverAPI.SendEvents(ctx, rsAPI, roomserverAPI.KindNew, []*types.HeaderedEvent{e}, device.UserDomain(), domain, domain, nil, false); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

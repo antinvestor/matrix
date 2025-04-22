@@ -48,8 +48,9 @@ type sendContent struct {
 
 func TestHandleSend(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		routers := httputil.NewRouters()
 		defer closeRig()
 
@@ -58,7 +59,7 @@ func TestHandleSend(t *testing.T) {
 		routers.Federation = fedMux
 		cfg.FederationAPI.Matrix.SigningIdentity.ServerName = testOrigin
 		cfg.FederationAPI.Matrix.Metrics.Enabled = false
-		fedapi := fedAPI.NewInternalAPI(processCtx, cfg, cm, &natsInstance, nil, nil, nil, nil, true)
+		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, &natsInstance, nil, nil, nil, nil, true)
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
 

@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"sync"
 	"testing"
 	"time"
@@ -129,13 +130,15 @@ func TestRequestPool_updatePresence(t *testing.T) {
 		},
 	}
 	db := dummyDB{}
-	go rp.cleanPresence(db, time.Millisecond*50)
+
+	ctx := testrig.NewContext(t)
+	go rp.cleanPresence(ctx, db, time.Millisecond*50)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			publisher.lock.Lock()
 			beforeCount := publisher.count
 			publisher.lock.Unlock()
-			rp.updatePresence(db, tt.args.presence, tt.args.userID)
+			rp.updatePresence(ctx, db, tt.args.presence, tt.args.userID)
 			publisher.lock.Lock()
 			if tt.wantIncrease && publisher.count <= beforeCount {
 				t.Fatalf("expected count to increase: %d <= %d", publisher.count, beforeCount)

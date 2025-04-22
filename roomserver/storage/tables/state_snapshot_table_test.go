@@ -2,6 +2,7 @@ package tables_test
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -13,10 +14,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateStateSnapshotTable(t *testing.T, _ test.DependancyOption) (tab tables.StateSnapshot, close func()) {
+func mustCreateStateSnapshotTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tab tables.StateSnapshot, close func()) {
 	t.Helper()
 
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -28,18 +28,18 @@ func mustCreateStateSnapshotTable(t *testing.T, _ test.DependancyOption) (tab ta
 	assert.NoError(t, err)
 	// for the PostgreSQL history visibility optimisation to work,
 	// we also need some other tables to exist
-	err = postgres.CreateEventStateKeysTable(db)
+	err = postgres.CreateEventStateKeysTable(ctx, db)
 	assert.NoError(t, err)
-	err = postgres.CreateEventsTable(db)
+	err = postgres.CreateEventsTable(ctx, db)
 	assert.NoError(t, err)
-	err = postgres.CreateEventJSONTable(db)
+	err = postgres.CreateEventJSONTable(ctx, db)
 	assert.NoError(t, err)
-	err = postgres.CreateStateBlockTable(db)
+	err = postgres.CreateStateBlockTable(ctx, db)
 	assert.NoError(t, err)
 	// ... and then the snapshot table itself
-	err = postgres.CreateStateSnapshotTable(db)
+	err = postgres.CreateStateSnapshotTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PrepareStateSnapshotTable(db)
+	tab, err = postgres.PrepareStateSnapshotTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -47,9 +47,9 @@ func mustCreateStateSnapshotTable(t *testing.T, _ test.DependancyOption) (tab ta
 }
 
 func TestStateSnapshotTable(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDb := mustCreateStateSnapshotTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		tab, closeDb := mustCreateStateSnapshotTable(ctx, t, testOpts)
 		defer closeDb()
 
 		// generate some dummy data

@@ -271,7 +271,7 @@ func (d *InMemoryFederationDatabase) GetPendingEDUServerNames(
 }
 
 func (d *InMemoryFederationDatabase) AddServerToBlacklist(
-	serverName spec.ServerName,
+	_ context.Context, serverName spec.ServerName,
 ) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -281,7 +281,7 @@ func (d *InMemoryFederationDatabase) AddServerToBlacklist(
 }
 
 func (d *InMemoryFederationDatabase) RemoveServerFromBlacklist(
-	serverName spec.ServerName,
+	_ context.Context, serverName spec.ServerName,
 ) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
@@ -290,7 +290,7 @@ func (d *InMemoryFederationDatabase) RemoveServerFromBlacklist(
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) RemoveAllServersFromBlacklist() error {
+func (d *InMemoryFederationDatabase) RemoveAllServersFromBlacklist(_ context.Context) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
@@ -299,7 +299,7 @@ func (d *InMemoryFederationDatabase) RemoveAllServersFromBlacklist() error {
 }
 
 func (d *InMemoryFederationDatabase) IsServerBlacklisted(
-	serverName spec.ServerName,
+	_ context.Context, serverName spec.ServerName,
 ) (bool, error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()

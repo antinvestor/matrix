@@ -18,10 +18,11 @@ import (
 
 func TestCollect(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeDB()
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		db, err := storage.NewUserDatabase(processCtx.Context(), nil, cm, &cfg.UserAPI.AccountDatabase, "localhost", bcrypt.MinCost, 1000, 1000, "")
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		db, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, "localhost", bcrypt.MinCost, 1000, 1000, "")
 		if err != nil {
 			t.Error(err)
 		}
@@ -69,7 +70,7 @@ func TestCollect(t *testing.T) {
 			client:     &http.Client{Timeout: time.Second},
 		}
 
-		stats.collect()
+		stats.collect(ctx)
 
 		select {
 		case <-time.After(time.Second * 5):

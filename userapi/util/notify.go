@@ -42,7 +42,7 @@ func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, loc
 	// ordering guarantees we must provide.
 	go func() {
 		// This background processing cannot be tied to a request.
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
 		// TODO: we could batch all devices with the same URL, but

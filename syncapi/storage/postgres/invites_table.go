@@ -73,7 +73,7 @@ type inviteEventsStatements struct {
 	purgeInvitesStmt              *sql.Stmt
 }
 
-func NewPostgresInvitesTable(db *sql.DB) (tables.Invites, error) {
+func NewPostgresInvitesTable(ctx context.Context, db *sql.DB) (tables.Invites, error) {
 	s := &inviteEventsStatements{}
 	_, err := db.Exec(inviteEventsSchema)
 	if err != nil {

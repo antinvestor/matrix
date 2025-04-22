@@ -2,6 +2,7 @@ package tables_test
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -13,10 +14,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateStateBlockTable(t *testing.T, _ test.DependancyOption) (tab tables.StateBlock, close func()) {
+func mustCreateStateBlockTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tab tables.StateBlock, close func()) {
 	t.Helper()
 
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -26,9 +26,9 @@ func mustCreateStateBlockTable(t *testing.T, _ test.DependancyOption) (tab table
 		MaxOpenConnections: 10,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	err = postgres.CreateStateBlockTable(db)
+	err = postgres.CreateStateBlockTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PrepareStateBlockTable(db)
+	tab, err = postgres.PrepareStateBlockTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -36,9 +36,9 @@ func mustCreateStateBlockTable(t *testing.T, _ test.DependancyOption) (tab table
 }
 
 func TestStateBlockTable(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeFn := mustCreateStateBlockTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		tab, closeFn := mustCreateStateBlockTable(ctx, t, testOpts)
 		defer closeFn()
 
 		// generate some dummy data

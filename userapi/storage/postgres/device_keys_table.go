@@ -85,7 +85,7 @@ type deviceKeysStatements struct {
 	deleteAllDeviceKeysStmt              *sql.Stmt
 }
 
-func NewPostgresDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
+func NewPostgresDeviceKeysTable(ctx context.Context, db *sql.DB) (tables.DeviceKeys, error) {
 	s := &deviceKeysStatements{
 		db: db,
 	}

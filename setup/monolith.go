@@ -15,6 +15,10 @@
 package setup
 
 import (
+	"context"
+	"github.com/antinvestor/matrix/syncapi"
+	userAPI "github.com/antinvestor/matrix/userapi/api"
+
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/gomatrixserverlib"
@@ -34,9 +38,6 @@ import (
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
-	"github.com/antinvestor/matrix/syncapi"
-	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/frame"
 )
 
@@ -52,19 +53,19 @@ type Monolith struct {
 	AppserviceAPI appserviceAPI.AppServiceInternalAPI
 	FederationAPI federationAPI.FederationInternalAPI
 	RoomserverAPI roomserverAPI.RoomserverInternalAPI
-	UserAPI       userapi.UserInternalAPI
+	UserAPI       userAPI.UserInternalAPI
 	RelayAPI      relayAPI.RelayInternalAPI
 
 	PartitionCli *partitionv1.PartitionClient
 	ProfileCli   *profilev1.ProfileClient
 	// Optional
 	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
-	ExtUserDirectoryProvider userapi.QuerySearchProfilesAPI
+	ExtUserDirectoryProvider userAPI.QuerySearchProfilesAPI
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router
 func (m *Monolith) AddAllPublicRoutes(
-	processCtx *process.ProcessContext,
+	ctx context.Context,
 	cfg *config.Dendrite,
 	routers httputil.Routers,
 	cm *sqlutil.Connections,
@@ -78,15 +79,15 @@ func (m *Monolith) AddAllPublicRoutes(
 		userDirectoryProvider = m.UserAPI
 	}
 	clientapi.AddPublicRoutes(
-		processCtx, routers, cfg, natsInstance, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
+		ctx, routers, cfg, natsInstance, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationAPI, m.UserAPI, userDirectoryProvider,
 		m.ExtPublicRoomsProvider, m.PartitionCli, enableMetrics,
 	)
 	federationapi.AddPublicRoutes(
-		processCtx, routers, cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
+		ctx, routers, cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
 	)
-	mediaapi.AddPublicRoutes(routers, cm, cfg, m.UserAPI, m.Client, m.FedClient, m.KeyRing)
-	syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, natsInstance, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
+	mediaapi.AddPublicRoutes(ctx, routers, cm, cfg, m.UserAPI, m.Client, m.FedClient, m.KeyRing)
+	syncapi.AddPublicRoutes(ctx, routers, cfg, cm, natsInstance, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
 
 	if m.RelayAPI != nil {
 		relayapi.AddPublicRoutes(routers, cfg, m.KeyRing, m.RelayAPI)

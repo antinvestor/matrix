@@ -60,7 +60,7 @@ type publishedStatements struct {
 	selectNetworkPublishedStmt *sql.Stmt
 }
 
-func CreatePublishedTable(db *sql.DB) error {
+func CreatePublishedTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(publishedSchema)
 	if err != nil {
 		return err
@@ -76,10 +76,10 @@ func CreatePublishedTable(db *sql.DB) error {
 			Up:      deltas.UpPulishedAppservicePrimaryKey,
 		},
 	}...)
-	return m.Up(context.Background())
+	return m.Up(ctx)
 }
 
-func PreparePublishedTable(db *sql.DB) (tables.Published, error) {
+func PreparePublishedTable(ctx context.Context, db *sql.DB) (tables.Published, error) {
 	s := &publishedStatements{}
 
 	return s, sqlutil.StatementList{

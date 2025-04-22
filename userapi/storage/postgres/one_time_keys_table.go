@@ -77,7 +77,7 @@ type oneTimeKeysStatements struct {
 	deleteOneTimeKeysStmt    *sql.Stmt
 }
 
-func NewPostgresOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
+func NewPostgresOneTimeKeysTable(ctx context.Context, db *sql.DB) (tables.OneTimeKeys, error) {
 	s := &oneTimeKeysStatements{
 		db: db,
 	}

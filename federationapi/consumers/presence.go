@@ -27,7 +27,6 @@ import (
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
@@ -36,7 +35,6 @@ import (
 
 // OutputReceiptConsumer consumes events that originate in the clientapi.
 type OutputPresenceConsumer struct {
-	ctx                     context.Context
 	jetstream               nats.JetStreamContext
 	durable                 string
 	db                      storage.Database
@@ -49,7 +47,7 @@ type OutputPresenceConsumer struct {
 
 // NewOutputPresenceConsumer creates a new OutputPresenceConsumer. Call Start() to begin consuming events.
 func NewOutputPresenceConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.FederationAPI,
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
@@ -57,7 +55,6 @@ func NewOutputPresenceConsumer(
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 ) *OutputPresenceConsumer {
 	return &OutputPresenceConsumer{
-		ctx:                     process.Context(),
 		jetstream:               js,
 		queues:                  queues,
 		db:                      store,
@@ -70,12 +67,12 @@ func NewOutputPresenceConsumer(
 }
 
 // Start consuming from the clientapi
-func (t *OutputPresenceConsumer) Start() error {
+func (t *OutputPresenceConsumer) Start(ctx context.Context) error {
 	if !t.outboundPresenceEnabled {
 		return nil
 	}
 	return jetstream.Consumer(
-		t.ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
+		ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)
 }
@@ -101,7 +98,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		return true
 	}
 
-	roomIDs, err := t.rsAPI.QueryRoomsForUser(t.ctx, *parsedUserID, "join")
+	roomIDs, err := t.rsAPI.QueryRoomsForUser(ctx, *parsedUserID, "join")
 	if err != nil {
 		log.WithError(err).Error("failed to calculate joined rooms for user")
 		return true
@@ -120,7 +117,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 
 	// send this presence to all servers who share rooms with this user.
-	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, roomIDStrs, true, true)
+	joined, err := t.db.GetJoinedHostsForRooms(ctx, roomIDStrs, true, true)
 	if err != nil {
 		log.WithError(err).Error("failed to get joined hosts")
 		return true
@@ -160,7 +157,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 
 	log.Tracef("sending presence EDU to %d servers", len(joined))
-	if err = t.queues.SendEDU(edu, serverName, joined); err != nil {
+	if err = t.queues.SendEDU(ctx, edu, serverName, joined); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
 	}

@@ -17,6 +17,7 @@ package query
 import (
 	"context"
 	"encoding/json"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -95,6 +96,7 @@ func (db *getEventDB) EventsFromIDs(_ context.Context, _ *types.RoomInfo, eventI
 }
 
 func TestGetAuthChainSingle(t *testing.T) {
+	ctx := testrig.NewContext(t)
 	db := createEventDB()
 
 	err := db.addFakeEvents(map[string][]string{
@@ -109,7 +111,7 @@ func TestGetAuthChainSingle(t *testing.T) {
 		t.Fatalf("Failed to add events to db: %v", err)
 	}
 
-	result, err := GetAuthChain(context.TODO(), db.EventsFromIDs, nil, []string{"e"})
+	result, err := GetAuthChain(ctx, db.EventsFromIDs, nil, []string{"e"})
 	if err != nil {
 		t.Fatalf("getAuthChain failed: %v", err)
 	}
@@ -127,6 +129,8 @@ func TestGetAuthChainSingle(t *testing.T) {
 }
 
 func TestGetAuthChainMultiple(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	db := createEventDB()
 
 	err := db.addFakeEvents(map[string][]string{
@@ -142,7 +146,7 @@ func TestGetAuthChainMultiple(t *testing.T) {
 		t.Fatalf("Failed to add events to db: %v", err)
 	}
 
-	result, err := GetAuthChain(context.TODO(), db.EventsFromIDs, nil, []string{"e", "f"})
+	result, err := GetAuthChain(ctx, db.EventsFromIDs, nil, []string{"e", "f"})
 	if err != nil {
 		t.Fatalf("getAuthChain failed: %v", err)
 	}
@@ -159,9 +163,8 @@ func TestGetAuthChainMultiple(t *testing.T) {
 	}
 }
 
-func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
+func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
 
-	ctx := context.TODO()
 	conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -180,7 +183,7 @@ func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database
 	}
 
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: conStr})
-	db, err := storage.Open(context.Background(), cm, &config.DatabaseOptions{ConnectionString: conStr}, caches)
+	db, err := storage.Open(ctx, cm, &config.DatabaseOptions{ConnectionString: conStr}, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}
@@ -192,14 +195,16 @@ func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database
 
 func TestCurrentEventIsNil(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
 		defer closeDb()
 		querier := Queryer{
 			DB: db,
 		}
 
 		roomID, _ := spec.NewRoomID("!room:server")
-		event, _ := querier.CurrentStateEvent(context.Background(), *roomID, spec.MRoomMember, "@user:server")
+		event, _ := querier.CurrentStateEvent(ctx, *roomID, spec.MRoomMember, "@user:server")
 		if event != nil {
 			t.Fatal("Event should equal nil, most likely this is failing because the interface type is not nil, but the value is.")
 		}

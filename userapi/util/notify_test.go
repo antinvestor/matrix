@@ -1,8 +1,8 @@
 package util_test
 
 import (
-	"context"
 	"encoding/json"
+	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,7 +37,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	// Create a test room, just used to provide events
 	room := test.NewRoom(t, alice)

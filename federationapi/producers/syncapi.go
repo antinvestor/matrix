@@ -81,7 +81,7 @@ func (p *SyncAPIProducer) SendToDevice(
 	// as-is, so that the federation sender can send it on with the wildcard intact.
 	if p.Config.Matrix.IsLocalServerName(domain) && deviceID == "*" {
 		var res userapi.QueryDevicesResponse
-		err = p.UserAPI.QueryDevices(context.TODO(), &userapi.QueryDevicesRequest{
+		err = p.UserAPI.QueryDevices(ctx, &userapi.QueryDevicesRequest{
 			UserID: userID,
 		}, &res)
 		if err != nil {

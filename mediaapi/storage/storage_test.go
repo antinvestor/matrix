@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
 
@@ -12,14 +13,13 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
-	ctx := context.TODO()
+func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewMediaAPIDatasource(cm, &config.DatabaseOptions{
+	db, err := storage.NewMediaAPIDatasource(ctx, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,
 	})
@@ -30,9 +30,9 @@ func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.Database
 }
 func TestMediaRepository(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
 		defer closeDb()
-		ctx := context.Background()
 		t.Run("can insert media & query media", func(t *testing.T) {
 			metadata := &types.MediaMetadata{
 				MediaID:       "testing",
@@ -68,9 +68,9 @@ func TestMediaRepository(t *testing.T) {
 
 func TestThumbnailsStorage(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
 		defer closeDb()
-		ctx := context.Background()
 		t.Run("can insert thumbnails & query media", func(t *testing.T) {
 			thumbnails := []*types.ThumbnailMetadata{
 				{

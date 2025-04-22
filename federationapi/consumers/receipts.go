@@ -26,7 +26,6 @@ import (
 	fedTypes "github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	syncTypes "github.com/antinvestor/matrix/syncapi/types"
 	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
@@ -35,7 +34,6 @@ import (
 
 // OutputReceiptConsumer consumes events that originate in the clientapi.
 type OutputReceiptConsumer struct {
-	ctx               context.Context
 	jetstream         nats.JetStreamContext
 	durable           string
 	db                storage.Database
@@ -46,14 +44,13 @@ type OutputReceiptConsumer struct {
 
 // NewOutputReceiptConsumer creates a new OutputReceiptConsumer. Call Start() to begin consuming typing events.
 func NewOutputReceiptConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.FederationAPI,
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 ) *OutputReceiptConsumer {
 	return &OutputReceiptConsumer{
-		ctx:               process.Context(),
 		jetstream:         js,
 		queues:            queues,
 		db:                store,
@@ -64,9 +61,9 @@ func NewOutputReceiptConsumer(
 }
 
 // Start consuming from the clientapi
-func (t *OutputReceiptConsumer) Start() error {
+func (t *OutputReceiptConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		t.ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
+		ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)
 }
@@ -142,7 +139,7 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg)
 		return true
 	}
 
-	if err := t.queues.SendEDU(edu, receiptServerName, names); err != nil {
+	if err := t.queues.SendEDU(ctx, edu, receiptServerName, names); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
 	}

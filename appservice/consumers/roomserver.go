@@ -33,7 +33,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 
 	log "github.com/sirupsen/logrus"
@@ -47,7 +46,6 @@ type ApplicationServiceTransaction struct {
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	ctx       context.Context
 	cfg       *config.AppServiceAPI
 	jetstream nats.JetStreamContext
 	topic     string
@@ -62,13 +60,12 @@ type appserviceState struct {
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call
 // Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.AppServiceAPI,
 	js nats.JetStreamContext,
 	rsAPI api.AppserviceRoomserverAPI,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
-		ctx:       process.Context(),
 		cfg:       cfg,
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputAppserviceEvent),
@@ -77,7 +74,7 @@ func NewOutputRoomEventConsumer(
 }
 
 // Start consuming from room servers
-func (s *OutputRoomEventConsumer) Start() error {
+func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 	durableNames := make([]string, 0, len(s.cfg.Derived.ApplicationServices))
 	for _, as := range s.cfg.Derived.ApplicationServices {
 		appsvc := as
@@ -86,7 +83,7 @@ func (s *OutputRoomEventConsumer) Start() error {
 		}
 		token := jetstream.Tokenise(as.ID)
 		if err := jetstream.Consumer(
-			s.ctx, s.jetstream, s.topic,
+			ctx, s.jetstream, s.topic,
 			s.cfg.Matrix.JetStream.Durable("Appservice_"+token),
 			50, // maximum number of events to send in a single transaction
 			func(ctx context.Context, msgs []*nats.Msg) bool {
@@ -148,7 +145,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 					}
 				}
 				if len(eventsReq.EventIDs) > 0 {
-					if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
+					if err := s.rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
 						log.WithError(err).Errorf("s.rsAPI.QueryEventsByID failed")
 						return false
 					}

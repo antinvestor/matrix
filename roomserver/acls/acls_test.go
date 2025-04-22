@@ -16,6 +16,7 @@ package acls
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"regexp"
 	"testing"
 
@@ -134,10 +135,12 @@ func (d dummyACLDB) GetBulkStateContent(ctx context.Context, roomIDs []string, t
 }
 
 func TestCachedRegex(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	db := dummyACLDB{}
 	wantBannedServer := spec.ServerName("hello.world")
 
-	acls := NewServerACLs(db)
+	acls := NewServerACLs(ctx, db)
 
 	// Check that hello.world is banned in room 1
 	banned := acls.IsServerBannedFromRoom(wantBannedServer, "1")

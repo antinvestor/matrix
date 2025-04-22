@@ -66,6 +66,7 @@ type WellKnownClientResponse struct {
 // applied:
 // nolint: gocyclo
 func Setup(
+	ctx context.Context,
 	routers httputil.Routers,
 	dendriteCfg *config.Dendrite,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
@@ -174,7 +175,7 @@ func Setup(
 					}
 				}
 				if req.Method == http.MethodPost {
-					return handleSharedSecretRegistration(cfg, userAPI, sr, req)
+					return handleSharedSecretRegistration(ctx, cfg, userAPI, sr, req)
 				}
 				return util.JSONResponse{
 					Code: http.StatusMethodNotAllowed,
@@ -259,7 +260,7 @@ func Setup(
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
-		serverNotificationSender, err := getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
+		serverNotificationSender, err := getSenderDevice(ctx, rsAPI, userAPI, cfg)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to get account for sending server notices")
 		}

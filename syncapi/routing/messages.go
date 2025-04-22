@@ -364,11 +364,11 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	// reached the oldest event in the room (or the most recent one, depending
 	// on the ordering), or we've reached a backward extremity.
 	if len(streamEvents) == 0 {
-		if events, err = r.handleEmptyEventsSlice(); err != nil {
+		if events, err = r.handleEmptyEventsSlice(ctx); err != nil {
 			return []synctypes.ClientEvent{}, *r.from, emptyToken, err
 		}
 	} else {
-		if events, err = r.handleNonEmptyEventsSlice(streamEvents); err != nil {
+		if events, err = r.handleNonEmptyEventsSlice(ctx, streamEvents); err != nil {
 			return []synctypes.ClientEvent{}, *r.from, emptyToken, err
 		}
 	}
@@ -469,7 +469,7 @@ func (r *messagesReq) getStartEnd(events []*rstypes.HeaderedEvent) (start, end t
 // another homeserver.
 // Returns an error if there was an issue talking with the database or
 // backfilling.
-func (r *messagesReq) handleEmptyEventsSlice() (
+func (r *messagesReq) handleEmptyEventsSlice(ctx context.Context) (
 	events []*rstypes.HeaderedEvent, err error,
 ) {
 	backwardExtremities, err := r.snapshot.BackwardExtremitiesForRoom(r.ctx, r.roomID)
@@ -477,7 +477,7 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 	// Check if we have backward extremities for this room.
 	if len(backwardExtremities) > 0 {
 		// If so, retrieve as much events as needed through backfilling.
-		events, err = r.backfill(r.roomID, backwardExtremities, r.filter.Limit)
+		events, err = r.backfill(ctx, r.roomID, backwardExtremities, r.filter.Limit)
 		if err != nil {
 			return
 		}
@@ -496,7 +496,7 @@ func (r *messagesReq) handleEmptyEventsSlice() (
 // events are missing from the expected result, and retrieve missing events
 // through backfilling if needed.
 // Returns an error if there was an issue while backfilling.
-func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent) (
+func (r *messagesReq) handleNonEmptyEventsSlice(ctx context.Context, streamEvents []types.StreamEvent) (
 	events []*rstypes.HeaderedEvent, err error,
 ) {
 	// Check if we have enough events.
@@ -527,7 +527,7 @@ func (r *messagesReq) handleNonEmptyEventsSlice(streamEvents []types.StreamEvent
 	if len(backwardExtremities) > 0 && !isSetLargeEnough && r.backwardOrdering {
 		var pdus []*rstypes.HeaderedEvent
 		// Only ask the remote server for enough events to reach the limit.
-		pdus, err = r.backfill(r.roomID, backwardExtremities, r.filter.Limit-len(streamEvents))
+		pdus, err = r.backfill(ctx, r.roomID, backwardExtremities, r.filter.Limit-len(streamEvents))
 		if err != nil {
 			return
 		}
@@ -564,9 +564,9 @@ func (e eventsByDepth) Less(i, j int) bool {
 // event, or if there is no remote homeserver to contact.
 // Returns an error if there was an issue with retrieving the list of servers in
 // the room or sending the request.
-func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]string, limit int) ([]*rstypes.HeaderedEvent, error) {
+func (r *messagesReq) backfill(ctx context.Context, roomID string, backwardsExtremities map[string][]string, limit int) ([]*rstypes.HeaderedEvent, error) {
 	var res api.PerformBackfillResponse
-	err := r.rsAPI.PerformBackfill(context.Background(), &api.PerformBackfillRequest{
+	err := r.rsAPI.PerformBackfill(ctx, &api.PerformBackfillRequest{
 		RoomID:               roomID,
 		BackwardsExtremities: backwardsExtremities,
 		Limit:                limit,
@@ -597,7 +597,7 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	for i := range events {
 		events[i].Visibility = res.HistoryVisibility
 		_, err = r.db.WriteEvent(
-			context.Background(),
+			ctx,
 			events[i],
 			[]*rstypes.HeaderedEvent{},
 			[]string{},

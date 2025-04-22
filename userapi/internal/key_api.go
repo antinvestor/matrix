@@ -513,7 +513,7 @@ func (a *UserInternalAPI) queryRemoteKeysOnServer(
 		}
 	}
 	for userID := range userIDsForAllDevices {
-		err := a.Updater.ManualUpdate(context.Background(), spec.ServerName(serverName), userID)
+		err := a.Updater.ManualUpdate(ctx, spec.ServerName(serverName), userID)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				logrus.ErrorKey: err,
@@ -716,7 +716,7 @@ func (a *UserInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Pe
 	// inform downstream components. However, we're fine with just creating the
 	// database entries above in other cases.
 	if !req.FromRegistration {
-		err = emitDeviceKeyChanges(a.KeyChangeProducer, existingKeys, keysToStore, req.OnlyDisplayNameUpdates)
+		err = emitDeviceKeyChanges(ctx, a.KeyChangeProducer, existingKeys, keysToStore, req.OnlyDisplayNameUpdates)
 		if err != nil {
 			util.GetLogger(ctx).Errorf("Failed to emitDeviceKeyChanges: %s", err)
 		}
@@ -779,10 +779,10 @@ func (a *UserInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perfor
 
 }
 
-func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.DeviceMessage, onlyUpdateDisplayName bool) error {
+func emitDeviceKeyChanges(ctx context.Context, producer KeyChangeProducer, existing, new []api.DeviceMessage, onlyUpdateDisplayName bool) error {
 	// if we only want to update the display names, we can skip the checks below
 	if onlyUpdateDisplayName {
-		return producer.ProduceKeyChanges(new)
+		return producer.ProduceKeyChanges(ctx, new)
 	}
 	// find keys in new that are not in existing
 	var keysAdded []api.DeviceMessage
@@ -800,5 +800,5 @@ func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.Device
 			keysAdded = append(keysAdded, newKey)
 		}
 	}
-	return producer.ProduceKeyChanges(keysAdded)
+	return producer.ProduceKeyChanges(ctx, keysAdded)
 }

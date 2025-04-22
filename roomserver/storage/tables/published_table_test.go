@@ -1,8 +1,8 @@
 package tables_test
 
 import (
-	"context"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"sort"
 	"testing"
 
@@ -18,7 +18,7 @@ import (
 func mustCreatePublishedTable(t *testing.T, _ test.DependancyOption) (tab tables.Published, close func()) {
 	t.Helper()
 
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -28,9 +28,9 @@ func mustCreatePublishedTable(t *testing.T, _ test.DependancyOption) (tab tables
 		MaxOpenConnections: 10,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	err = postgres.CreatePublishedTable(db)
+	err = postgres.CreatePublishedTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PreparePublishedTable(db)
+	tab, err = postgres.PreparePublishedTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -38,7 +38,7 @@ func mustCreatePublishedTable(t *testing.T, _ test.DependancyOption) (tab tables
 }
 
 func TestPublishedTable(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {

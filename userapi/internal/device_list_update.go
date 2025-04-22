@@ -37,7 +37,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/userapi/api"
 )
 
@@ -90,7 +89,6 @@ func init() {
 // In the event that the query fails, a lock is acquired and the server name along with the time to wait before retrying is
 // set in a map. A restarter goroutine periodically probes this map and injects servers which are ready to be retried.
 type DeviceListUpdater struct {
-	process *process.ProcessContext
 	// A map from user_id to a mutex. Used when we are missing prev IDs so we don't make more than 1
 	// request to the remote server and race.
 	// TODO: Put in an LRU cache to bound growth
@@ -110,7 +108,7 @@ type DeviceListUpdater struct {
 	userIDToChanMu *sync.Mutex
 	rsAPI          rsapi.KeyserverRoomserverAPI
 
-	isBlacklistedOrBackingOffFn func(s spec.ServerName) (*statistics.ServerStatistics, error)
+	isBlacklistedOrBackingOffFn func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error)
 }
 
 // DeviceListUpdaterDatabase is the subset of functionality from storage.Database required for the updater.
@@ -141,9 +139,9 @@ type DeviceListUpdaterAPI interface {
 	PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse)
 }
 
-// KeyChangeProducer is the interface for producers.KeyChange useful for testing.
+// KeyChangeProducer is the interface for producers.KeysChange useful for testing.
 type KeyChangeProducer interface {
-	ProduceKeyChanges(keys []api.DeviceMessage) error
+	ProduceKeyChanges(ctx context.Context, keys []api.DeviceMessage) error
 }
 
 var deviceListUpdaterBackpressure = prometheus.NewGaugeVec(
@@ -167,19 +165,18 @@ var deviceListUpdaterServersRetrying = prometheus.NewGaugeVec(
 
 // NewDeviceListUpdater creates a new updater which fetches fresh device lists when they go stale.
 func NewDeviceListUpdater(
-	process *process.ProcessContext, db DeviceListUpdaterDatabase,
+	_ context.Context, db DeviceListUpdaterDatabase,
 	api DeviceListUpdaterAPI, producer KeyChangeProducer,
 	fedClient fedsenderapi.KeyserverFederationAPI, numWorkers int,
 	rsAPI rsapi.KeyserverRoomserverAPI,
 	thisServer spec.ServerName,
 	enableMetrics bool,
-	isBlacklistedOrBackingOffFn func(s spec.ServerName) (*statistics.ServerStatistics, error),
+	isBlacklistedOrBackingOffFn func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error),
 ) *DeviceListUpdater {
 	if enableMetrics {
 		prometheus.MustRegister(deviceListUpdaterBackpressure, deviceListUpdaterServersRetrying)
 	}
 	return &DeviceListUpdater{
-		process:                     process,
 		userIDToMutex:               make(map[string]*sync.Mutex),
 		mu:                          &sync.Mutex{},
 		db:                          db,
@@ -196,30 +193,30 @@ func NewDeviceListUpdater(
 }
 
 // Start the device list updater, which will try to refresh any stale device lists.
-func (u *DeviceListUpdater) Start() error {
+func (u *DeviceListUpdater) Start(ctx context.Context) error {
 	for i := 0; i < len(u.workerChans); i++ {
 		// Allocate a small buffer per channel.
 		// If the buffer limit is reached, backpressure will cause the processing of EDUs
 		// to stop (in this transaction) until key requests can be made.
 		ch := make(chan spec.ServerName, 10)
 		u.workerChans[i] = ch
-		go u.worker(ch, i)
+		go u.worker(ctx, ch, i)
 	}
 
-	staleLists, err := u.db.StaleDeviceLists(u.process.Context(), []spec.ServerName{})
+	staleLists, err := u.db.StaleDeviceLists(ctx, []spec.ServerName{})
 	if err != nil {
 		return err
 	}
 
 	newStaleLists := dedupeStaleLists(staleLists)
 	offset, step := time.Second*10, time.Second
-	if max := len(newStaleLists); max > 120 {
-		step = (time.Second * 120) / time.Duration(max)
+	if maxSDL := len(newStaleLists); maxSDL > 120 {
+		step = (time.Second * 120) / time.Duration(maxSDL)
 	}
 	for _, userID := range newStaleLists {
 		userID := userID // otherwise we are only sending the last entry
 		time.AfterFunc(offset, func() {
-			u.notifyWorkers(userID)
+			u.notifyWorkers(ctx, userID)
 		})
 		offset += step
 	}
@@ -227,14 +224,14 @@ func (u *DeviceListUpdater) Start() error {
 }
 
 // CleanUp removes stale device entries for users we don't share a room with anymore
-func (u *DeviceListUpdater) CleanUp() error {
-	staleUsers, err := u.db.StaleDeviceLists(u.process.Context(), []spec.ServerName{})
+func (u *DeviceListUpdater) CleanUp(ctx context.Context) error {
+	staleUsers, err := u.db.StaleDeviceLists(ctx, []spec.ServerName{})
 	if err != nil {
 		return err
 	}
 
 	res := rsapi.QueryLeftUsersResponse{}
-	if err = u.rsAPI.QueryLeftUsers(u.process.Context(), &rsapi.QueryLeftUsersRequest{StaleDeviceListUsers: staleUsers}, &res); err != nil {
+	if err = u.rsAPI.QueryLeftUsers(ctx, &rsapi.QueryLeftUsersRequest{StaleDeviceListUsers: staleUsers}, &res); err != nil {
 		return err
 	}
 
@@ -242,7 +239,7 @@ func (u *DeviceListUpdater) CleanUp() error {
 		return nil
 	}
 	logrus.Debugf("Deleting %d stale device list entries", len(res.LeftUsers))
-	return u.db.DeleteStaleDeviceLists(u.process.Context(), res.LeftUsers)
+	return u.db.DeleteStaleDeviceLists(ctx, res.LeftUsers)
 }
 
 func (u *DeviceListUpdater) mutex(userID string) *sync.Mutex {
@@ -264,7 +261,7 @@ func (u *DeviceListUpdater) ManualUpdate(ctx context.Context, serverName spec.Se
 	if err != nil {
 		return fmt.Errorf("ManualUpdate: failed to mark device list for %s as stale: %w", userID, err)
 	}
-	u.notifyWorkers(userID)
+	u.notifyWorkers(ctx, userID)
 	return nil
 }
 
@@ -277,7 +274,7 @@ func (u *DeviceListUpdater) Update(ctx context.Context, event gomatrixserverlib.
 	}
 	if isDeviceListStale {
 		// poke workers to handle stale device lists
-		u.notifyWorkers(event.UserID)
+		u.notifyWorkers(ctx, event.UserID)
 	}
 	return nil
 }
@@ -349,7 +346,7 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 			return false, fmt.Errorf("failed to store remote device keys for %s (%s): %w", event.UserID, event.DeviceID, err)
 		}
 
-		if err = emitDeviceKeyChanges(u.producer, existingKeys, keys, false); err != nil {
+		if err = emitDeviceKeyChanges(ctx, u.producer, existingKeys, keys, false); err != nil {
 			return false, fmt.Errorf("failed to produce device key changes for %s (%s): %w", event.UserID, event.DeviceID, err)
 		}
 		return false, nil
@@ -363,12 +360,12 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 	return true, nil
 }
 
-func (u *DeviceListUpdater) notifyWorkers(userID string) {
+func (u *DeviceListUpdater) notifyWorkers(ctx context.Context, userID string) {
 	_, remoteServer, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return
 	}
-	_, err = u.isBlacklistedOrBackingOffFn(remoteServer)
+	_, err = u.isBlacklistedOrBackingOffFn(ctx, remoteServer)
 	var federationClientError *fedsenderapi.FederationClientError
 	if errors.As(err, &federationClientError) {
 		if federationClientError.Blacklisted {
@@ -413,7 +410,7 @@ func (u *DeviceListUpdater) clearChannel(userID string) {
 	}
 }
 
-func (u *DeviceListUpdater) worker(ch chan spec.ServerName, workerID int) {
+func (u *DeviceListUpdater) worker(ctx context.Context, ch chan spec.ServerName, workerID int) {
 	retries := make(map[spec.ServerName]time.Time)
 	retriesMu := &sync.Mutex{}
 	// restarter goroutine which will inject failed servers into ch when it is time
@@ -462,7 +459,7 @@ func (u *DeviceListUpdater) worker(ch chan spec.ServerName, workerID int) {
 
 		// If the serverName is coming from retries, maybe it was
 		// blacklisted in the meantime.
-		_, err := u.isBlacklistedOrBackingOffFn(serverName)
+		_, err := u.isBlacklistedOrBackingOffFn(ctx, serverName)
 		var federationClientError *fedsenderapi.FederationClientError
 		// unwrap errors and check for FederationClientError, if found, federationClientError will be not nil
 		errors.As(err, &federationClientError)
@@ -473,7 +470,7 @@ func (u *DeviceListUpdater) worker(ch chan spec.ServerName, workerID int) {
 			deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Dec()
 			continue
 		}
-		waitTime, shouldRetry := u.processServer(serverName)
+		waitTime, shouldRetry := u.processServer(ctx, serverName)
 		if shouldRetry {
 			retriesMu.Lock()
 			if _, exists = retries[serverName]; !exists {
@@ -485,8 +482,7 @@ func (u *DeviceListUpdater) worker(ch chan spec.ServerName, workerID int) {
 	}
 }
 
-func (u *DeviceListUpdater) processServer(serverName spec.ServerName) (time.Duration, bool) {
-	ctx := u.process.Context()
+func (u *DeviceListUpdater) processServer(ctx context.Context, serverName spec.ServerName) (time.Duration, bool) {
 	// If the process.Context is canceled, there is no need to go further.
 	// This avoids spamming the logs when shutting down
 	if errors.Is(ctx.Err(), context.Canceled) {
@@ -596,7 +592,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 		}
 		u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
 	}
-	err = u.updateDeviceList(&res)
+	err = u.updateDeviceList(ctx, &res)
 	if err != nil {
 		logger.WithError(err).Error("Fetched device list but failed to store/emit it")
 		return defaultWaitTime, err
@@ -604,8 +600,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 	return defaultWaitTime, nil
 }
 
-func (u *DeviceListUpdater) updateDeviceList(res *fclient.RespUserDevices) error {
-	ctx := context.Background() // we've got the keys, don't time out when persisting them to the database.
+func (u *DeviceListUpdater) updateDeviceList(ctx context.Context, res *fclient.RespUserDevices) error {
 	keys := make([]api.DeviceMessage, len(res.Devices))
 	existingKeys := make([]api.DeviceMessage, len(res.Devices))
 	for i, device := range res.Devices {
@@ -648,7 +643,7 @@ func (u *DeviceListUpdater) updateDeviceList(res *fclient.RespUserDevices) error
 	if err != nil {
 		return fmt.Errorf("failed to mark device list as fresh: %w", err)
 	}
-	err = emitDeviceKeyChanges(u.producer, existingKeys, keys, false)
+	err = emitDeviceKeyChanges(ctx, u.producer, existingKeys, keys, false)
 	if err != nil {
 		return fmt.Errorf("failed to emit key changes for fresh device list: %w", err)
 	}

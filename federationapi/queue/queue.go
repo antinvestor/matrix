@@ -15,6 +15,7 @@
 package queue
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -32,14 +33,12 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/process"
 )
 
 // OutgoingQueues is a collection of queues for sending transactions to other
 // matrix servers
 type OutgoingQueues struct {
 	db          storage.Database
-	process     *process.ProcessContext
 	disabled    bool
 	origin      spec.ServerName
 	client      fclient.FederationClient
@@ -82,8 +81,8 @@ var destinationQueueBackingOff = prometheus.NewGauge(
 
 // NewOutgoingQueues makes a new OutgoingQueues
 func NewOutgoingQueues(
+	ctx context.Context,
 	db storage.Database,
-	process *process.ProcessContext,
 	disabled bool,
 	origin spec.ServerName,
 	client fclient.FederationClient,
@@ -92,7 +91,6 @@ func NewOutgoingQueues(
 ) *OutgoingQueues {
 	queues := &OutgoingQueues{
 		disabled:   disabled,
-		process:    process,
 		db:         db,
 		origin:     origin,
 		client:     client,
@@ -106,14 +104,14 @@ func NewOutgoingQueues(
 	// Look up which servers we have pending items for and then rehydrate those queues.
 	if !disabled {
 		serverNames := map[spec.ServerName]struct{}{}
-		if names, err := db.GetPendingPDUServerNames(process.Context()); err == nil {
+		if names, err := db.GetPendingPDUServerNames(ctx); err == nil {
 			for _, serverName := range names {
 				serverNames[serverName] = struct{}{}
 			}
 		} else {
 			log.WithError(err).Error("Failed to get PDU server names for destination queue hydration")
 		}
-		if names, err := db.GetPendingEDUServerNames(process.Context()); err == nil {
+		if names, err := db.GetPendingEDUServerNames(ctx); err == nil {
 			for _, serverName := range names {
 				serverNames[serverName] = struct{}{}
 			}
@@ -125,8 +123,10 @@ func NewOutgoingQueues(
 			step = (time.Second * 120) / time.Duration(maxVal)
 		}
 		for serverName := range serverNames {
-			if queue := queues.getQueue(serverName); queue != nil {
-				time.AfterFunc(offset, queue.wakeQueueIfNeeded)
+			if queue := queues.getQueue(ctx, serverName); queue != nil {
+				time.AfterFunc(offset, func() {
+					queue.wakeQueueIfNeeded(ctx)
+				})
 				offset += step
 			}
 		}
@@ -144,8 +144,8 @@ type queuedEDU struct {
 	edu       *gomatrixserverlib.EDU
 }
 
-func (oqs *OutgoingQueues) getQueue(destination spec.ServerName) *destinationQueue {
-	if oqs.statistics.ForServer(destination).Blacklisted() {
+func (oqs *OutgoingQueues) getQueue(ctx context.Context, destination spec.ServerName) *destinationQueue {
+	if oqs.statistics.ForServer(ctx, destination).Blacklisted() {
 		return nil
 	}
 	oqs.queuesMutex.Lock()
@@ -156,15 +156,16 @@ func (oqs *OutgoingQueues) getQueue(destination spec.ServerName) *destinationQue
 		oq = &destinationQueue{
 			queues:      oqs,
 			db:          oqs.db,
-			process:     oqs.process,
 			origin:      oqs.origin,
 			destination: destination,
 			client:      oqs.client,
-			statistics:  oqs.statistics.ForServer(destination),
+			statistics:  oqs.statistics.ForServer(ctx, destination),
 			notify:      make(chan struct{}, 1),
 			signing:     oqs.signing,
 		}
-		oq.statistics.AssignBackoffNotifier(oq.handleBackoffNotifier)
+		oq.statistics.AssignBackoffNotifier(func() {
+			oq.handleBackoffNotifier(ctx)
+		})
 		oqs.queues[destination] = oq
 	}
 	return oq
@@ -182,6 +183,7 @@ func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
 
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendEvent(
+	ctx context.Context,
 	ev *types.HeaderedEvent, origin spec.ServerName,
 	destinations []spec.ServerName,
 ) error {
@@ -221,14 +223,14 @@ func (oqs *OutgoingQueues) SendEvent(
 		return fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	nid, err := oqs.db.StoreJSON(oqs.process.Context(), string(headeredJSON))
+	nid, err := oqs.db.StoreJSON(ctx, string(headeredJSON))
 	if err != nil {
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
 
 	destQueues := make([]*destinationQueue, 0, len(destmap))
 	for destination := range destmap {
-		if queue := oqs.getQueue(destination); queue != nil {
+		if queue := oqs.getQueue(ctx, destination); queue != nil {
 			destQueues = append(destQueues, queue)
 		} else {
 			delete(destmap, destination)
@@ -239,7 +241,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	// this destinations queue. We'll then be able to retrieve the PDU
 	// later.
 	if err := oqs.db.AssociatePDUWithDestinations(
-		oqs.process.Context(),
+		ctx,
 		destmap,
 		nid, // NIDs from federationapi_queue_json table
 	); err != nil {
@@ -252,7 +254,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	// If the send completes before they are associated then they won't
 	// get properly cleaned up in the database.
 	for _, queue := range destQueues {
-		queue.sendEvent(ev, nid)
+		queue.sendEvent(ctx, ev, nid)
 	}
 
 	return nil
@@ -260,6 +262,7 @@ func (oqs *OutgoingQueues) SendEvent(
 
 // SendEDU sends an EDU event to the destinations.
 func (oqs *OutgoingQueues) SendEDU(
+	ctx context.Context,
 	e *gomatrixserverlib.EDU, origin spec.ServerName,
 	destinations []spec.ServerName,
 ) error {
@@ -300,7 +303,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		return fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	nid, err := oqs.db.StoreJSON(oqs.process.Context(), string(ephemeralJSON))
+	nid, err := oqs.db.StoreJSON(ctx, string(ephemeralJSON))
 	if err != nil {
 		sentry.CaptureException(err)
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
@@ -308,7 +311,7 @@ func (oqs *OutgoingQueues) SendEDU(
 
 	destQueues := make([]*destinationQueue, 0, len(destmap))
 	for destination := range destmap {
-		if queue := oqs.getQueue(destination); queue != nil {
+		if queue := oqs.getQueue(ctx, destination); queue != nil {
 			destQueues = append(destQueues, queue)
 		} else {
 			delete(destmap, destination)
@@ -318,8 +321,8 @@ func (oqs *OutgoingQueues) SendEDU(
 	// Create a database entry that associates the given PDU NID with
 	// these destination queues. We'll then be able to retrieve the PDU
 	// later.
-	if err := oqs.db.AssociateEDUWithDestinations(
-		oqs.process.Context(),
+	if err = oqs.db.AssociateEDUWithDestinations(
+		ctx,
 		destmap, // the destination server names
 		nid,     // NIDs from federationapi_queue_json table
 		e.Type,
@@ -334,19 +337,19 @@ func (oqs *OutgoingQueues) SendEDU(
 	// If the send completes before they are associated then they won't
 	// get properly cleaned up in the database.
 	for _, queue := range destQueues {
-		queue.sendEDU(e, nid)
+		queue.sendEDU(ctx, e, nid)
 	}
 
 	return nil
 }
 
 // RetryServer attempts to resend events to the given server if we had given up.
-func (oqs *OutgoingQueues) RetryServer(srv spec.ServerName, wasBlacklisted bool) {
+func (oqs *OutgoingQueues) RetryServer(ctx context.Context, srv spec.ServerName, wasBlacklisted bool) {
 	if oqs.disabled {
 		return
 	}
 
-	if queue := oqs.getQueue(srv); queue != nil {
-		queue.wakeQueueIfEventsPending(wasBlacklisted)
+	if queue := oqs.getQueue(ctx, srv); queue != nil {
+		queue.wakeQueueIfEventsPending(ctx, wasBlacklisted)
 	}
 }

@@ -39,66 +39,66 @@ type SyncServerDatasource struct {
 func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
-	if d.db, d.writer, err = cm.Connection(dbProperties); err != nil {
+	if d.db, d.writer, err = cm.Connection(ctx, dbProperties); err != nil {
 		return nil, err
 	}
-	accountData, err := NewPostgresAccountDataTable(d.db)
+	accountData, err := NewPostgresAccountDataTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	events, err := NewPostgresEventsTable(d.db)
+	events, err := NewPostgresEventsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	currState, err := NewPostgresCurrentRoomStateTable(d.db)
+	currState, err := NewPostgresCurrentRoomStateTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	invites, err := NewPostgresInvitesTable(d.db)
+	invites, err := NewPostgresInvitesTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	peeks, err := NewPostgresPeeksTable(d.db)
+	peeks, err := NewPostgresPeeksTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	topology, err := NewPostgresTopologyTable(d.db)
+	topology, err := NewPostgresTopologyTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	backwardExtremities, err := NewPostgresBackwardsExtremitiesTable(d.db)
+	backwardExtremities, err := NewPostgresBackwardsExtremitiesTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	sendToDevice, err := NewPostgresSendToDeviceTable(d.db)
+	sendToDevice, err := NewPostgresSendToDeviceTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	filter, err := NewPostgresFilterTable(d.db)
+	filter, err := NewPostgresFilterTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	receipts, err := NewPostgresReceiptsTable(d.db)
+	receipts, err := NewPostgresReceiptsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	memberships, err := NewPostgresMembershipsTable(d.db)
+	memberships, err := NewPostgresMembershipsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	notificationData, err := NewPostgresNotificationDataTable(d.db)
+	notificationData, err := NewPostgresNotificationDataTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	ignores, err := NewPostgresIgnoresTable(d.db)
+	ignores, err := NewPostgresIgnoresTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	presence, err := NewPostgresPresenceTable(d.db)
+	presence, err := NewPostgresPresenceTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	relations, err := NewPostgresRelationsTable(d.db)
+	relations, err := NewPostgresRelationsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}

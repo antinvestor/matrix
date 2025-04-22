@@ -54,7 +54,7 @@ type keyChangesStatements struct {
 	selectKeyChangesStmt *sql.Stmt
 }
 
-func NewPostgresKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
+func NewPostgresKeyChangesTable(ctx context.Context, db *sql.DB) (tables.KeyChanges, error) {
 	s := &keyChangesStatements{
 		db: db,
 	}
@@ -63,7 +63,7 @@ func NewPostgresKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 		return s, err
 	}
 
-	if err = executeMigration(context.Background(), db); err != nil {
+	if err = executeMigration(ctx, db); err != nil {
 		return nil, err
 	}
 	return s, sqlutil.StatementList{

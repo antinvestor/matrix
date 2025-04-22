@@ -72,7 +72,7 @@ type queuePDUsStatements struct {
 	selectQueuePDUServerNamesStmt        *sql.Stmt
 }
 
-func NewPostgresQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
+func NewPostgresQueuePDUsTable(ctx context.Context, db *sql.DB) (s *queuePDUsStatements, err error) {
 	s = &queuePDUsStatements{
 		db: db,
 	}

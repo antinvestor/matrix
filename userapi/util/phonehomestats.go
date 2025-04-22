@@ -48,7 +48,7 @@ type timestampToRUUsage struct {
 	usage     syscall.Rusage
 }
 
-func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, statsDB storage.Statistics) {
+func StartPhoneHomeCollector(ctx context.Context, startTime time.Time, cfg *config.Dendrite, statsDB storage.Statistics) {
 
 	p := phoneHomeStats{
 		startTime:  startTime,
@@ -63,16 +63,18 @@ func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, statsDB 
 	}
 
 	// start initial run after 5min
-	time.AfterFunc(time.Minute*5, p.collect)
+	time.AfterFunc(time.Minute*5, func() {
+		p.collect(ctx)
+	})
 
 	// run every 3 hours
 	ticker := time.NewTicker(time.Hour * 3)
 	for range ticker.C {
-		p.collect()
+		p.collect(ctx)
 	}
 }
 
-func (p *phoneHomeStats) collect() {
+func (p *phoneHomeStats) collect(ctx context.Context) {
 	p.stats = make(map[string]interface{})
 	// general information
 	p.stats["homeserver"] = p.serverName
@@ -86,7 +88,7 @@ func (p *phoneHomeStats) collect() {
 	p.stats["num_go_routine"] = runtime.NumGoroutine()
 	p.stats["uptime_seconds"] = math.Floor(time.Since(p.startTime).Seconds())
 
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute*1)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*1)
 	defer cancel()
 
 	// cpu and memory usage information

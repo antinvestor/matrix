@@ -43,7 +43,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 )
 
 // Inputer is responsible for consuming from the roomserver input
@@ -75,7 +74,6 @@ import (
 // or C.
 type Inputer struct {
 	Cfg                 *config.RoomServer
-	ProcessContext      *process.ProcessContext
 	DB                  storage.RoomDatabase
 	NATSClient          *nats.Conn
 	JetStream           nats.JetStreamContext
@@ -111,7 +109,7 @@ type worker struct {
 	sentryHub    *sentry.Hub
 }
 
-func (r *Inputer) startWorkerForRoom(roomID string) {
+func (r *Inputer) startWorkerForRoom(ctx context.Context, roomID string) {
 	v, loaded := r.workers.LoadOrStore(roomID, &worker{
 		r:         r,
 		roomID:    roomID,
@@ -216,7 +214,9 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 
 		// Go and start pulling messages off the queue.
 		w.subscription = sub
-		w.Act(nil, w._next)
+		w.Act(nil, func() {
+			w._next(ctx)
+		})
 	}
 }
 
@@ -226,7 +226,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 // we only care about the `room_id` field. Once a message arrives, we
 // will look to see if we have a worker for that room which has its
 // own consumer. If we don't, we'll start one.
-func (r *Inputer) Start() error {
+func (r *Inputer) Start(ctx context.Context) error {
 	if r.EnableMetrics {
 		prometheus.MustRegister(roomserverInputBackpressure, processRoomEventDuration)
 	}
@@ -234,7 +234,7 @@ func (r *Inputer) Start() error {
 		"", // This is blank because we specified it in BindStream.
 		func(m *nats.Msg) {
 			roomID := m.Header.Get(jetstream.RoomID)
-			r.startWorkerForRoom(roomID)
+			r.startWorkerForRoom(ctx, roomID)
 			_ = m.Ack()
 		},
 		nats.HeadersOnly(),
@@ -263,9 +263,9 @@ func (r *Inputer) Start() error {
 
 // _next is called by the worker for the room. It must only be called
 // by the actor embedded into the worker.
-func (w *worker) _next() {
+func (w *worker) _next(ctx context.Context) {
 	// Look up what the next event is that's waiting to be processed.
-	ctx, cancel := context.WithTimeout(w.r.ProcessContext.Context(), time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	w.sentryHub.ConfigureScope(func(scope *sentry.Scope) {
 		scope.SetTag("room_id", w.roomID)
@@ -275,7 +275,7 @@ func (w *worker) _next() {
 	case nil:
 		// Make sure that once we're done here, we queue up another call
 		// to _next in the inbox.
-		defer w.Act(nil, w._next)
+		defer w.Act(nil, func() { w._next(ctx) })
 
 		// If no error was reported, but we didn't get exactly one message,
 		// then skip over this and try again on the next iteration.
@@ -335,7 +335,7 @@ func (w *worker) _next() {
 	// it was a synchronous request.
 	var errString string
 	if err = w.r.processRoomEvent(
-		w.r.ProcessContext.Context(),
+		ctx,
 		spec.ServerName(msg.Header.Get("virtual_host")),
 		&inputRoomEvent,
 	); err != nil {
@@ -360,7 +360,7 @@ func (w *worker) _next() {
 		// Even though we failed to process this message (e.g. due to Dendrite restarting and receiving a context canceled),
 		// the message may already have been queued for redelivery or will be, so this makes sure that we still reprocess the msg
 		// after restarting. We only Ack if the context was not yet canceled.
-		if w.r.ProcessContext.Context().Err() == nil {
+		if ctx.Err() == nil {
 			_ = msg.AckSync()
 		}
 		errString = err.Error()

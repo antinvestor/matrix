@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/test/testrig"
 	"io"
 	"os"
 	"path/filepath"
@@ -48,7 +49,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		DynamicThumbnails: false,
 	}
 
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	// create testdata folder and remove when done
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
@@ -57,7 +58,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	defer closeDb()
 
 	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewMediaAPIDatasource(cm, &config.DatabaseOptions{
+	db, err := storage.NewMediaAPIDatasource(ctx, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,
 	})
@@ -74,7 +75,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		{
 			name: "upload ok",
 			args: args{
-				ctx:       context.Background(),
+				ctx:       ctx,
 				reqReader: strings.NewReader("test"),
 				cfg:       cfg,
 				db:        db,
@@ -91,7 +92,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		{
 			name: "upload ok (exact size)",
 			args: args{
-				ctx:       context.Background(),
+				ctx:       ctx,
 				reqReader: strings.NewReader("testtest"),
 				cfg:       cfg,
 				db:        db,
@@ -108,7 +109,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		{
 			name: "upload not ok",
 			args: args{
-				ctx:       context.Background(),
+				ctx:       ctx,
 				reqReader: strings.NewReader("test test test"),
 				cfg:       cfg,
 				db:        db,
@@ -125,7 +126,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		{
 			name: "upload ok with unlimited filesize",
 			args: args{
-				ctx:       context.Background(),
+				ctx:       ctx,
 				reqReader: strings.NewReader("test test test"),
 				cfg: &config.MediaAPI{
 					MaxFileSizeBytes:  config.FileSizeBytes(0),

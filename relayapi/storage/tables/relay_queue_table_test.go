@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 	"time"
 
@@ -38,12 +39,12 @@ type RelayQueueDatabase struct {
 }
 
 func mustCreateQueueTable(
+	ctx context.Context,
 	t *testing.T,
 	_ test.DependancyOption,
 ) (database RelayQueueDatabase, close func()) {
 	t.Helper()
 
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -54,7 +55,7 @@ func mustCreateQueueTable(
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.RelayQueue
-	tab, err = postgres.NewPostgresRelayQueueTable(db)
+	tab, err = postgres.NewPostgresRelayQueueTable(ctx, db)
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
@@ -68,9 +69,9 @@ func mustCreateQueueTable(
 }
 
 func TestShoudInsertQueueTransaction(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateQueueTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
@@ -84,9 +85,9 @@ func TestShoudInsertQueueTransaction(t *testing.T) {
 }
 
 func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateQueueTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
@@ -109,9 +110,9 @@ func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 }
 
 func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateQueueTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
@@ -150,9 +151,9 @@ func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 }
 
 func TestShouldDeleteQueueTransaction(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateQueueTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
@@ -181,9 +182,9 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 }
 
 func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateQueueTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
 		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))

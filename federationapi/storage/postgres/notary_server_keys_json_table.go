@@ -43,7 +43,7 @@ type notaryServerKeysStatements struct {
 	insertServerKeysJSONStmt *sql.Stmt
 }
 
-func NewPostgresNotaryServerKeysTable(db *sql.DB) (s *notaryServerKeysStatements, err error) {
+func NewPostgresNotaryServerKeysTable(ctx context.Context, db *sql.DB) (s *notaryServerKeysStatements, err error) {
 	s = &notaryServerKeysStatements{
 		db: db,
 	}

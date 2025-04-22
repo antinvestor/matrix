@@ -99,12 +99,12 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt *sql.Stmt
 }
 
-func CreateEventTypesTable(db *sql.DB) error {
+func CreateEventTypesTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(eventTypesSchema)
 	return err
 }
 
-func PrepareEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
+func PrepareEventTypesTable(ctx context.Context, db *sql.DB) (tables.EventTypes, error) {
 	s := &eventTypeStatements{}
 
 	return s, sqlutil.StatementList{
