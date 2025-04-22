@@ -88,7 +88,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 	p.stats["num_go_routine"] = runtime.NumGoroutine()
 	p.stats["uptime_seconds"] = math.Floor(time.Since(p.startTime).Seconds())
 
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*1)
+	iCtx, cancel := context.WithTimeout(ctx, time.Minute*1)
 	defer cancel()
 
 	// cpu and memory usage information
@@ -110,7 +110,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 	// TODO: Find a solution to actually set this value
 	p.stats["total_room_count"] = 0
 
-	messageStats, activeRooms, activeE2EERooms, err := p.db.DailyRoomsMessages(ctx, p.serverName)
+	messageStats, activeRooms, activeE2EERooms, err := p.db.DailyRoomsMessages(iCtx, p.serverName)
 	if err != nil {
 		logrus.WithError(err).Warn("unable to query message stats, using default values")
 	}
@@ -122,7 +122,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 	p.stats["daily_active_e2ee_rooms"] = activeE2EERooms
 
 	// user stats and DB engine
-	userStats, db, err := p.db.UserStatistics(ctx)
+	userStats, db, err := p.db.UserStatistics(iCtx)
 	if err != nil {
 		logrus.WithError(err).Warn("unable to query userstats, using default values")
 	}
@@ -150,7 +150,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 
 	logrus.Infof("Reporting stats to %s: %s", p.cfg.Global.ReportStats.Endpoint, output.String())
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
+	request, err := http.NewRequestWithContext(iCtx, http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
 	if err != nil {
 		logrus.WithError(err).Error("Unable to create phone-home statistics request")
 		return

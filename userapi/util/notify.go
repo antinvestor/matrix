@@ -42,7 +42,7 @@ func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, loc
 	// ordering guarantees we must provide.
 	go func() {
 		// This background processing cannot be tied to a request.
-		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		iCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
 		// TODO: we could batch all devices with the same URL, but
@@ -62,7 +62,7 @@ func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, loc
 					Devices: []*pushgateway.Device{&pusherDevice.Device},
 				},
 			}
-			if err := pgClient.Notify(ctx, pusherDevice.URL, &req, &pushgateway.NotifyResponse{}); err != nil {
+			if err = pgClient.Notify(iCtx, pusherDevice.URL, &req, &pushgateway.NotifyResponse{}); err != nil {
 				log.WithFields(log.Fields{
 					"localpart": localpart,
 					"app_id0":   pusherDevice.Device.AppID,

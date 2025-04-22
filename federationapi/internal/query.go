@@ -27,10 +27,10 @@ func (r *FederationInternalAPI) QueryJoinedHostServerNamesInRoom(
 }
 
 func (r *FederationInternalAPI) fetchServerKeysDirectly(ctx context.Context, serverName spec.ServerName) (*gomatrixserverlib.ServerKeys, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	iCtx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
-	ires, err := r.doRequestIfNotBackingOffOrBlacklisted(ctx, serverName, func() (interface{}, error) {
-		return r.federation.GetServerKeys(ctx, serverName)
+	ires, err := r.doRequestIfNotBackingOffOrBlacklisted(iCtx, serverName, func() (interface{}, error) {
+		return r.federation.GetServerKeys(iCtx, serverName)
 	})
 	if err != nil {
 		return nil, err

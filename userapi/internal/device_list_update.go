@@ -525,18 +525,18 @@ func (u *DeviceListUpdater) processServer(ctx context.Context, serverName spec.S
 }
 
 func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName spec.ServerName, userID string) (time.Duration, error) {
-	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	iCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
 	// If we are processing more than one user per server, this unblocks further calls to Update
 	// immediately instead of just after **all** users have been processed.
 	defer u.clearChannel(userID)
 
-	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
+	logger := util.GetLogger(iCtx).WithFields(logrus.Fields{
 		"server_name": serverName,
 		"user_id":     userID,
 	})
-	res, err := u.fedClient.GetUserDevices(ctx, u.thisServer, serverName, userID)
+	res, err := u.fedClient.GetUserDevices(iCtx, u.thisServer, serverName, userID)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return time.Minute * 10, err
@@ -590,9 +590,9 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 				uploadReq.SelfSigningKey = *res.SelfSigningKey
 			}
 		}
-		u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
+		u.api.PerformUploadDeviceKeys(iCtx, uploadReq, uploadRes)
 	}
-	err = u.updateDeviceList(ctx, &res)
+	err = u.updateDeviceList(iCtx, &res)
 	if err != nil {
 		logger.WithError(err).Error("Fetched device list but failed to store/emit it")
 		return defaultWaitTime, err
