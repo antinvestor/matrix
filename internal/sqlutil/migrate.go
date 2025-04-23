@@ -51,9 +51,13 @@ const createNecessaryExtensionsSQL = `
 type Migration struct {
 	// Version is a simple description/name of this migration.
 	Version string
+	// QueryUp is the SQL to execute for an upgrade.
+	QueryUp string
+	// QueryDown is the SQL to execute for a downgrade.
+	QueryDown string
 	// Up defines the function to execute for an upgrade.
 	Up func(ctx context.Context, txn *sql.Tx) error
-	// Down defines the function to execute for a downgrade (not implemented yet).
+	// Down defines the function to execute for a downgrade.
 	Down func(ctx context.Context, txn *sql.Tx) error
 }
 
@@ -67,13 +71,16 @@ type Migrator struct {
 }
 
 // NewMigrator creates a new DB migrator.
-func NewMigrator(db *sql.DB) *Migrator {
-	return &Migrator{
+func NewMigrator(db *sql.DB, migrations ...Migration) *Migrator {
+	m := &Migrator{
 		db:              db,
 		migrations:      []Migration{},
 		knownMigrations: make(map[string]struct{}),
 		mutex:           &sync.Mutex{},
 	}
+
+	m.AddMigrations(migrations...)
+	return m
 }
 
 // AddMigrations appends migrations to the list of migrations. Migrations are executed

@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/antinvestor/matrix/relayapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -43,6 +44,8 @@ CREATE INDEX IF NOT EXISTS relayapi_queue_json_nid_idx
 CREATE INDEX IF NOT EXISTS relayapi_queue_server_name_idx
 	ON relayapi_queue (server_name);
 `
+
+const relayQueueSchemaRevert = `DROP TABLE IF EXISTS relayapi_queue;`
 
 const insertQueueEntrySQL = "" +
 	"INSERT INTO relayapi_queue (transaction_id, server_name, json_nid)" +
@@ -71,13 +74,10 @@ type relayQueueStatements struct {
 
 func NewPostgresRelayQueueTable(
 	_ context.Context, db *sql.DB,
-) (s *relayQueueStatements, err error) {
-	s = &relayQueueStatements{
+) (tables.RelayQueue, error) {
+
+	s := &relayQueueStatements{
 		db: db,
-	}
-	_, err = s.db.Exec(relayQueueSchema)
-	if err != nil {
-		return
 	}
 
 	return s, sqlutil.StatementList{

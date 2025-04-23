@@ -25,6 +25,20 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 )
 
+// Migrations All relayapi migrations for the postgres module
+var Migrations = []sqlutil.Migration{
+	{
+		Version:   "relayapi_001_create_queue_json_table",
+		QueryUp:   relayQueueJSONSchema,
+		QueryDown: relayQueueJSONSchemaRevert,
+	},
+	{
+		Version:   "relayapi_002_create_queue_table",
+		QueryUp:   relayQueueSchema,
+		QueryDown: relayQueueSchemaRevert,
+	},
+}
+
 // Database stores information needed by the relayapi
 type Database struct {
 	shared.Database
@@ -45,6 +59,13 @@ func NewDatabase(
 	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(d.db, Migrations...)
+	err = m.Up(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	queue, err := NewPostgresRelayQueueTable(ctx, d.db)
 	if err != nil {
 		return nil, err

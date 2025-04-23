@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/antinvestor/matrix/relayapi/storage/tables"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -37,6 +38,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS relayapi_queue_json_json_nid_idx
 	ON relayapi_queue_json (json_nid);
 `
 
+const relayQueueJSONSchemaRevert = `DROP TABLE IF EXISTS relayapi_queue_json;`
+
 const insertQueueJSONSQL = "" +
 	"INSERT INTO relayapi_queue_json (json_body)" +
 	" VALUES ($1)" +
@@ -56,13 +59,9 @@ type relayQueueJSONStatements struct {
 	selectJSONStmt *sql.Stmt
 }
 
-func NewPostgresRelayQueueJSONTable(ctx context.Context, db *sql.DB) (s *relayQueueJSONStatements, err error) {
-	s = &relayQueueJSONStatements{
+func NewPostgresRelayQueueJSONTable(ctx context.Context, db *sql.DB) (tables.RelayQueueJSON, error) {
+	s := &relayQueueJSONStatements{
 		db: db,
-	}
-	_, err = s.db.Exec(relayQueueJSONSchema)
-	if err != nil {
-		return
 	}
 
 	return s, sqlutil.StatementList{

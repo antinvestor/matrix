@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS mediaapi_media_repository (
 CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);
 `
 
+const mediaSchemaRevert = `DROP TABLE IF EXISTS mediaapi_media_repository;`
+
 const insertMediaSQL = `
 INSERT INTO mediaapi_media_repository (media_id, media_origin, content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -73,11 +75,6 @@ type mediaStatements struct {
 
 func NewPostgresMediaRepositoryTable(ctx context.Context, db *sql.DB) (tables.MediaRepository, error) {
 	s := &mediaStatements{}
-	_, err := db.Exec(mediaSchema)
-	if err != nil {
-		return nil, err
-	}
-
 	return s, sqlutil.StatementList{
 		{&s.insertMediaStmt, insertMediaSQL},
 		{&s.selectMediaStmt, selectMediaSQL},

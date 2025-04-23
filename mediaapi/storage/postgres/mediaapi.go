@@ -24,12 +24,33 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// Migrations All mediaapi migrations for the postgres module
+var Migrations = []sqlutil.Migration{
+	{
+		Version:   "mediaapi_001_create_media_repository_table",
+		QueryUp:   mediaSchema,
+		QueryDown: mediaSchemaRevert,
+	},
+	{
+		Version:   "mediaapi_002_create_thumbnail_table",
+		QueryUp:   thumbnailSchema,
+		QueryDown: thumbnailSchemaRevert,
+	},
+}
+
 // NewDatabase opens a postgres database.
 func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
 	db, writer, err := conMan.Connection(ctx, dbProperties)
 	if err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(db, Migrations...)
+	err = m.Up(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	mediaRepo, err := NewPostgresMediaRepositoryTable(ctx, db)
 	if err != nil {
 		return nil, err

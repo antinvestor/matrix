@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS mediaapi_thumbnail (
 CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_thumbnail_index ON mediaapi_thumbnail (media_id, media_origin, width, height, resize_method);
 `
 
+const thumbnailSchemaRevert = `DROP TABLE IF EXISTS mediaapi_thumbnail;`
+
 const insertThumbnailSQL = `
 INSERT INTO mediaapi_thumbnail (media_id, media_origin, content_type, file_size_bytes, creation_ts, width, height, resize_method)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -76,11 +78,6 @@ type thumbnailStatements struct {
 
 func NewPostgresThumbnailsTable(ctx context.Context, db *sql.DB) (tables.Thumbnails, error) {
 	s := &thumbnailStatements{}
-	_, err := db.Exec(thumbnailSchema)
-	if err != nil {
-		return nil, err
-	}
-
 	return s, sqlutil.StatementList{
 		{&s.insertThumbnailStmt, insertThumbnailSQL},
 		{&s.selectThumbnailStmt, selectThumbnailSQL},
