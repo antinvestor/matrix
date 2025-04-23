@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS keyserver_cross_signing_sigs (
 CREATE INDEX IF NOT EXISTS keyserver_cross_signing_sigs_idx ON keyserver_cross_signing_sigs (origin_user_id, target_user_id, target_key_id);
 `
 
+var crossSigningSigsSchemaRevert = "DROP TABLE IF EXISTS keyserver_cross_signing_sigs CASCADE; DROP INDEX IF EXISTS keyserver_cross_signing_sigs_idx;"
+
 const selectCrossSigningSigsForTargetSQL = "" +
 	"SELECT origin_user_id, origin_key_id, signature FROM keyserver_cross_signing_sigs" +
 	" WHERE (origin_user_id = $1 OR origin_user_id = $2) AND target_user_id = $2 AND target_key_id = $3"
@@ -62,15 +64,6 @@ type crossSigningSigsStatements struct {
 func NewPostgresCrossSigningSigsTable(ctx context.Context, db *sql.DB) (tables.CrossSigningSigs, error) {
 	s := &crossSigningSigsStatements{
 		db: db,
-	}
-	_, err := db.Exec(crossSigningSigsSchema)
-	if err != nil {
-		return nil, err
-	}
-
-	m := sqlutil.NewMigrator(db)
-	if err = m.Up(ctx); err != nil {
-		return nil, err
 	}
 
 	return s, sqlutil.StatementList{

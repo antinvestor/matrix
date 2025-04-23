@@ -58,6 +58,8 @@ CREATE INDEX IF NOT EXISTS userapi_notification_localpart_room_id_id_idx ON user
 CREATE INDEX IF NOT EXISTS userapi_notification_localpart_id_idx ON userapi_notifications(localpart, server_name, id);
 `
 
+const notificationsSchemaRevert = "DROP TABLE IF EXISTS userapi_notifications CASCADE;"
+
 const insertNotificationSQL = "" +
 	"INSERT INTO userapi_notifications (localpart, server_name, room_id, event_id, stream_pos, ts_ms, highlight, notification_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
 
@@ -87,10 +89,7 @@ const cleanNotificationsSQL = "" +
 
 func NewPostgresNotificationTable(ctx context.Context, db *sql.DB) (tables.NotificationTable, error) {
 	s := &notificationsStatements{}
-	_, err := db.Exec(notificationSchema)
-	if err != nil {
-		return nil, err
-	}
+	// Removed db.Exec(notificationSchema) from constructor. Schema handled by migrator.
 	return s, sqlutil.StatementList{
 		{&s.insertStmt, insertNotificationSQL},
 		{&s.deleteUpToStmt, deleteNotificationsUpToSQL},

@@ -123,12 +123,8 @@ func NewPostgresDevicesTable(ctx context.Context, db *sql.DB, serverName spec.Se
 	s := &devicesStatements{
 		serverName: serverName,
 	}
-	_, err := db.Exec(devicesSchema)
-	if err != nil {
-		return nil, err
-	}
 	m := sqlutil.NewMigrator(db)
-	err = m.Up(ctx)
+	err := m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}

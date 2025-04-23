@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS userapi_openid_tokens (
 );
 `
 
+const openIDTokenSchemaRevert = "DROP TABLE IF EXISTS userapi_openid_tokens CASCADE;"
+
 const insertOpenIDTokenSQL = "" +
 	"INSERT INTO userapi_openid_tokens(token, localpart, server_name, token_expires_at_ms) VALUES ($1, $2, $3, $4)"
 
@@ -38,13 +40,9 @@ type openIDTokenStatements struct {
 	serverName      spec.ServerName
 }
 
-func NewPostgresOpenIDTable(db *sql.DB, serverName spec.ServerName) (tables.OpenIDTable, error) {
+func NewPostgresOpenIDTable(ctx context.Context, db *sql.DB, serverName spec.ServerName) (tables.OpenIDTable, error) {
 	s := &openIDTokenStatements{
 		serverName: serverName,
-	}
-	_, err := db.Exec(openIDTokenSchema)
-	if err != nil {
-		return nil, err
 	}
 	return s, sqlutil.StatementList{
 		{&s.insertTokenStmt, insertOpenIDTokenSQL},

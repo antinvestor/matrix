@@ -55,15 +55,9 @@ type keyChangesStatements struct {
 }
 
 func NewPostgresKeyChangesTable(ctx context.Context, db *sql.DB) (tables.KeyChanges, error) {
-	s := &keyChangesStatements{
-		db: db,
-	}
-	_, err := db.Exec(keyChangesSchema)
-	if err != nil {
-		return s, err
-	}
-
-	if err = executeMigration(ctx, db); err != nil {
+	s := &keyChangesStatements{}
+	// Removed db.Exec(keyChangesSchema) from constructor. Schema handled by migrator.
+	if err := executeMigration(ctx, db); err != nil {
 		return nil, err
 	}
 	return s, sqlutil.StatementList{

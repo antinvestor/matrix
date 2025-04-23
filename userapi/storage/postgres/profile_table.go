@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS userapi_profiles (
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_profiles_idx ON userapi_profiles(localpart, server_name);
 `
 
+const profilesSchemaRevert = "DROP TABLE IF EXISTS userapi_profiles CASCADE; DROP INDEX IF EXISTS userapi_profiles_idx;"
+
 const insertProfileSQL = "" +
 	"INSERT INTO userapi_profiles(localpart, server_name, display_name, avatar_url) VALUES ($1, $2, $3, $4)"
 
@@ -77,10 +79,7 @@ func NewPostgresProfilesTable(db *sql.DB, serverNoticesLocalpart string) (tables
 	s := &profilesStatements{
 		serverNoticesLocalpart: serverNoticesLocalpart,
 	}
-	_, err := db.Exec(profilesSchema)
-	if err != nil {
-		return nil, err
-	}
+	// Removed db.Exec(profilesSchema) from constructor. Schema handled by migrator.
 	return s, sqlutil.StatementList{
 		{&s.insertProfileStmt, insertProfileSQL},
 		{&s.selectProfileByLocalpartStmt, selectProfileByLocalpartSQL},

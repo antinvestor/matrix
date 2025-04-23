@@ -57,6 +57,8 @@ CREATE INDEX IF NOT EXISTS userapi_pusher_localpart_idx ON userapi_pushers(local
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_pusher_app_id_pushkey_localpart_idx ON userapi_pushers(app_id, pushkey, localpart, server_name);
 `
 
+const pushersSchemaRevert = "DROP TABLE IF EXISTS userapi_pushers CASCADE;"
+
 const insertPusherSQL = "" +
 	"INSERT INTO userapi_pushers (localpart, server_name, session_id, pushkey, pushkey_ts_ms, kind, app_id, app_display_name, device_display_name, profile_tag, lang, data)" +
 	"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)" +
@@ -73,10 +75,7 @@ const deletePushersByAppIdAndPushKeySQL = "" +
 
 func NewPostgresPusherTable(ctx context.Context, db *sql.DB) (tables.PusherTable, error) {
 	s := &pushersStatements{}
-	_, err := db.Exec(pushersSchema)
-	if err != nil {
-		return nil, err
-	}
+	// Removed db.Exec(pushersSchema) from constructor. Schema handled by migrator.
 	return s, sqlutil.StatementList{
 		{&s.insertPusherStmt, insertPusherSQL},
 		{&s.selectPushersStmt, selectPushersSQL},

@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS userapi_key_backup_versions (
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_key_backup_versions_idx ON userapi_key_backup_versions(user_id, version);
 `
 
+const keyBackupVersionTableSchemaRevert = "DROP TABLE IF EXISTS userapi_key_backup_versions CASCADE; DROP SEQUENCE IF EXISTS userapi_key_backup_versions_seq; DROP INDEX IF EXISTS userapi_key_backup_versions_idx;"
+
 const insertKeyBackupSQL = "" +
 	"INSERT INTO userapi_key_backup_versions(user_id, algorithm, auth_data, etag) VALUES ($1, $2, $3, $4) RETURNING version"
 
@@ -72,10 +74,7 @@ type keyBackupVersionStatements struct {
 
 func NewPostgresKeyBackupVersionTable(ctx context.Context, db *sql.DB) (tables.KeyBackupVersionTable, error) {
 	s := &keyBackupVersionStatements{}
-	_, err := db.Exec(keyBackupVersionTableSchema)
-	if err != nil {
-		return nil, err
-	}
+	// Removed db.Exec(keyBackupVersionTableSchema) from constructor. Schema handled by migrator.
 	return s, sqlutil.StatementList{
 		{&s.insertKeyBackupStmt, insertKeyBackupSQL},
 		{&s.updateKeyBackupAuthDataStmt, updateKeyBackupAuthDataSQL},

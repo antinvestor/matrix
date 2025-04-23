@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS keyserver_device_keys (
 );
 `
 
+var deviceKeysSchemaRevert = "DROP TABLE IF EXISTS keyserver_device_keys CASCADE;"
+
 const upsertDeviceKeysSQL = "" +
 	"INSERT INTO keyserver_device_keys (user_id, device_id, ts_added_secs, key_json, stream_id, display_name)" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
@@ -88,10 +90,6 @@ type deviceKeysStatements struct {
 func NewPostgresDeviceKeysTable(ctx context.Context, db *sql.DB) (tables.DeviceKeys, error) {
 	s := &deviceKeysStatements{
 		db: db,
-	}
-	_, err := db.Exec(deviceKeysSchema)
-	if err != nil {
-		return nil, err
 	}
 	return s, sqlutil.StatementList{
 		{&s.upsertDeviceKeysStmt, upsertDeviceKeysSQL},

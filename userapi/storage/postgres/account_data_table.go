@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS userapi_account_datas (
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_account_datas_idx ON userapi_account_datas(localpart, server_name, room_id, type);
 `
 
+const accountDataSchemaRevert = "DROP TABLE IF EXISTS userapi_account_datas CASCADE; DROP INDEX IF EXISTS userapi_account_datas_idx;"
+
 const insertAccountDataSQL = `
 	INSERT INTO userapi_account_datas(localpart, server_name, room_id, type, content) VALUES($1, $2, $3, $4, $5)
 	ON CONFLICT (localpart, server_name, room_id, type) DO UPDATE SET content = EXCLUDED.content
@@ -62,10 +64,7 @@ type accountDataStatements struct {
 
 func NewPostgresAccountDataTable(ctx context.Context, db *sql.DB) (tables.AccountDataTable, error) {
 	s := &accountDataStatements{}
-	_, err := db.Exec(accountDataSchema)
-	if err != nil {
-		return nil, err
-	}
+	// Removed db.Exec(accountDataSchema) from constructor. Schema handled by migrator.
 	return s, sqlutil.StatementList{
 		{&s.insertAccountDataStmt, insertAccountDataSQL},
 		{&s.selectAccountDataStmt, selectAccountDataSQL},

@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS userapi_registration_tokens (
 );
 `
 
+const registrationTokensSchemaRevert = "DROP TABLE IF EXISTS userapi_registration_tokens CASCADE;"
+
 const selectTokenSQL = "" +
 	"SELECT token FROM userapi_registration_tokens WHERE token = $1"
 
@@ -71,11 +73,8 @@ type registrationTokenStatements struct {
 
 func NewPostgresRegistrationTokensTable(ctx context.Context, db *sql.DB) (tables.RegistrationTokensTable, error) {
 	s := &registrationTokenStatements{}
-	_, err := db.Exec(registrationTokensSchema)
-	if err != nil {
-		return nil, err
-	}
-	return s, sqlutil.StatementList{
+	// Removed db.Exec(registrationTokensSchema) from constructor. Schema handled by migrator.
+	err := sqlutil.StatementList{
 		{&s.selectTokenStatement, selectTokenSQL},
 		{&s.insertTokenStatement, insertTokenSQL},
 		{&s.listAllTokensStatement, listAllTokensSQL},
@@ -87,6 +86,7 @@ func NewPostgresRegistrationTokensTable(ctx context.Context, db *sql.DB) (tables
 		{&s.updateTokenUsesAllowedStatement, updateTokenUsesAllowedSQL},
 		{&s.updateTokenExpiryTimeStatement, updateTokenExpiryTimeSQL},
 	}.Prepare(db)
+	return s, err
 }
 
 func (s *registrationTokenStatements) RegistrationTokenExists(ctx context.Context, tx *sql.Tx, token string) (bool, error) {

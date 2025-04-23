@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS userapi_accounts (
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_accounts_idx ON userapi_accounts(localpart, server_name);
 `
 
+const accountsSchemaRevert = "DROP TABLE IF EXISTS userapi_accounts CASCADE;"
+
 const insertAccountSQL = "" +
 	"INSERT INTO userapi_accounts(localpart, server_name, created_ts, password_hash, appservice_id, account_type) VALUES ($1, $2, $3, $4, $5, $6)"
 
@@ -85,15 +87,7 @@ func NewPostgresAccountsTable(ctx context.Context, db *sql.DB, serverName spec.S
 	s := &accountsStatements{
 		serverName: serverName,
 	}
-	_, err := db.Exec(accountsSchema)
-	if err != nil {
-		return nil, err
-	}
-	m := sqlutil.NewMigrator(db)
-	err = m.Up(ctx)
-	if err != nil {
-		return nil, err
-	}
+
 	return s, sqlutil.StatementList{
 		{&s.insertAccountStmt, insertAccountSQL},
 		{&s.updatePasswordStmt, updatePasswordSQL},

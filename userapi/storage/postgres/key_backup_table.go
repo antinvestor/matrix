@@ -41,6 +41,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS userapi_key_backups_idx ON userapi_key_backups
 CREATE INDEX IF NOT EXISTS userapi_key_backups_versions_idx ON userapi_key_backups(user_id, version);
 `
 
+const keyBackupTableSchemaRevert = "DROP TABLE IF EXISTS userapi_key_backups CASCADE;"
+
 const insertBackupKeySQL = "" +
 	"INSERT INTO userapi_key_backups(user_id, room_id, session_id, version, first_message_index, forwarded_count, is_verified, session_data) " +
 	"VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
@@ -75,11 +77,8 @@ type keyBackupStatements struct {
 
 func NewPostgresKeyBackupTable(ctx context.Context, db *sql.DB) (tables.KeyBackupTable, error) {
 	s := &keyBackupStatements{}
-	_, err := db.Exec(keyBackupTableSchema)
-	if err != nil {
-		return nil, err
-	}
-	return s, sqlutil.StatementList{
+	// Removed db.Exec(keyBackupTableSchema) from constructor. Schema handled by migrator.
+	err := sqlutil.StatementList{
 		{&s.insertBackupKeyStmt, insertBackupKeySQL},
 		{&s.updateBackupKeyStmt, updateBackupKeySQL},
 		{&s.countKeysStmt, countKeysSQL},
@@ -87,6 +86,7 @@ func NewPostgresKeyBackupTable(ctx context.Context, db *sql.DB) (tables.KeyBacku
 		{&s.selectKeysByRoomIDStmt, selectKeysByRoomIDSQL},
 		{&s.selectKeysByRoomIDAndSessionIDStmt, selectKeysByRoomIDAndSessionIDSQL},
 	}.Prepare(db)
+	return s, err
 }
 
 func (s keyBackupStatements) CountKeys(

@@ -65,10 +65,7 @@ type threepidStatements struct {
 
 func NewPostgresThreePIDTable(ctx context.Context, db *sql.DB) (tables.ThreePIDTable, error) {
 	s := &threepidStatements{}
-	_, err := db.Exec(threepidSchema)
-	if err != nil {
-		return nil, err
-	}
+	// Removed db.Exec(threepidSchema) from constructor. Schema handled by migrator.
 	return s, sqlutil.StatementList{
 		{&s.selectLocalpartForThreePIDStmt, selectLocalpartForThreePIDSQL},
 		{&s.selectThreePIDsForLocalpartStmt, selectThreePIDsForLocalpartSQL},

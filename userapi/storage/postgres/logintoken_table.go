@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS userapi_login_tokens (
 CREATE INDEX IF NOT EXISTS userapi_login_tokens_expiration_idx ON userapi_login_tokens(token_expires_at);
 `
 
+const loginTokenSchemaRevert = "DROP TABLE IF EXISTS userapi_login_tokens CASCADE; DROP INDEX IF EXISTS userapi_login_tokens_expiration_idx;"
+
 const insertLoginTokenSQL = "" +
 	"INSERT INTO userapi_login_tokens(token, token_expires_at, user_id, extra_data) VALUES ($1, $2, $3, $4)"
 
@@ -61,12 +63,9 @@ type loginTokenStatements struct {
 	selectStmt *sql.Stmt
 }
 
+// Removed db.Exec(loginTokenSchema) from constructor. Schema handled by migrator.
 func NewPostgresLoginTokenTable(ctx context.Context, db *sql.DB) (tables.LoginTokenTable, error) {
 	s := &loginTokenStatements{}
-	_, err := db.Exec(loginTokenSchema)
-	if err != nil {
-		return nil, err
-	}
 	return s, sqlutil.StatementList{
 		{&s.insertStmt, insertLoginTokenSQL},
 		{&s.deleteStmt, deleteLoginTokenSQL},

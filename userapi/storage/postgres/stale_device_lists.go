@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS keyserver_stale_device_lists (
 CREATE INDEX IF NOT EXISTS keyserver_stale_device_lists_idx ON keyserver_stale_device_lists (domain, is_stale);
 `
 
+var staleDeviceListsSchemaRevert = "DROP TABLE IF EXISTS keyserver_stale_device_lists CASCADE; DROP INDEX IF EXISTS keyserver_stale_device_lists_idx;"
+
 const upsertStaleDeviceListSQL = "" +
 	"INSERT INTO keyserver_stale_device_lists (user_id, domain, is_stale, ts_added_secs)" +
 	" VALUES ($1, $2, $3, $4)" +
@@ -65,10 +67,7 @@ type staleDeviceListsStatements struct {
 
 func NewPostgresStaleDeviceListsTable(ctx context.Context, db *sql.DB) (tables.StaleDeviceLists, error) {
 	s := &staleDeviceListsStatements{}
-	_, err := db.Exec(staleDeviceListsSchema)
-	if err != nil {
-		return nil, err
-	}
+	// Removed db.Exec(staleDeviceListsSchema) from constructor. Schema handled by migrator.
 	return s, sqlutil.StatementList{
 		{&s.upsertStaleDeviceListStmt, upsertStaleDeviceListSQL},
 		{&s.selectStaleDeviceListsStmt, selectStaleDeviceListsSQL},

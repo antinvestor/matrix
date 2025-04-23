@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS keyserver_one_time_keys (
 CREATE INDEX IF NOT EXISTS keyserver_one_time_keys_idx ON keyserver_one_time_keys (user_id, device_id);
 `
 
+const oneTimeKeysSchemaRevert = "DROP TABLE IF EXISTS keyserver_one_time_keys CASCADE; DROP INDEX IF EXISTS keyserver_one_time_keys_idx;"
+
 const upsertKeysSQL = "" +
 	"INSERT INTO keyserver_one_time_keys (user_id, device_id, key_id, algorithm, ts_added_secs, key_json)" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
@@ -65,7 +67,7 @@ const selectKeyByAlgorithmSQL = "" +
 	"SELECT key_id, key_json FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 LIMIT 1"
 
 const deleteOneTimeKeysSQL = "" +
-	"DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2"
+	"DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND deviceID = $2"
 
 type oneTimeKeysStatements struct {
 	db                       *sql.DB
@@ -81,11 +83,8 @@ func NewPostgresOneTimeKeysTable(ctx context.Context, db *sql.DB) (tables.OneTim
 	s := &oneTimeKeysStatements{
 		db: db,
 	}
-	_, err := db.Exec(oneTimeKeysSchema)
-	if err != nil {
-		return nil, err
-	}
-	return s, sqlutil.StatementList{
+	// Removed db.Exec(oneTimeKeysSchema) from constructor. Schema handled by migrator.
+	err := sqlutil.StatementList{
 		{&s.upsertKeysStmt, upsertKeysSQL},
 		{&s.selectKeysStmt, selectOneTimeKeysSQL},
 		{&s.selectKeysCountStmt, selectKeysCountSQL},
@@ -93,6 +92,7 @@ func NewPostgresOneTimeKeysTable(ctx context.Context, db *sql.DB) (tables.OneTim
 		{&s.deleteOneTimeKeyStmt, deleteOneTimeKeySQL},
 		{&s.deleteOneTimeKeysStmt, deleteOneTimeKeysSQL},
 	}.Prepare(db)
+	return s, err
 }
 
 func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {

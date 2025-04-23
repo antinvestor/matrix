@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS keyserver_cross_signing_keys (
 );
 `
 
+var crossSigningKeysSchemaRevert = "DROP TABLE IF EXISTS keyserver_cross_signing_keys CASCADE;"
+
 const selectCrossSigningKeysForUserSQL = "" +
 	"SELECT key_type, key_data FROM keyserver_cross_signing_keys" +
 	" WHERE user_id = $1"
@@ -52,13 +54,8 @@ type crossSigningKeysStatements struct {
 }
 
 func NewPostgresCrossSigningKeysTable(ctx context.Context, db *sql.DB) (tables.CrossSigningKeys, error) {
-	s := &crossSigningKeysStatements{
-		db: db,
-	}
-	_, err := db.Exec(crossSigningKeysSchema)
-	if err != nil {
-		return nil, err
-	}
+	s := &crossSigningKeysStatements{}
+	s.db = db
 	return s, sqlutil.StatementList{
 		{&s.selectCrossSigningKeysForUserStmt, selectCrossSigningKeysForUserSQL},
 		{&s.upsertCrossSigningKeysForUserStmt, upsertCrossSigningKeysForUserSQL},
@@ -102,3 +99,5 @@ func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
 	}
 	return nil
 }
+
+// Removed db.Exec(crossSigningKeysSchema) from constructor. Schema handled by migrator.

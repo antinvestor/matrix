@@ -28,6 +28,110 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// Centralized migrations for userapi tables
+var Migrations = []sqlutil.Migration{
+	{
+		Version:   "userapi_001_account_data",
+		QueryUp:   accountDataSchema,
+		QueryDown: accountDataSchemaRevert,
+	},
+	{
+		Version:   "userapi_002_accounts",
+		QueryUp:   accountsSchema,
+		QueryDown: accountsSchemaRevert,
+	},
+	{
+		Version:   "userapi_003_devices",
+		QueryUp:   devicesSchema,
+		QueryDown: devicesSchemaRevert,
+	},
+	{
+		Version:   "userapi_004_device_keys",
+		QueryUp:   deviceKeysSchema,
+		QueryDown: deviceKeysSchemaRevert,
+	},
+	{
+		Version:   "userapi_005_one_time_keys",
+		QueryUp:   oneTimeKeysSchema,
+		QueryDown: oneTimeKeysSchemaRevert,
+	},
+	{
+		Version:   "userapi_006_cross_signing_keys",
+		QueryUp:   crossSigningKeysSchema,
+		QueryDown: crossSigningKeysSchemaRevert,
+	},
+	{
+		Version:   "userapi_007_cross_signing_sigs",
+		QueryUp:   crossSigningSigsSchema,
+		QueryDown: crossSigningSigsSchemaRevert,
+	},
+	{
+		Version:   "userapi_008_key_backup",
+		QueryUp:   keyBackupTableSchema,
+		QueryDown: keyBackupTableSchemaRevert,
+	},
+	{
+		Version:   "userapi_009_key_backup_version",
+		QueryUp:   keyBackupVersionTableSchema,
+		QueryDown: keyBackupVersionTableSchemaRevert,
+	},
+	{
+		Version:   "userapi_010_logintoken",
+		QueryUp:   loginTokenSchema,
+		QueryDown: loginToken.LoginTokenSchemaRevert,
+	},
+	{
+		Version:   "userapi_011_notifications",
+		QueryUp:   notificationSchema,
+		QueryDown: notificationsSchemaRevert,
+	},
+	{
+		Version:   "userapi_012_openid",
+		QueryUp:   openIDTokenSchema,
+		QueryDown: openIDTokenSchemaRevert,
+	},
+	{
+		Version:   "userapi_013_profile",
+		QueryUp:   profilesSchema,
+		QueryDown: profilesSchemaRevert,
+	},
+	{
+		Version:   "userapi_014_pusher",
+		QueryUp:   pushersSchema,
+		QueryDown: pushersSchemaRevert,
+	},
+	{
+		Version:   "userapi_015_registration_tokens",
+		QueryUp:   registrationTokensSchema,
+		QueryDown: registrationTokensSchemaRevert,
+	},
+	{
+		Version:   "userapi_016_stale_device_lists",
+		QueryUp:   staleDeviceListsSchema,
+		QueryDown: staleDeviceListsSchemaRevert,
+	},
+	{
+		Version:   "userapi_017_stats_daily_visits",
+		QueryUp:   userDailyVisitsSchema,
+		QueryDown: userDailyVisitsSchemaRevert,
+	},
+	{
+		Version:   "userapi_018_stats_daily_stats",
+		QueryUp:   messagesDailySchema,
+		QueryDown: messagesDailySchemaRevert,
+	},
+	{
+		Version:   "userapi_019_threepid",
+		QueryUp:   threepidSchema,
+		QueryDown: threepidSchemaRevert,
+	},
+	{
+		Version:   "userapi_020_key_changes",
+		QueryUp:   keyChangesSchema,
+		QueryDown: keyChangesSchemaRevert,
+	},
+}
+
 // NewDatabase creates a new accounts and profiles database
 func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 	db, writer, err := conMan.Connection(ctx, dbProperties)
@@ -36,6 +140,7 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	}
 
 	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(Migrations...)
 	if err = m.Up(ctx); err != nil {
 		return nil, err
 	}
@@ -68,7 +173,7 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresLoginTokenTable: %w", err)
 	}
-	openIDTable, err := NewPostgresOpenIDTable(db, serverName)
+	openIDTable, err := NewPostgresOpenIDTable(ctx, db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresOpenIDTable: %w", err)
 	}
@@ -91,11 +196,6 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	statsTable, err := NewPostgresStatsTable(ctx, db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresStatsTable: %w", err)
-	}
-
-	m = sqlutil.NewMigrator(db)
-	if err = m.Up(ctx); err != nil {
-		return nil, err
 	}
 
 	return &shared.Database{

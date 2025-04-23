@@ -45,6 +45,8 @@ CREATE INDEX IF NOT EXISTS userapi_daily_visits_timestamp_idx ON userapi_daily_v
 CREATE INDEX IF NOT EXISTS userapi_daily_visits_localpart_timestamp_idx ON userapi_daily_visits(localpart, timestamp);
 `
 
+const userDailyVisitsSchemaRevert = "DROP TABLE IF EXISTS userapi_daily_visits CASCADE; DROP INDEX IF EXISTS userapi_daily_visits_localpart_device_timestamp_idx; DROP INDEX IF EXISTS userapi_daily_visits_timestamp_idx; DROP INDEX IF EXISTS userapi_daily_visits_localpart_timestamp_idx;"
+
 const messagesDailySchema = `
 CREATE TABLE IF NOT EXISTS userapi_daily_stats (
 	timestamp BIGINT NOT NULL,
@@ -58,6 +60,8 @@ CREATE TABLE IF NOT EXISTS userapi_daily_stats (
 	CONSTRAINT daily_stats_unique UNIQUE (timestamp, server_name)
 );
 `
+
+const messagesDailySchemaRevert = "DROP TABLE IF EXISTS userapi_daily_stats CASCADE;"
 
 const upsertDailyMessagesSQL = `
 	INSERT INTO userapi_daily_stats AS u (timestamp, server_name, messages, sent_messages, e2ee_messages, sent_e2ee_messages, active_rooms, active_e2ee_rooms)
@@ -211,14 +215,6 @@ func NewPostgresStatsTable(ctx context.Context, db *sql.DB, serverName spec.Serv
 		lastUpdate: time.Now(),
 	}
 
-	_, err := db.Exec(userDailyVisitsSchema)
-	if err != nil {
-		return nil, err
-	}
-	_, err = db.Exec(messagesDailySchema)
-	if err != nil {
-		return nil, err
-	}
 	go s.startTimers(ctx)
 	return s, sqlutil.StatementList{
 		{&s.countUsersLastSeenAfterStmt, countUsersLastSeenAfterSQL},
