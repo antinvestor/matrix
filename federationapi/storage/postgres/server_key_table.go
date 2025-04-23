@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -69,8 +70,8 @@ type serverSigningKeyStatements struct {
 	upsertServerKeysStmt     *sql.Stmt
 }
 
-func NewPostgresServerSigningKeysTable(ctx context.Context, db *sql.DB) (s *serverSigningKeyStatements, err error) {
-	s = &serverSigningKeyStatements{}
+func NewPostgresServerSigningKeysTable(ctx context.Context, db *sql.DB) (tables.FederationServerSigningKeys, error) {
+	s := &serverSigningKeyStatements{}
 	return s, sqlutil.StatementList{
 		{&s.bulkSelectServerKeysStmt, bulkSelectServerSigningKeysSQL},
 		{&s.upsertServerKeysStmt, upsertServerSigningKeysSQL},

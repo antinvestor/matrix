@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS userapi_threepids (
 CREATE INDEX IF NOT EXISTS userapi_threepid_idx ON userapi_threepids(localpart, server_name);
 `
 
+const threepidSchemaRevert = "DROP TABLE IF EXISTS userapi_threepids CASCADE; DROP INDEX IF EXISTS userapi_threepid_idx;"
+
 const selectLocalpartForThreePIDSQL = "" +
 	"SELECT localpart, server_name FROM userapi_threepids WHERE threepid = $1 AND medium = $2"
 
@@ -65,7 +67,6 @@ type threepidStatements struct {
 
 func NewPostgresThreePIDTable(ctx context.Context, db *sql.DB) (tables.ThreePIDTable, error) {
 	s := &threepidStatements{}
-	// Removed db.Exec(threepidSchema) from constructor. Schema handled by migrator.
 	return s, sqlutil.StatementList{
 		{&s.selectLocalpartForThreePIDStmt, selectLocalpartForThreePIDSQL},
 		{&s.selectThreePIDsForLocalpartStmt, selectThreePIDsForLocalpartSQL},

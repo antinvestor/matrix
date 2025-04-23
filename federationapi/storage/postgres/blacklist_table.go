@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -53,8 +54,8 @@ type blacklistStatements struct {
 	deleteAllBlacklistStmt *sql.Stmt
 }
 
-func NewPostgresBlacklistTable(ctx context.Context, db *sql.DB) (s *blacklistStatements, err error) {
-	s = &blacklistStatements{
+func NewPostgresBlacklistTable(ctx context.Context, db *sql.DB) (blacklist tables.FederationBlacklist, err error) {
+	s := &blacklistStatements{
 		db: db,
 	}
 	return s, sqlutil.StatementList{

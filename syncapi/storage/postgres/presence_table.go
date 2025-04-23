@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -89,7 +90,7 @@ type presenceStatements struct {
 	selectPresenceAfterStmt    *sql.Stmt
 }
 
-func NewPostgresPresenceTable(ctx context.Context, db *sql.DB) (*presenceStatements, error) {
+func NewPostgresPresenceTable(ctx context.Context, db *sql.DB) (tables.Presence, error) {
 	s := &presenceStatements{}
 	return s, sqlutil.StatementList{
 		{&s.upsertPresenceStmt, upsertPresenceSQL},

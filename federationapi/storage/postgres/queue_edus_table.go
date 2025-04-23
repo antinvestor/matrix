@@ -18,11 +18,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/lib/pq"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/federationapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 )
@@ -85,8 +85,8 @@ type queueEDUsStatements struct {
 	deleteExpiredEDUsStmt                *sql.Stmt
 }
 
-func NewPostgresQueueEDUsTable(ctx context.Context, db *sql.DB) (s *queueEDUsStatements, err error) {
-	s = &queueEDUsStatements{
+func NewPostgresQueueEDUsTable(ctx context.Context, db *sql.DB) (tables.FederationQueueEDUs, error) {
+	s := &queueEDUsStatements{
 		db: db,
 	}
 	return s, sqlutil.StatementList{

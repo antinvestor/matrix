@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -74,8 +75,8 @@ type queuePDUsStatements struct {
 	selectQueuePDUServerNamesStmt        *sql.Stmt
 }
 
-func NewPostgresQueuePDUsTable(ctx context.Context, db *sql.DB) (s *queuePDUsStatements, err error) {
-	s = &queuePDUsStatements{
+func NewPostgresQueuePDUsTable(ctx context.Context, db *sql.DB) (tables.FederationQueuePDUs, error) {
+	s := &queuePDUsStatements{
 		db: db,
 	}
 	return s, sqlutil.StatementList{

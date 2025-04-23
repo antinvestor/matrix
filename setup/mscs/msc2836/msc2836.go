@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/setup/mscs/msc2836/shared"
 	"io"
 	"net/http"
 	"sort"
@@ -151,7 +152,7 @@ func Enable(
 
 type reqCtx struct {
 	rsAPI       roomserver.RoomserverInternalAPI
-	db          Database
+	db          shared.Database
 	req         *EventRelationshipRequest
 	userID      spec.UserID
 	roomVersion gomatrixserverlib.RoomVersion
@@ -162,7 +163,7 @@ type reqCtx struct {
 	fsAPI              fs.FederationInternalAPI
 }
 
-func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
+func eventRelationshipHandler(db shared.Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI) func(*http.Request, *userapi.Device) util.JSONResponse {
 	return func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		relation, err := NewEventRelationshipRequest(req.Body)
 		if err != nil {
@@ -200,7 +201,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 }
 
 func federatedEventRelationship(
-	ctx context.Context, fedReq *fclient.FederationRequest, db Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
+	ctx context.Context, fedReq *fclient.FederationRequest, db shared.Database, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 ) util.JSONResponse {
 	relation, err := NewEventRelationshipRequest(bytes.NewBuffer(fedReq.Content()))
 	if err != nil {
@@ -389,7 +390,7 @@ func (rc *reqCtx) fetchUnknownEvent(ctx context.Context, eventID, roomID string)
 // If include_parent: true and there is a valid m.relationship field in the event,
 // retrieve the referenced event. Apply history visibility check to that event and if it passes, add it to the response array.
 func (rc *reqCtx) includeParent(ctx context.Context, childEvent *types.HeaderedEvent) (parent *types.HeaderedEvent) {
-	parentID, _, _ := parentChildEventIDs(childEvent)
+	parentID, _, _ := shared.ParentChildEventIDs(childEvent)
 	if parentID == "" {
 		return nil
 	}
@@ -399,7 +400,7 @@ func (rc *reqCtx) includeParent(ctx context.Context, childEvent *types.HeaderedE
 // If include_children: true, lookup all events which have event_id as an m.relationship
 // Apply history visibility checks to all these events and add the ones which pass into the response array,
 // honouring the recent_first flag and the limit.
-func (rc *reqCtx) includeChildren(ctx context.Context, db Database, parentID string, limit int, recentFirst bool) ([]*types.HeaderedEvent, *util.JSONResponse) {
+func (rc *reqCtx) includeChildren(ctx context.Context, db shared.Database, parentID string, limit int, recentFirst bool) ([]*types.HeaderedEvent, *util.JSONResponse) {
 	if rc.hasUnexploredChildren(ctx, parentID) {
 		// we need to do a remote request to pull in the children as we are missing them locally.
 		serversToQuery := rc.getServersForEventID(ctx, parentID)
@@ -454,7 +455,7 @@ func (rc *reqCtx) includeChildren(ctx context.Context, db Database, parentID str
 // Begin to walk the thread DAG in the direction specified, either depth or breadth first according to the depth_first flag,
 // honouring the limit, max_depth and max_breadth values according to the following rules
 func walkThread(
-	ctx context.Context, db Database, rc *reqCtx, included map[string]bool, limit int,
+	ctx context.Context, db shared.Database, rc *reqCtx, included map[string]bool, limit int,
 ) ([]*types.HeaderedEvent, bool) {
 	var result []*types.HeaderedEvent
 	eventWalker := walker{
@@ -770,7 +771,7 @@ func (rc *reqCtx) hasUnexploredChildren(ctx context.Context, eventID string) boo
 }
 
 type walkInfo struct {
-	eventInfo
+	shared.EventInfo
 	SiblingNumber int
 	Depth         int
 }
@@ -778,7 +779,7 @@ type walkInfo struct {
 type walker struct {
 	ctx context.Context
 	req *EventRelationshipRequest
-	db  Database
+	db  shared.Database
 	fn  func(wi *walkInfo) bool // callback invoked for each event walked, return true to terminate the walk
 }
 
@@ -811,7 +812,7 @@ func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
 }
 
 // addChildren adds an event's children to the to walk data structure
-func (w *walker) addChildren(toWalk []walkInfo, children []eventInfo, depthOfChildren int) []walkInfo {
+func (w *walker) addChildren(toWalk []walkInfo, children []shared.EventInfo, depthOfChildren int) []walkInfo {
 	// Check what number child this event is (ordered by recent_first) compared to its parent, does it exceed (greater than) max_breadth? If yes, skip.
 	if len(children) > w.req.MaxBreadth {
 		children = children[:w.req.MaxBreadth]
@@ -826,7 +827,7 @@ func (w *walker) addChildren(toWalk []walkInfo, children []eventInfo, depthOfChi
 		// e.g [3,2,1] => [3,2] , 1 => [3] , 2 => [] , 3
 		for i := len(children) - 1; i >= 0; i-- {
 			toWalk = append(toWalk, walkInfo{
-				eventInfo:     children[i],
+				EventInfo:     children[i],
 				SiblingNumber: i + 1, // index from 1
 				Depth:         depthOfChildren,
 			})
@@ -836,7 +837,7 @@ func (w *walker) addChildren(toWalk []walkInfo, children []eventInfo, depthOfChi
 		// e.g [1,2,3] => 1, [2, 3] => 2 , [3] => 3, []
 		for i := range children {
 			toWalk = append(toWalk, walkInfo{
-				eventInfo:     children[i],
+				EventInfo:     children[i],
 				SiblingNumber: i + 1, // index from 1
 				Depth:         depthOfChildren,
 			})
@@ -862,7 +863,7 @@ func (w *walker) nextChild(toWalk []walkInfo) (*walkInfo, []walkInfo) {
 
 // childrenForParent returns the children events for this event ID, honouring the direction: up|down flags
 // meaning this can actually be returning the parent for the event instead of the children.
-func (w *walker) childrenForParent(eventID string) ([]eventInfo, error) {
+func (w *walker) childrenForParent(eventID string) ([]shared.EventInfo, error) {
 	if w.req.Direction == "down" {
 		return w.db.ChildrenForParent(w.ctx, eventID, constRelType, w.req.RecentFirst)
 	}
@@ -872,7 +873,7 @@ func (w *walker) childrenForParent(eventID string) ([]eventInfo, error) {
 		return nil, err
 	}
 	if ei != nil {
-		return []eventInfo{*ei}, nil
+		return []shared.EventInfo{*ei}, nil
 	}
 	return nil, nil
 }

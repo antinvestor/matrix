@@ -54,8 +54,7 @@ type crossSigningKeysStatements struct {
 }
 
 func NewPostgresCrossSigningKeysTable(ctx context.Context, db *sql.DB) (tables.CrossSigningKeys, error) {
-	s := &crossSigningKeysStatements{}
-	s.db = db
+	s := &crossSigningKeysStatements{db: db}
 	return s, sqlutil.StatementList{
 		{&s.selectCrossSigningKeysForUserStmt, selectCrossSigningKeysForUserSQL},
 		{&s.upsertCrossSigningKeysForUserStmt, upsertCrossSigningKeysForUserSQL},
@@ -99,5 +98,3 @@ func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
 	}
 	return nil
 }
-
-// Removed db.Exec(crossSigningKeysSchema) from constructor. Schema handled by migrator.

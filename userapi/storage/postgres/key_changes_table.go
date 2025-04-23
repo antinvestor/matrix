@@ -17,12 +17,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
 
@@ -35,6 +31,8 @@ CREATE TABLE IF NOT EXISTS keyserver_key_changes (
     CONSTRAINT keyserver_key_changes_unique_per_user UNIQUE (user_id)
 );
 `
+
+var keyChangesSchemaRevert = "DROP TABLE IF EXISTS keyserver_key_changes CASCADE;"
 
 // Replace based on user ID. We don't care how many times the user's keys have changed, only that they
 // have changed, hence we can just keep bumping the change ID for this user.
@@ -55,41 +53,12 @@ type keyChangesStatements struct {
 }
 
 func NewPostgresKeyChangesTable(ctx context.Context, db *sql.DB) (tables.KeyChanges, error) {
-	s := &keyChangesStatements{}
-	// Removed db.Exec(keyChangesSchema) from constructor. Schema handled by migrator.
-	if err := executeMigration(ctx, db); err != nil {
-		return nil, err
-	}
+	s := &keyChangesStatements{db: db}
+
 	return s, sqlutil.StatementList{
 		{&s.upsertKeyChangeStmt, upsertKeyChangeSQL},
 		{&s.selectKeyChangesStmt, selectKeyChangesSQL},
 	}.Prepare(db)
-}
-
-func executeMigration(ctx context.Context, db *sql.DB) error {
-	// TODO: Remove when we are sure we are not having goose artefacts in the db
-	// This forces an error, which indicates the migration is already applied, since the
-	// column partition was removed from the table
-	migrationName := "keyserver: refactor key changes"
-
-	var cName string
-	err := db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'keyserver_key_changes' AND column_name = 'partition'").Scan(&cName)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
-			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
-				return fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
-			}
-			return nil
-		}
-		return err
-	}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: migrationName,
-		Up:      deltas.UpRefactorKeyChanges,
-	})
-
-	return m.Up(ctx)
 }
 
 func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, userID string) (changeID int64, err error) {

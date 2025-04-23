@@ -86,6 +86,21 @@ func (m *Migrator) AddMigrations(migrations ...Migration) {
 	defer m.mutex.Unlock()
 	for _, mig := range migrations {
 		if _, ok := m.knownMigrations[mig.Version]; !ok {
+
+			if mig.QueryUp != "" && mig.Up == nil {
+				mig.Up = func(ctx context.Context, txn *sql.Tx) error {
+					_, err := txn.ExecContext(ctx, mig.QueryUp)
+					return err
+				}
+			}
+
+			if mig.QueryDown != "" && mig.Down == nil {
+				mig.Down = func(ctx context.Context, txn *sql.Tx) error {
+					_, err := txn.ExecContext(ctx, mig.QueryDown)
+					return err
+				}
+			}
+
 			m.migrations = append(m.migrations, mig)
 			m.knownMigrations[mig.Version] = struct{}{}
 		}

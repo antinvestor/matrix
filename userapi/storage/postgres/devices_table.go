@@ -74,6 +74,12 @@ CREATE TABLE IF NOT EXISTS userapi_devices (
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_device_localpart_id_idx ON userapi_devices(localpart, server_name, device_id);
 `
 
+const devicesSchemaRevert = `
+DROP TABLE IF EXISTS userapi_devices CASCADE;
+DROP INDEX IF EXISTS userapi_device_localpart_id_idx;
+DROP SEQUENCE IF EXISTS userapi_device_session_id_seq;
+`
+
 const insertDeviceSQL = "" +
 	"INSERT INTO userapi_devices(device_id, localpart, server_name, access_token, extra_data, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
 	" RETURNING session_id"
@@ -122,11 +128,6 @@ type devicesStatements struct {
 func NewPostgresDevicesTable(ctx context.Context, db *sql.DB, serverName spec.ServerName) (tables.DevicesTable, error) {
 	s := &devicesStatements{
 		serverName: serverName,
-	}
-	m := sqlutil.NewMigrator(db)
-	err := m.Up(ctx)
-	if err != nil {
-		return nil, err
 	}
 	return s, sqlutil.StatementList{
 		{&s.insertDeviceStmt, insertDeviceSQL},

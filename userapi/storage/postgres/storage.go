@@ -78,7 +78,7 @@ var Migrations = []sqlutil.Migration{
 	{
 		Version:   "userapi_010_logintoken",
 		QueryUp:   loginTokenSchema,
-		QueryDown: loginToken.LoginTokenSchemaRevert,
+		QueryDown: loginTokenSchemaRevert,
 	},
 	{
 		Version:   "userapi_011_notifications",
