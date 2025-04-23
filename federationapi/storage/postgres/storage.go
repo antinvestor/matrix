@@ -19,9 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/federationapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/federationapi/storage/shared"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -106,6 +104,14 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(d.db)
+	m.AddMigrations(Migrations...)
+	err = m.Up(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	blacklist, err := NewPostgresBlacklistTable(ctx, d.db)
 	if err != nil {
 		return nil, err
@@ -154,16 +160,7 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	if err != nil {
 		return nil, err
 	}
-	m := sqlutil.NewMigrator(d.db)
-	m.AddMigrations(Migrations...)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "federationsender: drop federationsender_rooms",
-		Up:      deltas.UpRemoveRoomsTable,
-	})
-	err = m.Up(ctx)
-	if err != nil {
-		return nil, err
-	}
+
 	if err = queueEDUs.Prepare(); err != nil {
 		return nil, err
 	}
