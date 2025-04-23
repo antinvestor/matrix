@@ -3,12 +3,13 @@ package tables_test
 import (
 	"context"
 	"database/sql"
+	"testing"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
 	"github.com/stretchr/testify/assert"
-	"testing"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/test"

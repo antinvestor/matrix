@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"

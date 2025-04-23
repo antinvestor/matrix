@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/ed25519"
 	"database/sql"
+	"testing"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/caching"
@@ -18,7 +20,6 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/stretchr/testify/assert"
 	ed255192 "golang.org/x/crypto/ed25519"
-	"testing"
 )
 
 func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, sqlutil.Writer, func()) {

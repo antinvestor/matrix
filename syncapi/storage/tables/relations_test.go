@@ -3,12 +3,13 @@ package tables_test
 import (
 	"context"
 	"database/sql"
+	"testing"
+
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
-	"testing"
 )
 
 func newRelationsTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.Relations, *sql.DB, func()) {

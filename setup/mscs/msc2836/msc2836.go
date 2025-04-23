@@ -21,12 +21,13 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/antinvestor/matrix/setup/mscs/msc2836/shared"
 	"io"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/antinvestor/matrix/setup/mscs/msc2836/shared"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"

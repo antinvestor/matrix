@@ -3,6 +3,7 @@ package msc2836
 import (
 	"context"
 	"fmt"
+
 	"github.com/antinvestor/matrix/setup/mscs/msc2836/postgres"
 	"github.com/antinvestor/matrix/setup/mscs/msc2836/shared"
 

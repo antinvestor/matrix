@@ -3,13 +3,14 @@ package tables_test
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func mustCreateEventsTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.Events, func()) {

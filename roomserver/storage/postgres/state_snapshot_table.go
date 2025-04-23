@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"

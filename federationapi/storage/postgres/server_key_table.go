@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"

@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"testing"
+
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/test/testrig"
-	"testing"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"

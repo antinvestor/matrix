@@ -28,7 +28,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// Centralized migrations for userapi tables
+// Centralised migrations for userapi tables
 var Migrations = []sqlutil.Migration{
 	{
 		Version:   "userapi_001_account_data",

@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 
 	"github.com/antinvestor/matrix/internal"

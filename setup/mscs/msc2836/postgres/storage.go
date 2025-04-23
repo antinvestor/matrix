@@ -2,12 +2,13 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/mscs/msc2836/shared"
 )
 
-// Migrations Centralized migrations for msc2836 tables
+// Migrations Centralised migrations for msc2836 tables
 var Migrations = []sqlutil.Migration{
 	{
 		Version:   "msc2836_001_nodes",

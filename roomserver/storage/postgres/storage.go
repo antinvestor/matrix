@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 
@@ -122,7 +123,7 @@ func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config
 
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations(Migrations...)
-	if err := m.Up(ctx); err != nil {
+	if err = m.Up(ctx); err != nil {
 		return nil, err
 	}
 

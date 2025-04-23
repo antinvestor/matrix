@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/shared"
 	"github.com/antinvestor/matrix/internal/caching"

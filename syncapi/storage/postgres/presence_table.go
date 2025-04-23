@@ -17,8 +17,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"time"
+
+	"github.com/antinvestor/matrix/syncapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/lib/pq"

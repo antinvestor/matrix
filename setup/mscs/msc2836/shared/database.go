@@ -17,6 +17,7 @@ package shared
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/types"
 )

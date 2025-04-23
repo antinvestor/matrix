@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/lib/pq"
