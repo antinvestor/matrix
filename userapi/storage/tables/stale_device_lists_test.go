@@ -1,33 +1,47 @@
 package tables_test
 
 import (
+	"context"
+	"database/sql"
 	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/antinvestor/matrix/userapi/storage"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
-
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
 
-func mustCreateTable(t *testing.T, _ test.DependancyOption) (tab tables.StaleDeviceLists, closeDb func()) {
+func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, func()) {
+
+	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	_, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, spec.ServerName("test"), 4, 0, 0, "")
+	if err != nil {
+		t.Fatalf("failed to create user api DB: %s", err)
+	}
+
+	_, err = storage.NewKeyDatabase(ctx, cm, &cfg.UserAPI.AccountDatabase)
+	if err != nil {
+		t.Fatalf("failed to create key api DB: %s", err)
+	}
+
+	db, err := sqlutil.Open(&cfg.UserAPI.AccountDatabase, sqlutil.NewExclusiveWriter())
+	assert.NoError(t, err)
+
+	return db, closeDB
+}
+
+func mustCreateTable(t *testing.T, dep test.DependancyOption) (tab tables.StaleDeviceLists, closeDb func()) {
 	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, nil)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	tab, err = postgres.NewPostgresStaleDeviceListsTable(ctx, db)
+
+	db, closeDb := migrateDatabase(ctx, t, dep)
+
+	tab, err := postgres.NewPostgresStaleDeviceListsTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to create new table: %s", err)

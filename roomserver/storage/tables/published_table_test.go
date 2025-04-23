@@ -1,6 +1,7 @@
 package tables_test
 
 import (
+	"context"
 	"fmt"
 	"github.com/antinvestor/matrix/test/testrig"
 	"sort"
@@ -8,29 +9,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreatePublishedTable(t *testing.T, _ test.DependancyOption) (tab tables.Published, close func()) {
+func mustCreatePublishedTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tab tables.Published, close func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	err = postgres.CreatePublishedTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PreparePublishedTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+	tab, err := postgres.NewPostgresPublishedTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -38,11 +26,11 @@ func mustCreatePublishedTable(t *testing.T, _ test.DependancyOption) (tab tables
 }
 
 func TestPublishedTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeFn := mustCreatePublishedTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		tab, closeFn := mustCreatePublishedTable(ctx, t, testOpts)
 		defer closeFn()
 
 		// Publish some rooms

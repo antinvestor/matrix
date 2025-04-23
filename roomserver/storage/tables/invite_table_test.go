@@ -8,30 +8,17 @@ import (
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateInviteTable(t *testing.T, ctx context.Context, _ test.DependancyOption) (tables.Invites, func()) {
+func mustCreateInviteTable(t *testing.T, ctx context.Context, dep test.DependancyOption) (tables.Invites, func()) {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	var tab tables.Invites
-	err = postgres.CreateInvitesTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PrepareInvitesTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+	tab, err := postgres.NewPostgresInvitesTable(ctx, db)
 
 	assert.NoError(t, err)
 

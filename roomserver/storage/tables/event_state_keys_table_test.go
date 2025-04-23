@@ -1,37 +1,24 @@
 package tables_test
 
 import (
+	"context"
 	"fmt"
 	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventStateKeysTable(t *testing.T, _ test.DependancyOption) (tables.EventStateKeys, func()) {
+func mustCreateEventStateKeysTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.EventStateKeys, func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
+	db, closeDb := migrateDatabase(ctx, t, dep)
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	var tab tables.EventStateKeys
-	err = postgres.CreateEventStateKeysTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PrepareEventStateKeysTable(ctx, db)
+	tab, err := postgres.NewPostgresEventStateKeysTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -40,9 +27,11 @@ func mustCreateEventStateKeysTable(t *testing.T, _ test.DependancyOption) (table
 
 func Test_EventStateKeysTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDb := mustCreateEventStateKeysTable(t, testOpts)
-		defer closeDb()
+
 		ctx := testrig.NewContext(t)
+		tab, closeDb := mustCreateEventStateKeysTable(ctx, t, testOpts)
+		defer closeDb()
+
 		var stateKeyNID, gotEventStateKey types.EventStateKeyNID
 		var err error
 		// create some dummy data

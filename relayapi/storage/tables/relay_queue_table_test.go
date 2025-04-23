@@ -27,7 +27,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/postgres"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -41,21 +40,13 @@ type RelayQueueDatabase struct {
 func mustCreateQueueTable(
 	ctx context.Context,
 	t *testing.T,
-	_ test.DependancyOption,
+	dep test.DependancyOption,
 ) (database RelayQueueDatabase, close func()) {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	var tab tables.RelayQueue
-	tab, err = postgres.NewPostgresRelayQueueTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+
+	tab, err := postgres.NewPostgresRelayQueueTable(ctx, db)
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)

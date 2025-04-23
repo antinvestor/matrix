@@ -5,42 +5,19 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateStateSnapshotTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tab tables.StateSnapshot, close func()) {
+func mustCreateStateSnapshotTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tab tables.StateSnapshot, close func()) {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	// for the PostgreSQL history visibility optimisation to work,
-	// we also need some other tables to exist
-	err = postgres.CreateEventStateKeysTable(ctx, db)
-	assert.NoError(t, err)
-	err = postgres.CreateEventsTable(ctx, db)
-	assert.NoError(t, err)
-	err = postgres.CreateEventJSONTable(ctx, db)
-	assert.NoError(t, err)
-	err = postgres.CreateStateBlockTable(ctx, db)
-	assert.NoError(t, err)
-	// ... and then the snapshot table itself
-	err = postgres.CreateStateSnapshotTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PrepareStateSnapshotTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
 
+	tab, err := postgres.NewPostgresStateSnapshotTable(ctx, db)
 	assert.NoError(t, err)
 
 	return tab, closeDb

@@ -12,8 +12,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
@@ -21,7 +19,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/types"
 )
 
-func mustMakeDBs(ctx context.Context, t *testing.T, _ test.DependancyOption) (
+func mustMakeDBs(ctx context.Context, t *testing.T, dep test.DependancyOption) (
 	*sql.DB, tables.AccountsTable, tables.DevicesTable, tables.StatsTable, func(),
 ) {
 	t.Helper()
@@ -33,17 +31,7 @@ func mustMakeDBs(ctx context.Context, t *testing.T, _ test.DependancyOption) (
 		err        error
 	)
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, nil)
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
+	db, closeDb := migrateDatabase(ctx, t, dep)
 
 	accTable, err = postgres.NewPostgresAccountsTable(ctx, db, "localhost")
 	if err != nil {

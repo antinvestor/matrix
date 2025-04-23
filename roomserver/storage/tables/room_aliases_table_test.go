@@ -5,28 +5,16 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRoomAliasesTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tab tables.RoomAliases, closeDb func()) {
+func mustCreateRoomAliasesTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tab tables.RoomAliases, closeDb func()) {
 	t.Helper()
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	err = postgres.CreateRoomAliasesTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PrepareRoomAliasesTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+	tab, err := postgres.NewPostgresRoomAliasesTable(ctx, db)
 
 	assert.NoError(t, err)
 

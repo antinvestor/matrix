@@ -1,6 +1,9 @@
 package tables_test
 
 import (
+	"context"
+	"database/sql"
+	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
@@ -9,28 +12,30 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateInboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.FederationInboundPeeks, func()) {
-	ctx := testrig.NewContext(t)
+func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, func()) {
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
+	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	_, err := storage.NewDatabase(ctx, cm, &cfg.RelayAPI.Database, nil, cfg.Global.IsLocalServerName)
 	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
+		t.Fatalf("failed to create sync DB: %s", err)
 	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	var tab tables.FederationInboundPeeks
-	tab, err = postgres.NewPostgresInboundPeeksTable(ctx, db)
+
+	db, err := sqlutil.Open(&cfg.RoomServer.Database, sqlutil.NewExclusiveWriter())
+	assert.NoError(t, err)
+
+	return db, closeDB
+}
+
+func mustCreateInboundpeeksTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.FederationInboundPeeks, func()) {
+
+	db, closeDb := migrateDatabase(ctx, t, dep)
+	tab, err := postgres.NewPostgresInboundPeeksTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)
@@ -39,12 +44,14 @@ func mustCreateInboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.
 }
 
 func TestInboundPeeksTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDB := mustCreateInboundpeeksTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+
+		tab, closeDB := mustCreateInboundpeeksTable(ctx, t, testOpts)
 		defer closeDB()
 
 		// Insert a peek

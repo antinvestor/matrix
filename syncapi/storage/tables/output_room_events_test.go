@@ -1,6 +1,7 @@
 package tables_test
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"github.com/antinvestor/matrix/test/testrig"
@@ -10,31 +11,18 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/test"
 )
 
-func newOutputRoomEventsTable(t *testing.T, _ test.DependancyOption) (tables.Events, *sql.DB, func()) {
+func newOutputRoomEventsTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.Events, *sql.DB, func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
+	db, closeDb := migrateDatabase(ctx, t, dep)
 
-	var tab tables.Events
-	tab, err = postgres.NewPostgresEventsTable(ctx, db)
+	tab, err := postgres.NewPostgresEventsTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -43,11 +31,13 @@ func newOutputRoomEventsTable(t *testing.T, _ test.DependancyOption) (tables.Eve
 }
 
 func TestOutputRoomEventsTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, closeDb := newOutputRoomEventsTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+
+		tab, db, closeDb := newOutputRoomEventsTable(ctx, t, testOpts)
 		defer closeDb()
 		events := room.Events()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
@@ -104,7 +94,6 @@ func TestOutputRoomEventsTable(t *testing.T) {
 }
 
 func TestReindex(t *testing.T) {
-	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
@@ -122,7 +111,10 @@ func TestReindex(t *testing.T) {
 	})
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, closeDb := newOutputRoomEventsTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+
+		tab, db, closeDb := newOutputRoomEventsTable(ctx, t, testOpts)
 		defer closeDb()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			for _, ev := range room.Events() {

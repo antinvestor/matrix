@@ -9,31 +9,19 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
 )
 
-func newMembershipsTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tables.Memberships, *sql.DB, func()) {
+func newMembershipsTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.Memberships, *sql.DB, func()) {
 	t.Helper()
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
 
-	var tab tables.Memberships
-	tab, err = postgres.NewPostgresMembershipsTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+
+	tab, err := postgres.NewPostgresMembershipsTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)

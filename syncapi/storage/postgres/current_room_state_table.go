@@ -26,7 +26,6 @@ import (
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/syncapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -143,15 +142,6 @@ type currentRoomStateStatements struct {
 
 func NewPostgresCurrentRoomStateTable(ctx context.Context, db *sql.DB) (tables.CurrentRoomState, error) {
 	s := &currentRoomStateStatements{}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "syncapi: add history visibility column (current_room_state)",
-		Up:      deltas.UpAddHistoryVisibilityColumnCurrentRoomState,
-	})
-	err := m.Up(ctx)
-	if err != nil {
-		return nil, err
-	}
 
 	return s, sqlutil.StatementList{
 		{&s.upsertRoomStateStmt, upsertRoomStateSQL},

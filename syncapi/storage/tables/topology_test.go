@@ -1,13 +1,13 @@
 package tables_test
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -15,25 +15,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTopologyTable(t *testing.T, _ test.DependancyOption) (tables.Topology, *sql.DB, func()) {
+func newTopologyTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.Topology, *sql.DB, func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
+	db, closeDb := migrateDatabase(ctx, t, dep)
 
-	var tab tables.Topology
-	tab, err = postgres.NewPostgresTopologyTable(ctx, db)
-
+	tab, err := postgres.NewPostgresTopologyTable(ctx, db)
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
@@ -41,11 +28,13 @@ func newTopologyTable(t *testing.T, _ test.DependancyOption) (tables.Topology, *
 }
 
 func TestTopologyTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, closeDb := newTopologyTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+
+		tab, db, closeDb := newTopologyTable(ctx, t, testOpts)
 		defer closeDb()
 		events := room.Events()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {

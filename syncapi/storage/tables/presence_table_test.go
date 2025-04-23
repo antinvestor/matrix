@@ -1,6 +1,7 @@
 package tables_test
 
 import (
+	"context"
 	"database/sql"
 	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
@@ -8,8 +9,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
@@ -17,23 +16,12 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustPresenceTable(t *testing.T, _ test.DependancyOption) (tables.Presence, func()) {
+func mustPresenceTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.Presence, func()) {
 	t.Helper()
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
 
-	var tab tables.Presence
-	tab, err = postgres.NewPostgresPresenceTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+
+	tab, err := postgres.NewPostgresPresenceTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -44,14 +32,16 @@ func mustPresenceTable(t *testing.T, _ test.DependancyOption) (tables.Presence, 
 func TestPresence(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
-	ctx := testrig.NewContext(t)
 
 	statusMsg := "Hello World!"
 	timestamp := spec.AsTimestamp(time.Now())
 
 	var txn *sql.Tx
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDB := mustPresenceTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+
+		tab, closeDB := mustPresenceTable(ctx, t, testOpts)
 		defer closeDB()
 
 		// Insert some presences

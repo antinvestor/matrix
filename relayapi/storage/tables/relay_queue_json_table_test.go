@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/antinvestor/matrix/relayapi/storage"
 	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/postgres"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -34,6 +34,21 @@ import (
 const (
 	testOrigin = spec.ServerName("kaer.morhen")
 )
+
+func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, func()) {
+
+	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	_, err := storage.NewDatabase(ctx, cm, &cfg.RelayAPI.Database, nil, cfg.Global.IsLocalServerName)
+	if err != nil {
+		t.Fatalf("failed to create sync DB: %s", err)
+	}
+
+	db, err := sqlutil.Open(&cfg.RoomServer.Database, sqlutil.NewExclusiveWriter())
+	assert.NoError(t, err)
+
+	return db, closeDB
+}
 
 func mustCreateTransaction() gomatrixserverlib.Transaction {
 	txn := gomatrixserverlib.Transaction{}
@@ -54,21 +69,13 @@ type RelayQueueJSONDatabase struct {
 func mustCreateQueueJSONTable(
 	ctx context.Context,
 	t *testing.T,
-	_ test.DependancyOption,
+	dep test.DependancyOption,
 ) (database RelayQueueJSONDatabase, closeDb func()) {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	var tab tables.RelayQueueJSON
-	tab, err = postgres.NewPostgresRelayQueueJSONTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+
+	tab, err := postgres.NewPostgresRelayQueueJSONTable(ctx, db)
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)

@@ -1,34 +1,22 @@
 package tables_test
 
 import (
+	"context"
 	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRedactionsTable(t *testing.T, _ test.DependancyOption) (tab tables.Redactions, closeDb func()) {
+func mustCreateRedactionsTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tab tables.Redactions, closeDb func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	err = postgres.CreateRedactionsTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PrepareRedactionsTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+	tab, err := postgres.NewPostgresRedactionsTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -36,10 +24,11 @@ func mustCreateRedactionsTable(t *testing.T, _ test.DependancyOption) (tab table
 }
 
 func TestRedactionsTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeFn := mustCreateRedactionsTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		tab, closeFn := mustCreateRedactionsTable(ctx, t, testOpts)
 		defer closeFn()
 
 		// insert and verify some redactions

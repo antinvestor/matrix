@@ -1,6 +1,7 @@
 package tables_test
 
 import (
+	"context"
 	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
@@ -8,28 +9,15 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateOutboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.FederationOutboundPeeks, func()) {
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	var tab tables.FederationOutboundPeeks
-	tab, err = postgres.NewPostgresOutboundPeeksTable(ctx, db)
+func mustCreateOutboundpeeksTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.FederationOutboundPeeks, func()) {
+
+	db, closeDb := migrateDatabase(ctx, t, dep)
+	tab, err := postgres.NewPostgresOutboundPeeksTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)
@@ -38,12 +26,14 @@ func mustCreateOutboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables
 }
 
 func TestOutboundPeeksTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
+
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDB := mustCreateOutboundpeeksTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		tab, closeDB := mustCreateOutboundpeeksTable(ctx, t, testOpts)
 		defer closeDB()
 
 		// Insert a peek

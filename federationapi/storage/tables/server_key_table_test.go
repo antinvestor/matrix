@@ -10,26 +10,13 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateServerKeyDB(ctx context.Context, t *testing.T, _ test.DependancyOption) (tables.FederationServerSigningKeys, func()) {
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	var tab tables.FederationServerSigningKeys
-	tab, err = postgres.NewPostgresServerSigningKeysTable(ctx, db)
+func mustCreateServerKeyDB(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.FederationServerSigningKeys, func()) {
+	db, closeDb := migrateDatabase(ctx, t, dep)
+	tab, err := postgres.NewPostgresServerSigningKeysTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)

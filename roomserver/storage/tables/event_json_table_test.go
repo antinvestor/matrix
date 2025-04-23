@@ -2,7 +2,9 @@ package tables_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
@@ -10,27 +12,31 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventJSONTable(t *testing.T, _ test.DependancyOption) (tables.EventJSON, context.Context, func()) {
-	t.Helper()
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
+func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, func()) {
+
+	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	_, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, nil)
 	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
+		t.Fatalf("failed to create sync DB: %s", err)
 	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
+
+	db, err := sqlutil.Open(&cfg.RoomServer.Database, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	var tab tables.EventJSON
-	err = postgres.CreateEventJSONTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PrepareEventJSONTable(ctx, db)
+
+	return db, closeDB
+}
+
+func mustCreateEventJSONTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.EventJSON, context.Context, func()) {
+	t.Helper()
+
+	db, closeDb := migrateDatabase(ctx, t, dep)
+
+	tab, err := postgres.NewPostgresEventJSONTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -39,7 +45,8 @@ func mustCreateEventJSONTable(t *testing.T, _ test.DependancyOption) (tables.Eve
 
 func Test_EventJSONTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, ctx, closeDb := mustCreateEventJSONTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		tab, ctx, closeDb := mustCreateEventJSONTable(ctx, t, testOpts)
 		defer closeDb()
 
 		// create some dummy data

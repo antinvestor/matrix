@@ -6,34 +6,19 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateMembershipTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tab tables.Membership, stateKeyTab tables.EventStateKeys, close func()) {
+func mustCreateMembershipTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tab tables.Membership, stateKeyTab tables.EventStateKeys, close func()) {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	err = postgres.CreateEventStateKeysTable(ctx, db)
-	assert.NoError(t, err)
-	err = postgres.CreateMembershipTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PrepareMembershipTable(ctx, db)
-	assert.NoError(t, err)
-	stateKeyTab, err = postgres.PrepareEventStateKeysTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+
+	stateKeyTab, err := postgres.NewPostgresEventStateKeysTable(ctx, db)
 
 	assert.NoError(t, err)
 

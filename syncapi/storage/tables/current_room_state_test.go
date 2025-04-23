@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
@@ -17,23 +18,27 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func newCurrentRoomStateTable(t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, *sql.DB, func()) {
-	t.Helper()
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
+func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, func()) {
+
+	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	_, err := storage.NewSyncServerDatasource(ctx, cm, &cfg.SyncAPI.Database)
 	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
+		t.Fatalf("failed to create sync DB: %s", err)
 	}
 
-	var tab tables.CurrentRoomState
-	tab, err = postgres.NewPostgresCurrentRoomStateTable(ctx, db)
+	db, err := sqlutil.Open(&cfg.SyncAPI.Database, sqlutil.NewExclusiveWriter())
+	assert.NoError(t, err)
+
+	return db, closeDB
+}
+
+func newCurrentRoomStateTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.CurrentRoomState, *sql.DB, func()) {
+	t.Helper()
+
+	db, closeDb := migrateDatabase(ctx, t, dep)
+
+	tab, err := postgres.NewPostgresCurrentRoomStateTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -42,11 +47,12 @@ func newCurrentRoomStateTable(t *testing.T, _ test.DependancyOption) (tables.Cur
 }
 
 func TestCurrentRoomStateTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, closeDb := newCurrentRoomStateTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		tab, db, closeDb := newCurrentRoomStateTable(ctx, t, testOpts)
 		defer closeDb()
 		events := room.CurrentState()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {

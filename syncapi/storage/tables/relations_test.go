@@ -1,36 +1,22 @@
 package tables_test
 
 import (
+	"context"
 	"database/sql"
 	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
 )
 
-func newRelationsTable(t *testing.T, _ test.DependancyOption) (tables.Relations, *sql.DB, func()) {
+func newRelationsTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.Relations, *sql.DB, func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
-
-	var tab tables.Relations
-	tab, err = postgres.NewPostgresRelationsTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+	tab, err := postgres.NewPostgresRelationsTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -65,7 +51,7 @@ func TestRelationsTable(t *testing.T) {
 
 		ctx := testrig.NewContext(t)
 
-		tab, _, closeDb := newRelationsTable(t, testOpts)
+		tab, _, closeDb := newRelationsTable(ctx, t, testOpts)
 		defer closeDb()
 
 		// Insert some relations
