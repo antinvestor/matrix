@@ -29,7 +29,6 @@ import (
 
 	"github.com/antinvestor/matrix/clientapi/producers"
 	"github.com/antinvestor/matrix/roomserver"
-	"github.com/antinvestor/matrix/roomserver/api"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -645,7 +644,7 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 				beforeJoinBody := fmt.Sprintf("Before invite in a %s room", tc.historyVisibility)
 				beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": beforeJoinBody})
 				eventsToSend := append(room.Events(), beforeJoinEv)
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
+				if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
 				syncUntil(t, routers, aliceDev.AccessToken, false,
@@ -685,7 +684,7 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 
 				eventsToSend = append([]*rstypes.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
 
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
+				if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
 				syncUntil(t, routers, aliceDev.AccessToken, false,
@@ -920,7 +919,7 @@ func TestGetMembership(t *testing.T) {
 				if tc.additionalEvents != nil {
 					tc.additionalEvents(t, room)
 				}
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+				if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
 
@@ -1220,7 +1219,7 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 	thirdMsg := room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world3!"})
 	room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world4!"})
 
-	if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+	if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 		t.Fatalf("failed to send events: %v", err)
 	}
 
@@ -1402,7 +1401,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 	room := test.NewRoom(t, user)
 	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
 
-	if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+	if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 		t.Fatalf("failed to send events: %v", err)
 	}
 
@@ -1422,7 +1421,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	for _, e := range events {
 		roomEvents := append([]*rstypes.HeaderedEvent{}, e)
-		if err = api.SendEvents(ctx, rsAPI, api.KindNew, roomEvents, "test", "test", "test", nil, false); err != nil {
+		if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, roomEvents, "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 
@@ -1507,7 +1506,7 @@ func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*rstypes.HeaderedEv
 		if ev.StateKey() != nil {
 			addsStateIDs = append(addsStateIDs, ev.EventID())
 		}
-		result[i] = testrig.NewOutputEventMsg(t, cfg, ev.RoomID().String(), api.OutputEvent{
+		result[i] = testrig.NewOutputEventMsg(t, cfg, ev.RoomID().String(), rsapi.OutputEvent{
 			Type: rsapi.OutputTypeNewRoomEvent,
 			NewRoomEvent: &rsapi.OutputNewRoomEvent{
 				Event:             ev,

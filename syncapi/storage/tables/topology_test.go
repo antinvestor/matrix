@@ -3,8 +3,9 @@ package tables_test
 import (
 	"database/sql"
 	"fmt"
-	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"

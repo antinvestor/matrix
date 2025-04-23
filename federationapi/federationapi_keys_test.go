@@ -6,12 +6,13 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
-	"github.com/antinvestor/matrix/test/testrig"
 	"io"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/test"
 

@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
-	"github.com/antinvestor/matrix/test/testrig"
 	"io"
 	"net/http"
 	"net/url"
@@ -27,6 +26,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -292,9 +293,10 @@ func TestUpdateNoPrevID(t *testing.T) {
 // update is still ongoing.
 func TestDebounce(t *testing.T) {
 
+	t.Skipf("panic on closed channel on GHA")
+
 	ctx := testrig.NewContext(t)
 
-	t.Skipf("panic on closed channel on GHA")
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
 		prevIDsExist: func(string, []int64) bool {

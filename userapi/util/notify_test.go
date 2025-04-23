@@ -2,11 +2,12 @@ package util_test
 
 import (
 	"encoding/json"
-	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

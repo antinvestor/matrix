@@ -26,7 +26,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/getsentry/sentry-go"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/federationapi/statistics"
@@ -240,12 +239,12 @@ func (oqs *OutgoingQueues) SendEvent(
 	// Create a database entry that associates the given PDU NID with
 	// this destinations queue. We'll then be able to retrieve the PDU
 	// later.
-	if err := oqs.db.AssociatePDUWithDestinations(
+	if err = oqs.db.AssociatePDUWithDestinations(
 		ctx,
 		destmap,
 		nid, // NIDs from federationapi_queue_json table
 	); err != nil {
-		logrus.WithError(err).Errorf("failed to associate PDUs %q with destinations", nid)
+		log.WithError(err).Errorf("failed to associate PDUs %q with destinations", nid)
 		return err
 	}
 
@@ -328,7 +327,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		e.Type,
 		nil, // this will use the default expireEDUTypes map
 	); err != nil {
-		logrus.WithError(err).Errorf("failed to associate EDU with destinations")
+		log.WithError(err).Errorf("failed to associate EDU with destinations")
 		return err
 	}
 

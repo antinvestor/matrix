@@ -1,9 +1,10 @@
 package tables_test
 
 import (
-	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"

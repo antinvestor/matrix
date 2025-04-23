@@ -90,8 +90,8 @@ type serverACL struct {
 
 func compileACLRegex(orig string) (*regexp.Regexp, error) {
 	escaped := regexp.QuoteMeta(orig)
-	escaped = strings.Replace(escaped, "\\?", ".", -1)
-	escaped = strings.Replace(escaped, "\\*", ".*", -1)
+	escaped = strings.ReplaceAll(escaped, "\\?", ".")
+	escaped = strings.ReplaceAll(escaped, "\\*", ".*")
 	return regexp.Compile(escaped)
 }
 

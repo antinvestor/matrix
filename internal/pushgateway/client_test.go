@@ -2,11 +2,12 @@ package pushgateway
 
 import (
 	"encoding/json"
-	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 )
 
 func TestNotify(t *testing.T) {

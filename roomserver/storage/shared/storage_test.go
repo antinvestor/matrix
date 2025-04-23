@@ -3,8 +3,9 @@ package shared_test
 import (
 	"context"
 	"crypto/ed25519"
-	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

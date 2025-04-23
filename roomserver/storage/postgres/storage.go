@@ -92,64 +92,49 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 }
 
 func (d *Database) create(ctx context.Context, db *sql.DB) error {
-	if err := CreateEventStateKeysTable(ctx, db)
-		err != nil {
+	if err := CreateEventStateKeysTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateEventTypesTable(ctx, db)
-		err != nil {
+	if err := CreateEventTypesTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateEventJSONTable(ctx, db)
-		err != nil {
+	if err := CreateEventJSONTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateEventsTable(ctx, db)
-		err != nil {
+	if err := CreateEventsTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateRoomsTable(ctx, db)
-		err != nil {
+	if err := CreateRoomsTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateStateBlockTable(ctx, db)
-		err != nil {
+	if err := CreateStateBlockTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateStateSnapshotTable(ctx, db)
-		err != nil {
+	if err := CreateStateSnapshotTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreatePrevEventsTable(ctx, db)
-		err != nil {
+	if err := CreatePrevEventsTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateRoomAliasesTable(ctx, db)
-		err != nil {
+	if err := CreateRoomAliasesTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateInvitesTable(ctx, db)
-		err != nil {
+	if err := CreateInvitesTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateMembershipTable(ctx, db)
-		err != nil {
+	if err := CreateMembershipTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreatePublishedTable(ctx, db)
-		err != nil {
+	if err := CreatePublishedTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateRedactionsTable(ctx, db)
-		err != nil {
+	if err := CreateRedactionsTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateUserRoomKeysTable(ctx, db)
-		err != nil {
+	if err := CreateUserRoomKeysTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateReportedEventsTable(ctx, db)
-		err != nil {
+	if err := CreateReportedEventsTable(ctx, db); err != nil {
 		return err
 	}
 

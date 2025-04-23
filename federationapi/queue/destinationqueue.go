@@ -364,7 +364,7 @@ func (oq *destinationQueue) backgroundSend(ctx context.Context) {
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		// Try sending the next transaction and see what happens.
-		terr, sendMethod := oq.nextTransaction(ctx, toSendPDUs, toSendEDUs)
+		sendMethod, terr := oq.nextTransaction(ctx, toSendPDUs, toSendEDUs)
 		if terr != nil {
 			// We failed to send the transaction. Mark it as a failure.
 			_, blacklisted := oq.statistics.Failure(ctx)
@@ -393,7 +393,7 @@ func (oq *destinationQueue) backgroundSend(ctx context.Context) {
 func (oq *destinationQueue) nextTransaction(ctx context.Context,
 	pdus []*queuedPDU,
 	edus []*queuedEDU,
-) (err error, sendMethod statistics.SendMethod) {
+) (sendMethod statistics.SendMethod, err error) {
 	// Create the transaction.
 	t, pduReceipts, eduReceipts := oq.createTransaction(pdus, edus)
 	logrus.WithField("server_name", oq.destination).Debugf("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
@@ -420,7 +420,7 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 			// TODO : how to pass through actual userID here?!?!?!?!
 			userID, userErr := spec.NewUserID("@user:"+string(oq.destination), false)
 			if userErr != nil {
-				return userErr, sendMethod
+				return sendMethod, userErr
 			}
 
 			// Attempt sending to each known relay server.
@@ -466,7 +466,7 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 		oq.transactionIDMutex.Lock()
 		oq.transactionID = ""
 		oq.transactionIDMutex.Unlock()
-		return nil, sendMethod
+		return sendMethod, nil
 	case gomatrix.HTTPError:
 		// Report that we failed to send the transaction and we
 		// will retry again, subject to backoff.
@@ -476,13 +476,13 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 		// to a 400-ish error
 		code := errResponse.Code
 		logrus.Debug("Transaction failed with HTTP", code)
-		return err, sendMethod
+		return sendMethod, err
 	default:
 		logrus.WithFields(logrus.Fields{
 			"destination":   oq.destination,
 			logrus.ErrorKey: err,
 		}).Debugf("Failed to send transaction %q", t.TransactionID)
-		return err, sendMethod
+		return sendMethod, err
 	}
 }
 

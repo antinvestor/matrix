@@ -2,9 +2,10 @@ package tables_test
 
 import (
 	"fmt"
-	"github.com/antinvestor/matrix/test/testrig"
 	"sort"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/stretchr/testify/assert"
 

@@ -142,11 +142,12 @@ func AuthFallback(
 		serveTemplate(w, successTemplate, data)
 	}
 
-	if req.Method == http.MethodGet {
+	switch req.Method {
+	case http.MethodGet:
 		// Handle Recaptcha
 		serveRecaptcha()
 		return
-	} else if req.Method == http.MethodPost {
+	case http.MethodPost:
 		// Handle Recaptcha
 		clientIP := req.RemoteAddr
 		err := req.ParseForm()

@@ -29,7 +29,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
-	"github.com/antinvestor/matrix/roomserver/api"
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/internal/input"
@@ -50,9 +49,9 @@ type Leaver struct {
 // WriteOutputEvents implements OutputRoomEventWriter
 func (r *Leaver) PerformLeave(
 	ctx context.Context,
-	req *api.PerformLeaveRequest,
-	res *api.PerformLeaveResponse,
-) ([]api.OutputEvent, error) {
+	req *rsAPI.PerformLeaveRequest,
+	res *rsAPI.PerformLeaveResponse,
+) ([]rsAPI.OutputEvent, error) {
 	if !r.Cfg.Matrix.IsLocalServerName(req.Leaver.Domain()) {
 		return nil, fmt.Errorf("user %q does not belong to this homeserver", req.Leaver.String())
 	}
@@ -76,9 +75,9 @@ func (r *Leaver) PerformLeave(
 // nolint:gocyclo
 func (r *Leaver) performLeaveRoomByID(
 	ctx context.Context,
-	req *api.PerformLeaveRequest,
-	res *api.PerformLeaveResponse, // nolint:unparam
-) ([]api.OutputEvent, error) {
+	req *rsAPI.PerformLeaveRequest,
+	res *rsAPI.PerformLeaveResponse, // nolint:unparam
+) ([]rsAPI.OutputEvent, error) {
 	roomID, err := spec.NewRoomID(req.RoomID)
 	if err != nil {
 		return nil, err
@@ -138,7 +137,7 @@ func (r *Leaver) performLeaveRoomByID(
 
 	// There's no invite pending, so first of all we want to find out
 	// if the room exists and if the user is actually in it.
-	latestReq := api.QueryLatestEventsAndStateRequest{
+	latestReq := rsAPI.QueryLatestEventsAndStateRequest{
 		RoomID: req.RoomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{
 			{
@@ -147,7 +146,7 @@ func (r *Leaver) performLeaveRoomByID(
 			},
 		},
 	}
-	latestRes := api.QueryLatestEventsAndStateResponse{}
+	latestRes := rsAPI.QueryLatestEventsAndStateResponse{}
 	if err = helpers.QueryLatestEventsAndState(ctx, r.DB, r.RSAPI, &latestReq, &latestRes); err != nil {
 		return nil, err
 	}
@@ -206,17 +205,17 @@ func (r *Leaver) performLeaveRoomByID(
 	// Give our leave event to the roomserver input stream. The
 	// roomserver will process the membership change and notify
 	// downstream automatically.
-	inputReq := api.InputRoomEventsRequest{
-		InputRoomEvents: []api.InputRoomEvent{
+	inputReq := rsAPI.InputRoomEventsRequest{
+		InputRoomEvents: []rsAPI.InputRoomEvent{
 			{
-				Kind:         api.KindNew,
+				Kind:         rsAPI.KindNew,
 				Event:        event,
 				Origin:       req.Leaver.Domain(),
 				SendAsServer: string(req.Leaver.Domain()),
 			},
 		},
 	}
-	inputRes := api.InputRoomEventsResponse{}
+	inputRes := rsAPI.InputRoomEventsResponse{}
 	r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
 	if err = inputRes.Err(); err != nil {
 		return nil, fmt.Errorf("r.InputRoomEvents: %w", err)
@@ -227,11 +226,11 @@ func (r *Leaver) performLeaveRoomByID(
 
 func (r *Leaver) performFederatedRejectInvite(
 	ctx context.Context,
-	req *api.PerformLeaveRequest,
-	res *api.PerformLeaveResponse, // nolint:unparam
+	req *rsAPI.PerformLeaveRequest,
+	res *rsAPI.PerformLeaveResponse, // nolint:unparam
 	inviteDomain spec.ServerName, eventID string,
 	leaver spec.SenderID,
-) ([]api.OutputEvent, error) {
+) ([]rsAPI.OutputEvent, error) {
 	// Ask the federation sender to perform a federated leave for us.
 	leaveReq := fsAPI.PerformLeaveRequest{
 		RoomID:      req.RoomID,
@@ -269,10 +268,10 @@ func (r *Leaver) performFederatedRejectInvite(
 
 	// Withdraw the invite, so that the sync API etc are
 	// notified that we rejected it.
-	return []api.OutputEvent{
+	return []rsAPI.OutputEvent{
 		{
-			Type: api.OutputTypeRetireInviteEvent,
-			RetireInviteEvent: &api.OutputRetireInviteEvent{
+			Type: rsAPI.OutputTypeRetireInviteEvent,
+			RetireInviteEvent: &rsAPI.OutputRetireInviteEvent{
 				EventID:        eventID,
 				RoomID:         req.RoomID,
 				Membership:     "leave",

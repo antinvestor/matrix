@@ -316,7 +316,7 @@ func (r *downloadRequest) respondFromLocalFile(
 		return nil, fmt.Errorf("fileutils.GetPathFromBase64Hash: %w", err)
 	}
 	file, err := os.Open(filePath)
-	defer file.Close() // nolint: errcheck, staticcheck, megacheck
+	defer file.Close() // nolint: errcheck, staticcheck
 	if err != nil {
 		return nil, fmt.Errorf("os.Open: %w", err)
 	}
@@ -836,7 +836,7 @@ func (r *downloadRequest) fetchRemoteFile(
 		resp, err = client.CreateMediaDownloadRequest(ctx, r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
 		if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
 			if resp != nil && resp.StatusCode == http.StatusNotFound {
-				return "", false, fmt.Errorf("File with media ID %q does not exist on %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+				return "", false, fmt.Errorf("file with media ID %q does not exist on %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 			}
 			return "", false, fmt.Errorf("file with media ID %q could not be downloaded from %s: %w", r.MediaMetadata.MediaID, r.MediaMetadata.Origin, err)
 		}
@@ -956,7 +956,7 @@ func parseMultipartResponse(r *downloadRequest, resp *http.Response, maxFileSize
 
 	redirect := p.Header.Get("Location")
 	if redirect != "" {
-		return 0, nil, fmt.Errorf("Location header is not yet supported")
+		return 0, nil, fmt.Errorf("location header is not yet supported")
 	}
 
 	contentLength, reader, err := r.GetContentLengthAndReader(p.Header.Get("Content-Length"), p, maxFileSizeBytes)

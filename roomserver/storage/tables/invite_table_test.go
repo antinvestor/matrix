@@ -2,8 +2,9 @@ package tables_test
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"

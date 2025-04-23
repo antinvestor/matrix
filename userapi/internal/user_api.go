@@ -824,7 +824,7 @@ func (a *UserInternalAPI) QueryNotifications(ctx context.Context, req *api.Query
 			return fmt.Errorf("QueryNotifications: parsing 'from': %w", err)
 		}
 	}
-	var filter tables.NotificationFilter = tables.AllNotifications
+	var filter = tables.AllNotifications
 	if req.Only == "highlight" {
 		filter = tables.HighlightNotifications
 	}
@@ -850,16 +850,16 @@ func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.Perform
 		"display_name": req.Pusher.AppDisplayName,
 	}).Info("PerformPusherCreation")
 	if !req.Append {
-		err := a.DB.RemovePushers(ctx, req.Pusher.AppID, req.Pusher.PushKey)
+		err := a.DB.RemovePushers(ctx, req.AppID, req.PushKey)
 		if err != nil {
 			return err
 		}
 	}
-	if req.Pusher.Kind == "" {
-		return a.DB.RemovePusher(ctx, req.Pusher.AppID, req.Pusher.PushKey, req.Localpart, req.ServerName)
+	if req.Kind == "" {
+		return a.DB.RemovePusher(ctx, req.AppID, req.PushKey, req.Localpart, req.ServerName)
 	}
-	if req.Pusher.PushKeyTS == 0 {
-		req.Pusher.PushKeyTS = int64(time.Now().Unix())
+	if req.PushKeyTS == 0 {
+		req.PushKeyTS = time.Now().Unix()
 	}
 	return a.DB.UpsertPusher(ctx, req.Pusher, req.Localpart, req.ServerName)
 }

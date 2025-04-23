@@ -64,12 +64,12 @@ func (r *Upgrader) performRoomUpgrade(
 		return "", err
 	} else if senderID == nil {
 		util.GetLogger(ctx).WithField("userID", userID).WithField("roomID", *fullRoomID).Error("No senderID for user")
-		return "", fmt.Errorf("No sender ID for %s in %s", userID, *fullRoomID)
+		return "", fmt.Errorf("no sender ID for %s in %s", userID, *fullRoomID)
 	}
 
 	// 1. Check if the user is authorized to actually perform the upgrade (can send m.room.tombstone)
 	if !r.userIsAuthorized(ctx, *senderID, roomID) {
-		return "", api.ErrNotAllowed{Err: fmt.Errorf("You don't have permission to upgrade the room, power level too low.")}
+		return "", api.ErrNotAllowed{Err: fmt.Errorf("you don't have permission to upgrade the room, power level too low")}
 	}
 
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
@@ -82,7 +82,7 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 	oldRoomRes := &api.QueryLatestEventsAndStateResponse{}
 	if err := r.URSAPI.QueryLatestEventsAndState(ctx, oldRoomReq, oldRoomRes); err != nil {
-		return "", fmt.Errorf("Failed to get latest state: %s", err)
+		return "", fmt.Errorf("gailed to get latest state: %s", err)
 	}
 
 	// Make the tombstone event
@@ -181,7 +181,7 @@ func moveLocalAliases(ctx context.Context,
 	aliasReq := api.GetAliasesForRoomIDRequest{RoomID: roomID}
 	aliasRes := api.GetAliasesForRoomIDResponse{}
 	if err = URSAPI.GetAliasesForRoomID(ctx, &aliasReq, &aliasRes); err != nil {
-		return fmt.Errorf("Failed to get old room aliases: %w", err)
+		return fmt.Errorf("failed to get old room aliases: %w", err)
 	}
 
 	// TODO: this should be spec.RoomID further up the call stack
@@ -193,18 +193,18 @@ func moveLocalAliases(ctx context.Context,
 	for _, alias := range aliasRes.Aliases {
 		aliasFound, aliasRemoved, err := URSAPI.RemoveRoomAlias(ctx, senderID, alias)
 		if err != nil {
-			return fmt.Errorf("Failed to remove old room alias: %w", err)
+			return fmt.Errorf("failed to remove old room alias: %w", err)
 		} else if !aliasFound {
-			return fmt.Errorf("Failed to remove old room alias: alias not found, possible race")
+			return fmt.Errorf("failed to remove old room alias: alias not found, possible race")
 		} else if !aliasRemoved {
-			return fmt.Errorf("Failed to remove old alias")
+			return fmt.Errorf("failed to remove old alias")
 		}
 
 		aliasAlreadyExists, err := URSAPI.SetRoomAlias(ctx, senderID, *parsedNewRoomID, alias)
 		if err != nil {
-			return fmt.Errorf("Failed to set new room alias: %w", err)
+			return fmt.Errorf("failed to set new room alias: %w", err)
 		} else if aliasAlreadyExists {
-			return fmt.Errorf("Failed to set new room alias: alias exists when it should have just been removed")
+			return fmt.Errorf("failed to set new room alias: alias exists when it should have just been removed")
 		}
 	}
 	return nil
@@ -410,7 +410,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	powerLevelContent, err := oldPowerLevelsEvent.PowerLevels()
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error()
-		return nil, fmt.Errorf("Power level event content was invalid")
+		return nil, fmt.Errorf("power level event content was invalid")
 	}
 
 	tempPowerLevelsEvent, powerLevelsOverridden := createTemporaryPowerLevels(powerLevelContent, senderID)
@@ -521,7 +521,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, send
 		if err = gomatrixserverlib.Allowed(event, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.URSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
-			return fmt.Errorf("Failed to auth new %q event: %w", builder.Type, err)
+			return fmt.Errorf("failed to auth new %q event: %w", builder.Type, err)
 		}
 
 		// Add the event to the list of auth events

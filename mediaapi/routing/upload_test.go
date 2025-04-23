@@ -2,13 +2,14 @@ package routing
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/test/testrig"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/test"
 

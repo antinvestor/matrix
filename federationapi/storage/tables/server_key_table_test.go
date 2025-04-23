@@ -2,9 +2,10 @@ package tables_test
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

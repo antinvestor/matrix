@@ -16,6 +16,7 @@ package roomserver
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
