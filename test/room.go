@@ -139,7 +139,7 @@ func (r *Room) insertCreateEvents(t *testing.T) {
 	}
 }
 
-// Create an event in this room but do not insert it. Does not modify the room in any way (depth, fwd extremities, etc) so is thread-safe.
+// CreateEvent an event in this room but do not insert it. Does not modify the room in any way (depth, fwd extremities, etc) so is thread-safe.
 func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, content interface{}, mods ...eventModifier) *rstypes.HeaderedEvent {
 	t.Helper()
 	depth := 1 + len(r.events) // depth starts at 1

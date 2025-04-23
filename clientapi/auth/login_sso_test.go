@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/matrix/setup/config"
 )
 
@@ -27,7 +29,7 @@ func TestNewAuthenticator(t *testing.T) {
 }
 
 func TestAuthenticator(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	var idp fakeIdentityProvider
 

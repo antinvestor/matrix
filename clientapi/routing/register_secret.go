@@ -28,8 +28,8 @@ type SharedSecretRegistrationRequest struct {
 	DisplayName string `json:"displayname,omitempty"`
 }
 
-func NewSharedSecretRegistrationRequest(reader io.ReadCloser) (*SharedSecretRegistrationRequest, error) {
-	defer internal.CloseAndLogIfError(context.Background(), reader, "NewSharedSecretRegistrationRequest: failed to close request body")
+func NewSharedSecretRegistrationRequest(ctx context.Context, reader io.ReadCloser) (*SharedSecretRegistrationRequest, error) {
+	defer internal.CloseAndLogIfError(ctx, reader, "NewSharedSecretRegistrationRequest: failed to close request body")
 	var ssrr SharedSecretRegistrationRequest
 	err := json.NewDecoder(reader).Decode(&ssrr)
 	if err != nil {

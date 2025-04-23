@@ -87,7 +87,7 @@ type presenceStatements struct {
 	selectPresenceAfterStmt    *sql.Stmt
 }
 
-func NewPostgresPresenceTable(db *sql.DB) (*presenceStatements, error) {
+func NewPostgresPresenceTable(ctx context.Context, db *sql.DB) (*presenceStatements, error) {
 	_, err := db.Exec(presenceSchema)
 	if err != nil {
 		return nil, err

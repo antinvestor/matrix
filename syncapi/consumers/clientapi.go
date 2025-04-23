@@ -22,20 +22,17 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
-	ctx          context.Context
 	jetstream    nats.JetStreamContext
 	nats         *nats.Conn
 	durable      string
@@ -50,7 +47,7 @@ type OutputClientDataConsumer struct {
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
 func NewOutputClientDataConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
 	nats *nats.Conn,
@@ -59,7 +56,6 @@ func NewOutputClientDataConsumer(
 	stream streams.StreamProvider,
 ) *OutputClientDataConsumer {
 	return &OutputClientDataConsumer{
-		ctx:          process.Context(),
 		jetstream:    js,
 		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
 		topicReIndex: cfg.Matrix.JetStream.Prefixed(jetstream.InputFulltextReindex),
@@ -74,9 +70,9 @@ func NewOutputClientDataConsumer(
 }
 
 // Start consuming from room servers
-func (s *OutputClientDataConsumer) Start() error {
+func (s *OutputClientDataConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
@@ -102,7 +98,7 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	}).Debug("Received data from client API server")
 
 	streamPos, err := s.db.UpsertAccountData(
-		s.ctx, userID, output.RoomID, output.Type,
+		ctx, userID, output.RoomID, output.Type,
 	)
 	if err != nil {
 		sentry.CaptureException(err)
@@ -116,7 +112,7 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.M
 
 	if output.IgnoredUsers != nil {
 		if err := s.db.UpdateIgnoresForUser(ctx, userID, output.IgnoredUsers); err != nil {
-			log.WithError(err).WithFields(logrus.Fields{
+			log.WithError(err).WithFields(log.Fields{
 				"user_id": userID,
 			}).Errorf("Failed to update ignored users")
 			sentry.CaptureException(err)

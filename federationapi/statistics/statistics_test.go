@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +18,8 @@ const (
 )
 
 func TestBackoff(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
 	stats := NewStatistics(nil, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	server := ServerStatistics{
 		statistics: &stats,
@@ -23,13 +27,13 @@ func TestBackoff(t *testing.T) {
 	}
 
 	// Start by checking that counting successes works.
-	server.Success(SendDirect)
+	server.Success(ctx, SendDirect)
 	if successes := server.SuccessCount(); successes != 1 {
 		t.Fatalf("Expected success count 1, got %d", successes)
 	}
 
 	// Register a failure.
-	server.Failure()
+	server.Failure(ctx)
 
 	t.Logf("Backoff counter: %d", server.backoffCount.Load())
 
@@ -39,7 +43,7 @@ func TestBackoff(t *testing.T) {
 		// Register another failure for good measure. This should have no
 		// side effects since a backoff is already in progress. If it does
 		// then we'll fail.
-		until, blacklisted := server.Failure()
+		until, blacklisted := server.Failure(ctx)
 		blacklist := server.Blacklisted()
 		assumedOffline := server.AssumedOffline()
 		duration := time.Until(until)
@@ -106,12 +110,15 @@ func TestBackoff(t *testing.T) {
 }
 
 func TestRelayServersListing(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	stats := NewStatistics(test.NewInMemoryFederationDatabase(), FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	server := ServerStatistics{statistics: &stats}
-	server.AddRelayServers([]spec.ServerName{"relay1", "relay1", "relay2"})
+	server.AddRelayServers(ctx, []spec.ServerName{"relay1", "relay1", "relay2"})
 	relayServers := server.KnownRelayServers()
 	assert.Equal(t, []spec.ServerName{"relay1", "relay2"}, relayServers)
-	server.AddRelayServers([]spec.ServerName{"relay1", "relay1", "relay2"})
+	server.AddRelayServers(ctx, []spec.ServerName{"relay1", "relay1", "relay2"})
 	relayServers = server.KnownRelayServers()
 	assert.Equal(t, []spec.ServerName{"relay1", "relay2"}, relayServers)
 }

@@ -61,7 +61,7 @@ func Consumer(
 			// not when a context error is returned. Footguns. Footguns everywhere.
 			msgs, err := sub.Fetch(batch, nats.Context(ctx))
 			if err != nil {
-				if err == context.Canceled || err == context.DeadlineExceeded {
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 					// Work out whether it was the JetStream context that expired
 					// or whether it was our supplied context.
 					select {

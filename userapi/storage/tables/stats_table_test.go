@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 
@@ -20,7 +22,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/types"
 )
 
-func mustMakeDBs(t *testing.T, _ test.DependancyOption) (
+func mustMakeDBs(ctx context.Context, t *testing.T, _ test.DependancyOption) (
 	*sql.DB, tables.AccountsTable, tables.DevicesTable, tables.StatsTable, func(),
 ) {
 	t.Helper()
@@ -32,7 +34,6 @@ func mustMakeDBs(t *testing.T, _ test.DependancyOption) (
 		err        error
 	)
 
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -45,15 +46,15 @@ func mustMakeDBs(t *testing.T, _ test.DependancyOption) (
 		t.Fatalf("failed to open db: %s", err)
 	}
 
-	accTable, err = postgres.NewPostgresAccountsTable(db, "localhost")
+	accTable, err = postgres.NewPostgresAccountsTable(ctx, db, "localhost")
 	if err != nil {
 		t.Fatalf("unable to create acc db: %v", err)
 	}
-	devTable, err = postgres.NewPostgresDevicesTable(db, "localhost")
+	devTable, err = postgres.NewPostgresDevicesTable(ctx, db, "localhost")
 	if err != nil {
 		t.Fatalf("unable to open device db: %v", err)
 	}
-	statsTable, err = postgres.NewPostgresStatsTable(db, "localhost")
+	statsTable, err = postgres.NewPostgresStatsTable(ctx, db, "localhost")
 	if err != nil {
 		t.Fatalf("unable to open stats db: %v", err)
 	}
@@ -118,9 +119,10 @@ func mustUserUpdateRegistered(
 // These tests must run sequentially, as they build up on each other
 func Test_UserStatistics(t *testing.T) {
 
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, accDB, devDB, statsDB, closeDb := mustMakeDBs(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		db, accDB, devDB, statsDB, closeDb := mustMakeDBs(ctx, t, testOpts)
 		defer closeDb()
 		wantType := "Postgres"
 

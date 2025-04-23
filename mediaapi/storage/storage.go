@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -23,10 +24,10 @@ import (
 )
 
 // NewMediaAPIDatasource opens a database connection.
-func NewMediaAPIDatasource(conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
+func NewMediaAPIDatasource(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(conMan, dbProperties)
+		return postgres.NewDatabase(ctx, conMan, dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

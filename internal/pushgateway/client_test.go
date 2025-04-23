@@ -1,15 +1,19 @@
 package pushgateway
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 )
 
 func TestNotify(t *testing.T) {
+
+	ctx := testrig.NewContext(t)
+
 	wantResponse := NotifyResponse{
 		Rejected: []string{"testing"},
 	}
@@ -37,7 +41,7 @@ func TestNotify(t *testing.T) {
 	gotResponse := NotifyResponse{}
 
 	// Test happy path
-	err := cl.Notify(context.Background(), svr.URL, &NotifyRequest{}, &gotResponse)
+	err := cl.Notify(ctx, svr.URL, &NotifyRequest{}, &gotResponse)
 	if err != nil {
 		t.Errorf("failed to notify client")
 	}
@@ -47,7 +51,7 @@ func TestNotify(t *testing.T) {
 
 	// Test error path
 	i++
-	err = cl.Notify(context.Background(), svr.URL, &NotifyRequest{}, &gotResponse)
+	err = cl.Notify(ctx, svr.URL, &NotifyRequest{}, &gotResponse)
 	if err == nil {
 		t.Errorf("expected notifying the pushgateway to fail, but it succeeded")
 	}

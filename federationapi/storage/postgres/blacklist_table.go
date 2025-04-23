@@ -51,7 +51,7 @@ type blacklistStatements struct {
 	deleteAllBlacklistStmt *sql.Stmt
 }
 
-func NewPostgresBlacklistTable(db *sql.DB) (s *blacklistStatements, err error) {
+func NewPostgresBlacklistTable(ctx context.Context, db *sql.DB) (s *blacklistStatements, err error) {
 	s = &blacklistStatements{
 		db: db,
 	}

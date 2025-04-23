@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -79,6 +81,9 @@ func TestIsServerAllowed(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
+			ctx := testrig.NewContext(t)
+
 			if tt.roomFunc == nil {
 				t.Fatalf("missing roomFunc")
 			}
@@ -87,7 +92,7 @@ func TestIsServerAllowed(t *testing.T) {
 				authEvents = append(authEvents, ev.PDU)
 			}
 
-			if got := IsServerAllowed(context.Background(), &FakeQuerier{}, tt.serverName, tt.serverCurrentlyInRoom, authEvents); got != tt.want {
+			if got := IsServerAllowed(ctx, &FakeQuerier{}, tt.serverName, tt.serverCurrentlyInRoom, authEvents); got != tt.want {
 				t.Errorf("IsServerAllowed() = %v, want %v", got, tt.want)
 			}
 		})

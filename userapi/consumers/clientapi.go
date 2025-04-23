@@ -27,7 +27,6 @@ import (
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/userapi/producers"
 	"github.com/antinvestor/matrix/userapi/util"
 )
@@ -47,7 +46,7 @@ type OutputReceiptEventConsumer struct {
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputReceiptEventConsumer(
-	process *process.ProcessContext,
+	ctx context.Context,
 	cfg *config.UserAPI,
 	js nats.JetStreamContext,
 	store storage.UserDatabase,
@@ -55,7 +54,7 @@ func NewOutputReceiptEventConsumer(
 	pgClient pushgateway.Client,
 ) *OutputReceiptEventConsumer {
 	return &OutputReceiptEventConsumer{
-		ctx:          process.Context(),
+		ctx:          ctx,
 		jetstream:    js,
 		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 		durable:      cfg.Matrix.JetStream.Durable("UserAPIReceiptConsumer"),
@@ -67,7 +66,7 @@ func NewOutputReceiptEventConsumer(
 }
 
 // Start consuming receipts events.
-func (s *OutputReceiptEventConsumer) Start() error {
+func (s *OutputReceiptEventConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
 		s.ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),

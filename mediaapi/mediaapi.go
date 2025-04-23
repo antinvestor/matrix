@@ -15,6 +15,8 @@
 package mediaapi
 
 import (
+	"context"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal/httputil"
@@ -28,6 +30,7 @@ import (
 
 // AddPublicRoutes sets up and registers HTTP handlers for the MediaAPI component.
 func AddPublicRoutes(
+	ctx context.Context,
 	routers httputil.Routers,
 	cm *sqlutil.Connections,
 	cfg *config.Dendrite,
@@ -36,7 +39,7 @@ func AddPublicRoutes(
 	fedClient fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 ) {
-	mediaDB, err := storage.NewMediaAPIDatasource(cm, &cfg.MediaAPI.Database)
+	mediaDB, err := storage.NewMediaAPIDatasource(ctx, cm, &cfg.MediaAPI.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to media db")
 	}

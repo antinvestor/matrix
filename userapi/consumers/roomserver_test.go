@@ -27,15 +27,14 @@ import (
 	userAPITypes "github.com/antinvestor/matrix/userapi/types"
 )
 
-func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (storage.UserDatabase, func()) {
+func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.UserDatabase, func()) {
 	t.Helper()
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
-	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewUserDatabase(context.Background(), nil, cm, &config.DatabaseOptions{
+	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
+	db, err := storage.NewUserDatabase(ctx, nil, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,
 	}, "", 4, 0, 0, "")
@@ -61,10 +60,10 @@ func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, _ spec
 }
 
 func Test_evaluatePushRules(t *testing.T) {
-	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
 		defer closeDb()
 		consumer := OutputRoomEventConsumer{db: db, rsAPI: &FakeUserRoomserverAPI{}}
 
@@ -146,8 +145,8 @@ func Test_evaluatePushRules(t *testing.T) {
 
 func TestLocalRoomMembers(t *testing.T) {
 	alice := test.NewUser(t)
-	_, sk, err := ed25519.GenerateKey(nil)
-	assert.NoError(t, err)
+	_, sk, err0 := ed25519.GenerateKey(nil)
+	assert.NoError(t, err0)
 	bob := test.NewUser(t, test.WithSigningServer("notlocalhost", "ed25519:abc", sk))
 	charlie := test.NewUser(t, test.WithSigningServer("notlocalhost", "ed25519:abc", sk))
 
@@ -156,25 +155,27 @@ func TestLocalRoomMembers(t *testing.T) {
 	room.CreateAndInsert(t, charlie, spec.MRoomMember, map[string]string{"membership": spec.Join}, test.WithStateKey(charlie.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		natsInstance := &jetstream.NATSInstance{}
+
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
-		rsAPI.SetFederationAPI(nil, nil)
-		db, err := storage.NewUserDatabase(processCtx.Context(), nil, cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(ctx, nil, nil)
+		db, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 		assert.NoError(t, err)
 
-		err = rsapi.SendEvents(processCtx.Context(), rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
+		err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
 		assert.NoError(t, err)
 
 		consumer := OutputRoomEventConsumer{db: db, rsAPI: rsAPI, serverName: "test", cfg: &cfg.UserAPI}
-		members, count, err := consumer.localRoomMembers(processCtx.Context(), room.ID)
+		members, count, err := consumer.localRoomMembers(ctx, room.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, 3, count)
 		expectedLocalMember := &localMembership{UserID: alice.ID, Localpart: alice.Localpart, Domain: "test", MemberContent: gomatrixserverlib.MemberContent{Membership: spec.Join}}
@@ -263,7 +264,9 @@ func TestMessageStats(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
 		defer closeDb()
 
 		for _, tt := range tests {
@@ -282,9 +285,9 @@ func TestMessageStats(t *testing.T) {
 					lastUpdate: tt.lastUpdate,
 					serverName: tt.ourServer,
 				}
-				s.storeMessageStats(context.Background(), tt.args.eventType, tt.args.eventSender, tt.args.roomID)
+				s.storeMessageStats(ctx, tt.args.eventType, tt.args.eventSender, tt.args.roomID)
 				t.Logf("%+v", s.roomCounts)
-				gotStats, activeRooms, activeE2EERooms, err := db.DailyRoomsMessages(context.Background(), tt.ourServer)
+				gotStats, activeRooms, activeE2EERooms, err := db.DailyRoomsMessages(ctx, tt.ourServer)
 				if err != nil {
 					t.Fatalf("unexpected error: %s", err)
 				}
@@ -305,17 +308,18 @@ func TestMessageStats(t *testing.T) {
 func BenchmarkLocalRoomMembers(b *testing.B) {
 	t := &testing.T{}
 
-	cfg, processCtx, closeDb := testrig.CreateConfig(t, test.DependancyOption{})
-	defer closeDb()
-	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	ctx := testrig.NewContext(t)
+	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
+	defer closeRig()
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 	natsInstance := &jetstream.NATSInstance{}
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
-	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
-	rsAPI.SetFederationAPI(nil, nil)
-	db, err := storage.NewUserDatabase(processCtx.Context(), nil, cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+	rsAPI.SetFederationAPI(ctx, nil, nil)
+	db, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 	assert.NoError(b, err)
 
 	consumer := OutputRoomEventConsumer{db: db, rsAPI: rsAPI, serverName: "test", cfg: &cfg.UserAPI}
@@ -330,14 +334,14 @@ func BenchmarkLocalRoomMembers(b *testing.B) {
 		room.CreateAndInsert(t, user, spec.MRoomMember, map[string]string{"membership": spec.Join}, test.WithStateKey(user.ID))
 	}
 
-	err = rsapi.SendEvents(processCtx.Context(), rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
+	err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
 	assert.NoError(b, err)
 
 	expectedLocalMember := &localMembership{UserID: alice.ID, Localpart: alice.Localpart, Domain: "test", MemberContent: gomatrixserverlib.MemberContent{Membership: spec.Join}}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		members, count, err := consumer.localRoomMembers(processCtx.Context(), room.ID)
+		members, count, err := consumer.localRoomMembers(ctx, room.ID)
 		assert.NoError(b, err)
 		assert.Equal(b, 101, count)
 		assert.Equal(b, expectedLocalMember, members[0])

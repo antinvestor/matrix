@@ -73,7 +73,7 @@ type sendToDeviceStatements struct {
 	selectMaxSendToDeviceIDStmt    *sql.Stmt
 }
 
-func NewPostgresSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
+func NewPostgresSendToDeviceTable(ctx context.Context, db *sql.DB) (tables.SendToDevice, error) {
 	s := &sendToDeviceStatements{}
 	_, err := db.Exec(sendToDeviceSchema)
 	if err != nil {
@@ -84,7 +84,7 @@ func NewPostgresSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 		Version: "syncapi: drop sent_by_token",
 		Up:      deltas.UpRemoveSendToDeviceSentColumn,
 	})
-	err = m.Up(context.Background())
+	err = m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}

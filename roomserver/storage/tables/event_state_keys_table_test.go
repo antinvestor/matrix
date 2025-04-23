@@ -1,9 +1,10 @@
 package tables_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
@@ -17,7 +18,7 @@ import (
 func mustCreateEventStateKeysTable(t *testing.T, _ test.DependancyOption) (tables.EventStateKeys, func()) {
 	t.Helper()
 
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
@@ -29,9 +30,9 @@ func mustCreateEventStateKeysTable(t *testing.T, _ test.DependancyOption) (table
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.EventStateKeys
-	err = postgres.CreateEventStateKeysTable(db)
+	err = postgres.CreateEventStateKeysTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PrepareEventStateKeysTable(db)
+	tab, err = postgres.PrepareEventStateKeysTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -42,7 +43,7 @@ func Test_EventStateKeysTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		tab, closeDb := mustCreateEventStateKeysTable(t, testOpts)
 		defer closeDb()
-		ctx := context.Background()
+		ctx := testrig.NewContext(t)
 		var stateKeyNID, gotEventStateKey types.EventStateKeyNID
 		var err error
 		// create some dummy data

@@ -205,7 +205,7 @@ type statsStatements struct {
 	selectDailyMessagesStmt       *sql.Stmt
 }
 
-func NewPostgresStatsTable(db *sql.DB, serverName spec.ServerName) (tables.StatsTable, error) {
+func NewPostgresStatsTable(ctx context.Context, db *sql.DB, serverName spec.ServerName) (tables.StatsTable, error) {
 	s := &statsStatements{
 		serverName: serverName,
 		lastUpdate: time.Now(),
@@ -219,7 +219,7 @@ func NewPostgresStatsTable(db *sql.DB, serverName spec.ServerName) (tables.Stats
 	if err != nil {
 		return nil, err
 	}
-	go s.startTimers()
+	go s.startTimers(ctx)
 	return s, sqlutil.StatementList{
 		{&s.countUsersLastSeenAfterStmt, countUsersLastSeenAfterSQL},
 		{&s.countR30UsersStmt, countR30UsersSQL},
@@ -233,11 +233,11 @@ func NewPostgresStatsTable(db *sql.DB, serverName spec.ServerName) (tables.Stats
 	}.Prepare(db)
 }
 
-func (s *statsStatements) startTimers() {
+func (s *statsStatements) startTimers(ctx context.Context) {
 	var updateStatsFunc func()
 	updateStatsFunc = func() {
 		logrus.Infof("Executing UpdateUserDailyVisits")
-		if err := s.UpdateUserDailyVisits(context.Background(), nil, time.Now(), s.lastUpdate); err != nil {
+		if err := s.UpdateUserDailyVisits(ctx, nil, time.Now(), s.lastUpdate); err != nil {
 			logrus.WithError(err).Error("failed to update daily user visits")
 		}
 		time.AfterFunc(time.Hour*3, updateStatsFunc)

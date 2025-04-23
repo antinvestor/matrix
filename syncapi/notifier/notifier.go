@@ -90,7 +90,7 @@ func (n *Notifier) SetCurrentPosition(currPos types.StreamingToken) {
 // Typically a consumer supplies a posUpdate with the latest sync position for the
 // event type it handles, leaving other fields as 0.
 func (n *Notifier) OnNewEvent(
-	ev *rstypes.HeaderedEvent, roomID string, userIDs []string,
+	ctx context.Context, ev *rstypes.HeaderedEvent, roomID string, userIDs []string,
 	posUpdate types.StreamingToken,
 ) {
 	// update the current position then notify relevant /sync streams.
@@ -107,7 +107,7 @@ func (n *Notifier) OnNewEvent(
 		peekingDevicesToNotify := n._peekingDevices(ev.RoomID().String())
 		// If this is an invite, also add in the invitee to this list.
 		if ev.Type() == "m.room.member" && ev.StateKey() != nil {
-			targetUserID, err := n.rsAPI.QueryUserIDForSender(context.Background(), ev.RoomID(), spec.SenderID(*ev.StateKey()))
+			targetUserID, err := n.rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
 			if err != nil || targetUserID == nil {
 				log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
 					"Notifier.OnNewEvent: Failed to find the userID for this event",

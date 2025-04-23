@@ -71,11 +71,11 @@ type RoomserverInternalAPI interface {
 	UserRoomPrivateKeyCreator
 	DefaultRoomVersionAPI
 
-	// needed to avoid chicken and egg scenario when setting up the
+	// SetFederationAPI needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
-	SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing)
-	SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI)
-	SetUserAPI(userAPI userapi.RoomserverUserAPI)
+	SetFederationAPI(ctx context.Context, fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing)
+	SetAppserviceAPI(ctx context.Context, asAPI asAPI.AppServiceInternalAPI)
+	SetUserAPI(ctx context.Context, userAPI userapi.RoomserverUserAPI)
 
 	// QueryAuthChain returns the entire auth chain for the event IDs given.
 	// The response includes the events in the request.

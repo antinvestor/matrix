@@ -230,7 +230,8 @@ func TestValidateApplicationServiceRequest(t *testing.T) {
 	}
 
 	// Set up a config
-	cfg, _, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
+	ctx := testrig.NewContext(t)
+	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer closeRig()
 
 	cfg.Global.ServerName = "localhost"

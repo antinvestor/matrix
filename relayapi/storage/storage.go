@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -26,6 +27,7 @@ import (
 
 // NewDatabase opens a new database
 func NewDatabase(
+	ctx context.Context,
 	conMan *sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	cache caching.FederationCache,
@@ -33,7 +35,7 @@ func NewDatabase(
 ) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(conMan, dbProperties, cache, isLocalServerName)
+		return postgres.NewDatabase(ctx, conMan, dbProperties, cache, isLocalServerName)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

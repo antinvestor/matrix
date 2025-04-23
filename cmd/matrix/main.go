@@ -30,7 +30,6 @@ import (
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/getsentry/sentry-go"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -70,13 +69,6 @@ func main() {
 		}
 		log.Fatalf("Failed to start due to configuration errors")
 	}
-	processCtx := process.NewProcessContextFilled(ctx)
-
-	internal.SetupStdLogging()
-	internal.SetupHookLogging(cfg.Logging)
-	internal.SetupPprof()
-
-	basepkg.PlatformSanityChecks()
 
 	log.Infof("Matrix version %s", internal.VersionString())
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
@@ -177,7 +169,7 @@ func main() {
 	httpClient := basepkg.CreateClient(cfg, dnsCache)
 
 	// prepare required dependencies
-	cm := sqlutil.NewConnectionManager(processCtx, globalCfg.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(ctx, globalCfg.DatabaseOptions)
 	routers := httputil.NewRouters()
 
 	globalCfg.Cache.EnablePrometheus = caching.EnableMetrics
@@ -187,9 +179,9 @@ func main() {
 	}
 
 	natsInstance := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
 	fsAPI := federationapi.NewInternalAPI(
-		processCtx, cfg, cm, &natsInstance, federationClient, rsAPI, caches, nil, false,
+		ctx, cfg, cm, &natsInstance, federationClient, rsAPI, caches, nil, false,
 	)
 
 	keyRing := fsAPI.KeyRing()
@@ -197,13 +189,13 @@ func main() {
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this
 	// dependency. Other components also need updating after their dependencies are up.
-	rsAPI.SetFederationAPI(fsAPI, keyRing)
+	rsAPI.SetFederationAPI(ctx, fsAPI, keyRing)
 
-	userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, federationClient, profileCli, caching.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
-	asAPI := appservice.NewInternalAPI(processCtx, cfg, &natsInstance, userAPI, rsAPI)
+	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, federationClient, profileCli, caching.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+	asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, userAPI, rsAPI)
 
-	rsAPI.SetAppserviceAPI(asAPI)
-	rsAPI.SetUserAPI(userAPI)
+	rsAPI.SetAppserviceAPI(ctx, asAPI)
+	rsAPI.SetUserAPI(ctx, userAPI)
 
 	monolith := setup.Monolith{
 		Config:    cfg,
@@ -222,10 +214,10 @@ func main() {
 		PartitionCli: partitionCli,
 		ProfileCli:   profileCli,
 	}
-	monolith.AddAllPublicRoutes(processCtx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
+	monolith.AddAllPublicRoutes(ctx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
 
 	if len(cfg.MSCs.MSCs) > 0 {
-		err = mscs.Enable(cfg, cm, routers, &monolith, caches)
+		err = mscs.Enable(ctx, cfg, cm, routers, &monolith, caches)
 		if err != nil {
 			log.WithError(err).Fatalf("Failed to enable MSCs")
 		}
@@ -242,7 +234,7 @@ func main() {
 	prometheus.MustRegister(upCounter)
 
 	var httpOpt frame.Option
-	httpOpt, err = basepkg.SetupHTTPOption(processCtx, cfg, routers)
+	httpOpt, err = basepkg.SetupHTTPOption(ctx, cfg, routers)
 	if err != nil {
 		log.WithError(err).Fatal("could not setup Server Routers")
 	}

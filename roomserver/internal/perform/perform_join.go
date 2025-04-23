@@ -33,7 +33,6 @@ import (
 
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/internal/eventutil"
-	"github.com/antinvestor/matrix/roomserver/api"
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/internal/input"
@@ -64,7 +63,7 @@ func (r *Joiner) PerformJoin(
 		"servers": req.ServerNames,
 	})
 	logger.Info("User requested to room join")
-	roomID, joinedVia, err = r.performJoin(context.Background(), req)
+	roomID, joinedVia, err = r.performJoin(ctx, req)
 	if err != nil {
 		logger.WithError(err).Error("Failed to join room")
 		sentry.CaptureException(err)
@@ -355,7 +354,7 @@ func (r *Joiner) performJoinRoomByID(
 		// a member of the room. This is best-effort (as in we won't
 		// fail if we can't find the existing membership) because there
 		// is really no harm in just sending another membership event.
-		membershipRes := &api.QueryMembershipForUserResponse{}
+		membershipRes := &rsAPI.QueryMembershipForUserResponse{}
 		_ = r.Queryer.QueryMembershipForSenderID(ctx, *roomID, senderID, membershipRes)
 
 		// If we haven't already joined the room then send an event

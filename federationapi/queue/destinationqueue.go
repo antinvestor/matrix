@@ -32,7 +32,6 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/process"
 )
 
 const (
@@ -50,7 +49,6 @@ const (
 type destinationQueue struct {
 	queues             *OutgoingQueues
 	db                 storage.Database
-	process            *process.ProcessContext
 	signing            map[spec.ServerName]*fclient.SigningIdentity
 	client             fclient.FederationClient        // federation client
 	origin             spec.ServerName                 // origin of requests
@@ -70,7 +68,7 @@ type destinationQueue struct {
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEvent(event *types.HeaderedEvent, dbReceipt *receipt.Receipt) {
+func (oq *destinationQueue) sendEvent(ctx context.Context, event *types.HeaderedEvent, dbReceipt *receipt.Receipt) {
 	if event == nil {
 		logrus.Errorf("attempt to send nil PDU with destination %q", oq.destination)
 		return
@@ -93,7 +91,7 @@ func (oq *destinationQueue) sendEvent(event *types.HeaderedEvent, dbReceipt *rec
 		oq.pendingMutex.Unlock()
 
 		if !oq.backingOff.Load() {
-			oq.wakeQueueAndNotify()
+			oq.wakeQueueAndNotify(ctx)
 		}
 	}
 }
@@ -101,7 +99,7 @@ func (oq *destinationQueue) sendEvent(event *types.HeaderedEvent, dbReceipt *rec
 // sendEDU adds the EDU event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, dbReceipt *receipt.Receipt) {
+func (oq *destinationQueue) sendEDU(ctx context.Context, event *gomatrixserverlib.EDU, dbReceipt *receipt.Receipt) {
 	if event == nil {
 		logrus.Errorf("attempt to send nil EDU with destination %q", oq.destination)
 		return
@@ -124,7 +122,7 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, dbReceipt *rec
 		oq.pendingMutex.Unlock()
 
 		if !oq.backingOff.Load() {
-			oq.wakeQueueAndNotify()
+			oq.wakeQueueAndNotify(ctx)
 		}
 	}
 }
@@ -132,19 +130,19 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, dbReceipt *rec
 // handleBackoffNotifier is registered as the backoff notification
 // callback with Statistics. It will wakeup and notify the queue
 // if the queue is currently backing off.
-func (oq *destinationQueue) handleBackoffNotifier() {
+func (oq *destinationQueue) handleBackoffNotifier(ctx context.Context) {
 	// Only wake up the queue if it is backing off.
 	// Otherwise there is no pending work for the queue to handle
 	// so waking the queue would be a waste of resources.
 	if oq.backingOff.Load() {
-		oq.wakeQueueAndNotify()
+		oq.wakeQueueAndNotify(ctx)
 	}
 }
 
 // wakeQueueIfEventsPending calls wakeQueueAndNotify only if there are
 // pending events or if forceWakeup is true. This prevents starting the
 // queue unnecessarily.
-func (oq *destinationQueue) wakeQueueIfEventsPending(forceWakeup bool) {
+func (oq *destinationQueue) wakeQueueIfEventsPending(ctx context.Context, forceWakeup bool) {
 	eventsPending := func() bool {
 		oq.pendingMutex.Lock()
 		defer oq.pendingMutex.Unlock()
@@ -156,13 +154,13 @@ func (oq *destinationQueue) wakeQueueIfEventsPending(forceWakeup bool) {
 	// queue goroutine and waste resources.
 	if forceWakeup || eventsPending() {
 		logrus.Info("Starting queue due to pending events or forceWakeup")
-		oq.wakeQueueAndNotify()
+		oq.wakeQueueAndNotify(ctx)
 	}
 }
 
 // wakeQueueAndNotify ensures the destination queue is running and notifies it
 // that there is pending work.
-func (oq *destinationQueue) wakeQueueAndNotify() {
+func (oq *destinationQueue) wakeQueueAndNotify(ctx context.Context) {
 	// NOTE : Send notification before waking queue to prevent a race
 	// where the queue was running and stops due to a timeout in between
 	// checking it and sending the notification.
@@ -174,12 +172,12 @@ func (oq *destinationQueue) wakeQueueAndNotify() {
 	}
 
 	// Wake up the queue if it's asleep.
-	oq.wakeQueueIfNeeded()
+	oq.wakeQueueIfNeeded(ctx)
 }
 
 // wakeQueueIfNeeded will wake up the destination queue if it is
 // not already running.
-func (oq *destinationQueue) wakeQueueIfNeeded() {
+func (oq *destinationQueue) wakeQueueIfNeeded(ctx context.Context) {
 	// Clear the backingOff flag and update the backoff metrics if it was set.
 	if oq.backingOff.CompareAndSwap(true, false) {
 		destinationQueueBackingOff.Dec()
@@ -188,18 +186,17 @@ func (oq *destinationQueue) wakeQueueIfNeeded() {
 	// If we aren't running then wake up the queue.
 	if !oq.running.Load() {
 		// Start the queue.
-		go oq.backgroundSend()
+		go oq.backgroundSend(ctx)
 	}
 }
 
 // getPendingFromDatabase will look at the database and see if
 // there are any persisted events that haven't been sent to this
 // destination yet. If so, they will be queued up.
-func (oq *destinationQueue) getPendingFromDatabase() {
+func (oq *destinationQueue) getPendingFromDatabase(ctx context.Context) {
 	// Check to see if there's anything to do for this server
 	// in the database.
 	retrieved := false
-	ctx := oq.process.Context()
 	oq.pendingMutex.Lock()
 	defer oq.pendingMutex.Unlock()
 
@@ -276,7 +273,7 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 
 // checkNotificationsOnClose checks for any remaining notifications
 // and starts a new backgroundSend goroutine if any exist.
-func (oq *destinationQueue) checkNotificationsOnClose() {
+func (oq *destinationQueue) checkNotificationsOnClose(ctx context.Context) {
 	// NOTE : If we are stopping the queue due to blacklist then it
 	// doesn't matter if we have been notified of new work since
 	// this queue instance will be deleted anyway.
@@ -286,18 +283,14 @@ func (oq *destinationQueue) checkNotificationsOnClose() {
 			// We received a new notification in between the
 			// idle timeout firing and stopping the goroutine.
 			// Immediately restart the queue.
-			oq.wakeQueueAndNotify()
+			oq.wakeQueueAndNotify(ctx)
 		default:
 		}
 	}
 }
 
 // backgroundSend is the worker goroutine for sending events.
-func (oq *destinationQueue) backgroundSend() {
-	// Don't try to send transactions if we are shutting down.
-	if oq.process.Context().Err() != nil {
-		return
-	}
+func (oq *destinationQueue) backgroundSend(ctx context.Context) {
 	// Check if a worker is already running, and if it isn't, then
 	// mark it as started.
 	if !oq.running.CompareAndSwap(false, true) {
@@ -306,7 +299,7 @@ func (oq *destinationQueue) backgroundSend() {
 
 	// Register queue cleanup functions.
 	// NOTE : The ordering here is very intentional.
-	defer oq.checkNotificationsOnClose()
+	defer oq.checkNotificationsOnClose(ctx)
 	defer oq.running.Store(false)
 
 	destinationQueueRunning.Inc()
@@ -323,7 +316,7 @@ func (oq *destinationQueue) backgroundSend() {
 		// If we are overflowing memory and have sent things out to the
 		// database then we can look up what those things are.
 		if oq.overflowed.Load() {
-			oq.getPendingFromDatabase()
+			oq.getPendingFromDatabase(ctx)
 		}
 
 		// Reset the queue idle timeout.
@@ -346,10 +339,6 @@ func (oq *destinationQueue) backgroundSend() {
 			// The worker is idle so stop the goroutine. It'll get
 			// restarted automatically the next time we have an event to
 			// send.
-			return
-		case <-oq.process.Context().Done():
-			// The parent process is shutting down, so stop.
-			oq.statistics.ClearBackoff()
 			return
 		}
 
@@ -375,10 +364,10 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		// Try sending the next transaction and see what happens.
-		terr, sendMethod := oq.nextTransaction(toSendPDUs, toSendEDUs)
+		sendMethod, terr := oq.nextTransaction(ctx, toSendPDUs, toSendEDUs)
 		if terr != nil {
 			// We failed to send the transaction. Mark it as a failure.
-			_, blacklisted := oq.statistics.Failure()
+			_, blacklisted := oq.statistics.Failure(ctx)
 			if !blacklisted {
 				// Register the backoff state and exit the goroutine.
 				// It'll get restarted automatically when the backoff
@@ -392,7 +381,7 @@ func (oq *destinationQueue) backgroundSend() {
 				return
 			}
 		} else {
-			oq.handleTransactionSuccess(pduCount, eduCount, sendMethod)
+			oq.handleTransactionSuccess(ctx, pduCount, eduCount, sendMethod)
 		}
 	}
 }
@@ -401,16 +390,16 @@ func (oq *destinationQueue) backgroundSend() {
 // queue and sends it.
 // Returns an error if the transaction wasn't sent. And whether the success
 // was to a relay server or not.
-func (oq *destinationQueue) nextTransaction(
+func (oq *destinationQueue) nextTransaction(ctx context.Context,
 	pdus []*queuedPDU,
 	edus []*queuedEDU,
-) (err error, sendMethod statistics.SendMethod) {
+) (sendMethod statistics.SendMethod, err error) {
 	// Create the transaction.
 	t, pduReceipts, eduReceipts := oq.createTransaction(pdus, edus)
 	logrus.WithField("server_name", oq.destination).Debugf("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
 
 	// Try to send the transaction to the destination server.
-	ctx, cancel := context.WithTimeout(oq.process.Context(), time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
 	relayServers := oq.statistics.KnownRelayServers()
@@ -431,7 +420,7 @@ func (oq *destinationQueue) nextTransaction(
 			// TODO : how to pass through actual userID here?!?!?!?!
 			userID, userErr := spec.NewUserID("@user:"+string(oq.destination), false)
 			if userErr != nil {
-				return userErr, sendMethod
+				return sendMethod, userErr
 			}
 
 			// Attempt sending to each known relay server.
@@ -463,13 +452,13 @@ func (oq *destinationQueue) nextTransaction(
 		// Clean up the transaction in the database.
 		if pduReceipts != nil {
 			//logrus.Infof("Cleaning PDUs %q", pduReceipt.String())
-			if err = oq.db.CleanPDUs(oq.process.Context(), oq.destination, pduReceipts); err != nil {
+			if err = oq.db.CleanPDUs(ctx, oq.destination, pduReceipts); err != nil {
 				logrus.WithError(err).Errorf("Failed to clean PDUs for server %q", t.Destination)
 			}
 		}
 		if eduReceipts != nil {
 			//logrus.Infof("Cleaning EDUs %q", eduReceipt.String())
-			if err = oq.db.CleanEDUs(oq.process.Context(), oq.destination, eduReceipts); err != nil {
+			if err = oq.db.CleanEDUs(ctx, oq.destination, eduReceipts); err != nil {
 				logrus.WithError(err).Errorf("Failed to clean EDUs for server %q", t.Destination)
 			}
 		}
@@ -477,7 +466,7 @@ func (oq *destinationQueue) nextTransaction(
 		oq.transactionIDMutex.Lock()
 		oq.transactionID = ""
 		oq.transactionIDMutex.Unlock()
-		return nil, sendMethod
+		return sendMethod, nil
 	case gomatrix.HTTPError:
 		// Report that we failed to send the transaction and we
 		// will retry again, subject to backoff.
@@ -487,13 +476,13 @@ func (oq *destinationQueue) nextTransaction(
 		// to a 400-ish error
 		code := errResponse.Code
 		logrus.Debug("Transaction failed with HTTP", code)
-		return err, sendMethod
+		return sendMethod, err
 	default:
 		logrus.WithFields(logrus.Fields{
 			"destination":   oq.destination,
 			logrus.ErrorKey: err,
 		}).Debugf("Failed to send transaction %q", t.TransactionID)
-		return err, sendMethod
+		return sendMethod, err
 	}
 }
 
@@ -580,11 +569,11 @@ func (oq *destinationQueue) blacklistDestination() {
 
 // handleTransactionSuccess updates the cached event queues as well as the success and
 // backoff information for this server.
-func (oq *destinationQueue) handleTransactionSuccess(pduCount int, eduCount int, sendMethod statistics.SendMethod) {
+func (oq *destinationQueue) handleTransactionSuccess(ctx context.Context, pduCount int, eduCount int, sendMethod statistics.SendMethod) {
 	// If we successfully sent the transaction then clear out
 	// the pending events and EDUs, and wipe our transaction ID.
 
-	oq.statistics.Success(sendMethod)
+	oq.statistics.Success(ctx, sendMethod)
 	oq.pendingMutex.Lock()
 	defer oq.pendingMutex.Unlock()
 

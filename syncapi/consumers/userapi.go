@@ -25,7 +25,6 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -35,7 +34,6 @@ import (
 // OutputNotificationDataConsumer consumes events that originated in
 // the Push server.
 type OutputNotificationDataConsumer struct {
-	ctx       context.Context
 	jetstream nats.JetStreamContext
 	durable   string
 	topic     string
@@ -47,7 +45,7 @@ type OutputNotificationDataConsumer struct {
 // NewOutputNotificationDataConsumer creates a new consumer. Call
 // Start() to begin consuming.
 func NewOutputNotificationDataConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
 	store storage.Database,
@@ -55,7 +53,6 @@ func NewOutputNotificationDataConsumer(
 	stream streams.StreamProvider,
 ) *OutputNotificationDataConsumer {
 	s := &OutputNotificationDataConsumer{
-		ctx:       process.Context(),
 		jetstream: js,
 		durable:   cfg.Matrix.JetStream.Durable("SyncAPINotificationDataConsumer"),
 		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputNotificationData),
@@ -67,9 +64,9 @@ func NewOutputNotificationDataConsumer(
 }
 
 // Start starts consumption.
-func (s *OutputNotificationDataConsumer) Start() error {
+func (s *OutputNotificationDataConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }

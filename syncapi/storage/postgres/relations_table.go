@@ -74,7 +74,7 @@ type relationsStatements struct {
 	selectMaxRelationIDStmt        *sql.Stmt
 }
 
-func NewPostgresRelationsTable(db *sql.DB) (tables.Relations, error) {
+func NewPostgresRelationsTable(ctx context.Context, db *sql.DB) (tables.Relations, error) {
 	s := &relationsStatements{}
 	_, err := db.Exec(relationsSchema)
 	if err != nil {

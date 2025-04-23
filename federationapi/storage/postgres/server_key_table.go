@@ -67,7 +67,7 @@ type serverSigningKeyStatements struct {
 	upsertServerKeysStmt     *sql.Stmt
 }
 
-func NewPostgresServerSigningKeysTable(db *sql.DB) (s *serverSigningKeyStatements, err error) {
+func NewPostgresServerSigningKeysTable(ctx context.Context, db *sql.DB) (s *serverSigningKeyStatements, err error) {
 	s = &serverSigningKeyStatements{}
 	_, err = db.Exec(serverSigningKeysSchema)
 	if err != nil {

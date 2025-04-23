@@ -25,7 +25,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -34,7 +33,6 @@ import (
 
 // OutputReceiptEventConsumer consumes events that originated in the EDU server.
 type OutputReceiptEventConsumer struct {
-	ctx       context.Context
 	jetstream nats.JetStreamContext
 	durable   string
 	topic     string
@@ -46,7 +44,7 @@ type OutputReceiptEventConsumer struct {
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputReceiptEventConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
 	store storage.Database,
@@ -54,7 +52,6 @@ func NewOutputReceiptEventConsumer(
 	stream streams.StreamProvider,
 ) *OutputReceiptEventConsumer {
 	return &OutputReceiptEventConsumer{
-		ctx:       process.Context(),
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 		durable:   cfg.Matrix.JetStream.Durable("SyncAPIReceiptConsumer"),
@@ -65,9 +62,9 @@ func NewOutputReceiptEventConsumer(
 }
 
 // Start consuming receipts events.
-func (s *OutputReceiptEventConsumer) Start() error {
+func (s *OutputReceiptEventConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
@@ -92,7 +89,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 	output.Timestamp = spec.Timestamp(timestamp)
 
 	streamPos, err := s.db.StoreReceipt(
-		s.ctx,
+		ctx,
 		output.RoomID,
 		output.Type,
 		output.UserID,

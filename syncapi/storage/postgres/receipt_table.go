@@ -73,7 +73,7 @@ type receiptStatements struct {
 	purgeReceiptsStmt  *sql.Stmt
 }
 
-func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
+func NewPostgresReceiptsTable(ctx context.Context, db *sql.DB) (tables.Receipts, error) {
 	_, err := db.Exec(receiptsSchema)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
 		Version: "syncapi: fix sequences",
 		Up:      deltas.UpFixSequences,
 	})
-	err = m.Up(context.Background())
+	err = m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}

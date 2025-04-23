@@ -56,7 +56,7 @@ func NewStatistics(
 
 // ForServer returns server statistics for the given server name. If it
 // does not exist, it will create empty statistics and return those.
-func (s *Statistics) ForServer(serverName spec.ServerName) *ServerStatistics {
+func (s *Statistics) ForServer(ctx context.Context, serverName spec.ServerName) *ServerStatistics {
 	// Look up if we have statistics for this server already.
 	s.mutex.RLock()
 	server, found := s.servers[serverName]
@@ -71,7 +71,7 @@ func (s *Statistics) ForServer(serverName spec.ServerName) *ServerStatistics {
 		}
 		s.servers[serverName] = server
 		s.mutex.Unlock()
-		blacklisted, err := s.DB.IsServerBlacklisted(serverName)
+		blacklisted, err := s.DB.IsServerBlacklisted(ctx, serverName)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to get blacklist entry %q", serverName)
 		} else {
@@ -84,14 +84,14 @@ func (s *Statistics) ForServer(serverName spec.ServerName) *ServerStatistics {
 			return server
 		}
 
-		assumedOffline, err := s.DB.IsServerAssumedOffline(context.Background(), serverName)
+		assumedOffline, err := s.DB.IsServerAssumedOffline(ctx, serverName)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to get assumed offline entry %q", serverName)
 		} else {
 			server.assumedOffline.Store(assumedOffline)
 		}
 
-		knownRelayServers, err := s.DB.P2PGetRelayServersForServer(context.Background(), serverName)
+		knownRelayServers, err := s.DB.P2PGetRelayServersForServer(ctx, serverName)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to get relay server list for %q", serverName)
 		} else {
@@ -163,7 +163,7 @@ func (s *ServerStatistics) AssignBackoffNotifier(notifier func()) {
 // we will unblacklist it.
 // `relay` specifies whether the success was to the actual destination
 // or one of their relay servers.
-func (s *ServerStatistics) Success(method SendMethod) {
+func (s *ServerStatistics) Success(ctx context.Context, method SendMethod) {
 	s.cancel()
 	s.backoffCount.Store(0)
 	// NOTE : Sending to the final destination vs. a relay server has
@@ -171,12 +171,12 @@ func (s *ServerStatistics) Success(method SendMethod) {
 	if method == SendDirect {
 		s.successCounter.Add(1)
 		if s.blacklisted.Load() && s.statistics.DB != nil {
-			if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
+			if err := s.statistics.DB.RemoveServerFromBlacklist(ctx, s.serverName); err != nil {
 				logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
 			}
 		}
 
-		s.removeAssumedOffline()
+		s.removeAssumedOffline(ctx)
 	}
 }
 
@@ -184,7 +184,7 @@ func (s *ServerStatistics) Success(method SendMethod) {
 // It will return the time that the current failure
 // will result in backoff waiting until, and a bool signalling
 // whether we have blacklisted and therefore to give up.
-func (s *ServerStatistics) Failure() (time.Time, bool) {
+func (s *ServerStatistics) Failure(ctx context.Context) (time.Time, bool) {
 	// Return immediately if we have blacklisted this node.
 	if s.blacklisted.Load() {
 		return time.Time{}, true
@@ -200,7 +200,7 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 		if backoffCount >= s.statistics.FailuresUntilAssumedOffline {
 			s.assumedOffline.CompareAndSwap(false, true)
 			if s.statistics.DB != nil {
-				if err := s.statistics.DB.SetServerAssumedOffline(context.Background(), s.serverName); err != nil {
+				if err := s.statistics.DB.SetServerAssumedOffline(ctx, s.serverName); err != nil {
 					logrus.WithError(err).Errorf("Failed to set %q as assumed offline", s.serverName)
 				}
 			}
@@ -209,7 +209,7 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 		if backoffCount >= s.statistics.FailuresUntilBlacklist {
 			s.blacklisted.Store(true)
 			if s.statistics.DB != nil {
-				if err := s.statistics.DB.AddServerToBlacklist(s.serverName); err != nil {
+				if err := s.statistics.DB.AddServerToBlacklist(ctx, s.serverName); err != nil {
 					logrus.WithError(err).Errorf("Failed to add %q to blacklist", s.serverName)
 				}
 			}
@@ -233,9 +233,9 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 
 // MarkServerAlive removes the assumed offline and blacklisted statuses from this server.
 // Returns whether the server was blacklisted before this point.
-func (s *ServerStatistics) MarkServerAlive() bool {
-	s.removeAssumedOffline()
-	wasBlacklisted := s.removeBlacklist()
+func (s *ServerStatistics) MarkServerAlive(ctx context.Context) bool {
+	s.removeAssumedOffline(ctx)
+	wasBlacklisted := s.removeBlacklist(ctx)
 	return wasBlacklisted
 }
 
@@ -289,12 +289,12 @@ func (s *ServerStatistics) AssumedOffline() bool {
 
 // removeBlacklist removes the blacklisted status from the server.
 // Returns whether the server was blacklisted.
-func (s *ServerStatistics) removeBlacklist() bool {
+func (s *ServerStatistics) removeBlacklist(ctx context.Context) bool {
 	var wasBlacklisted bool
 
 	if s.Blacklisted() {
 		wasBlacklisted = true
-		_ = s.statistics.DB.RemoveServerFromBlacklist(s.serverName)
+		_ = s.statistics.DB.RemoveServerFromBlacklist(ctx, s.serverName)
 	}
 	s.cancel()
 	s.backoffCount.Store(0)
@@ -303,9 +303,9 @@ func (s *ServerStatistics) removeBlacklist() bool {
 }
 
 // removeAssumedOffline removes the assumed offline status from the server.
-func (s *ServerStatistics) removeAssumedOffline() {
+func (s *ServerStatistics) removeAssumedOffline(ctx context.Context) {
 	if s.AssumedOffline() {
-		_ = s.statistics.DB.RemoveServerAssumedOffline(context.Background(), s.serverName)
+		_ = s.statistics.DB.RemoveServerAssumedOffline(ctx, s.serverName)
 	}
 	s.assumedOffline.Store(false)
 }
@@ -324,7 +324,7 @@ func (s *ServerStatistics) KnownRelayServers() []spec.ServerName {
 	return s.knownRelayServers
 }
 
-func (s *ServerStatistics) AddRelayServers(relayServers []spec.ServerName) {
+func (s *ServerStatistics) AddRelayServers(ctx context.Context, relayServers []spec.ServerName) {
 	seenSet := make(map[spec.ServerName]bool)
 	uniqueList := []spec.ServerName{}
 	for _, srv := range relayServers {
@@ -335,7 +335,7 @@ func (s *ServerStatistics) AddRelayServers(relayServers []spec.ServerName) {
 		uniqueList = append(uniqueList, srv)
 	}
 
-	err := s.statistics.DB.P2PAddRelayServersForServer(context.Background(), s.serverName, uniqueList)
+	err := s.statistics.DB.P2PAddRelayServersForServer(ctx, s.serverName, uniqueList)
 	if err != nil {
 		logrus.WithError(err).Errorf("Failed to add relay servers for %q. Servers: %v", s.serverName, uniqueList)
 		return

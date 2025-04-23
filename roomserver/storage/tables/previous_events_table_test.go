@@ -1,8 +1,9 @@
 package tables_test
 
 import (
-	"context"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
@@ -16,7 +17,7 @@ import (
 func mustCreatePreviousEventsTable(t *testing.T, _ test.DependancyOption) (tab tables.PreviousEvents, closeDb func()) {
 	t.Helper()
 
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -26,9 +27,9 @@ func mustCreatePreviousEventsTable(t *testing.T, _ test.DependancyOption) (tab t
 		MaxOpenConnections: 10,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	err = postgres.CreatePrevEventsTable(db)
+	err = postgres.CreatePrevEventsTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PreparePrevEventsTable(db)
+	tab, err = postgres.PreparePrevEventsTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -36,7 +37,7 @@ func mustCreatePreviousEventsTable(t *testing.T, _ test.DependancyOption) (tab t
 }
 
 func TestPreviousEventsTable(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {

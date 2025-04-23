@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage"
@@ -17,9 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateFederationDatabase(t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
+func mustCreateFederationDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
 
-	ctx := context.TODO()
 	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
 	if err != nil {
 		t.Fatalf("Could not create redis container %s", err)
@@ -36,7 +37,7 @@ func mustCreateFederationDatabase(t *testing.T, _ test.DependancyOption) (storag
 		t.Fatalf("failed to open database: %s", err)
 	}
 
-	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
+	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
 	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,
@@ -55,10 +56,12 @@ func TestExpireEDUs(t *testing.T) {
 		spec.MReceipt: 0,
 	}
 
-	ctx := context.Background()
 	destinations := map[spec.ServerName]struct{}{"localhost": {}}
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateFederationDatabase(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+
+		db, closeDb := mustCreateFederationDatabase(ctx, t, testOpts)
 		defer closeDb()
 		// insert some data
 		for i := 0; i < 100; i++ {
@@ -106,10 +109,10 @@ func TestOutboundPeeking(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
-	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDB := mustCreateFederationDatabase(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
 		defer closeDB()
 		peekID := util.RandomString(8)
 		var renewalInterval int64 = 1000
@@ -188,10 +191,10 @@ func TestInboundPeeking(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDB := mustCreateFederationDatabase(t, testOpts)
+		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
 		defer closeDB()
 		peekID := util.RandomString(8)
 		var renewalInterval int64 = 1000
@@ -271,52 +274,54 @@ func TestServersAssumedOffline(t *testing.T) {
 	server2 := spec.ServerName("server2")
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDB := mustCreateFederationDatabase(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
 		defer closeDB()
 
 		// Set server1 & server2 as assumed offline.
-		err := db.SetServerAssumedOffline(context.Background(), server1)
+		err := db.SetServerAssumedOffline(ctx, server1)
 		assert.Nil(t, err)
-		err = db.SetServerAssumedOffline(context.Background(), server2)
+		err = db.SetServerAssumedOffline(ctx, server2)
 		assert.Nil(t, err)
 
 		// Ensure both servers are assumed offline.
-		isOffline, err := db.IsServerAssumedOffline(context.Background(), server1)
+		isOffline, err := db.IsServerAssumedOffline(ctx, server1)
 		assert.Nil(t, err)
 		assert.True(t, isOffline)
-		isOffline, err = db.IsServerAssumedOffline(context.Background(), server2)
+		isOffline, err = db.IsServerAssumedOffline(ctx, server2)
 		assert.Nil(t, err)
 		assert.True(t, isOffline)
 
 		// Set server1 as not assumed offline.
-		err = db.RemoveServerAssumedOffline(context.Background(), server1)
+		err = db.RemoveServerAssumedOffline(ctx, server1)
 		assert.Nil(t, err)
 
 		// Ensure both servers have correct state.
-		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
+		isOffline, err = db.IsServerAssumedOffline(ctx, server1)
 		assert.Nil(t, err)
 		assert.False(t, isOffline)
-		isOffline, err = db.IsServerAssumedOffline(context.Background(), server2)
+		isOffline, err = db.IsServerAssumedOffline(ctx, server2)
 		assert.Nil(t, err)
 		assert.True(t, isOffline)
 
 		// Re-set server1 as assumed offline.
-		err = db.SetServerAssumedOffline(context.Background(), server1)
+		err = db.SetServerAssumedOffline(ctx, server1)
 		assert.Nil(t, err)
 
 		// Ensure server1 is assumed offline.
-		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
+		isOffline, err = db.IsServerAssumedOffline(ctx, server1)
 		assert.Nil(t, err)
 		assert.True(t, isOffline)
 
-		err = db.RemoveAllServersAssumedOffline(context.Background())
+		err = db.RemoveAllServersAssumedOffline(ctx)
 		assert.Nil(t, err)
 
 		// Ensure both servers have correct state.
-		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
+		isOffline, err = db.IsServerAssumedOffline(ctx, server1)
 		assert.Nil(t, err)
 		assert.False(t, isOffline)
-		isOffline, err = db.IsServerAssumedOffline(context.Background(), server2)
+		isOffline, err = db.IsServerAssumedOffline(ctx, server2)
 		assert.Nil(t, err)
 		assert.False(t, isOffline)
 	})
@@ -328,35 +333,37 @@ func TestRelayServersStored(t *testing.T) {
 	relayServer2 := spec.ServerName("relayserver2")
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDB := mustCreateFederationDatabase(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
 		defer closeDB()
 
-		err := db.P2PAddRelayServersForServer(context.Background(), server, []spec.ServerName{relayServer1})
+		err := db.P2PAddRelayServersForServer(ctx, server, []spec.ServerName{relayServer1})
 		assert.Nil(t, err)
 
-		relayServers, err := db.P2PGetRelayServersForServer(context.Background(), server)
+		relayServers, err := db.P2PGetRelayServersForServer(ctx, server)
 		assert.Nil(t, err)
 		assert.Equal(t, relayServer1, relayServers[0])
 
-		err = db.P2PRemoveRelayServersForServer(context.Background(), server, []spec.ServerName{relayServer1})
+		err = db.P2PRemoveRelayServersForServer(ctx, server, []spec.ServerName{relayServer1})
 		assert.Nil(t, err)
 
-		relayServers, err = db.P2PGetRelayServersForServer(context.Background(), server)
+		relayServers, err = db.P2PGetRelayServersForServer(ctx, server)
 		assert.Nil(t, err)
 		assert.Zero(t, len(relayServers))
 
-		err = db.P2PAddRelayServersForServer(context.Background(), server, []spec.ServerName{relayServer1, relayServer2})
+		err = db.P2PAddRelayServersForServer(ctx, server, []spec.ServerName{relayServer1, relayServer2})
 		assert.Nil(t, err)
 
-		relayServers, err = db.P2PGetRelayServersForServer(context.Background(), server)
+		relayServers, err = db.P2PGetRelayServersForServer(ctx, server)
 		assert.Nil(t, err)
 		assert.Equal(t, relayServer1, relayServers[0])
 		assert.Equal(t, relayServer2, relayServers[1])
 
-		err = db.P2PRemoveAllRelayServersForServer(context.Background(), server)
+		err = db.P2PRemoveAllRelayServersForServer(ctx, server)
 		assert.Nil(t, err)
 
-		relayServers, err = db.P2PGetRelayServersForServer(context.Background(), server)
+		relayServers, err = db.P2PGetRelayServersForServer(ctx, server)
 		assert.Nil(t, err)
 		assert.Zero(t, len(relayServers))
 	})

@@ -81,12 +81,12 @@ type inviteStatements struct {
 	updateInviteRetiredStmt             *sql.Stmt
 }
 
-func CreateInvitesTable(db *sql.DB) error {
+func CreateInvitesTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(inviteSchema)
 	return err
 }
 
-func PrepareInvitesTable(db *sql.DB) (tables.Invites, error) {
+func PrepareInvitesTable(ctx context.Context, db *sql.DB) (tables.Invites, error) {
 	s := &inviteStatements{}
 
 	return s, sqlutil.StatementList{

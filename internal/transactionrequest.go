@@ -115,6 +115,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		if v, ok := roomVersions[roomID]; ok {
 			return v
 		}
+
 		roomVersion, err := t.rsAPI.QueryRoomVersionForRoom(ctx, roomID)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", roomID)

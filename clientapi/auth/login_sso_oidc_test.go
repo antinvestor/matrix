@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,11 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/matrix/setup/config"
 )
 
 func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/discovery", func(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +74,7 @@ func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
 }
 
 func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	const callbackURL = "https://matrix.example.com/continue"
 
@@ -107,8 +108,8 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 			var sURL string
 			mux.HandleFunc("/discovery", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(fmt.Sprintf(`{"authorization_endpoint":"%s/authorize","token_endpoint":"%s/token","userinfo_endpoint":"%s/userinfo","issuer":"http://oidc.example.com/"}`,
-					sURL, sURL, sURL)))
+				_, _ = fmt.Fprintf(w, `{"authorization_endpoint":"%s/authorize","token_endpoint":"%s/token","userinfo_endpoint":"%s/userinfo","issuer":"http://oidc.example.com/"}`,
+					sURL, sURL, sURL)
 			})
 			mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
@@ -142,7 +143,7 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 }
 
 func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	idp := &oidcIdentityProvider{
 		cfg: &config.IdentityProvider{
@@ -172,7 +173,7 @@ func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
 }
 
 func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	const callbackURL = "https://matrix.example.com/continue"
 
@@ -251,7 +252,7 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 }
 
 func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	mux := http.NewServeMux()
 	var gotHeader http.Header

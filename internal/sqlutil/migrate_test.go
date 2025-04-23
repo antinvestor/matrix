@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/antinvestor/matrix/setup/process"
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/test"
@@ -83,9 +83,7 @@ func Test_migrations_Up(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		processCtx := process.NewProcessContext()
-		ctx := processCtx.Context()
-
+		ctx := testrig.NewContext(t)
 		conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 		if err != nil {
 			t.Fatalf("failed to open database: %s", err)
@@ -118,10 +116,7 @@ func Test_migrations_Up(t *testing.T) {
 
 func Test_insertMigration(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-
-		processCtx := process.NewProcessContext()
-		ctx := processCtx.Context()
-
+		ctx := testrig.NewContext(t)
 		conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 		if err != nil {
 			t.Fatalf("failed to open database: %s", err)
@@ -133,11 +128,11 @@ func Test_insertMigration(t *testing.T) {
 			t.Errorf("unable to open database: %v", err)
 		}
 
-		if err := sqlutil.InsertMigration(context.Background(), db, "testing"); err != nil {
+		if err := sqlutil.InsertMigration(ctx, db, "testing"); err != nil {
 			t.Fatalf("unable to insert migration: %s", err)
 		}
 		// Second insert should not return an error, as it was already executed.
-		if err := sqlutil.InsertMigration(context.Background(), db, "testing"); err != nil {
+		if err := sqlutil.InsertMigration(ctx, db, "testing"); err != nil {
 			t.Fatalf("unable to insert migration: %s", err)
 		}
 	})

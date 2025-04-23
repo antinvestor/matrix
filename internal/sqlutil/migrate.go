@@ -40,7 +40,6 @@ const selectDBMigrationsSQL = "SELECT version FROM db_migrations"
 
 const createNecessaryExtensionsSQL = `
 	CREATE EXTENSION IF NOT EXISTS pg_search;
-	CREATE EXTENSION IF NOT EXISTS pg_analytics;
 	CREATE EXTENSION IF NOT EXISTS pg_ivm;
 	CREATE EXTENSION IF NOT EXISTS vector;
 	CREATE EXTENSION IF NOT EXISTS postgis;
@@ -98,7 +97,7 @@ func (m *Migrator) Up(ctx context.Context) error {
 		return fmt.Errorf("unable to create/get migrations: %w", err)
 	}
 	// ensure we close the insert statement, as it's not needed anymore
-	defer m.close()
+	defer m.close(ctx)
 	return WithTransaction(m.db, func(txn *sql.Tx) error {
 		for i := range m.migrations {
 			migration := m.migrations[i]
@@ -175,7 +174,7 @@ func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]struct{},
 // This should only be used when manually inserting migrations.
 func InsertMigration(ctx context.Context, db *sql.DB, migrationName string) error {
 	m := NewMigrator(db)
-	defer m.close()
+	defer m.close(ctx)
 	existingMigrations, err := m.ExecutedMigrations(ctx)
 	if err != nil {
 		return err
@@ -186,8 +185,8 @@ func InsertMigration(ctx context.Context, db *sql.DB, migrationName string) erro
 	return m.insertMigration(ctx, nil, migrationName)
 }
 
-func (m *Migrator) close() {
+func (m *Migrator) close(ctx context.Context) {
 	if m.insertStmt != nil {
-		internal.CloseAndLogIfError(context.Background(), m.insertStmt, "unable to close insert statement")
+		internal.CloseAndLogIfError(ctx, m.insertStmt, "unable to close insert statement")
 	}
 }

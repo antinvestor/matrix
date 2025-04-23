@@ -15,17 +15,16 @@
 package sqlutil
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"sync"
 
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 )
 
 type Connections struct {
 	globalConfig        config.DatabaseOptions
-	processContext      *process.ProcessContext
 	existingConnections sync.Map
 }
 
@@ -34,14 +33,13 @@ type con struct {
 	writer Writer
 }
 
-func NewConnectionManager(processCtx *process.ProcessContext, globalConfig config.DatabaseOptions) *Connections {
+func NewConnectionManager(_ context.Context, globalConfig config.DatabaseOptions) *Connections {
 	return &Connections{
-		globalConfig:   globalConfig,
-		processContext: processCtx,
+		globalConfig: globalConfig,
 	}
 }
 
-func (c *Connections) Connection(dbProperties *config.DatabaseOptions) (*sql.DB, Writer, error) {
+func (c *Connections) Connection(ctx context.Context, dbProperties *config.DatabaseOptions) (*sql.DB, Writer, error) {
 	var err error
 	// If no connectionString was provided, try the global one
 	if dbProperties.ConnectionString == "" {
@@ -68,16 +66,8 @@ func (c *Connections) Connection(dbProperties *config.DatabaseOptions) (*sql.DB,
 	}
 	c.existingConnections.Store(dbProperties.ConnectionString, &con{db: db, writer: writer})
 	go func() {
-		if c.processContext == nil {
-			return
-		}
-		// If we have a ProcessContext, start a component and wait for
-		// Dendrite to shut down to cleanly close the database connection.
-		c.processContext.ComponentStarted()
-		<-c.processContext.WaitForShutdown()
+		<-ctx.Done()
 		_ = db.Close()
-		c.processContext.ComponentFinished()
 	}()
 	return db, writer, nil
-
 }

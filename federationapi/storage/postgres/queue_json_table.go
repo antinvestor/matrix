@@ -57,7 +57,7 @@ type queueJSONStatements struct {
 	selectJSONStmt *sql.Stmt
 }
 
-func NewPostgresQueueJSONTable(db *sql.DB) (s *queueJSONStatements, err error) {
+func NewPostgresQueueJSONTable(ctx context.Context, db *sql.DB) (s *queueJSONStatements, err error) {
 	s = &queueJSONStatements{
 		db: db,
 	}

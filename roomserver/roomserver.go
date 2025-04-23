@@ -15,11 +15,12 @@
 package roomserver
 
 import (
+	"context"
+
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -32,21 +33,21 @@ import (
 // Many of the methods provided by this API depend on access to a federation API, and so
 // you may wish to call `SetFederationAPI` on the returned struct to avoid nil-dereference errors.
 func NewInternalAPI(
-	processContext *process.ProcessContext,
+	ctx context.Context,
 	cfg *config.Dendrite,
 	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	caches caching.RoomServerCaches,
 	enableMetrics bool,
 ) api.RoomserverInternalAPI {
-	roomserverDB, err := storage.Open(processContext.Context(), cm, &cfg.RoomServer.Database, caches)
+	roomserverDB, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	js, nc := natsInstance.Prepare(processContext, &cfg.Global.JetStream)
+	js, nc := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 
 	return internal.NewRoomserverAPI(
-		processContext, cfg, roomserverDB, js, nc, caches, enableMetrics,
+		ctx, cfg, roomserverDB, js, nc, caches, enableMetrics,
 	)
 }

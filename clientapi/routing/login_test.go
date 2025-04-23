@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -31,9 +30,9 @@ func TestLogin(t *testing.T) {
 	charlie := &test.User{ID: "@Charlie:test", AccountType: uapi.AccountTypeUser}
 	vhUser := &test.User{ID: "@vhuser:vh1"}
 
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
@@ -43,19 +42,19 @@ func TestLogin(t *testing.T) {
 			SigningIdentity: fclient.SigningIdentity{ServerName: "vh1"},
 		})
 
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		routers := httputil.NewRouters()
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-		rsAPI.SetFederationAPI(nil, nil)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(ctx, nil, nil)
 		// Needed for /login
-		userAPI := userapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		Setup(routers, cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, nil, caching.DisableMetrics)
+		Setup(ctx, routers, cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, nil, caching.DisableMetrics)
 
 		// Create password
 		password := util.RandomString(8)
@@ -115,8 +114,6 @@ func TestLogin(t *testing.T) {
 			},
 		}
 
-		ctx := context.Background()
-
 		// Inject a dummy application service, so we have a "m.login.application_service"
 		// in the login flows
 		as := &config.ApplicationService{}
@@ -140,13 +137,14 @@ func TestLogin(t *testing.T) {
 			passwordFound := false
 			ssoFound := false
 			for _, flow := range resp.Flows {
-				if flow.Type == "m.login.password" {
+				switch flow.Type {
+				case "m.login.password":
 					passwordFound = true
-				} else if flow.Type == "m.login.sso" {
+				case "m.login.sso":
 					ssoFound = true
-				} else if flow.Type == "m.login.application_service" {
+				case "m.login.application_service":
 					appServiceFound = true
-				} else {
+				default:
 					t.Fatalf("got unknown login flow: %s", flow.Type)
 				}
 			}

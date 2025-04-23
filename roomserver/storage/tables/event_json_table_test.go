@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -14,9 +16,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventJSONTable(t *testing.T, _ test.DependancyOption) (tables.EventJSON, func()) {
+func mustCreateEventJSONTable(t *testing.T, _ test.DependancyOption) (tables.EventJSON, context.Context, func()) {
 	t.Helper()
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -27,24 +29,24 @@ func mustCreateEventJSONTable(t *testing.T, _ test.DependancyOption) (tables.Eve
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.EventJSON
-	err = postgres.CreateEventJSONTable(db)
+	err = postgres.CreateEventJSONTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PrepareEventJSONTable(db)
+	tab, err = postgres.PrepareEventJSONTable(ctx, db)
 
 	assert.NoError(t, err)
 
-	return tab, closeDb
+	return tab, ctx, closeDb
 }
 
 func Test_EventJSONTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDb := mustCreateEventJSONTable(t, testOpts)
+		tab, ctx, closeDb := mustCreateEventJSONTable(t, testOpts)
 		defer closeDb()
 
 		// create some dummy data
 		for i := 0; i < 10; i++ {
 			err := tab.InsertEventJSON(
-				context.Background(), nil, types.EventNID(i),
+				ctx, nil, types.EventNID(i),
 				[]byte(fmt.Sprintf(`{"value":%d"}`, i)),
 			)
 			assert.NoError(t, err)
@@ -80,7 +82,7 @@ func Test_EventJSONTable(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
 				// select a subset of the data
-				values, err := tab.BulkSelectEventJSON(context.Background(), nil, tc.args)
+				values, err := tab.BulkSelectEventJSON(ctx, nil, tc.args)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.wantCount, len(values))
 				for i, v := range values {

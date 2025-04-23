@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -12,9 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRoomAliasesTable(t *testing.T, _ test.DependancyOption) (tab tables.RoomAliases, closeDb func()) {
+func mustCreateRoomAliasesTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tab tables.RoomAliases, closeDb func()) {
 	t.Helper()
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -24,9 +25,9 @@ func mustCreateRoomAliasesTable(t *testing.T, _ test.DependancyOption) (tab tabl
 		MaxOpenConnections: 10,
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	err = postgres.CreateRoomAliasesTable(db)
+	err = postgres.CreateRoomAliasesTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PrepareRoomAliasesTable(db)
+	tab, err = postgres.PrepareRoomAliasesTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -37,9 +38,9 @@ func TestRoomAliasesTable(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeFn := mustCreateRoomAliasesTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		tab, closeFn := mustCreateRoomAliasesTable(ctx, t, testOpts)
 		defer closeFn()
 		alias, alias2, alias3 := "#alias:localhost", "#alias2:localhost", "#alias3:localhost"
 		// insert aliases

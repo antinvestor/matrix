@@ -57,7 +57,7 @@ type filterStatements struct {
 	insertFilterStmt            *sql.Stmt
 }
 
-func NewPostgresFilterTable(db *sql.DB) (tables.Filter, error) {
+func NewPostgresFilterTable(ctx context.Context, db *sql.DB) (tables.Filter, error) {
 	_, err := db.Exec(filterSchema)
 	if err != nil {
 		return nil, err

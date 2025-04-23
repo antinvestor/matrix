@@ -207,11 +207,12 @@ func TestSearch(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeDB()
 
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
-		db, err := storage.NewSyncServerDatasource(processCtx.Context(), cm, &cfg.SyncAPI.Database)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		db, err := storage.NewSyncServerDatasource(ctx, cm, &cfg.SyncAPI.Database)
 		assert.NoError(t, err)
 
 		// store the events in the database
@@ -224,7 +225,7 @@ func TestSearch(t *testing.T) {
 				stateEventIDs = append(stateEventIDs, x.EventID())
 			}
 			x.StateKeyResolved = x.StateKey()
-			sp, err = db.WriteEvent(processCtx.Context(), x, stateEvents, stateEventIDs, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
+			sp, err = db.WriteEvent(ctx, x, stateEvents, stateEventIDs, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 			assert.NoError(t, err)
 			assert.True(t, sp > 0, "expected to have a stream position greater than zero")
 			if x.Type() != "m.room.message" {

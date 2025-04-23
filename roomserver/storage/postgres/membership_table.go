@@ -185,7 +185,7 @@ type membershipStatements struct {
 	selectJoinedUsersStmt                           *sql.Stmt
 }
 
-func CreateMembershipTable(db *sql.DB) error {
+func CreateMembershipTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(membershipSchema)
 	if err != nil {
 		return err
@@ -195,10 +195,10 @@ func CreateMembershipTable(db *sql.DB) error {
 		Version: "roomserver: add forgotten column",
 		Up:      deltas.UpAddForgottenColumn,
 	})
-	return m.Up(context.Background())
+	return m.Up(ctx)
 }
 
-func PrepareMembershipTable(db *sql.DB) (tables.Membership, error) {
+func PrepareMembershipTable(ctx context.Context, db *sql.DB) (tables.Membership, error) {
 	s := &membershipStatements{}
 
 	return s, sqlutil.StatementList{

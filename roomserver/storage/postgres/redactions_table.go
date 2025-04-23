@@ -60,12 +60,12 @@ type redactionStatements struct {
 	markRedactionValidatedStmt                  *sql.Stmt
 }
 
-func CreateRedactionsTable(db *sql.DB) error {
+func CreateRedactionsTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(redactionsSchema)
 	return err
 }
 
-func PrepareRedactionsTable(db *sql.DB) (tables.Redactions, error) {
+func PrepareRedactionsTable(ctx context.Context, db *sql.DB) (tables.Redactions, error) {
 	s := &redactionStatements{}
 
 	return s, sqlutil.StatementList{

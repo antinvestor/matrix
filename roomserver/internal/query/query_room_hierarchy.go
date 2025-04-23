@@ -425,13 +425,12 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 		return &resp
 	}
 	util.GetLogger(ctx).Debugf("Querying %s via %+v", roomID, vias)
-	innerCtx := context.Background()
 	// query more of the spaces graph using these servers
 	for _, serverName := range vias {
 		if serverName == string(querier.Cfg.Global.ServerName) {
 			continue
 		}
-		res, err := querier.FSAPI.RoomHierarchies(innerCtx, querier.Cfg.Global.ServerName, spec.ServerName(serverName), roomID.String(), suggestedOnly)
+		res, err := querier.FSAPI.RoomHierarchies(ctx, querier.Cfg.Global.ServerName, spec.ServerName(serverName), roomID.String(), suggestedOnly)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Warnf("failed to call RoomHierarchies on server %s", serverName)
 			continue
@@ -464,7 +463,7 @@ func childReferences(ctx context.Context, querier *Queryer, suggestedOnly bool, 
 		StateKey:  "",
 	}
 	var res roomserver.QueryCurrentStateResponse
-	err := querier.QueryCurrentState(context.Background(), &roomserver.QueryCurrentStateRequest{
+	err := querier.QueryCurrentState(ctx, &roomserver.QueryCurrentStateRequest{
 		RoomID:         roomID.String(),
 		AllowWildcards: true,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{

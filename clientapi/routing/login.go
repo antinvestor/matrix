@@ -46,7 +46,8 @@ func Login(
 	req *http.Request, userAPI userapi.ClientUserAPI,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
-	if req.Method == http.MethodGet {
+	switch req.Method {
+	case http.MethodGet:
 		loginFlows := []flow{{Type: authtypes.LoginTypePassword}, {Type: authtypes.LoginTypeSSO}}
 		if len(cfg.Derived.ApplicationServices) > 0 {
 			loginFlows = append(loginFlows, flow{Type: authtypes.LoginTypeApplicationService})
@@ -58,7 +59,7 @@ func Login(
 				Flows: loginFlows,
 			},
 		}
-	} else if req.Method == http.MethodPost {
+	case http.MethodPost:
 		login, cleanup, authErr := auth.LoginFromJSONReader(req, userAPI, userAPI, cfg)
 		if authErr != nil {
 			return *authErr

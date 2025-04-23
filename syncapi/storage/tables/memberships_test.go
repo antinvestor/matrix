@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -17,9 +19,8 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func newMembershipsTable(t *testing.T, _ test.DependancyOption) (tables.Memberships, *sql.DB, func()) {
+func newMembershipsTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tables.Memberships, *sql.DB, func()) {
 	t.Helper()
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -33,7 +34,7 @@ func newMembershipsTable(t *testing.T, _ test.DependancyOption) (tables.Membersh
 	}
 
 	var tab tables.Memberships
-	tab, err = postgres.NewPostgresMembershipsTable(db)
+	tab, err = postgres.NewPostgresMembershipsTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -73,10 +74,12 @@ func TestMembershipsTable(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		table, _, closeDb := newMembershipsTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		table, _, closeDb := newMembershipsTable(ctx, t, testOpts)
 		defer closeDb()
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()
 
 		for _, ev := range userEvents {

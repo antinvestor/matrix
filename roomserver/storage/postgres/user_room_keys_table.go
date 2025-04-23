@@ -67,12 +67,12 @@ type userRoomKeysStatements struct {
 	selectAllUserRoomPublicKeysForUser *sql.Stmt
 }
 
-func CreateUserRoomKeysTable(db *sql.DB) error {
+func CreateUserRoomKeysTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(userRoomKeysSchema)
 	return err
 }
 
-func PrepareUserRoomKeysTable(db *sql.DB) (tables.UserRoomKeys, error) {
+func PrepareUserRoomKeysTable(ctx context.Context, db *sql.DB) (tables.UserRoomKeys, error) {
 	s := &userRoomKeysStatements{}
 	return s, sqlutil.StatementList{
 		{&s.insertUserRoomPrivateKeyStmt, insertUserRoomPrivateKeySQL},

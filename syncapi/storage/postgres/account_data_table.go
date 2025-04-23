@@ -72,7 +72,7 @@ type accountDataStatements struct {
 	selectMaxAccountDataIDStmt   *sql.Stmt
 }
 
-func NewPostgresAccountDataTable(db *sql.DB) (tables.AccountData, error) {
+func NewPostgresAccountDataTable(ctx context.Context, db *sql.DB) (tables.AccountData, error) {
 	s := &accountDataStatements{}
 	_, err := db.Exec(accountDataSchema)
 	if err != nil {

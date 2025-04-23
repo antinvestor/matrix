@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
@@ -15,8 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateServerKeyDB(t *testing.T, _ test.DependancyOption) (tables.FederationServerSigningKeys, func()) {
-	ctx := context.TODO()
+func mustCreateServerKeyDB(ctx context.Context, t *testing.T, _ test.DependancyOption) (tables.FederationServerSigningKeys, func()) {
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -29,7 +30,7 @@ func mustCreateServerKeyDB(t *testing.T, _ test.DependancyOption) (tables.Federa
 		t.Fatalf("failed to open database: %s", err)
 	}
 	var tab tables.FederationServerSigningKeys
-	tab, err = postgres.NewPostgresServerSigningKeysTable(db)
+	tab, err = postgres.NewPostgresServerSigningKeysTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)
@@ -39,8 +40,10 @@ func mustCreateServerKeyDB(t *testing.T, _ test.DependancyOption) (tables.Federa
 
 func TestServerKeysTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, cancel := context.WithCancel(context.Background())
-		tab, closeKeyDb := mustCreateServerKeyDB(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		ctx, cancel := context.WithCancel(ctx)
+		tab, closeKeyDb := mustCreateServerKeyDB(ctx, t, testOpts)
 		t.Cleanup(func() {
 			closeKeyDb()
 			cancel()

@@ -15,6 +15,8 @@
 package relayapi
 
 import (
+	"context"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/federationapi/producers"
@@ -52,6 +54,7 @@ func AddPublicRoutes(
 }
 
 func NewRelayInternalAPI(
+	ctx context.Context,
 	dendriteCfg *config.Dendrite,
 	cm *sqlutil.Connections,
 	fedClient fclient.FederationClient,
@@ -61,7 +64,7 @@ func NewRelayInternalAPI(
 	relayingEnabled bool,
 	caches caching.FederationCache,
 ) api.RelayInternalAPI {
-	relayDB, err := storage.NewDatabase(cm, &dendriteCfg.RelayAPI.Database, caches, dendriteCfg.Global.IsLocalServerName)
+	relayDB, err := storage.NewDatabase(ctx, cm, &dendriteCfg.RelayAPI.Database, caches, dendriteCfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to relay db")
 	}

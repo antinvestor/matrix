@@ -74,7 +74,7 @@ type thumbnailStatements struct {
 	selectThumbnailsStmt *sql.Stmt
 }
 
-func NewPostgresThumbnailsTable(db *sql.DB) (tables.Thumbnails, error) {
+func NewPostgresThumbnailsTable(ctx context.Context, db *sql.DB) (tables.Thumbnails, error) {
 	s := &thumbnailStatements{}
 	_, err := db.Exec(thumbnailSchema)
 	if err != nil {

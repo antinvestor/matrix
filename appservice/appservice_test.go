@@ -43,7 +43,7 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 )
 
-var testIsBlacklistedOrBackingOff = func(s spec.ServerName) (*statistics.ServerStatistics, error) {
+var testIsBlacklistedOrBackingOff = func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error) {
 	return &statistics.ServerStatistics{}, nil
 }
 
@@ -131,7 +131,8 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, ctx, closeRig := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
 		// Create a dummy application service
@@ -159,7 +160,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-		rsAPI.SetFederationAPI(nil, nil)
+		rsAPI.SetFederationAPI(ctx, nil, nil)
 		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 		asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, usrAPI, rsAPI)
 
@@ -226,7 +227,8 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	srv.Start()
 	defer srv.Close()
 
-	cfg, ctx, tearDown := testrig.CreateConfig(t, test.DependancyOption{})
+	ctx := testrig.NewContext(t)
+	cfg, tearDown := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer tearDown()
 
 	// Create a dummy application service
@@ -253,7 +255,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	natsInstance := jetstream.NATSInstance{}
 	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-	rsAPI.SetFederationAPI(nil, nil)
+	rsAPI.SetFederationAPI(ctx, nil, nil)
 	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 	asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, usrAPI, rsAPI)
 
@@ -265,7 +267,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 }
 
 func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID string, wantExists bool) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	userResp := &api.UserIDExistsResponse{}
 
 	if err := asAPI.UserIDExists(ctx, &api.UserIDExistsRequest{
@@ -279,7 +281,7 @@ func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID stri
 }
 
 func testAliasExists(t *testing.T, asAPI api.AppServiceInternalAPI, alias string, wantExists bool) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	aliasResp := &api.RoomAliasExistsResponse{}
 
 	if err := asAPI.RoomAliasExists(ctx, &api.RoomAliasExistsRequest{
@@ -293,7 +295,7 @@ func testAliasExists(t *testing.T, asAPI api.AppServiceInternalAPI, alias string
 }
 
 func testLocations(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult []api.ASLocationResponse) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	locationResp := &api.LocationResponse{}
 
 	if err := asAPI.Locations(ctx, &api.LocationRequest{
@@ -307,7 +309,7 @@ func testLocations(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, 
 }
 
 func testUser(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult []api.ASUserResponse) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	userResp := &api.UserResponse{}
 
 	if err := asAPI.User(ctx, &api.UserRequest{
@@ -321,7 +323,7 @@ func testUser(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantR
 }
 
 func testProtocol(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult map[string]api.ASProtocolResponse) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	protoResp := &api.ProtocolResponse{}
 
 	if err := asAPI.Protocols(ctx, &api.ProtocolRequest{
@@ -347,9 +349,10 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeDB()
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		natsInstance := &jetstream.NATSInstance{}
 
 		evChan := make(chan struct{})
@@ -394,14 +397,14 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		// Create required internal APIs
-		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
-		rsAPI.SetFederationAPI(nil, nil)
-		usrAPI := userapi.NewInternalAPI(processCtx, cfg, cm, natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(ctx, nil, nil)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 		// start the consumer
-		appservice.NewInternalAPI(processCtx, cfg, natsInstance, usrAPI, rsAPI)
+		appservice.NewInternalAPI(ctx, cfg, natsInstance, usrAPI, rsAPI)
 
 		// Create the room
-		if err := rsapi.SendEvents(context.Background(), rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+		if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 		var seenInvitesForBob int
@@ -430,10 +433,11 @@ func TestOutputAppserviceEvent(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		cfg, processCtx, closeDB := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
 		t.Cleanup(closeDB)
 
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		natsInstance := &jetstream.NATSInstance{}
 
 		evChan := make(chan struct{})
@@ -443,8 +447,8 @@ func TestOutputAppserviceEvent(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		// Create required internal APIs
-		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
-		rsAPI.SetFederationAPI(nil, nil)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(ctx, nil, nil)
 
 		// Create the router, so we can hit `/joined_members`
 		routers := httputil.NewRouters()
@@ -453,9 +457,9 @@ func TestOutputAppserviceEvent(t *testing.T) {
 			bob: {},
 		}
 
-		usrAPI := userapi.NewInternalAPI(processCtx, cfg, cm, natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-		clientapi.AddPublicRoutes(processCtx, routers, cfg, natsInstance, nil, rsAPI, nil, nil, nil, usrAPI, nil, nil, nil, caching.DisableMetrics)
-		createAccessTokens(t, accessTokens, usrAPI, processCtx.Context(), routers)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		clientapi.AddPublicRoutes(ctx, routers, cfg, natsInstance, nil, rsAPI, nil, nil, nil, usrAPI, nil, nil, nil, caching.DisableMetrics)
+		createAccessTokens(t, accessTokens, usrAPI, ctx, routers)
 
 		room := test.NewRoom(t, alice)
 
@@ -485,7 +489,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 							"membership": "join",
 						}, test.WithStateKey(bob.ID))
 
-						if err := rsapi.SendEvents(context.Background(), rsAPI, rsapi.KindNew, []*types.HeaderedEvent{joinEv}, "test", "test", "test", nil, false); err != nil {
+						if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, []*types.HeaderedEvent{joinEv}, "test", "test", "test", nil, false); err != nil {
 							t.Fatalf("failed to send events: %v", err)
 						}
 					case spec.Join: // the AS has received the join event, now hit `/joined_members` to validate that
@@ -530,11 +534,11 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
 
 		// Prepare AS Streams on the old topic to validate that they get deleted
-		jsCtx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+		jsCtx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 
 		token := jetstream.Tokenise(as.ID)
 		if err := jetstream.Consumer(
-			processCtx.Context(), jsCtx, cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
+			ctx, jsCtx, cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
 			cfg.Global.JetStream.Durable("Appservice_"+token),
 			50, // maximum number of events to send in a single transaction
 			func(ctx context.Context, msgs []*nats.Msg) bool {
@@ -545,10 +549,10 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		}
 
 		// Start the syncAPI to have `/joined_members` available
-		syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, natsInstance, usrAPI, rsAPI, caches, caching.DisableMetrics)
+		syncapi.AddPublicRoutes(ctx, routers, cfg, cm, natsInstance, usrAPI, rsAPI, caches, caching.DisableMetrics)
 
 		// start the consumer
-		appservice.NewInternalAPI(processCtx, cfg, natsInstance, usrAPI, rsAPI)
+		appservice.NewInternalAPI(ctx, cfg, natsInstance, usrAPI, rsAPI)
 
 		// At this point, the old JetStream consumers should be deleted
 		for consumer := range jsCtx.Consumers(cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent)) {
@@ -558,7 +562,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		}
 
 		// Create the room, this triggers the AS to receive an invite for Bob.
-		if err := rsapi.SendEvents(context.Background(), rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+		if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 

@@ -22,7 +22,6 @@ import (
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -32,7 +31,6 @@ import (
 
 // OutputTypingEventConsumer consumes events that originated in the EDU server.
 type OutputTypingEventConsumer struct {
-	ctx       context.Context
 	jetstream nats.JetStreamContext
 	durable   string
 	topic     string
@@ -44,7 +42,7 @@ type OutputTypingEventConsumer struct {
 // NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputTypingEventConsumer(
-	process *process.ProcessContext,
+	_ context.Context,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
 	eduCache *caching.EDUCache,
@@ -52,7 +50,6 @@ func NewOutputTypingEventConsumer(
 	stream streams.StreamProvider,
 ) *OutputTypingEventConsumer {
 	return &OutputTypingEventConsumer{
-		ctx:       process.Context(),
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
 		durable:   cfg.Matrix.JetStream.Durable("SyncAPITypingConsumer"),
@@ -63,9 +60,9 @@ func NewOutputTypingEventConsumer(
 }
 
 // Start consuming typing events.
-func (s *OutputTypingEventConsumer) Start() error {
+func (s *OutputTypingEventConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }

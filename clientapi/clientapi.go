@@ -15,12 +15,13 @@
 package clientapi
 
 import (
+	"context"
+
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
-	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/antinvestor/matrix/setup/jetstream"
 
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/api"
@@ -29,12 +30,13 @@ import (
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/internal/transactions"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
+	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
 func AddPublicRoutes(
-	processContext *process.ProcessContext,
+	ctx context.Context,
 	routers httputil.Routers,
 	cfg *config.Dendrite,
 	natsInstance *jetstream.NATSInstance,
@@ -49,7 +51,7 @@ func AddPublicRoutes(
 	partitionCli *partitionv1.PartitionClient,
 	enableMetrics bool,
 ) {
-	js, natsClient := natsInstance.Prepare(processContext, &cfg.Global.JetStream)
+	js, natsClient := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream:              js,
@@ -62,6 +64,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
+		ctx,
 		routers,
 		cfg, rsAPI, asAPI,
 		userAPI, userDirectoryProvider, federation,

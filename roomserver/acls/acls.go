@@ -47,8 +47,7 @@ type ServerACLs struct {
 	aclRegexCacheMutex sync.RWMutex               // protects the above
 }
 
-func NewServerACLs(db ServerACLDatabase) *ServerACLs {
-	ctx := context.TODO()
+func NewServerACLs(ctx context.Context, db ServerACLDatabase) *ServerACLs {
 	acls := &ServerACLs{
 		acls: make(map[string]*serverACL),
 		// Be generous when creating the cache, as in reality
@@ -91,8 +90,8 @@ type serverACL struct {
 
 func compileACLRegex(orig string) (*regexp.Regexp, error) {
 	escaped := regexp.QuoteMeta(orig)
-	escaped = strings.Replace(escaped, "\\?", ".", -1)
-	escaped = strings.Replace(escaped, "\\*", ".*", -1)
+	escaped = strings.ReplaceAll(escaped, "\\?", ".")
+	escaped = strings.ReplaceAll(escaped, "\\*", ".*")
 	return regexp.Compile(escaped)
 }
 

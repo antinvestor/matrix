@@ -62,12 +62,12 @@ type roomAliasesStatements struct {
 	deleteRoomAliasStmt          *sql.Stmt
 }
 
-func CreateRoomAliasesTable(db *sql.DB) error {
+func CreateRoomAliasesTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(roomAliasesSchema)
 	return err
 }
 
-func PrepareRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
+func PrepareRoomAliasesTable(ctx context.Context, db *sql.DB) (tables.RoomAliases, error) {
 	s := &roomAliasesStatements{}
 
 	return s, sqlutil.StatementList{

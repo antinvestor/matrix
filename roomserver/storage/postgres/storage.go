@@ -40,13 +40,13 @@ type Database struct {
 func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
 	var err error
-	db, writer, err := conMan.Connection(dbProperties)
+	db, writer, err := conMan.Connection(ctx, dbProperties)
 	if err != nil {
 		return nil, fmt.Errorf("sqlutil.Open: %w", err)
 	}
 
 	// Create the tables.
-	if err = d.create(db); err != nil {
+	if err = d.create(ctx, db); err != nil {
 		return nil, err
 	}
 
@@ -58,7 +58,7 @@ func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config
 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
-	if err = d.prepare(db, writer, cache); err != nil {
+	if err = d.prepare(ctx, db, writer, cache); err != nil {
 		return nil, err
 	}
 
@@ -91,106 +91,106 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 	return m.Up(ctx)
 }
 
-func (d *Database) create(db *sql.DB) error {
-	if err := CreateEventStateKeysTable(db); err != nil {
+func (d *Database) create(ctx context.Context, db *sql.DB) error {
+	if err := CreateEventStateKeysTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateEventTypesTable(db); err != nil {
+	if err := CreateEventTypesTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateEventJSONTable(db); err != nil {
+	if err := CreateEventJSONTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateEventsTable(db); err != nil {
+	if err := CreateEventsTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateRoomsTable(db); err != nil {
+	if err := CreateRoomsTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateStateBlockTable(db); err != nil {
+	if err := CreateStateBlockTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateStateSnapshotTable(db); err != nil {
+	if err := CreateStateSnapshotTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreatePrevEventsTable(db); err != nil {
+	if err := CreatePrevEventsTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateRoomAliasesTable(db); err != nil {
+	if err := CreateRoomAliasesTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateInvitesTable(db); err != nil {
+	if err := CreateInvitesTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateMembershipTable(db); err != nil {
+	if err := CreateMembershipTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreatePublishedTable(db); err != nil {
+	if err := CreatePublishedTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateRedactionsTable(db); err != nil {
+	if err := CreateRedactionsTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateUserRoomKeysTable(db); err != nil {
+	if err := CreateUserRoomKeysTable(ctx, db); err != nil {
 		return err
 	}
-	if err := CreateReportedEventsTable(db); err != nil {
+	if err := CreateReportedEventsTable(ctx, db); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.RoomServerCaches) error {
-	eventStateKeys, err := PrepareEventStateKeysTable(db)
+func (d *Database) prepare(ctx context.Context, db *sql.DB, writer sqlutil.Writer, cache caching.RoomServerCaches) error {
+	eventStateKeys, err := PrepareEventStateKeysTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	eventTypes, err := PrepareEventTypesTable(db)
+	eventTypes, err := PrepareEventTypesTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	eventJSON, err := PrepareEventJSONTable(db)
+	eventJSON, err := PrepareEventJSONTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	events, err := PrepareEventsTable(db)
+	events, err := PrepareEventsTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	rooms, err := PrepareRoomsTable(db)
+	rooms, err := PrepareRoomsTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	stateBlock, err := PrepareStateBlockTable(db)
+	stateBlock, err := PrepareStateBlockTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	stateSnapshot, err := PrepareStateSnapshotTable(db)
+	stateSnapshot, err := PrepareStateSnapshotTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	prevEvents, err := PreparePrevEventsTable(db)
+	prevEvents, err := PreparePrevEventsTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	roomAliases, err := PrepareRoomAliasesTable(db)
+	roomAliases, err := PrepareRoomAliasesTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	invites, err := PrepareInvitesTable(db)
+	invites, err := PrepareInvitesTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	membership, err := PrepareMembershipTable(db)
+	membership, err := PrepareMembershipTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	published, err := PreparePublishedTable(db)
+	published, err := PreparePublishedTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	redactions, err := PrepareRedactionsTable(db)
+	redactions, err := PrepareRedactionsTable(ctx, db)
 	if err != nil {
 		return err
 	}
@@ -198,11 +198,11 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	userRoomKeys, err := PrepareUserRoomKeysTable(db)
+	userRoomKeys, err := PrepareUserRoomKeysTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	reportedEvents, err := PrepareReportedEventsTable(db)
+	reportedEvents, err := PrepareReportedEventsTable(ctx, db)
 	if err != nil {
 		return err
 	}

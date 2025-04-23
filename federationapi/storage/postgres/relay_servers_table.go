@@ -58,7 +58,7 @@ type relayServersStatements struct {
 	deleteAllRelayServersStmt *sql.Stmt
 }
 
-func NewPostgresRelayServersTable(db *sql.DB) (s *relayServersStatements, err error) {
+func NewPostgresRelayServersTable(ctx context.Context, db *sql.DB) (s *relayServersStatements, err error) {
 	s = &relayServersStatements{
 		db: db,
 	}

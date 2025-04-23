@@ -69,7 +69,7 @@ type registrationTokenStatements struct {
 	updateTokenExpiryTimeStatement               *sql.Stmt
 }
 
-func NewPostgresRegistrationTokensTable(db *sql.DB) (tables.RegistrationTokensTable, error) {
+func NewPostgresRegistrationTokensTable(ctx context.Context, db *sql.DB) (tables.RegistrationTokensTable, error) {
 	s := &registrationTokenStatements{}
 	_, err := db.Exec(registrationTokensSchema)
 	if err != nil {

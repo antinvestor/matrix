@@ -19,24 +19,25 @@ import (
 
 func TestSingleTransactionOnInput(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 
 		natsInstance := &jetstream.NATSInstance{}
-		js, jc := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+		js, jc := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(processCtx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
-		rsAPI.SetFederationAPI(nil, nil)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(ctx, nil, nil)
 
 		deadline, _ := t.Deadline()
 		if maxVal := time.Now().Add(time.Second * 3); deadline.Before(maxVal) {
 			deadline = maxVal
 		}
-		ctx, cancel := context.WithDeadline(processCtx.Context(), deadline)
+		ctx, cancel := context.WithDeadline(ctx, deadline)
 		defer cancel()
 
 		event, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV6).NewEventFromTrustedJSON(

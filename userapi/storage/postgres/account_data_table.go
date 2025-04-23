@@ -60,7 +60,7 @@ type accountDataStatements struct {
 	selectAccountDataByTypeStmt *sql.Stmt
 }
 
-func NewPostgresAccountDataTable(db *sql.DB) (tables.AccountDataTable, error) {
+func NewPostgresAccountDataTable(ctx context.Context, db *sql.DB) (tables.AccountDataTable, error) {
 	s := &accountDataStatements{}
 	_, err := db.Exec(accountDataSchema)
 	if err != nil {

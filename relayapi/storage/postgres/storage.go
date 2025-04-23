@@ -15,6 +15,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -33,6 +34,7 @@ type Database struct {
 
 // NewDatabase opens a new database
 func NewDatabase(
+	ctx context.Context,
 	conMan *sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	cache caching.FederationCache,
@@ -40,14 +42,14 @@ func NewDatabase(
 ) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, d.writer, err = conMan.Connection(dbProperties); err != nil {
+	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
 		return nil, err
 	}
-	queue, err := NewPostgresRelayQueueTable(d.db)
+	queue, err := NewPostgresRelayQueueTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	queueJSON, err := NewPostgresRelayQueueJSONTable(d.db)
+	queueJSON, err := NewPostgresRelayQueueJSONTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}

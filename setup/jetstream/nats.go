@@ -1,13 +1,13 @@
 package jetstream
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 
@@ -26,7 +26,7 @@ func DeleteAllStreams(js natsclient.JetStreamContext, cfg *config.JetStream) {
 	}
 }
 
-func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
+func (s *NATSInstance) Prepare(ctx context.Context, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) == 0 {
 		logrus.Fatalf("No Jetstream addresses specified")
@@ -36,7 +36,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 		return s.js, s.nc
 	}
 	var err error
-	s.js, s.nc, err = setupNATS(process, cfg, nil)
+	s.js, s.nc, err = setupNATS(ctx, cfg, nil)
 	if err != nil {
 		logrus.WithError(err).Fatalf("Could not setup nats at : %s", cfg.Addresses)
 	}
@@ -45,7 +45,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 }
 
 // nolint:gocyclo
-func setupNATS(processCtx *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn, error) {
+func setupNATS(ctx context.Context, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn, error) {
 	if nc == nil {
 		var err error
 		var opts []natsclient.Option
@@ -69,7 +69,7 @@ func setupNATS(processCtx *process.ProcessContext, cfg *config.JetStream, nc *na
 		streamName := cfg.Prefixed(stream.Name)
 
 		opts := []natsclient.JSOpt{
-			natsclient.Context(processCtx.Context()),
+			natsclient.Context(ctx),
 		}
 
 		info, err = s.StreamInfo(streamName, opts...)

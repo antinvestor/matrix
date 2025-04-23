@@ -15,6 +15,7 @@
 package userapi
 
 import (
+	"context"
 	"time"
 
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
@@ -25,10 +26,6 @@ import (
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
-	"github.com/sirupsen/logrus"
-
-	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/consumers"
@@ -36,6 +33,9 @@ import (
 	"github.com/antinvestor/matrix/userapi/producers"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/util"
+	"github.com/sirupsen/logrus"
+
+	rsapi "github.com/antinvestor/matrix/roomserver/api"
 )
 
 // NewInternalAPI returns a concrete implementation of the internal API. Callers
@@ -44,7 +44,7 @@ import (
 // Creating a new instance of the user API requires a roomserver API with a federation API set
 // using its `SetFederationAPI` method, other you may get nil-dereference errors.
 func NewInternalAPI(
-	processContext *process.ProcessContext,
+	ctx context.Context,
 	dendriteCfg *config.Dendrite,
 	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
@@ -52,17 +52,17 @@ func NewInternalAPI(
 	fedClient fedsenderapi.KeyserverFederationAPI,
 	profileCli *profilev1.ProfileClient,
 	enableMetrics bool,
-	blacklistedOrBackingOffFn func(s spec.ServerName) (*statistics.ServerStatistics, error),
+	blacklistedOrBackingOffFn func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error),
 ) *internal.UserInternalAPI {
 
 	var err error
-	js, _ := natsInstance.Prepare(processContext, &dendriteCfg.Global.JetStream)
+	js, _ := natsInstance.Prepare(ctx, &dendriteCfg.Global.JetStream)
 	appServices := dendriteCfg.Derived.ApplicationServices
 
 	pgClient := pushgateway.NewHTTPClient(dendriteCfg.UserAPI.PushGatewayDisableTLSValidation)
 
 	db, err := storage.NewUserDatabase(
-		processContext.Context(),
+		ctx,
 		profileCli,
 		cm,
 		&dendriteCfg.UserAPI.AccountDatabase,
@@ -76,7 +76,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
-	keyDB, err := storage.NewKeyDatabase(cm, &dendriteCfg.KeyServer.Database)
+	keyDB, err := storage.NewKeyDatabase(ctx, cm, &dendriteCfg.KeyServer.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key db")
 	}
@@ -109,51 +109,51 @@ func NewInternalAPI(
 		FedClient:            fedClient,
 	}
 
-	updater := internal.NewDeviceListUpdater(processContext, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn)
+	updater := internal.NewDeviceListUpdater(ctx, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn)
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
-	if err := updater.CleanUp(); err != nil {
+	if err := updater.CleanUp(ctx); err != nil {
 		logrus.WithError(err).Error("failed to cleanup stale device lists")
 	}
 
 	go func() {
-		if err := updater.Start(); err != nil {
+		if err := updater.Start(ctx); err != nil {
 			logrus.WithError(err).Panicf("failed to start device list updater")
 		}
 	}()
 
 	dlConsumer := consumers.NewDeviceListUpdateConsumer(
-		processContext, &dendriteCfg.UserAPI, js, updater,
+		ctx, &dendriteCfg.UserAPI, js, updater,
 	)
-	if err := dlConsumer.Start(); err != nil {
+	if err := dlConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start device list consumer")
 	}
 
 	sigConsumer := consumers.NewSigningKeyUpdateConsumer(
-		processContext, &dendriteCfg.UserAPI, js, userAPI,
+		ctx, &dendriteCfg.UserAPI, js, userAPI,
 	)
-	if err := sigConsumer.Start(); err != nil {
+	if err := sigConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start signing key consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
-		processContext, &dendriteCfg.UserAPI, js, db, syncProducer, pgClient,
+		ctx, &dendriteCfg.UserAPI, js, db, syncProducer, pgClient,
 	)
-	if err := receiptConsumer.Start(); err != nil {
+	if err := receiptConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start user API receipt consumer")
 	}
 
 	eventConsumer := consumers.NewOutputRoomEventConsumer(
-		processContext, &dendriteCfg.UserAPI, js, db, pgClient, rsAPI, syncProducer,
+		ctx, &dendriteCfg.UserAPI, js, db, pgClient, rsAPI, syncProducer,
 	)
-	if err := eventConsumer.Start(); err != nil {
+	if err := eventConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
 	}
 
 	var cleanOldNotifs func()
 	cleanOldNotifs = func() {
 		logrus.Infof("Cleaning old notifications")
-		if err := db.DeleteOldNotifications(processContext.Context()); err != nil {
+		if err := db.DeleteOldNotifications(ctx); err != nil {
 			logrus.WithError(err).Error("Failed to clean old notifications")
 		}
 		time.AfterFunc(time.Hour, cleanOldNotifs)
@@ -161,7 +161,7 @@ func NewInternalAPI(
 	time.AfterFunc(time.Minute, cleanOldNotifs)
 
 	if dendriteCfg.Global.ReportStats.Enabled {
-		go util.StartPhoneHomeCollector(time.Now(), dendriteCfg, db)
+		go util.StartPhoneHomeCollector(ctx, time.Now(), dendriteCfg, db)
 	}
 
 	return userAPI

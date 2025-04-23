@@ -29,7 +29,6 @@ import (
 	"github.com/antinvestor/matrix/federationapi/producers"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/httputil"
-	"github.com/antinvestor/matrix/roomserver/api"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
@@ -608,15 +607,15 @@ func Setup(
 
 func ErrorIfLocalServerNotInRoom(
 	ctx context.Context,
-	rsAPI api.FederationRoomserverAPI,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
 	roomID string,
 ) *util.JSONResponse {
 	// Check if we think we're in this room. If we aren't then
 	// we won't waste CPU cycles serving this request.
-	joinedReq := &api.QueryServerJoinedToRoomRequest{
+	joinedReq := &roomserverAPI.QueryServerJoinedToRoomRequest{
 		RoomID: roomID,
 	}
-	joinedRes := &api.QueryServerJoinedToRoomResponse{}
+	joinedRes := &roomserverAPI.QueryServerJoinedToRoomResponse{}
 	if err := rsAPI.QueryServerJoinedToRoom(ctx, joinedReq, joinedRes); err != nil {
 		res := util.ErrorResponse(err)
 		return &res
@@ -739,6 +738,6 @@ func (f *FederationWakeups) Wakeup(ctx context.Context, origin spec.ServerName) 
 			return
 		}
 	}
-	f.FsAPI.MarkServersAlive([]spec.ServerName{origin})
+	f.FsAPI.MarkServersAlive(ctx, []spec.ServerName{origin})
 	f.origins.Store(origin, time.Now())
 }

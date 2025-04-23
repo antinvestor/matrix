@@ -171,13 +171,13 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 	return nil
 }
 
-func postRegisterJoinRooms(cfg *config.UserAPI, acc *api.Account, rsAPI rsapi.UserRoomserverAPI) {
+func postRegisterJoinRooms(ctx context.Context, cfg *config.UserAPI, acc *api.Account, rsAPI rsapi.UserRoomserverAPI) {
 	// POST register behaviour: check if the user is a normal user.
 	// If the user is a normal user, add user to room specified in the configuration "auto_join_rooms".
 	if acc.AccountType != api.AccountTypeAppService && acc.AppServiceID == "" {
 		for room := range cfg.AutoJoinRooms {
 			userID := userutil.MakeUserID(acc.Localpart, cfg.Matrix.ServerName)
-			err := addUserToRoom(context.Background(), rsAPI, cfg.AutoJoinRooms[room], acc.Localpart, userID)
+			err := addUserToRoom(ctx, rsAPI, cfg.AutoJoinRooms[room], acc.Localpart, userID)
 			if err != nil {
 				logrus.WithFields(logrus.Fields{
 					"user_id": userID,
@@ -261,7 +261,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return fmt.Errorf("a.DB.SetDisplayName: %w", err)
 	}
 
-	postRegisterJoinRooms(a.Config, acc, a.RSAPI)
+	postRegisterJoinRooms(ctx, a.Config, acc, a.RSAPI)
 
 	res.AccountCreated = true
 	res.Account = acc
@@ -276,7 +276,7 @@ func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.Pe
 		return err
 	}
 	if req.LogoutDevices {
-		if _, err := a.DB.RemoveAllDevices(context.Background(), req.Localpart, req.ServerName, ""); err != nil {
+		if _, err := a.DB.RemoveAllDevices(ctx, req.Localpart, req.ServerName, ""); err != nil {
 			return err
 		}
 	}
@@ -318,7 +318,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 		return nil
 	}
 	// create empty device keys and upload them to trigger device list changes
-	return a.deviceListUpdate(dev.UserID, []string{dev.ID}, req.FromRegistration)
+	return a.deviceListUpdate(ctx, dev.UserID, []string{dev.ID}, req.FromRegistration)
 }
 
 func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.PerformDeviceDeletionRequest, res *api.PerformDeviceDeletionResponse) error {
@@ -358,10 +358,10 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 		return fmt.Errorf("a.KeyAPI.PerformDeleteKeys: %w", err)
 	}
 	// create empty device keys and upload them to delete what was once there and trigger device list changes
-	return a.deviceListUpdate(req.UserID, deletedDeviceIDs, false)
+	return a.deviceListUpdate(ctx, req.UserID, deletedDeviceIDs, false)
 }
 
-func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string, fromRegistration bool) error {
+func (a *UserInternalAPI) deviceListUpdate(ctx context.Context, userID string, deviceIDs []string, fromRegistration bool) error {
 	deviceKeys := make([]api.DeviceKeys, len(deviceIDs))
 	for i, did := range deviceIDs {
 		deviceKeys[i] = api.DeviceKeys{
@@ -372,7 +372,7 @@ func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string, fr
 	}
 
 	var uploadRes api.PerformUploadKeysResponse
-	if err := a.PerformUploadKeys(context.Background(), &api.PerformUploadKeysRequest{
+	if err := a.PerformUploadKeys(ctx, &api.PerformUploadKeysRequest{
 		UserID:           userID,
 		DeviceKeys:       deviceKeys,
 		FromRegistration: fromRegistration,
@@ -433,7 +433,7 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 	if req.DisplayName != nil && dev.DisplayName != *req.DisplayName {
 		// display name has changed: update the device key
 		var uploadRes api.PerformUploadKeysResponse
-		if err := a.PerformUploadKeys(context.Background(), &api.PerformUploadKeysRequest{
+		if err := a.PerformUploadKeys(ctx, &api.PerformUploadKeysRequest{
 			UserID: req.RequestingUserID,
 			DeviceKeys: []api.DeviceKeys{
 				{
@@ -824,7 +824,7 @@ func (a *UserInternalAPI) QueryNotifications(ctx context.Context, req *api.Query
 			return fmt.Errorf("QueryNotifications: parsing 'from': %w", err)
 		}
 	}
-	var filter tables.NotificationFilter = tables.AllNotifications
+	var filter = tables.AllNotifications
 	if req.Only == "highlight" {
 		filter = tables.HighlightNotifications
 	}
@@ -850,16 +850,16 @@ func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.Perform
 		"display_name": req.Pusher.AppDisplayName,
 	}).Info("PerformPusherCreation")
 	if !req.Append {
-		err := a.DB.RemovePushers(ctx, req.Pusher.AppID, req.Pusher.PushKey)
+		err := a.DB.RemovePushers(ctx, req.AppID, req.PushKey)
 		if err != nil {
 			return err
 		}
 	}
-	if req.Pusher.Kind == "" {
-		return a.DB.RemovePusher(ctx, req.Pusher.AppID, req.Pusher.PushKey, req.Localpart, req.ServerName)
+	if req.Kind == "" {
+		return a.DB.RemovePusher(ctx, req.AppID, req.PushKey, req.Localpart, req.ServerName)
 	}
-	if req.Pusher.PushKeyTS == 0 {
-		req.Pusher.PushKeyTS = int64(time.Now().Unix())
+	if req.PushKeyTS == 0 {
+		req.PushKeyTS = time.Now().Unix()
 	}
 	return a.DB.UpsertPusher(ctx, req.Pusher, req.Localpart, req.ServerName)
 }

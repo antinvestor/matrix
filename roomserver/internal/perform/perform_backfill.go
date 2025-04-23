@@ -388,7 +388,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 	event gomatrixserverlib.PDU, eventIDs []string) (map[string]gomatrixserverlib.PDU, error) {
 
 	// try to fetch the events from the database first
-	events, err := b.ProvideEvents(roomVer, eventIDs)
+	events, err := b.ProvideEvents(ctx, roomVer, eventIDs)
 	if err != nil {
 		// non-fatal, fallthrough
 		logrus.WithError(err).Info("Failed to fetch events")
@@ -526,8 +526,7 @@ func (b *backfillRequester) Backfill(ctx context.Context, origin, server spec.Se
 	return tx, err
 }
 
-func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.PDU, error) {
-	ctx := context.Background()
+func (b *backfillRequester) ProvideEvents(ctx context.Context, roomVer gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.PDU, error) {
 	nidMap, err := b.db.EventNIDs(ctx, eventIDs)
 	if err != nil {
 		logrus.WithError(err).WithField("event_ids", eventIDs).Error("Failed to find events")

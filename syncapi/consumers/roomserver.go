@@ -30,7 +30,6 @@ import (
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/producers"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -39,7 +38,6 @@ import (
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -60,7 +58,7 @@ type OutputRoomEventConsumer struct {
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
-	process *process.ProcessContext,
+	ctx context.Context,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
 	store storage.Database,
@@ -71,7 +69,7 @@ func NewOutputRoomEventConsumer(
 	asProducer *producers.AppserviceEventProducer,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
-		ctx:          process.Context(),
+		ctx:          ctx,
 		cfg:          cfg,
 		jetstream:    js,
 		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
@@ -86,7 +84,7 @@ func NewOutputRoomEventConsumer(
 }
 
 // Start consuming from room servers
-func (s *OutputRoomEventConsumer) Start() error {
+func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
 		s.ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
@@ -119,28 +117,28 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 				return true
 			}
 		}
-		err = s.onNewRoomEvent(s.ctx, *output.NewRoomEvent)
+		err = s.onNewRoomEvent(ctx, *output.NewRoomEvent)
 		if err == nil && s.asProducer != nil {
 			if err = s.asProducer.ProduceRoomEvents(msg); err != nil {
 				log.WithError(err).Warn("failed to produce OutputAppserviceEvent")
 			}
 		}
 	case api.OutputTypeOldRoomEvent:
-		err = s.onOldRoomEvent(s.ctx, *output.OldRoomEvent)
+		err = s.onOldRoomEvent(ctx, *output.OldRoomEvent)
 	case api.OutputTypeNewInviteEvent:
-		s.onNewInviteEvent(s.ctx, *output.NewInviteEvent)
+		s.onNewInviteEvent(ctx, *output.NewInviteEvent)
 	case api.OutputTypeRetireInviteEvent:
-		s.onRetireInviteEvent(s.ctx, *output.RetireInviteEvent)
+		s.onRetireInviteEvent(ctx, *output.RetireInviteEvent)
 	case api.OutputTypeNewPeek:
-		s.onNewPeek(s.ctx, *output.NewPeek)
+		s.onNewPeek(ctx, *output.NewPeek)
 	case api.OutputTypeRetirePeek:
-		s.onRetirePeek(s.ctx, *output.RetirePeek)
+		s.onRetirePeek(ctx, *output.RetirePeek)
 	case api.OutputTypeRedactedEvent:
-		err = s.onRedactEvent(s.ctx, *output.RedactedEvent)
+		err = s.onRedactEvent(ctx, *output.RedactedEvent)
 	case api.OutputTypePurgeRoom:
-		err = s.onPurgeRoom(s.ctx, *output.PurgeRoom)
+		err = s.onPurgeRoom(ctx, *output.PurgeRoom)
 		if err != nil {
-			logrus.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from sync API")
+			log.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from sync API")
 			return true // non-fatal, as otherwise we end up in a loop of trying to purge the room
 		}
 	default:
@@ -309,7 +307,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	}
 
 	s.pduStream.Advance(pduPos)
-	s.notifier.OnNewEvent(ev, ev.RoomID().String(), nil, types.StreamingToken{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(ctx, ev, ev.RoomID().String(), nil, types.StreamingToken{PDUPosition: pduPos})
 
 	return nil
 }
@@ -365,7 +363,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	}
 
 	s.pduStream.Advance(pduPos)
-	s.notifier.OnNewEvent(ev, ev.RoomID().String(), nil, types.StreamingToken{PDUPosition: pduPos})
+	s.notifier.OnNewEvent(ctx, ev, ev.RoomID().String(), nil, types.StreamingToken{PDUPosition: pduPos})
 
 	return nil
 }
@@ -524,13 +522,13 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 func (s *OutputRoomEventConsumer) onPurgeRoom(
 	ctx context.Context, req api.OutputPurgeRoom,
 ) error {
-	logrus.WithField("room_id", req.RoomID).Warn("Purging room from sync API")
+	log.WithField("room_id", req.RoomID).Warn("Purging room from sync API")
 
 	if err := s.db.PurgeRoom(ctx, req.RoomID); err != nil {
-		logrus.WithField("room_id", req.RoomID).WithError(err).Error("Failed to purge room from sync API")
+		log.WithField("room_id", req.RoomID).WithError(err).Error("Failed to purge room from sync API")
 		return err
 	} else {
-		logrus.WithField("room_id", req.RoomID).Warn("Room purged from sync API")
+		log.WithField("room_id", req.RoomID).Warn("Room purged from sync API")
 		return nil
 	}
 }

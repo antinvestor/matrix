@@ -6,6 +6,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
@@ -78,7 +80,7 @@ func (s *mockDB) SelectMembershipForUser(ctx context.Context, roomID string, use
 //
 // This also aims to emulate "Only see history_visibility changes on bounadries" in sytest/tests/30rooms/30history-visibility.pl
 func Test_ApplyHistoryVisbility_Boundaries(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	roomID := "!roomid:domain"
 

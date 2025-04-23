@@ -1,12 +1,13 @@
 package util_test
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -37,7 +38,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	// Create a test room, just used to provide events
 	room := test.NewRoom(t, alice)
@@ -90,7 +91,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 			t.Fatalf("failed to open database: %s", err)
 		}
 		defer closeDb()
-		cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
+		cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
 		db, err := storage.NewUserDatabase(ctx, nil, cm, &config.DatabaseOptions{
 			ConnectionString: connStr,
 		}, "test", bcrypt.MinCost, 0, 0, "")

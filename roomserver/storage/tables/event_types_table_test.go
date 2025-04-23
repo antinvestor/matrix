@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -14,10 +16,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventTypesTable(t *testing.T, _ test.DependancyOption) (tables.EventTypes, func()) {
+func mustCreateEventTypesTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tables.EventTypes, func()) {
 	t.Helper()
 
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -28,9 +29,9 @@ func mustCreateEventTypesTable(t *testing.T, _ test.DependancyOption) (tables.Ev
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.EventTypes
-	err = postgres.CreateEventTypesTable(db)
+	err = postgres.CreateEventTypesTable(ctx, db)
 	assert.NoError(t, err)
-	tab, err = postgres.PrepareEventTypesTable(db)
+	tab, err = postgres.PrepareEventTypesTable(ctx, db)
 
 	assert.NoError(t, err)
 
@@ -39,9 +40,10 @@ func mustCreateEventTypesTable(t *testing.T, _ test.DependancyOption) (tables.Ev
 
 func Test_EventTypesTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDb := mustCreateEventTypesTable(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		tab, closeDb := mustCreateEventTypesTable(ctx, t, testOpts)
 		defer closeDb()
-		ctx := context.Background()
 		var eventTypeNID, gotEventTypeNID types.EventTypeNID
 		var err error
 		// create some dummy data

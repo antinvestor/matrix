@@ -1,10 +1,11 @@
 package tables_test
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -18,7 +19,7 @@ import (
 func newTopologyTable(t *testing.T, _ test.DependancyOption) (tables.Topology, *sql.DB, func()) {
 	t.Helper()
 
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -32,7 +33,7 @@ func newTopologyTable(t *testing.T, _ test.DependancyOption) (tables.Topology, *
 	}
 
 	var tab tables.Topology
-	tab, err = postgres.NewPostgresTopologyTable(db)
+	tab, err = postgres.NewPostgresTopologyTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -41,7 +42,7 @@ func newTopologyTable(t *testing.T, _ test.DependancyOption) (tables.Topology, *
 }
 
 func TestTopologyTable(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {

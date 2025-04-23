@@ -139,7 +139,7 @@ type currentRoomStateStatements struct {
 	selectRoomHeroesStmt               *sql.Stmt
 }
 
-func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
+func NewPostgresCurrentRoomStateTable(ctx context.Context, db *sql.DB) (tables.CurrentRoomState, error) {
 	s := &currentRoomStateStatements{}
 	_, err := db.Exec(currentRoomStateSchema)
 	if err != nil {
@@ -151,7 +151,7 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 		Version: "syncapi: add history visibility column (current_room_state)",
 		Up:      deltas.UpAddHistoryVisibilityColumnCurrentRoomState,
 	})
-	err = m.Up(context.Background())
+	err = m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
@@ -28,12 +30,12 @@ type RelayServersDatabase struct {
 }
 
 func mustCreateRelayServersTable(
+	ctx context.Context,
 	t *testing.T,
 	_ test.DependancyOption,
 ) (database RelayServersDatabase, close func()) {
 	t.Helper()
 
-	ctx := context.TODO()
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -44,7 +46,7 @@ func mustCreateRelayServersTable(
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
 	var tab tables.FederationRelayServers
-	tab, err = postgres.NewPostgresRelayServersTable(db)
+	tab, err = postgres.NewPostgresRelayServersTable(ctx, db)
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
@@ -70,9 +72,9 @@ func Equal(a, b []spec.ServerName) bool {
 }
 
 func TestShouldInsertRelayServers(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateRelayServersTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
 		defer closeDb()
 		expectedRelayServers := []spec.ServerName{server2, server3}
 
@@ -93,9 +95,9 @@ func TestShouldInsertRelayServers(t *testing.T) {
 }
 
 func TestShouldInsertRelayServersWithDuplicates(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateRelayServersTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
 		defer closeDb()
 		insertRelayServers := []spec.ServerName{server2, server2, server2, server3, server2}
 		expectedRelayServers := []spec.ServerName{server2, server3}
@@ -123,9 +125,9 @@ func TestShouldInsertRelayServersWithDuplicates(t *testing.T) {
 }
 
 func TestShouldGetRelayServersUnknownDestination(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateRelayServersTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
 		defer closeDb()
 
 		// Query relay servers for a destination that doesn't exist in the table.
@@ -141,9 +143,9 @@ func TestShouldGetRelayServersUnknownDestination(t *testing.T) {
 }
 
 func TestShouldDeleteCorrectRelayServers(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateRelayServersTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
 		defer closeDb()
 		relayServers1 := []spec.ServerName{server2, server3}
 		relayServers2 := []spec.ServerName{server1, server3, server4}
@@ -185,9 +187,9 @@ func TestShouldDeleteCorrectRelayServers(t *testing.T) {
 }
 
 func TestShouldDeleteAllRelayServers(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateRelayServersTable(t, testOpts)
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
 		defer closeDb()
 		expectedRelayServers := []spec.ServerName{server2, server3}
 

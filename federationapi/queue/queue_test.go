@@ -35,32 +35,32 @@ import (
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateFederationDatabase(t *testing.T, realDatabase bool) (storage.Database, *process.ProcessContext, func()) {
+func mustCreateFederationDatabase(t *testing.T, realDatabase bool) (storage.Database, context.Context, func()) {
 	if realDatabase {
 		// Real Database/s
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 
 		dbOptions := cfg.Global.DatabaseOptions
 
-		cm := sqlutil.NewConnectionManager(processCtx, dbOptions)
+		cm := sqlutil.NewConnectionManager(ctx, dbOptions)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 
-		db, err := storage.NewDatabase(processCtx.Context(), cm, &dbOptions, caches, cfg.Global.IsLocalServerName)
+		db, err := storage.NewDatabase(ctx, cm, &dbOptions, caches, cfg.Global.IsLocalServerName)
 		if err != nil {
 			t.Fatalf("NewDatabase failed with : %s", err)
 		}
-		return db, processCtx, closeRig
+		return db, ctx, closeRig
 	} else {
 		// Fake Database
 		db := test.NewInMemoryFederationDatabase()
-		return db, process.NewProcessContext(), func() {}
+		return db, context.TODO(), func() {}
 	}
 }
 
@@ -72,7 +72,7 @@ type stubFederationClient struct {
 	txRelayCount         atomic.Uint32
 }
 
-func (f *stubFederationClient) SendTransaction(_ context.Context, _ gomatrixserverlib.Transaction) (res fclient.RespSend, err error) {
+func (f *stubFederationClient) SendTransaction(ctx context.Context, tx gomatrixserverlib.Transaction) (res fclient.RespSend, err error) {
 	var result error
 	if !f.shouldTxSucceed {
 		result = fmt.Errorf("transaction failed")
@@ -82,7 +82,7 @@ func (f *stubFederationClient) SendTransaction(_ context.Context, _ gomatrixserv
 	return fclient.RespSend{}, result
 }
 
-func (f *stubFederationClient) P2PSendTransactionToRelay(_ context.Context, _ spec.UserID, _ gomatrixserverlib.Transaction, _ spec.ServerName) (res fclient.EmptyResp, err error) {
+func (f *stubFederationClient) P2PSendTransactionToRelay(ctx context.Context, userID spec.UserID, tx gomatrixserverlib.Transaction, serverName spec.ServerName) (res fclient.EmptyResp, err error) {
 	var result error
 	if !f.shouldTxRelaySucceed {
 		result = fmt.Errorf("relay transaction failed")
@@ -107,8 +107,8 @@ func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {
 	return &gomatrixserverlib.EDU{Type: spec.MTyping}
 }
 
-func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, realDatabase bool) (storage.Database, *stubFederationClient, *OutgoingQueues, *process.ProcessContext, func()) {
-	db, processContext, closeFn := mustCreateFederationDatabase(t, realDatabase)
+func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, realDatabase bool) (context.Context, storage.Database, *stubFederationClient, *OutgoingQueues, func()) {
+	db, ctx, closeFn := mustCreateFederationDatabase(t, realDatabase)
 
 	fc := &stubFederationClient{
 		shouldTxSucceed:      shouldTxSucceed,
@@ -125,29 +125,25 @@ func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32
 			ServerName: "localhost",
 		},
 	}
-	queues := NewOutgoingQueues(db, processContext, false, "localhost", fc, &stats, signingInfo)
+	queues := NewOutgoingQueues(ctx, db, false, "localhost", fc, &stats, signingInfo)
 
-	return db, fc, queues, processContext, closeFn
+	return ctx, db, fc, queues, closeFn
 }
 
 func TestSendPDUOnSuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 	defer closeSetup()
-	defer func() {
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
 
 	ev := mustCreatePDU(t)
-	err := queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == 1 {
-			data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingPDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 0 {
 				return poll.Success()
@@ -163,20 +159,16 @@ func TestSendEDUOnSuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 	defer closeSetup()
-	defer func() {
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
 
 	ev := mustCreateEDU(t)
-	err := queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == 1 {
-			data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingEDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 0 {
 				return poll.Success()
@@ -192,21 +184,17 @@ func TestSendPDUOnFailStoredInDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 	defer closeSetup()
-	defer func() {
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
 
 	ev := mustCreatePDU(t)
-	err := queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		// Wait for 2 backoff attempts to ensure there was adequate time to attempt sending
 		if fc.txCount.Load() >= 2 {
-			data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingPDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
 				return poll.Success()
@@ -222,21 +210,17 @@ func TestSendEDUOnFailStoredInDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+	defer closeSetup()
 
 	ev := mustCreateEDU(t)
-	err := queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		// Wait for 2 backoff attempts to ensure there was adequate time to attempt sending
 		if fc.txCount.Load() >= 2 {
-			data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingEDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
 				return poll.Success()
@@ -252,22 +236,18 @@ func TestSendPDUAgainDoesntInterruptBackoff(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	ev := mustCreatePDU(t)
-	err := queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		// Wait for 2 backoff attempts to ensure there was adequate time to attempt sending
 		if fc.txCount.Load() >= 2 {
-			data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingPDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
 				return poll.Success()
@@ -280,12 +260,12 @@ func TestSendPDUAgainDoesntInterruptBackoff(t *testing.T) {
 
 	fc.shouldTxSucceed = true
 	ev = mustCreatePDU(t)
-	err = queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+	err = queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	pollEnd := time.Now().Add(1 * time.Second)
 	immediateCheck := func(log poll.LogT) poll.Result {
-		data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+		data, dbErr := db.GetPendingPDUs(ctx, destination, 100)
 		assert.NoError(t, dbErr)
 		if len(data) == 0 {
 			return poll.Error(fmt.Errorf("The backoff was interrupted early"))
@@ -304,22 +284,18 @@ func TestSendEDUAgainDoesntInterruptBackoff(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	ev := mustCreateEDU(t)
-	err := queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		// Wait for 2 backoff attempts to ensure there was adequate time to attempt sending
 		if fc.txCount.Load() >= 2 {
-			data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingEDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
 				return poll.Success()
@@ -332,12 +308,12 @@ func TestSendEDUAgainDoesntInterruptBackoff(t *testing.T) {
 
 	fc.shouldTxSucceed = true
 	ev = mustCreateEDU(t)
-	err = queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err = queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	pollEnd := time.Now().Add(1 * time.Second)
 	immediateCheck := func(log poll.LogT) poll.Result {
-		data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+		data, dbErr := db.GetPendingEDUs(ctx, destination, 100)
 		assert.NoError(t, dbErr)
 		if len(data) == 0 {
 			return poll.Error(fmt.Errorf("The backoff was interrupted early"))
@@ -356,24 +332,20 @@ func TestSendPDUMultipleFailuresBlacklisted(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	ev := mustCreatePDU(t)
-	err := queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == failuresUntilBlacklist {
-			data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingPDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
-				if val, _ := db.IsServerBlacklisted(destination); val {
+				if val, _ := db.IsServerBlacklisted(ctx, destination); val {
 					return poll.Success()
 				}
 				return poll.Continue("waiting for server to be blacklisted")
@@ -389,24 +361,20 @@ func TestSendEDUMultipleFailuresBlacklisted(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	ev := mustCreateEDU(t)
-	err := queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == failuresUntilBlacklist {
-			data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingEDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
-				if val, _ := db.IsServerBlacklisted(destination); val {
+				if val, _ := db.IsServerBlacklisted(ctx, destination); val {
 					return poll.Success()
 				}
 				return poll.Continue("waiting for server to be blacklisted")
@@ -422,26 +390,22 @@ func TestSendPDUBlacklistedWithPriorExternalFailure(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
-	queues.statistics.ForServer(destination).Failure()
+	queues.statistics.ForServer(ctx, destination).Failure(ctx)
 
 	ev := mustCreatePDU(t)
-	err := queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == failuresUntilBlacklist {
-			data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingPDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
-				if val, _ := db.IsServerBlacklisted(destination); val {
+				if val, _ := db.IsServerBlacklisted(ctx, destination); val {
 					return poll.Success()
 				}
 				return poll.Continue("waiting for server to be blacklisted")
@@ -457,26 +421,22 @@ func TestSendEDUBlacklistedWithPriorExternalFailure(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
-	queues.statistics.ForServer(destination).Failure()
+	queues.statistics.ForServer(ctx, destination).Failure(ctx)
 
 	ev := mustCreateEDU(t)
-	err := queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == failuresUntilBlacklist {
-			data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingEDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
-				if val, _ := db.IsServerBlacklisted(destination); val {
+				if val, _ := db.IsServerBlacklisted(ctx, destination); val {
 					return poll.Success()
 				}
 				return poll.Continue("waiting for server to be blacklisted")
@@ -492,27 +452,23 @@ func TestRetryServerSendsPDUSuccessfully(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(1)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	// NOTE : getQueue before sending event to ensure we grab the same queue reference
 	// before it is blacklisted and deleted.
-	dest := queues.getQueue(destination)
+	dest := queues.getQueue(ctx, destination)
 	ev := mustCreatePDU(t)
-	err := queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	checkBlacklisted := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == failuresUntilBlacklist {
-			data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingPDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
-				if val, _ := db.IsServerBlacklisted(destination); val {
+				if val, _ := db.IsServerBlacklisted(ctx, destination); val {
 					if !dest.running.Load() {
 						return poll.Success()
 					}
@@ -527,10 +483,10 @@ func TestRetryServerSendsPDUSuccessfully(t *testing.T) {
 	poll.WaitOn(t, checkBlacklisted, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 
 	fc.shouldTxSucceed = true
-	wasBlacklisted := dest.statistics.MarkServerAlive()
-	queues.RetryServer(destination, wasBlacklisted)
+	wasBlacklisted := dest.statistics.MarkServerAlive(ctx)
+	queues.RetryServer(ctx, destination, wasBlacklisted)
 	checkRetry := func(log poll.LogT) poll.Result {
-		data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+		data, dbErr := db.GetPendingPDUs(ctx, destination, 100)
 		assert.NoError(t, dbErr)
 		if len(data) == 0 {
 			return poll.Success()
@@ -544,27 +500,23 @@ func TestRetryServerSendsEDUSuccessfully(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(1)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	// NOTE : getQueue before sending event to ensure we grab the same queue reference
 	// before it is blacklisted and deleted.
-	dest := queues.getQueue(destination)
+	dest := queues.getQueue(ctx, destination)
 	ev := mustCreateEDU(t)
-	err := queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	checkBlacklisted := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == failuresUntilBlacklist {
-			data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingEDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
-				if val, _ := db.IsServerBlacklisted(destination); val {
+				if val, _ := db.IsServerBlacklisted(ctx, destination); val {
 					if !dest.running.Load() {
 						return poll.Success()
 					}
@@ -579,10 +531,10 @@ func TestRetryServerSendsEDUSuccessfully(t *testing.T) {
 	poll.WaitOn(t, checkBlacklisted, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 
 	fc.shouldTxSucceed = true
-	wasBlacklisted := dest.statistics.MarkServerAlive()
-	queues.RetryServer(destination, wasBlacklisted)
+	wasBlacklisted := dest.statistics.MarkServerAlive(ctx)
+	queues.RetryServer(ctx, destination, wasBlacklisted)
 	checkRetry := func(log poll.LogT) poll.Result {
-		data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+		data, dbErr := db.GetPendingEDUs(ctx, destination, 100)
 		assert.NoError(t, dbErr)
 		if len(data) == 0 {
 			return poll.Success()
@@ -598,14 +550,10 @@ func TestSendPDUBatches(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
+	// ctx, db, fc, queues, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	// Populate database with > maxPDUsPerTransaction
@@ -613,18 +561,18 @@ func TestSendPDUBatches(t *testing.T) {
 	for i := 0; i < maxPDUsPerTransaction*int(pduMultiplier); i++ {
 		ev := mustCreatePDU(t)
 		headeredJSON, _ := json.Marshal(ev)
-		nid, _ := db.StoreJSON(pc.Context(), string(headeredJSON))
-		err := db.AssociatePDUWithDestinations(pc.Context(), destinations, nid)
+		nid, _ := db.StoreJSON(ctx, string(headeredJSON))
+		err := db.AssociatePDUWithDestinations(ctx, destinations, nid)
 		assert.NoError(t, err, "failed to associate PDU with destinations")
 	}
 
 	ev := mustCreatePDU(t)
-	err := queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == pduMultiplier+1 { // +1 for the extra SendEvent()
-			data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 200)
+			data, dbErr := db.GetPendingPDUs(ctx, destination, 200)
 			assert.NoError(t, dbErr)
 			if len(data) == 0 {
 				return poll.Success()
@@ -643,14 +591,10 @@ func TestSendEDUBatches(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
+	// ctx, db, fc, queues, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	// Populate database with > maxEDUsPerTransaction
@@ -658,18 +602,18 @@ func TestSendEDUBatches(t *testing.T) {
 	for i := 0; i < maxEDUsPerTransaction*int(eduMultiplier); i++ {
 		ev := mustCreateEDU(t)
 		ephemeralJSON, _ := json.Marshal(ev)
-		nid, _ := db.StoreJSON(pc.Context(), string(ephemeralJSON))
-		err := db.AssociateEDUWithDestinations(pc.Context(), destinations, nid, ev.Type, nil)
+		nid, _ := db.StoreJSON(ctx, string(ephemeralJSON))
+		err := db.AssociateEDUWithDestinations(ctx, destinations, nid, ev.Type, nil)
 		assert.NoError(t, err, "failed to associate EDU with destinations")
 	}
 
 	ev := mustCreateEDU(t)
-	err := queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == eduMultiplier+1 { // +1 for the extra SendEvent()
-			data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 200)
+			data, dbErr := db.GetPendingEDUs(ctx, destination, 200)
 			assert.NoError(t, dbErr)
 			if len(data) == 0 {
 				return poll.Success()
@@ -688,14 +632,10 @@ func TestSendPDUAndEDUBatches(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-	// db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
+	// ctx, db, fc, queues, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	// Populate database with > maxEDUsPerTransaction
@@ -703,28 +643,28 @@ func TestSendPDUAndEDUBatches(t *testing.T) {
 	for i := 0; i < maxPDUsPerTransaction*int(multiplier)+1; i++ {
 		ev := mustCreatePDU(t)
 		headeredJSON, _ := json.Marshal(ev)
-		nid, _ := db.StoreJSON(pc.Context(), string(headeredJSON))
-		err := db.AssociatePDUWithDestinations(pc.Context(), destinations, nid)
+		nid, _ := db.StoreJSON(ctx, string(headeredJSON))
+		err := db.AssociatePDUWithDestinations(ctx, destinations, nid)
 		assert.NoError(t, err, "failed to associate PDU with destinations")
 	}
 
 	for i := 0; i < maxEDUsPerTransaction*int(multiplier); i++ {
 		ev := mustCreateEDU(t)
 		ephemeralJSON, _ := json.Marshal(ev)
-		nid, _ := db.StoreJSON(pc.Context(), string(ephemeralJSON))
-		err := db.AssociateEDUWithDestinations(pc.Context(), destinations, nid, ev.Type, nil)
+		nid, _ := db.StoreJSON(ctx, string(ephemeralJSON))
+		err := db.AssociateEDUWithDestinations(ctx, destinations, nid, ev.Type, nil)
 		assert.NoError(t, err, "failed to associate EDU with destinations")
 	}
 
 	ev := mustCreateEDU(t)
-	err := queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == multiplier+1 { // +1 for the extra SendEvent()
-			pduData, dbErrPDU := db.GetPendingPDUs(pc.Context(), destination, 200)
+			pduData, dbErrPDU := db.GetPendingPDUs(ctx, destination, 200)
 			assert.NoError(t, dbErrPDU)
-			eduData, dbErrEDU := db.GetPendingEDUs(pc.Context(), destination, 200)
+			eduData, dbErrEDU := db.GetPendingEDUs(ctx, destination, 200)
 			assert.NoError(t, dbErrEDU)
 			if len(pduData) == 0 && len(eduData) == 0 {
 				return poll.Success()
@@ -741,21 +681,17 @@ func TestExternalFailureBackoffDoesntStartQueue(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
-	dest := queues.getQueue(destination)
-	queues.statistics.ForServer(destination).Failure()
+	dest := queues.getQueue(ctx, destination)
+	queues.statistics.ForServer(ctx, destination).Failure(ctx)
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	ev := mustCreatePDU(t)
 	headeredJSON, _ := json.Marshal(ev)
-	nid, _ := db.StoreJSON(pc.Context(), string(headeredJSON))
-	err := db.AssociatePDUWithDestinations(pc.Context(), destinations, nid)
+	nid, _ := db.StoreJSON(ctx, string(headeredJSON))
+	err := db.AssociatePDUWithDestinations(ctx, destinations, nid)
 	assert.NoError(t, err, "failed to associate PDU with destinations")
 
 	pollEnd := time.Now().Add(3 * time.Second)
@@ -780,38 +716,36 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, true)
+		ctx, db, fc, queues, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, true)
 		// NOTE : These defers aren't called if go test is killed so the dbs may not get cleaned up.
 
 		defer func() {
 			closeDb()
-			pc.ShutdownDendrite()
-			<-pc.WaitForShutdown()
 		}()
 
 		// NOTE : getQueue before sending event to ensure we grab the same queue reference
 		// before it is blacklisted and deleted.
-		dest := queues.getQueue(destination)
+		dest := queues.getQueue(ctx, destination)
 		ev := mustCreatePDU(t)
-		err := queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+		err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 		assert.NoError(t, err)
 
 		// NOTE : The server can be blacklisted before this, so manually inject the event
 		// into the database.
 		edu := mustCreateEDU(t)
 		ephemeralJSON, _ := json.Marshal(edu)
-		nid, _ := db.StoreJSON(pc.Context(), string(ephemeralJSON))
-		err = db.AssociateEDUWithDestinations(pc.Context(), destinations, nid, edu.Type, nil)
+		nid, _ := db.StoreJSON(ctx, string(ephemeralJSON))
+		err = db.AssociateEDUWithDestinations(ctx, destinations, nid, edu.Type, nil)
 		assert.NoError(t, err, "failed to associate EDU with destinations")
 
 		checkBlacklisted := func(log poll.LogT) poll.Result {
 			if fc.txCount.Load() == failuresUntilBlacklist {
-				pduData, dbErrPDU := db.GetPendingPDUs(pc.Context(), destination, 200)
+				pduData, dbErrPDU := db.GetPendingPDUs(ctx, destination, 200)
 				assert.NoError(t, dbErrPDU)
-				eduData, dbErrEDU := db.GetPendingEDUs(pc.Context(), destination, 200)
+				eduData, dbErrEDU := db.GetPendingEDUs(ctx, destination, 200)
 				assert.NoError(t, dbErrEDU)
 				if len(pduData) == 1 && len(eduData) == 1 {
-					if val, _ := db.IsServerBlacklisted(destination); val {
+					if val, _ := db.IsServerBlacklisted(ctx, destination); val {
 						if !dest.running.Load() {
 							return poll.Success()
 						}
@@ -826,12 +760,12 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 		poll.WaitOn(t, checkBlacklisted, poll.WithTimeout(10*time.Second), poll.WithDelay(100*time.Millisecond))
 
 		fc.shouldTxSucceed = true
-		wasBlacklisted := dest.statistics.MarkServerAlive()
-		queues.RetryServer(destination, wasBlacklisted)
+		wasBlacklisted := dest.statistics.MarkServerAlive(ctx)
+		queues.RetryServer(ctx, destination, wasBlacklisted)
 		checkRetry := func(log poll.LogT) poll.Result {
-			pduData, dbErrPDU := db.GetPendingPDUs(pc.Context(), destination, 200)
+			pduData, dbErrPDU := db.GetPendingPDUs(ctx, destination, 200)
 			assert.NoError(t, dbErrPDU)
-			eduData, dbErrEDU := db.GetPendingEDUs(pc.Context(), destination, 200)
+			eduData, dbErrEDU := db.GetPendingEDUs(ctx, destination, 200)
 			assert.NoError(t, dbErrEDU)
 			if len(pduData) == 0 && len(eduData) == 0 {
 				return poll.Success()
@@ -847,24 +781,20 @@ func TestSendPDUMultipleFailuresAssumedOffline(t *testing.T) {
 	failuresUntilBlacklist := uint32(7)
 	failuresUntilAssumedOffline := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	ev := mustCreatePDU(t)
-	err := queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == failuresUntilAssumedOffline {
-			data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingPDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
-				if val, _ := db.IsServerAssumedOffline(context.Background(), destination); val {
+				if val, _ := db.IsServerAssumedOffline(ctx, destination); val {
 					return poll.Success()
 				}
 				return poll.Continue("waiting for server to be assumed offline")
@@ -881,24 +811,20 @@ func TestSendEDUMultipleFailuresAssumedOffline(t *testing.T) {
 	failuresUntilBlacklist := uint32(7)
 	failuresUntilAssumedOffline := uint32(2)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	ev := mustCreateEDU(t)
-	err := queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == failuresUntilAssumedOffline {
-			data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+			data, dbErr := db.GetPendingEDUs(ctx, destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
-				if val, _ := db.IsServerAssumedOffline(context.Background(), destination); val {
+				if val, _ := db.IsServerAssumedOffline(ctx, destination); val {
 					return poll.Success()
 				}
 				return poll.Continue("waiting for server to be assumed offline")
@@ -915,25 +841,21 @@ func TestSendPDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	failuresUntilBlacklist := uint32(16)
 	failuresUntilAssumedOffline := uint32(1)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	relayServers := []spec.ServerName{"relayserver"}
-	queues.statistics.ForServer(destination).AddRelayServers(relayServers)
+	queues.statistics.ForServer(ctx, destination).AddRelayServers(ctx, relayServers)
 
 	ev := mustCreatePDU(t)
-	err := queues.SendEvent(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() >= 1 {
 			if fc.txRelayCount.Load() == 1 {
-				data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+				data, dbErr := db.GetPendingPDUs(ctx, destination, 100)
 				assert.NoError(t, dbErr)
 				if len(data) == 0 {
 					return poll.Success()
@@ -946,7 +868,7 @@ func TestSendPDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	}
 	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 
-	assumedOffline, _ := db.IsServerAssumedOffline(context.Background(), destination)
+	assumedOffline, _ := db.IsServerAssumedOffline(ctx, destination)
 	assert.Equal(t, true, assumedOffline)
 }
 
@@ -955,25 +877,21 @@ func TestSendEDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	failuresUntilBlacklist := uint32(16)
 	failuresUntilAssumedOffline := uint32(1)
 	destination := spec.ServerName("remotehost")
-	db, fc, queues, pc, closeDb := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, false)
+	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, false)
 
-	defer func() {
-		closeDb()
-		pc.ShutdownDendrite()
-		<-pc.WaitForShutdown()
-	}()
+	defer closeSetup()
 
 	relayServers := []spec.ServerName{"relayserver"}
-	queues.statistics.ForServer(destination).AddRelayServers(relayServers)
+	queues.statistics.ForServer(ctx, destination).AddRelayServers(ctx, relayServers)
 
 	ev := mustCreateEDU(t)
-	err := queues.SendEDU(ev, "localhost", []spec.ServerName{destination})
+	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() >= 1 {
 			if fc.txRelayCount.Load() == 1 {
-				data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+				data, dbErr := db.GetPendingEDUs(ctx, destination, 100)
 				assert.NoError(t, dbErr)
 				if len(data) == 0 {
 					return poll.Success()
@@ -986,6 +904,6 @@ func TestSendEDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	}
 	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 
-	assumedOffline, _ := db.IsServerAssumedOffline(context.Background(), destination)
+	assumedOffline, _ := db.IsServerAssumedOffline(ctx, destination)
 	assert.Equal(t, true, assumedOffline)
 }

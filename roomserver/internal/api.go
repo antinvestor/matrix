@@ -25,7 +25,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/setup/process"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
@@ -45,7 +44,6 @@ type RoomserverInternalAPI struct {
 	*perform.Upgrader
 	*perform.Admin
 	*perform.Creator
-	ProcessContext         *process.ProcessContext
 	DB                     storage.Database
 	Cfg                    *config.Dendrite
 	Cache                  caching.RoomServerCaches
@@ -65,7 +63,7 @@ type RoomserverInternalAPI struct {
 }
 
 func NewRoomserverAPI(
-	processContext *process.ProcessContext, dendriteCfg *config.Dendrite, roomserverDB storage.Database,
+	ctx context.Context, dendriteCfg *config.Dendrite, roomserverDB storage.Database,
 	js nats.JetStreamContext, nc *nats.Conn, caches caching.RoomServerCaches, enableMetrics bool,
 ) *RoomserverInternalAPI {
 	var perspectiveServerNames []spec.ServerName
@@ -73,14 +71,13 @@ func NewRoomserverAPI(
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
 	}
 
-	serverACLs := acls.NewServerACLs(roomserverDB)
+	serverACLs := acls.NewServerACLs(ctx, roomserverDB)
 	producer := &producers.RoomEventProducer{
 		Topic:     dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		JetStream: js,
 		ACLs:      serverACLs,
 	}
 	a := &RoomserverInternalAPI{
-		ProcessContext:         processContext,
 		DB:                     roomserverDB,
 		Cfg:                    dendriteCfg,
 		Cache:                  caches,
@@ -102,7 +99,7 @@ func NewRoomserverAPI(
 // SetFederationInputAPI passes in a federation input API reference so that we can
 // avoid the chicken-and-egg problem of both the roomserver input API and the
 // federation input API being interdependent.
-func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
+func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
 	r.fsAPI = fsAPI
 	r.KeyRing = keyRing
 
@@ -117,7 +114,6 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 
 	r.Inputer = &input.Inputer{
 		Cfg:                 &r.Cfg.RoomServer,
-		ProcessContext:      r.ProcessContext,
 		DB:                  r.DB,
 		InputRoomEventTopic: r.InputRoomEventTopic,
 		OutputProducer:      r.OutputProducer,
@@ -206,17 +202,17 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		RSAPI: r,
 	}
 
-	if err := r.Inputer.Start(); err != nil {
+	if err := r.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start roomserver input API")
 	}
 }
 
-func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
+func (r *RoomserverInternalAPI) SetUserAPI(_ context.Context, userAPI userapi.RoomserverUserAPI) {
 	r.Leaver.UserAPI = userAPI
 	r.Inputer.UserAPI = userAPI
 }
 
-func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
+func (r *RoomserverInternalAPI) SetAppserviceAPI(_ context.Context, asAPI asAPI.AppServiceInternalAPI) {
 	r.asAPI = asAPI
 }
 
@@ -235,7 +231,7 @@ func (r *RoomserverInternalAPI) StateQuerier() gomatrixserverlib.StateQuerier {
 func (r *RoomserverInternalAPI) HandleInvite(
 	ctx context.Context, inviteEvent *types.HeaderedEvent,
 ) error {
-	outputEvents, err := r.Inviter.ProcessInviteMembership(ctx, inviteEvent)
+	outputEvents, err := r.ProcessInviteMembership(ctx, inviteEvent)
 	if err != nil {
 		return err
 	}

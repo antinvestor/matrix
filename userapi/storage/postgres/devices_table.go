@@ -119,7 +119,7 @@ type devicesStatements struct {
 	serverName                   spec.ServerName
 }
 
-func NewPostgresDevicesTable(db *sql.DB, serverName spec.ServerName) (tables.DevicesTable, error) {
+func NewPostgresDevicesTable(ctx context.Context, db *sql.DB, serverName spec.ServerName) (tables.DevicesTable, error) {
 	s := &devicesStatements{
 		serverName: serverName,
 	}
@@ -128,7 +128,7 @@ func NewPostgresDevicesTable(db *sql.DB, serverName spec.ServerName) (tables.Dev
 		return nil, err
 	}
 	m := sqlutil.NewMigrator(db)
-	err = m.Up(context.Background())
+	err = m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}

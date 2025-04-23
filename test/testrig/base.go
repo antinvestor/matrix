@@ -15,6 +15,7 @@
 package testrig
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -22,14 +23,15 @@ import (
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/process"
 	"github.com/antinvestor/matrix/test"
 )
 
-func CreateConfig(t *testing.T, testOpts test.DependancyOption) (*config.Dendrite, *process.ProcessContext, func()) {
+func NewContext(t *testing.T) context.Context {
+	return t.Context()
+}
 
-	processContext := process.NewProcessContext()
-	ctx := processContext.Context()
+func CreateConfig(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*config.Dendrite, func()) {
+
 	defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx)
 	if err != nil {
 		t.Fatalf("Could not create default connections %s", err)
@@ -52,9 +54,7 @@ func CreateConfig(t *testing.T, testOpts test.DependancyOption) (*config.Dendrit
 	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%s", util.RandomString(8))
 	cfg.SyncAPI.Fulltext.InMemory = true
 
-	return &cfg, processContext, func() {
-		processContext.ShutdownDendrite()
-		processContext.WaitForShutdown()
+	return &cfg, func() {
 		closeDSConns()
 	}
 }

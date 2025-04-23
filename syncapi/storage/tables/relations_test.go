@@ -1,9 +1,10 @@
 package tables_test
 
 import (
-	"context"
 	"database/sql"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -16,7 +17,7 @@ import (
 func newRelationsTable(t *testing.T, _ test.DependancyOption) (tables.Relations, *sql.DB, func()) {
 	t.Helper()
 
-	ctx := context.TODO()
+	ctx := testrig.NewContext(t)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -30,7 +31,7 @@ func newRelationsTable(t *testing.T, _ test.DependancyOption) (tables.Relations,
 	}
 
 	var tab tables.Relations
-	tab, err = postgres.NewPostgresRelationsTable(db)
+	tab, err = postgres.NewPostgresRelationsTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -39,7 +40,7 @@ func newRelationsTable(t *testing.T, _ test.DependancyOption) (tables.Relations,
 }
 
 func compareRelationsToExpected(t *testing.T, tab tables.Relations, r types.Range, expected []types.RelationEntry) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 	relations, _, err := tab.SelectRelationsInRange(ctx, nil, roomID, "a", "", "", r, 50)
 	if err != nil {
 		t.Fatal(err)
@@ -61,8 +62,10 @@ const childType = "m.room.something"
 const relType = "m.reaction"
 
 func TestRelationsTable(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+
+		ctx := testrig.NewContext(t)
+
 		tab, _, closeDb := newRelationsTable(t, testOpts)
 		defer closeDb()
 

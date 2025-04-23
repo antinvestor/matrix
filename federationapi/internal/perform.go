@@ -23,14 +23,14 @@ import (
 	"github.com/antinvestor/matrix/roomserver/version"
 )
 
-// PerformLeaveRequest implements api.FederationInternalAPI
+// PerformDirectoryLookup implements api.FederationInternalAPI
 func (r *FederationInternalAPI) PerformDirectoryLookup(
 	ctx context.Context,
 	request *api.PerformDirectoryLookupRequest,
 	response *api.PerformDirectoryLookupResponse,
 ) (err error) {
-	if !r.shouldAttemptDirectFederation(request.ServerName) {
-		return fmt.Errorf("relay servers have no meaningful response for directory lookup.")
+	if !r.shouldAttemptDirectFederation(ctx, request.ServerName) {
+		return fmt.Errorf("relay servers have no meaningful response for directory lookup")
 	}
 
 	dir, err := r.federation.LookupRoomAlias(
@@ -40,12 +40,12 @@ func (r *FederationInternalAPI) PerformDirectoryLookup(
 		request.RoomAlias,
 	)
 	if err != nil {
-		r.statistics.ForServer(request.ServerName).Failure()
+		r.statistics.ForServer(ctx, request.ServerName).Failure(ctx)
 		return err
 	}
 	response.RoomID = dir.RoomID
 	response.ServerNames = dir.Servers
-	r.statistics.ForServer(request.ServerName).Success(statistics.SendDirect)
+	r.statistics.ForServer(ctx, request.ServerName).Success(ctx, statistics.SendDirect)
 	return nil
 }
 
@@ -143,8 +143,8 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	serverName spec.ServerName,
 	unsigned map[string]interface{},
 ) error {
-	if !r.shouldAttemptDirectFederation(serverName) {
-		return fmt.Errorf("relay servers have no meaningful response for join.")
+	if !r.shouldAttemptDirectFederation(ctx, serverName) {
+		return fmt.Errorf("relay servers have no meaningful response for join")
 	}
 
 	user, err := spec.NewUserID(userID, true)
@@ -195,15 +195,15 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 
 	if joinErr != nil {
 		if !joinErr.Reachable {
-			r.statistics.ForServer(joinErr.ServerName).Failure()
+			r.statistics.ForServer(ctx, joinErr.ServerName).Failure(ctx)
 		} else {
-			r.statistics.ForServer(joinErr.ServerName).Success(statistics.SendDirect)
+			r.statistics.ForServer(ctx, joinErr.ServerName).Success(ctx, statistics.SendDirect)
 		}
 		return joinErr.Err
 	}
-	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
+	r.statistics.ForServer(ctx, serverName).Success(ctx, statistics.SendDirect)
 	if response == nil {
-		return fmt.Errorf("Received nil response from gomatrixserverlib.PerformJoin")
+		return fmt.Errorf("received nil response from gomatrixserverlib.PerformJoin")
 	}
 
 	// We need to immediately update our list of joined hosts for this room now as we are technically
@@ -214,17 +214,17 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// The events are trusted now as we performed auth checks above.
 	joinedHosts, err := consumers.JoinedHostsFromEvents(ctx, response.StateSnapshot.GetStateEvents().TrustedEvents(response.JoinEvent.Version(), false), r.rsAPI)
 	if err != nil {
-		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
+		return fmt.Errorf("joinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
 
 	logrus.WithField("room", roomID).Infof("Joined federated room with %d hosts", len(joinedHosts))
-	if _, err = r.db.UpdateRoom(context.Background(), roomID, joinedHosts, nil, true); err != nil {
-		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
+	if _, err = r.db.UpdateRoom(ctx, roomID, joinedHosts, nil, true); err != nil {
+		return fmt.Errorf("updatedRoom: failed to update room with joined hosts: %s", err)
 	}
 
 	// TODO: Can I change this to not take respState but instead just take an opaque list of events?
 	if err = roomserverAPI.SendEventWithState(
-		context.Background(),
+		ctx,
 		r.rsAPI,
 		user.Domain(),
 		roomserverAPI.KindNew,
@@ -324,8 +324,8 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	serverName spec.ServerName,
 	supportedVersions []gomatrixserverlib.RoomVersion,
 ) error {
-	if !r.shouldAttemptDirectFederation(serverName) {
-		return fmt.Errorf("relay servers have no meaningful response for outbound peek.")
+	if !r.shouldAttemptDirectFederation(ctx, serverName) {
+		return fmt.Errorf("relay servers have no meaningful response for outbound peek")
 	}
 
 	// create a unique ID for this peek.
@@ -364,10 +364,10 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 		supportedVersions,
 	)
 	if err != nil {
-		r.statistics.ForServer(serverName).Failure()
+		r.statistics.ForServer(ctx, serverName).Failure(ctx)
 		return fmt.Errorf("r.federation.Peek: %w", err)
 	}
-	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
+	r.statistics.ForServer(ctx, serverName).Success(ctx, statistics.SendDirect)
 
 	// Work out if we support the room version that has been supplied in
 	// the peek response.
@@ -445,7 +445,7 @@ func (r *FederationInternalAPI) PerformLeave(
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-leave send-leave dance.
 	for _, serverName := range request.ServerNames {
-		if !r.shouldAttemptDirectFederation(serverName) {
+		if !r.shouldAttemptDirectFederation(ctx, serverName) {
 			continue
 		}
 
@@ -461,7 +461,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		if err != nil {
 			// TODO: Check if the user was not allowed to leave the room.
 			logrus.WithError(err).Warnf("r.federation.MakeLeave failed")
-			r.statistics.ForServer(serverName).Failure()
+			r.statistics.ForServer(ctx, serverName).Failure(ctx)
 			continue
 		}
 
@@ -527,11 +527,11 @@ func (r *FederationInternalAPI) PerformLeave(
 		)
 		if err != nil {
 			logrus.WithError(err).Warnf("r.federation.SendLeave failed")
-			r.statistics.ForServer(serverName).Failure()
+			r.statistics.ForServer(ctx, serverName).Failure(ctx)
 			continue
 		}
 
-		r.statistics.ForServer(serverName).Success(statistics.SendDirect)
+		r.statistics.ForServer(ctx, serverName).Success(ctx, statistics.SendDirect)
 		return nil
 	}
 
@@ -564,8 +564,8 @@ func (r *FederationInternalAPI) SendInvite(
 
 	// TODO (devon): This should be allowed via a relay. Currently only transactions
 	// can be sent to relays. Would need to extend relays to handle invites.
-	if !r.shouldAttemptDirectFederation(destination) {
-		return nil, fmt.Errorf("relay servers have no meaningful response for invite.")
+	if !r.shouldAttemptDirectFederation(ctx, destination) {
+		return nil, fmt.Errorf("relay servers have no meaningful response for invite")
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -621,8 +621,8 @@ func (r *FederationInternalAPI) SendInviteV3(
 
 	// TODO (devon): This should be allowed via a relay. Currently only transactions
 	// can be sent to relays. Would need to extend relays to handle invites.
-	if !r.shouldAttemptDirectFederation(invitee.Domain()) {
-		return nil, fmt.Errorf("relay servers have no meaningful response for invite.")
+	if !r.shouldAttemptDirectFederation(ctx, invitee.Domain()) {
+		return nil, fmt.Errorf("relay servers have no meaningful response for invite")
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -649,7 +649,7 @@ func (r *FederationInternalAPI) SendInviteV3(
 	return inviteEvent, nil
 }
 
-// PerformServersAlive implements api.FederationInternalAPI
+// PerformBroadcastEDU implements api.FederationInternalAPI
 func (r *FederationInternalAPI) PerformBroadcastEDU(
 	ctx context.Context,
 	request *api.PerformBroadcastEDURequest,
@@ -669,10 +669,10 @@ func (r *FederationInternalAPI) PerformBroadcastEDU(
 		Type:   "org.matrix.dendrite.wakeup",
 		Origin: string(r.cfg.Matrix.ServerName),
 	}
-	if err = r.queues.SendEDU(edu, r.cfg.Matrix.ServerName, destinations); err != nil {
+	if err = r.queues.SendEDU(ctx, edu, r.cfg.Matrix.ServerName, destinations); err != nil {
 		return fmt.Errorf("r.queues.SendEDU: %w", err)
 	}
-	r.MarkServersAlive(destinations)
+	r.MarkServersAlive(ctx, destinations)
 
 	return nil
 }
@@ -683,14 +683,14 @@ func (r *FederationInternalAPI) PerformWakeupServers(
 	request *api.PerformWakeupServersRequest,
 	response *api.PerformWakeupServersResponse,
 ) (err error) {
-	r.MarkServersAlive(request.ServerNames)
+	r.MarkServersAlive(ctx, request.ServerNames)
 	return nil
 }
 
-func (r *FederationInternalAPI) MarkServersAlive(destinations []spec.ServerName) {
+func (r *FederationInternalAPI) MarkServersAlive(ctx context.Context, destinations []spec.ServerName) {
 	for _, srv := range destinations {
-		wasBlacklisted := r.statistics.ForServer(srv).MarkServerAlive()
-		r.queues.RetryServer(srv, wasBlacklisted)
+		wasBlacklisted := r.statistics.ForServer(ctx, srv).MarkServerAlive(ctx)
+		r.queues.RetryServer(ctx, srv, wasBlacklisted)
 	}
 }
 
@@ -724,7 +724,7 @@ func checkEventsContainCreateEvent(events []gomatrixserverlib.PDU) error {
 
 // federatedEventProvider is an event provider which fetches events from the server provided
 func federatedEventProvider(
-	ctx context.Context, federation fclient.FederationClient,
+	_ context.Context, federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier, origin, server spec.ServerName,
 	userIDForSender spec.UserIDForSender,
 ) gomatrixserverlib.EventProvider {
@@ -735,7 +735,7 @@ func federatedEventProvider(
 	// Define a function which we can pass to Check to retrieve missing
 	// auth events inline. This greatly increases our chances of not having
 	// to repeat the entire set of checks just for a missing event or two.
-	return func(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.PDU, error) {
+	return func(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.PDU, error) {
 		returning := []gomatrixserverlib.PDU{}
 		verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 		if err != nil {
@@ -836,10 +836,10 @@ func (r *FederationInternalAPI) P2PRemoveRelayServers(
 }
 
 func (r *FederationInternalAPI) shouldAttemptDirectFederation(
-	destination spec.ServerName,
+	ctx context.Context, destination spec.ServerName,
 ) bool {
 	var shouldRelay bool
-	stats := r.statistics.ForServer(destination)
+	stats := r.statistics.ForServer(ctx, destination)
 	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
 		shouldRelay = true
 	}

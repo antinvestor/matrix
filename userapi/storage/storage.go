@@ -65,10 +65,10 @@ func NewUserDatabase(
 
 // NewKeyDatabase opens a new Postgres database (base on dataSourceName) scheme)
 // and sets postgres connection parameters.
-func NewKeyDatabase(conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
+func NewKeyDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
 	switch {
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewKeyDatabase(conMan, dbProperties)
+		return postgres.NewKeyDatabase(ctx, conMan, dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

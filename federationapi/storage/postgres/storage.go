@@ -39,54 +39,54 @@ type Database struct {
 func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, d.writer, err = conMan.Connection(dbProperties); err != nil {
+	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
 		return nil, err
 	}
-	blacklist, err := NewPostgresBlacklistTable(d.db)
+	blacklist, err := NewPostgresBlacklistTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	joinedHosts, err := NewPostgresJoinedHostsTable(d.db)
+	joinedHosts, err := NewPostgresJoinedHostsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	queuePDUs, err := NewPostgresQueuePDUsTable(d.db)
+	queuePDUs, err := NewPostgresQueuePDUsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	queueEDUs, err := NewPostgresQueueEDUsTable(d.db)
+	queueEDUs, err := NewPostgresQueueEDUsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	queueJSON, err := NewPostgresQueueJSONTable(d.db)
+	queueJSON, err := NewPostgresQueueJSONTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	assumedOffline, err := NewPostgresAssumedOfflineTable(d.db)
+	assumedOffline, err := NewPostgresAssumedOfflineTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	relayServers, err := NewPostgresRelayServersTable(d.db)
+	relayServers, err := NewPostgresRelayServersTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	inboundPeeks, err := NewPostgresInboundPeeksTable(d.db)
+	inboundPeeks, err := NewPostgresInboundPeeksTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	outboundPeeks, err := NewPostgresOutboundPeeksTable(d.db)
+	outboundPeeks, err := NewPostgresOutboundPeeksTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	notaryJSON, err := NewPostgresNotaryServerKeysTable(d.db)
+	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, d.db)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotaryServerKeysTable: %s", err)
 	}
-	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(d.db)
+	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, d.db)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotaryServerKeysMetadataTable: %s", err)
 	}
-	serverSigningKeys, err := NewPostgresServerSigningKeysTable(d.db)
+	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}

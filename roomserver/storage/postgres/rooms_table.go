@@ -96,12 +96,12 @@ type roomStatements struct {
 	bulkSelectRoomNIDsStmt             *sql.Stmt
 }
 
-func CreateRoomsTable(db *sql.DB) error {
+func CreateRoomsTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(roomsSchema)
 	return err
 }
 
-func PrepareRoomsTable(db *sql.DB) (tables.Rooms, error) {
+func PrepareRoomsTable(ctx context.Context, db *sql.DB) (tables.Rooms, error) {
 	s := &roomStatements{}
 
 	return s, sqlutil.StatementList{

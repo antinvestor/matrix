@@ -71,7 +71,7 @@ type mediaStatements struct {
 	selectMediaByHashStmt *sql.Stmt
 }
 
-func NewPostgresMediaRepositoryTable(db *sql.DB) (tables.MediaRepository, error) {
+func NewPostgresMediaRepositoryTable(ctx context.Context, db *sql.DB) (tables.MediaRepository, error) {
 	s := &mediaStatements{}
 	_, err := db.Exec(mediaSchema)
 	if err != nil {

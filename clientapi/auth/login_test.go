@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/antinvestor/matrix/test/testrig"
+
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/userutil"
@@ -32,7 +34,7 @@ import (
 )
 
 func TestLoginFromJSONReader(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	tsts := []struct {
 		Name  string
@@ -152,7 +154,7 @@ func TestLoginFromJSONReader(t *testing.T) {
 }
 
 func TestBadLoginFromJSONReader(t *testing.T) {
-	ctx := context.Background()
+	ctx := testrig.NewContext(t)
 
 	tsts := []struct {
 		Name  string

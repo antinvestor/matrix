@@ -57,7 +57,7 @@ type backwardExtremitiesStatements struct {
 	purgeBackwardExtremitiesStmt         *sql.Stmt
 }
 
-func NewPostgresBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities, error) {
+func NewPostgresBackwardsExtremitiesTable(ctx context.Context, db *sql.DB) (tables.BackwardsExtremities, error) {
 	s := &backwardExtremitiesStatements{}
 	_, err := db.Exec(backwardExtremitiesSchema)
 	if err != nil {

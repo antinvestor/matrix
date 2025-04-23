@@ -35,7 +35,8 @@ func TestLandingPage_Tcp(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
+	ctx := testrig.NewContext(t)
+	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer closeRig()
 
 	// Hack to get a free port to use in test
@@ -45,7 +46,7 @@ func TestLandingPage_Tcp(t *testing.T) {
 	httpUrl, err := url.Parse(s.URL)
 	cfg.Global.HttpServerPort = fmt.Sprintf(":%s", httpUrl.Port())
 
-	ctx, service := frame.NewServiceWithContext(processCtx.Context(), "matrix tests",
+	ctx, service := frame.NewServiceWithContext(ctx, "matrix tests",
 		frame.Config(&cfg.Global))
 	defer service.Stop(ctx)
 
@@ -53,7 +54,7 @@ func TestLandingPage_Tcp(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	opt, err := basepkg.SetupHTTPOption(processCtx, cfg, routers)
+	opt, err := basepkg.SetupHTTPOption(ctx, cfg, routers)
 	assert.NoError(t, err)
 
 	go func(ctx context.Context, service *frame.Service, opt frame.Option) {

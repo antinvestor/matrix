@@ -183,8 +183,9 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 }
 
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOption) {
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
-	cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+	ctx := testrig.NewContext(t)
+	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
@@ -193,7 +194,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 	cfg.FederationAPI.PreferDirectFetch = true
 	cfg.FederationAPI.KeyPerspectives = nil
 	defer closeRig()
-	jsctx, _ := natsInstance.Prepare(processCtx, &cfg.Global.JetStream)
+	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 	serverA := spec.ServerName("server.a")
@@ -243,10 +244,10 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 			},
 		},
 	}
-	fsapi := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, fc, fedRSApi, caches, nil, false)
+	fsapi := federationapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, fc, fedRSApi, caches, nil, false)
 
 	var resp api.PerformJoinResponse
-	fsapi.PerformJoin(context.Background(), &api.PerformJoinRequest{
+	fsapi.PerformJoin(ctx, &api.PerformJoinRequest{
 		RoomID:      room.ID,
 		UserID:      joiningUser.ID,
 		ServerNames: []spec.ServerName{serverA},
@@ -322,7 +323,9 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 		},
 	}
 
-	cfg, processCtx, closeRig := testrig.CreateConfig(t, test.DependancyOption{})
+	ctx := testrig.NewContext(t)
+	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
+
 	defer closeRig()
 	routers := httputil.NewRouters()
 
@@ -334,8 +337,8 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	natsInstance := jetstream.NATSInstance{}
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(processCtx, routers, cfg, &natsInstance, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, caching.DisableMetrics)
-	baseURL, cancel := test.ListenAndServe(t, routers.Federation, true)
+	federationapi.AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, caching.DisableMetrics)
+	baseURL, cancel := test.ListenAndServe(ctx, t, routers.Federation, true)
 	defer cancel()
 	serverName := spec.ServerName(strings.TrimPrefix(baseURL, "https://"))
 
@@ -354,7 +357,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 			t.Errorf("failed to create invite v2 request: %s", err)
 			continue
 		}
-		_, err = fedCli.SendInviteV2(context.Background(), cfg.Global.ServerName, serverName, invReq)
+		_, err = fedCli.SendInviteV2(ctx, cfg.Global.ServerName, serverName, invReq)
 		if err == nil {
 			t.Errorf("expected an error, got none")
 			continue
@@ -457,9 +460,10 @@ func TestNotaryServer(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		cfg, processCtx, closeRig := testrig.CreateConfig(t, testOpts)
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
-		cm := sqlutil.NewConnectionManager(processCtx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -481,7 +485,7 @@ func TestNotaryServer(t *testing.T) {
 			},
 		}
 
-		fedAPI := federationapi.NewInternalAPI(processCtx, cfg, cm, &natsInstance, fc, nil, caches, nil, true)
+		fedAPI := federationapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, fc, nil, caches, nil, true)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {

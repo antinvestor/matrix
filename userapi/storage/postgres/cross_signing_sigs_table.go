@@ -59,7 +59,7 @@ type crossSigningSigsStatements struct {
 	deleteCrossSigningSigsForTargetStmt *sql.Stmt
 }
 
-func NewPostgresCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, error) {
+func NewPostgresCrossSigningSigsTable(ctx context.Context, db *sql.DB) (tables.CrossSigningSigs, error) {
 	s := &crossSigningSigsStatements{
 		db: db,
 	}
@@ -69,7 +69,7 @@ func NewPostgresCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, erro
 	}
 
 	m := sqlutil.NewMigrator(db)
-	if err = m.Up(context.Background()); err != nil {
+	if err = m.Up(ctx); err != nil {
 		return nil, err
 	}
 

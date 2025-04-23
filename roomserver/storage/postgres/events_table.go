@@ -175,7 +175,7 @@ type eventStatements struct {
 	selectRoomsWithEventTypeNIDStmt               *sql.Stmt
 }
 
-func CreateEventsTable(db *sql.DB) error {
+func CreateEventsTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(eventsSchema)
 	if err != nil {
 		return err
@@ -188,10 +188,10 @@ func CreateEventsTable(db *sql.DB) error {
 			Up:      deltas.UpDropEventReferenceSHAEvents,
 		},
 	}...)
-	return m.Up(context.Background())
+	return m.Up(ctx)
 }
 
-func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
+func PrepareEventsTable(ctx context.Context, db *sql.DB) (tables.Events, error) {
 	s := &eventStatements{}
 
 	return s, sqlutil.StatementList{

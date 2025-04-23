@@ -50,7 +50,7 @@ type assumedOfflineStatements struct {
 	deleteAllAssumedOfflineStmt *sql.Stmt
 }
 
-func NewPostgresAssumedOfflineTable(db *sql.DB) (s *assumedOfflineStatements, err error) {
+func NewPostgresAssumedOfflineTable(ctx context.Context, db *sql.DB) (s *assumedOfflineStatements, err error) {
 	s = &assumedOfflineStatements{
 		db: db,
 	}

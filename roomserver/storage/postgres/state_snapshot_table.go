@@ -121,12 +121,12 @@ type stateSnapshotStatements struct {
 	bulktSelectMembershipForHistoryVisibilityStmt *sql.Stmt
 }
 
-func CreateStateSnapshotTable(db *sql.DB) error {
+func CreateStateSnapshotTable(ctx context.Context, db *sql.DB) error {
 	_, err := db.Exec(stateSnapshotSchema)
 	return err
 }
 
-func PrepareStateSnapshotTable(db *sql.DB) (*stateSnapshotStatements, error) {
+func PrepareStateSnapshotTable(ctx context.Context, db *sql.DB) (*stateSnapshotStatements, error) {
 	s := &stateSnapshotStatements{}
 
 	return s, sqlutil.StatementList{

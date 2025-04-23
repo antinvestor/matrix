@@ -70,7 +70,7 @@ type keyBackupVersionStatements struct {
 	updateKeyBackupETagStmt     *sql.Stmt
 }
 
-func NewPostgresKeyBackupVersionTable(db *sql.DB) (tables.KeyBackupVersionTable, error) {
+func NewPostgresKeyBackupVersionTable(ctx context.Context, db *sql.DB) (tables.KeyBackupVersionTable, error) {
 	s := &keyBackupVersionStatements{}
 	_, err := db.Exec(keyBackupVersionTableSchema)
 	if err != nil {

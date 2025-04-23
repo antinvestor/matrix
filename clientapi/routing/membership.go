@@ -29,7 +29,6 @@ import (
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/threepid"
 	"github.com/antinvestor/matrix/internal/eventutil"
-	"github.com/antinvestor/matrix/roomserver/api"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -366,7 +365,7 @@ func sendInvite(
 			JSON: spec.InternalServerError{},
 		}, err
 	}
-	err = rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
+	err = rsAPI.PerformInvite(ctx, &roomserverAPI.PerformInviteRequest{
 		InviteInput: roomserverAPI.InviteInput{
 			RoomID:     *validRoomID,
 			Inviter:    *inviter,

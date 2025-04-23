@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/base64"
 	"fmt"
@@ -112,8 +113,8 @@ func NewFederationInternalAPI(
 	}
 }
 
-func (a *FederationInternalAPI) IsBlacklistedOrBackingOff(s spec.ServerName) (*statistics.ServerStatistics, error) {
-	stats := a.statistics.ForServer(s)
+func (r *FederationInternalAPI) IsBlacklistedOrBackingOff(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error) {
+	stats := r.statistics.ForServer(ctx, s)
 	if stats.Blacklisted() {
 		return stats, &api.FederationClientError{
 			Blacklisted: true,
@@ -131,33 +132,33 @@ func (a *FederationInternalAPI) IsBlacklistedOrBackingOff(s spec.ServerName) (*s
 	return stats, nil
 }
 
-func failBlacklistableError(err error, stats *statistics.ServerStatistics) (until time.Time, blacklisted bool) {
+func failBlacklistableError(ctx context.Context, err error, stats *statistics.ServerStatistics) (until time.Time, blacklisted bool) {
 	if err == nil {
 		return
 	}
 	mxerr, ok := err.(gomatrix.HTTPError)
 	if !ok {
-		return stats.Failure()
+		return stats.Failure(ctx)
 	}
 	if mxerr.Code == 401 { // invalid signature in X-Matrix header
-		return stats.Failure()
+		return stats.Failure(ctx)
 	}
 	if mxerr.Code >= 500 && mxerr.Code < 600 { // internal server errors
-		return stats.Failure()
+		return stats.Failure(ctx)
 	}
 	return
 }
 
-func (a *FederationInternalAPI) doRequestIfNotBackingOffOrBlacklisted(
-	s spec.ServerName, request func() (interface{}, error),
+func (r *FederationInternalAPI) doRequestIfNotBackingOffOrBlacklisted(
+	ctx context.Context, s spec.ServerName, request func() (interface{}, error),
 ) (interface{}, error) {
-	stats, err := a.IsBlacklistedOrBackingOff(s)
+	stats, err := r.IsBlacklistedOrBackingOff(ctx, s)
 	if err != nil {
 		return nil, err
 	}
 	res, err := request()
 	if err != nil {
-		until, blacklisted := failBlacklistableError(err, stats)
+		until, blacklisted := failBlacklistableError(ctx, err, stats)
 		now := time.Now()
 		var retryAfter time.Duration
 		if until.After(now) {
@@ -169,14 +170,14 @@ func (a *FederationInternalAPI) doRequestIfNotBackingOffOrBlacklisted(
 			RetryAfter:  retryAfter,
 		}
 	}
-	stats.Success(statistics.SendDirect)
+	stats.Success(ctx, statistics.SendDirect)
 	return res, nil
 }
 
-func (a *FederationInternalAPI) doRequestIfNotBlacklisted(
-	s spec.ServerName, request func() (interface{}, error),
+func (r *FederationInternalAPI) doRequestIfNotBlacklisted(
+	ctx context.Context, s spec.ServerName, request func() (interface{}, error),
 ) (interface{}, error) {
-	stats := a.statistics.ForServer(s)
+	stats := r.statistics.ForServer(ctx, s)
 	if blacklisted := stats.Blacklisted(); blacklisted {
 		return stats, &api.FederationClientError{
 			Err:         fmt.Sprintf("server %q is blacklisted", s),

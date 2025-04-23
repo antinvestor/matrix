@@ -82,7 +82,7 @@ type joinedHostsStatements struct {
 	selectJoinedHostsForRoomsExcludingBlacklistedStmt *sql.Stmt
 }
 
-func NewPostgresJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
+func NewPostgresJoinedHostsTable(ctx context.Context, db *sql.DB) (s *joinedHostsStatements, err error) {
 	s = &joinedHostsStatements{
 		db: db,
 	}

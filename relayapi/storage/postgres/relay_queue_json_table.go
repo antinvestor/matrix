@@ -56,7 +56,7 @@ type relayQueueJSONStatements struct {
 	selectJSONStmt *sql.Stmt
 }
 
-func NewPostgresRelayQueueJSONTable(db *sql.DB) (s *relayQueueJSONStatements, err error) {
+func NewPostgresRelayQueueJSONTable(ctx context.Context, db *sql.DB) (s *relayQueueJSONStatements, err error) {
 	s = &relayQueueJSONStatements{
 		db: db,
 	}
