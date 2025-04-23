@@ -41,11 +41,7 @@ const selectDBMigrationsSQL = "SELECT version FROM db_migrations"
 const createNecessaryExtensionsSQL = `
 	CREATE EXTENSION IF NOT EXISTS pg_search;
 	CREATE EXTENSION IF NOT EXISTS pg_ivm;
-	CREATE EXTENSION IF NOT EXISTS vector;
-	CREATE EXTENSION IF NOT EXISTS postgis;
-	CREATE EXTENSION IF NOT EXISTS postgis_topology;
-	CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
-	CREATE EXTENSION IF NOT EXISTS postgis_tiger_geocoder;`
+	CREATE EXTENSION IF NOT EXISTS vector;`
 
 // Migration defines a migration to be run.
 type Migration struct {
