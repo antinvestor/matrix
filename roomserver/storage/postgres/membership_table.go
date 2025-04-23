@@ -26,7 +26,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/roomserver/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 )
@@ -67,6 +66,8 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 	UNIQUE (room_nid, target_nid)
 );
 `
+
+const membershipSchemaRevert = `DROP TABLE IF EXISTS roomserver_membership;`
 
 var selectJoinedUsersSetForRoomsAndUserSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
@@ -185,22 +186,8 @@ type membershipStatements struct {
 	selectJoinedUsersStmt                           *sql.Stmt
 }
 
-func CreateMembershipTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(membershipSchema)
-	if err != nil {
-		return err
-	}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "roomserver: add forgotten column",
-		Up:      deltas.UpAddForgottenColumn,
-	})
-	return m.Up(ctx)
-}
-
-func PrepareMembershipTable(ctx context.Context, db *sql.DB) (tables.Membership, error) {
+func NewPostgresMembershipTable(ctx context.Context, db *sql.DB) (tables.Membership, error) {
 	s := &membershipStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.insertMembershipStmt, insertMembershipSQL},
 		{&s.selectMembershipForUpdateStmt, selectMembershipForUpdateSQL},

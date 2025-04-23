@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS roomserver_room_aliases (
 CREATE INDEX IF NOT EXISTS roomserver_room_id_idx ON roomserver_room_aliases(room_id);
 `
 
+const roomAliasesSchemaRevert = `DROP TABLE IF EXISTS roomserver_room_aliases;`
+
 const insertRoomAliasSQL = "" +
 	"INSERT INTO roomserver_room_aliases (alias, room_id, creator_id) VALUES ($1, $2, $3)"
 
@@ -62,14 +64,8 @@ type roomAliasesStatements struct {
 	deleteRoomAliasStmt          *sql.Stmt
 }
 
-func CreateRoomAliasesTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(roomAliasesSchema)
-	return err
-}
-
-func PrepareRoomAliasesTable(ctx context.Context, db *sql.DB) (tables.RoomAliases, error) {
+func NewPostgresRoomAliasesTable(ctx context.Context, db *sql.DB) (tables.RoomAliases, error) {
 	s := &roomAliasesStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.insertRoomAliasStmt, insertRoomAliasSQL},
 		{&s.selectRoomIDFromAliasStmt, selectRoomIDFromAliasSQL},

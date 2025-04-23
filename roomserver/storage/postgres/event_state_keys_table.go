@@ -47,6 +47,8 @@ INSERT INTO roomserver_event_state_keys (event_state_key_nid, event_state_key) V
     (1, '') ON CONFLICT DO NOTHING;
 `
 
+const eventStateKeysSchemaRevert = `DROP TABLE IF EXISTS roomserver_event_state_keys;`
+
 // Same as insertEventTypeNIDSQL
 const insertEventStateKeyNIDSQL = "" +
 	"INSERT INTO roomserver_event_state_keys (event_state_key) VALUES ($1)" +
@@ -76,14 +78,8 @@ type eventStateKeyStatements struct {
 	bulkSelectEventStateKeyStmt    *sql.Stmt
 }
 
-func CreateEventStateKeysTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(eventStateKeysSchema)
-	return err
-}
-
-func PrepareEventStateKeysTable(ctx context.Context, db *sql.DB) (tables.EventStateKeys, error) {
+func NewPostgresEventStateKeysTable(ctx context.Context, db *sql.DB) (tables.EventStateKeys, error) {
 	s := &eventStateKeyStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
 		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},

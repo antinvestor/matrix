@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS roomserver_user_room_keys (
 );
 `
 
+const userRoomKeysSchemaRevert = `DROP TABLE IF EXISTS roomserver_user_room_keys;`
+
 const insertUserRoomPrivateKeySQL = `
 	INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_key, pseudo_id_pub_key) VALUES ($1, $2, $3, $4)
 	ON CONFLICT ON CONSTRAINT roomserver_user_room_keys_pk DO UPDATE SET pseudo_id_key = roomserver_user_room_keys.pseudo_id_key
@@ -67,12 +69,7 @@ type userRoomKeysStatements struct {
 	selectAllUserRoomPublicKeysForUser *sql.Stmt
 }
 
-func CreateUserRoomKeysTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(userRoomKeysSchema)
-	return err
-}
-
-func PrepareUserRoomKeysTable(ctx context.Context, db *sql.DB) (tables.UserRoomKeys, error) {
+func NewPostgresUserRoomKeysTable(ctx context.Context, db *sql.DB) (tables.UserRoomKeys, error) {
 	s := &userRoomKeysStatements{}
 	return s, sqlutil.StatementList{
 		{&s.insertUserRoomPrivateKeyStmt, insertUserRoomPrivateKeySQL},

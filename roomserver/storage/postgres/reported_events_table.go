@@ -27,7 +27,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 )
 
-const reportedEventsScheme = `
+const reportedEventsSchema = `
 CREATE SEQUENCE IF NOT EXISTS roomserver_reported_events_id_seq;
 CREATE TABLE IF NOT EXISTS roomserver_reported_events
 (
@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS roomserver_reported_events
     score       		INTEGER,
     received_ts 		BIGINT NOT NULL
 );`
+
+const reportedEventsSchemaRevert = `DROP TABLE IF EXISTS roomserver_reported_events;`
 
 const insertReportedEventSQL = `
 	INSERT INTO roomserver_reported_events (room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts) 
@@ -91,14 +93,8 @@ type reportedEventsStatements struct {
 	deleteReportedEventStmt      *sql.Stmt
 }
 
-func CreateReportedEventsTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(reportedEventsScheme)
-	return err
-}
-
-func PrepareReportedEventsTable(ctx context.Context, db *sql.DB) (tables.ReportedEvents, error) {
+func NewPostgresReportedEventsTable(ctx context.Context, db *sql.DB) (tables.ReportedEvents, error) {
 	s := &reportedEventsStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.insertReportedEventsStmt, insertReportedEventSQL},
 		{&s.selectReportedEventsDescStmt, selectReportedEventsDescSQL},

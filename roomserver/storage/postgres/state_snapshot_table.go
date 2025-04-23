@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/lib/pq"
@@ -53,6 +54,8 @@ CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
 	state_block_nids bigint[] NOT NULL
 );
 `
+
+const stateSnapshotSchemaRevert = `DROP TABLE IF EXISTS roomserver_state_snapshots;`
 
 // Insert a new state snapshot. If we conflict on the hash column then
 // we must perform an update so that the RETURNING statement returns the
@@ -121,14 +124,8 @@ type stateSnapshotStatements struct {
 	bulktSelectMembershipForHistoryVisibilityStmt *sql.Stmt
 }
 
-func CreateStateSnapshotTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(stateSnapshotSchema)
-	return err
-}
-
-func PrepareStateSnapshotTable(ctx context.Context, db *sql.DB) (*stateSnapshotStatements, error) {
+func NewPostgresStateSnapshotTable(ctx context.Context, db *sql.DB) (tables.StateSnapshot, error) {
 	s := &stateSnapshotStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.insertStateStmt, insertStateSQL},
 		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},

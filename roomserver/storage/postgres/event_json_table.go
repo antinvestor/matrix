@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS roomserver_event_json (
 );
 `
 
+const eventJSONSchemaRevert = `DROP TABLE IF EXISTS roomserver_event_json;`
+
 const insertEventJSONSQL = "" +
 	"INSERT INTO roomserver_event_json (event_nid, event_json) VALUES ($1, $2)" +
 	" ON CONFLICT (event_nid) DO UPDATE SET event_json=$2"
@@ -59,14 +61,8 @@ type eventJSONStatements struct {
 	bulkSelectEventJSONStmt *sql.Stmt
 }
 
-func CreateEventJSONTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(eventJSONSchema)
-	return err
-}
-
-func PrepareEventJSONTable(ctx context.Context, db *sql.DB) (tables.EventJSON, error) {
+func NewPostgresEventJSONTable(ctx context.Context, db *sql.DB) (tables.EventJSON, error) {
 	s := &eventJSONStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.insertEventJSONStmt, insertEventJSONSQL},
 		{&s.bulkSelectEventJSONStmt, bulkSelectEventJSONSQL},

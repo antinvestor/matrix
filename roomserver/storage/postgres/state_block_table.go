@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS roomserver_state_block (
 );
 `
 
+const stateDataSchemaRevert = `DROP TABLE IF EXISTS roomserver_state_block;`
+
 // Insert a new state block. If we conflict on the hash column then
 // we must perform an update so that the RETURNING statement returns the
 // ID of the row that we conflicted with, so that we can then refer to
@@ -70,12 +72,7 @@ type stateBlockStatements struct {
 	bulkSelectStateBlockEntriesStmt *sql.Stmt
 }
 
-func CreateStateBlockTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(stateDataSchema)
-	return err
-}
-
-func PrepareStateBlockTable(ctx context.Context, db *sql.DB) (tables.StateBlock, error) {
+func NewPostgresStateBlockTable(ctx context.Context, db *sql.DB) (tables.StateBlock, error) {
 	s := &stateBlockStatements{}
 
 	return s, sqlutil.StatementList{

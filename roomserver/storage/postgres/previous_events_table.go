@@ -20,7 +20,6 @@ import (
 	"database/sql"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/roomserver/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 )
@@ -38,6 +37,8 @@ CREATE TABLE IF NOT EXISTS roomserver_previous_events (
     CONSTRAINT roomserver_previous_event_id_unique UNIQUE (previous_event_id)
 );
 `
+
+const previousEventSchemaRevert = `DROP TABLE IF EXISTS roomserver_previous_events;`
 
 // Insert an entry into the previous_events table.
 // If there is already an entry indicating that an event references that previous event then
@@ -63,25 +64,8 @@ type previousEventStatements struct {
 	selectPreviousEventExistsStmt *sql.Stmt
 }
 
-func CreatePrevEventsTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(previousEventSchema)
-	if err != nil {
-		return err
-	}
-
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations([]sqlutil.Migration{
-		{
-			Version: "roomserver: drop column reference_sha from roomserver_prev_events",
-			Up:      deltas.UpDropEventReferenceSHAPrevEvents,
-		},
-	}...)
-	return m.Up(ctx)
-}
-
-func PreparePrevEventsTable(ctx context.Context, db *sql.DB) (tables.PreviousEvents, error) {
+func NewPostgresPreviousEventsTable(ctx context.Context, db *sql.DB) (tables.PreviousEvents, error) {
 	s := &previousEventStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.insertPreviousEventStmt, insertPreviousEventSQL},
 		{&s.selectPreviousEventExistsStmt, selectPreviousEventExistsSQL},

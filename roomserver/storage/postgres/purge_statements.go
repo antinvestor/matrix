@@ -83,9 +83,8 @@ type purgeStatements struct {
 	purgeStateSnapshotEntriesStmt *sql.Stmt
 }
 
-func PreparePurgeStatements(db *sql.DB) (*purgeStatements, error) {
+func NewPostgresPurgeStatements(db *sql.DB) (*purgeStatements, error) {
 	s := &purgeStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.purgeEventJSONStmt, purgeEventJSONSQL},
 		{&s.purgeEventsStmt, purgeEventsSQL},

@@ -21,7 +21,6 @@ import (
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/roomserver/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 )
 
@@ -39,6 +38,8 @@ CREATE TABLE IF NOT EXISTS roomserver_published (
     PRIMARY KEY (room_id, appservice_id, network_id)
 );
 `
+
+const publishedSchemaRevert = `DROP TABLE IF EXISTS roomserver_published;`
 
 const upsertPublishedSQL = "" +
 	"INSERT INTO roomserver_published (room_id, appservice_id, network_id, published) VALUES ($1, $2, $3, $4) " +
@@ -60,28 +61,8 @@ type publishedStatements struct {
 	selectNetworkPublishedStmt *sql.Stmt
 }
 
-func CreatePublishedTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(publishedSchema)
-	if err != nil {
-		return err
-	}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations([]sqlutil.Migration{
-		{
-			Version: "roomserver: published appservice",
-			Up:      deltas.UpPulishedAppservice,
-		},
-		{
-			Version: "roomserver: published appservice pkey",
-			Up:      deltas.UpPulishedAppservicePrimaryKey,
-		},
-	}...)
-	return m.Up(ctx)
-}
-
-func PreparePublishedTable(ctx context.Context, db *sql.DB) (tables.Published, error) {
+func NewPostgresPublishedTable(ctx context.Context, db *sql.DB) (tables.Published, error) {
 	s := &publishedStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.upsertPublishedStmt, upsertPublishedSQL},
 		{&s.selectAllPublishedStmt, selectAllPublishedSQL},

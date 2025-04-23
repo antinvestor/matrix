@@ -66,6 +66,8 @@ INSERT INTO roomserver_event_types (event_type_nid, event_type) VALUES
     (7, 'm.room.history_visibility') ON CONFLICT DO NOTHING;
 `
 
+const eventTypesSchemaRevert = `DROP TABLE IF EXISTS roomserver_event_types;`
+
 // Assign a new numeric event type ID.
 // The usual case is that the event type is not in the database.
 // In that case the ID will be assigned using the next value from the sequence.
@@ -99,14 +101,8 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt *sql.Stmt
 }
 
-func CreateEventTypesTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(eventTypesSchema)
-	return err
-}
-
-func PrepareEventTypesTable(ctx context.Context, db *sql.DB) (tables.EventTypes, error) {
+func NewPostgresEventTypesTable(ctx context.Context, db *sql.DB) (tables.EventTypes, error) {
 	s := &eventTypeStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},

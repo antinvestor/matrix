@@ -55,6 +55,9 @@ CREATE TABLE IF NOT EXISTS roomserver_invites (
 CREATE INDEX IF NOT EXISTS roomserver_invites_active_idx ON roomserver_invites (target_nid, room_nid)
 	WHERE NOT retired;
 `
+
+const inviteSchemaRevert = `DROP TABLE IF EXISTS roomserver_invites;`
+
 const insertInviteEventSQL = "" +
 	"INSERT INTO roomserver_invites (invite_event_id, room_nid, target_nid," +
 	" sender_nid, invite_event_json) VALUES ($1, $2, $3, $4, $5)" +
@@ -81,14 +84,8 @@ type inviteStatements struct {
 	updateInviteRetiredStmt             *sql.Stmt
 }
 
-func CreateInvitesTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(inviteSchema)
-	return err
-}
-
-func PrepareInvitesTable(ctx context.Context, db *sql.DB) (tables.Invites, error) {
+func NewPostgresInvitesTable(ctx context.Context, db *sql.DB) (tables.Invites, error) {
 	s := &inviteStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.insertInviteEventStmt, insertInviteEventSQL},
 		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},

@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS roomserver_rooms (
 );
 `
 
+const roomsSchemaRevert = `DROP TABLE IF EXISTS roomserver_rooms;`
+
 // Same as insertEventTypeNIDSQL
 const insertRoomNIDSQL = "" +
 	"INSERT INTO roomserver_rooms (room_id, room_version) VALUES ($1, $2)" +
@@ -96,12 +98,7 @@ type roomStatements struct {
 	bulkSelectRoomNIDsStmt             *sql.Stmt
 }
 
-func CreateRoomsTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(roomsSchema)
-	return err
-}
-
-func PrepareRoomsTable(ctx context.Context, db *sql.DB) (tables.Rooms, error) {
+func NewPostgresRoomsTable(ctx context.Context, db *sql.DB) (tables.Rooms, error) {
 	s := &roomStatements{}
 
 	return s, sqlutil.StatementList{

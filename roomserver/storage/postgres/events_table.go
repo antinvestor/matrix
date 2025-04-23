@@ -23,7 +23,6 @@ import (
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/roomserver/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
@@ -73,6 +72,8 @@ CREATE INDEX IF NOT EXISTS roomserver_events_memberships_idx ON roomserver_event
 CREATE INDEX IF NOT EXISTS roomserver_event_event_type_nid_idx ON roomserver_events (event_type_nid);
 CREATE INDEX IF NOT EXISTS roomserver_event_state_key_nid_idx ON roomserver_events (event_state_key_nid);
 `
+
+const eventsSchemaRevert = `DROP TABLE IF EXISTS roomserver_events;`
 
 const insertEventSQL = "" +
 	"INSERT INTO roomserver_events AS e (room_nid, event_type_nid, event_state_key_nid, event_id, auth_event_nids, depth, is_rejected)" +
@@ -175,25 +176,8 @@ type eventStatements struct {
 	selectRoomsWithEventTypeNIDStmt               *sql.Stmt
 }
 
-func CreateEventsTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(eventsSchema)
-	if err != nil {
-		return err
-	}
-
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations([]sqlutil.Migration{
-		{
-			Version: "roomserver: drop column reference_sha from roomserver_events",
-			Up:      deltas.UpDropEventReferenceSHAEvents,
-		},
-	}...)
-	return m.Up(ctx)
-}
-
-func PrepareEventsTable(ctx context.Context, db *sql.DB) (tables.Events, error) {
+func NewPostgresEventsTable(ctx context.Context, db *sql.DB) (tables.Events, error) {
 	s := &eventStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
