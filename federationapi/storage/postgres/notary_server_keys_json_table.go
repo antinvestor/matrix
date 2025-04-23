@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS federationsender_notary_server_keys_json (
 );
 `
 
+const notaryServerKeysJSONSchemaRevert = `DROP TABLE IF EXISTS federationsender_notary_server_keys_json; DROP SEQUENCE IF EXISTS federationsender_notary_server_keys_json_pkey;`
+
 const insertServerKeysJSONSQL = "" +
 	"INSERT INTO federationsender_notary_server_keys_json (response_json, server_name, valid_until) VALUES ($1, $2, $3)" +
 	" RETURNING notary_id"
@@ -47,11 +49,6 @@ func NewPostgresNotaryServerKeysTable(ctx context.Context, db *sql.DB) (s *notar
 	s = &notaryServerKeysStatements{
 		db: db,
 	}
-	_, err = db.Exec(notaryServerKeysJSONSchema)
-	if err != nil {
-		return
-	}
-
 	return s, sqlutil.StatementList{
 		{&s.insertServerKeysJSONStmt, insertServerKeysJSONSQL},
 	}.Prepare(db)

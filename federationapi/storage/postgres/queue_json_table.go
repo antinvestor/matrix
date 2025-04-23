@@ -38,6 +38,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_json_json_nid_idx
     ON federationsender_queue_json (json_nid);
 `
 
+const queueJSONSchemaRevert = `DROP TABLE IF EXISTS federationsender_queue_json;`
+
 const insertJSONSQL = "" +
 	"INSERT INTO federationsender_queue_json (json_body)" +
 	" VALUES ($1)" +
@@ -60,10 +62,6 @@ type queueJSONStatements struct {
 func NewPostgresQueueJSONTable(ctx context.Context, db *sql.DB) (s *queueJSONStatements, err error) {
 	s = &queueJSONStatements{
 		db: db,
-	}
-	_, err = s.db.Exec(queueJSONSchema)
-	if err != nil {
-		return
 	}
 	return s, sqlutil.StatementList{
 		{&s.insertJSONStmt, insertJSONSQL},

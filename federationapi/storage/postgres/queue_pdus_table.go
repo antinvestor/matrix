@@ -44,6 +44,8 @@ CREATE INDEX IF NOT EXISTS federationsender_queue_pdus_server_name_idx
     ON federationsender_queue_pdus (server_name);
 `
 
+const queuePDUsSchemaRevert = `DROP TABLE IF EXISTS federationsender_queue_pdus;`
+
 const insertQueuePDUSQL = "" +
 	"INSERT INTO federationsender_queue_pdus (transaction_id, server_name, json_nid)" +
 	" VALUES ($1, $2, $3)"
@@ -75,10 +77,6 @@ type queuePDUsStatements struct {
 func NewPostgresQueuePDUsTable(ctx context.Context, db *sql.DB) (s *queuePDUsStatements, err error) {
 	s = &queuePDUsStatements{
 		db: db,
-	}
-	_, err = s.db.Exec(queuePDUsSchema)
-	if err != nil {
-		return
 	}
 	return s, sqlutil.StatementList{
 		{&s.insertQueuePDUStmt, insertQueuePDUSQL},

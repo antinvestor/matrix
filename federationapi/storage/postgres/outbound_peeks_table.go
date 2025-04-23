@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS federationsender_outbound_peeks (
 );
 `
 
+const outboundPeeksSchemaRevert = `DROP TABLE IF EXISTS federationsender_outbound_peeks;`
+
 const insertOutboundPeekSQL = "" +
 	"INSERT INTO federationsender_outbound_peeks (room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5, $6)"
 
@@ -70,11 +72,6 @@ func NewPostgresOutboundPeeksTable(ctx context.Context, db *sql.DB) (s *outbound
 	s = &outboundPeeksStatements{
 		db: db,
 	}
-	_, err = db.Exec(outboundPeeksSchema)
-	if err != nil {
-		return
-	}
-
 	return s, sqlutil.StatementList{
 		{&s.insertOutboundPeekStmt, insertOutboundPeekSQL},
 		{&s.selectOutboundPeekStmt, selectOutboundPeekSQL},

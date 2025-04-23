@@ -47,6 +47,8 @@ CREATE INDEX IF NOT EXISTS federationsender_queue_edus_server_name_idx
     ON federationsender_queue_edus (server_name);
 `
 
+const queueEDUsSchemaRevert = `DROP TABLE IF EXISTS federationsender_queue_edus;`
+
 const insertQueueEDUSQL = "" +
 	"INSERT INTO federationsender_queue_edus (edu_type, server_name, json_nid, expires_at)" +
 	" VALUES ($1, $2, $3, $4)"
@@ -87,23 +89,15 @@ func NewPostgresQueueEDUsTable(ctx context.Context, db *sql.DB) (s *queueEDUsSta
 	s = &queueEDUsStatements{
 		db: db,
 	}
-	_, err = s.db.Exec(queueEDUsSchema)
-	if err != nil {
-		return s, err
-	}
-
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(
-		sqlutil.Migration{
-			Version: "federationapi: add expiresat column",
-			Up:      deltas.UpAddexpiresat,
-		},
-	)
-	if err := m.Up(ctx); err != nil {
-		return s, err
-	}
-
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertQueueEDUStmt, insertQueueEDUSQL},
+		{&s.deleteQueueEDUStmt, deleteQueueEDUSQL},
+		{&s.selectQueueEDUStmt, selectQueueEDUSQL},
+		{&s.selectQueueEDUReferenceJSONCountStmt, selectQueueEDUReferenceJSONCountSQL},
+		{&s.selectQueueEDUServerNamesStmt, selectQueueServerNamesSQL},
+		{&s.selectExpiredEDUsStmt, selectExpiredEDUsSQL},
+		{&s.deleteExpiredEDUsStmt, deleteExpiredEDUsSQL},
+	}.Prepare(s.db)
 }
 
 func (s *queueEDUsStatements) Prepare() error {

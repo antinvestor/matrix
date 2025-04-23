@@ -46,6 +46,8 @@ CREATE INDEX IF NOT EXISTS federatonsender_joined_hosts_room_id_idx
     ON federationsender_joined_hosts (room_id)
 `
 
+const joinedHostsSchemaRevert = `DROP TABLE IF EXISTS federationsender_joined_hosts; DROP INDEX IF EXISTS federatonsender_joined_hosts_event_id_idx; DROP INDEX IF EXISTS federatonsender_joined_hosts_room_id_idx;`
+
 const insertJoinedHostsSQL = "" +
 	"INSERT INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
 	" VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
@@ -85,10 +87,6 @@ type joinedHostsStatements struct {
 func NewPostgresJoinedHostsTable(ctx context.Context, db *sql.DB) (s *joinedHostsStatements, err error) {
 	s = &joinedHostsStatements{
 		db: db,
-	}
-	_, err = s.db.Exec(joinedHostsSchema)
-	if err != nil {
-		return
 	}
 	return s, sqlutil.StatementList{
 		{&s.insertJoinedHostsStmt, insertJoinedHostsSQL},

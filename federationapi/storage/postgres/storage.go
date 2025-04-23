@@ -28,6 +28,70 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 )
 
+// Migrations All federationapi migrations for the postgres module
+var Migrations = []sqlutil.Migration{
+	{
+		Version:   "federationapi_001_create_queue_json_table",
+		QueryUp:   queueJSONSchema,
+		QueryDown: queueJSONSchemaRevert,
+	},
+	{
+		Version:   "federationapi_002_create_queue_pdus_table",
+		QueryUp:   queuePDUsSchema,
+		QueryDown: queuePDUsSchemaRevert,
+	},
+	{
+		Version:   "federationapi_003_create_queue_edus_table",
+		QueryUp:   queueEDUsSchema,
+		QueryDown: queueEDUsSchemaRevert,
+	},
+	{
+		Version:   "federationapi_004_create_server_keys_table",
+		QueryUp:   serverSigningKeysSchema,
+		QueryDown: serverSigningKeysSchemaRevert,
+	},
+	{
+		Version:   "federationapi_005_create_blacklist_table",
+		QueryUp:   blacklistSchema,
+		QueryDown: blacklistSchemaRevert,
+	},
+	{
+		Version:   "federationapi_006_create_notary_server_keys_json_table",
+		QueryUp:   notaryServerKeysJSONSchema,
+		QueryDown: notaryServerKeysJSONSchemaRevert,
+	},
+	{
+		Version:   "federationapi_007_create_joined_hosts_table",
+		QueryUp:   joinedHostsSchema,
+		QueryDown: joinedHostsSchemaRevert,
+	},
+	{
+		Version:   "federationapi_008_create_assumed_offline_table",
+		QueryUp:   assumedOfflineSchema,
+		QueryDown: assumedOfflineSchemaRevert,
+	},
+	{
+		Version:   "federationapi_009_create_inbound_peeks_table",
+		QueryUp:   inboundPeeksSchema,
+		QueryDown: inboundPeeksSchemaRevert,
+	},
+	{
+		Version:   "federationapi_010_create_outbound_peeks_table",
+		QueryUp:   outboundPeeksSchema,
+		QueryDown: outboundPeeksSchemaRevert,
+	},
+	{
+		Version:   "federationapi_011_create_relay_servers_table",
+		QueryUp:   relayServersSchema,
+		QueryDown: relayServersSchemaRevert,
+	},
+	{
+		Version:   "federationapi_012_create_notary_server_keys_metadata_table",
+		QueryUp:   notaryServerKeysMetadataSchema,
+		QueryDown: notaryServerKeysMetadataSchemaRevert,
+	},
+}
+
 // Database stores information needed by the federation sender
 type Database struct {
 	shared.Database
@@ -91,6 +155,7 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 		return nil, err
 	}
 	m := sqlutil.NewMigrator(d.db)
+	m.AddMigrations(Migrations...)
 	m.AddMigrations(sqlutil.Migration{
 		Version: "federationsender: drop federationsender_rooms",
 		Up:      deltas.UpRemoveRoomsTable,

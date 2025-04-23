@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS federationsender_assumed_offline(
 );
 `
 
+const assumedOfflineSchemaRevert = `DROP TABLE IF EXISTS federationsender_assumed_offline;`
+
 const insertAssumedOfflineSQL = "" +
 	"INSERT INTO federationsender_assumed_offline (server_name) VALUES ($1)" +
 	" ON CONFLICT DO NOTHING"
@@ -54,11 +56,6 @@ func NewPostgresAssumedOfflineTable(ctx context.Context, db *sql.DB) (s *assumed
 	s = &assumedOfflineStatements{
 		db: db,
 	}
-	_, err = db.Exec(assumedOfflineSchema)
-	if err != nil {
-		return
-	}
-
 	return s, sqlutil.StatementList{
 		{&s.insertAssumedOfflineStmt, insertAssumedOfflineSQL},
 		{&s.selectAssumedOfflineStmt, selectAssumedOfflineSQL},

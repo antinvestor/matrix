@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS federationsender_blacklist (
 );
 `
 
+const blacklistSchemaRevert = `DROP TABLE IF EXISTS federationsender_blacklist;`
+
 const insertBlacklistSQL = "" +
 	"INSERT INTO federationsender_blacklist (server_name) VALUES ($1)" +
 	" ON CONFLICT DO NOTHING"
@@ -55,11 +57,6 @@ func NewPostgresBlacklistTable(ctx context.Context, db *sql.DB) (s *blacklistSta
 	s = &blacklistStatements{
 		db: db,
 	}
-	_, err = db.Exec(blacklistSchema)
-	if err != nil {
-		return
-	}
-
 	return s, sqlutil.StatementList{
 		{&s.insertBlacklistStmt, insertBlacklistSQL},
 		{&s.selectBlacklistStmt, selectBlacklistSQL},

@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS keydb_server_keys (
 CREATE INDEX IF NOT EXISTS keydb_server_name_and_key_id ON keydb_server_keys (server_name_and_key_id);
 `
 
+const serverSigningKeysSchemaRevert = `DROP TABLE IF EXISTS keydb_server_keys;`
+
 const bulkSelectServerSigningKeysSQL = "" +
 	"SELECT server_name, server_key_id, valid_until_ts, expired_ts, " +
 	"   server_key FROM keydb_server_keys" +
@@ -69,10 +71,6 @@ type serverSigningKeyStatements struct {
 
 func NewPostgresServerSigningKeysTable(ctx context.Context, db *sql.DB) (s *serverSigningKeyStatements, err error) {
 	s = &serverSigningKeyStatements{}
-	_, err = db.Exec(serverSigningKeysSchema)
-	if err != nil {
-		return
-	}
 	return s, sqlutil.StatementList{
 		{&s.bulkSelectServerKeysStmt, bulkSelectServerSigningKeysSQL},
 		{&s.upsertServerKeysStmt, upsertServerSigningKeysSQL},

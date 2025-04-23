@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS federationsender_notary_server_keys_metadata (
 );
 `
 
+const notaryServerKeysMetadataSchemaRevert = `DROP TABLE IF EXISTS federationsender_notary_server_keys_metadata;`
+
 const upsertServerKeysSQL = "" +
 	"INSERT INTO federationsender_notary_server_keys_metadata (notary_id, server_name, key_id) VALUES ($1, $2, $3)" +
 	" ON CONFLICT (server_name, key_id) DO UPDATE SET notary_id = $1"
@@ -89,11 +91,6 @@ func NewPostgresNotaryServerKeysMetadataTable(ctx context.Context, db *sql.DB) (
 	s = &notaryServerKeysMetadataStatements{
 		db: db,
 	}
-	_, err = db.Exec(notaryServerKeysMetadataSchema)
-	if err != nil {
-		return
-	}
-
 	return s, sqlutil.StatementList{
 		{&s.upsertServerKeysStmt, upsertServerKeysSQL},
 		{&s.selectNotaryKeyResponsesStmt, selectNotaryKeyResponsesSQL},

@@ -37,6 +37,8 @@ CREATE INDEX IF NOT EXISTS federationsender_relay_servers_server_name_idx
 	ON federationsender_relay_servers (server_name);
 `
 
+const relayServersSchemaRevert = `DROP TABLE IF EXISTS federationsender_relay_servers; DROP INDEX IF EXISTS federationsender_relay_servers_server_name_idx;`
+
 const insertRelayServersSQL = "" +
 	"INSERT INTO federationsender_relay_servers (server_name, relay_server_name) VALUES ($1, $2)" +
 	" ON CONFLICT DO NOTHING"
@@ -62,11 +64,6 @@ func NewPostgresRelayServersTable(ctx context.Context, db *sql.DB) (s *relayServ
 	s = &relayServersStatements{
 		db: db,
 	}
-	_, err = db.Exec(relayServersSchema)
-	if err != nil {
-		return
-	}
-
 	return s, sqlutil.StatementList{
 		{&s.insertRelayServersStmt, insertRelayServersSQL},
 		{&s.selectRelayServersStmt, selectRelayServersSQL},
