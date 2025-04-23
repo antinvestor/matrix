@@ -2,9 +2,10 @@ package routing
 
 import (
 	"bytes"
-	"github.com/antinvestor/matrix/test/testrig"
 	"io"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/patrickmn/go-cache"
 )

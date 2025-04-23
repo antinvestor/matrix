@@ -137,13 +137,14 @@ func TestLogin(t *testing.T) {
 			passwordFound := false
 			ssoFound := false
 			for _, flow := range resp.Flows {
-				if flow.Type == "m.login.password" {
+				switch flow.Type {
+				case "m.login.password":
 					passwordFound = true
-				} else if flow.Type == "m.login.sso" {
+				case "m.login.sso":
 					ssoFound = true
-				} else if flow.Type == "m.login.application_service" {
+				case "m.login.application_service":
 					appServiceFound = true
-				} else {
+				default:
 					t.Fatalf("got unknown login flow: %s", flow.Type)
 				}
 			}

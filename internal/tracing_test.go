@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/stretchr/testify/assert"
 )

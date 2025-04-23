@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/tidwall/gjson"
 

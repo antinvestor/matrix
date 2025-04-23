@@ -1,10 +1,11 @@
 package statistics
 
 import (
-	"github.com/antinvestor/matrix/test/testrig"
 	"math"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/test"

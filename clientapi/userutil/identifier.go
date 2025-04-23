@@ -92,7 +92,7 @@ func (i AnyIdentifier) MarshalJSON() ([]byte, error) {
 		*PhoneIdentifier
 		Type IdentifierType `json:"type"`
 	}{
-		Type: i.Identifier.IdentifierType(),
+		Type: i.IdentifierType(),
 	}
 	switch iid := i.Identifier.(type) {
 	case *UserIdentifier:

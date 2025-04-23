@@ -3,9 +3,10 @@ package tables_test
 import (
 	"context"
 	"fmt"
-	"github.com/antinvestor/matrix/test/testrig"
 	"sort"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/stretchr/testify/assert"
 

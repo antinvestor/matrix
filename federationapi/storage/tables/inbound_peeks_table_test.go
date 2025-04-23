@@ -3,18 +3,17 @@ package tables_test
 import (
 	"context"
 	"database/sql"
-	"github.com/antinvestor/matrix/federationapi/storage"
-	"github.com/antinvestor/matrix/test/testrig"
-	"reflect"
-	"testing"
-
 	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
+	"reflect"
+	"testing"
 )
 
 func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, func()) {

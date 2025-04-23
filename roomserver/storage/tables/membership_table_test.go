@@ -3,14 +3,13 @@ package tables_test
 import (
 	"context"
 	"fmt"
-	"github.com/antinvestor/matrix/test/testrig"
-	"testing"
-
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func mustCreateMembershipTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tab tables.Membership, stateKeyTab tables.EventStateKeys, close func()) {

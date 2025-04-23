@@ -2,14 +2,13 @@ package tables_test
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/test/testrig"
-	"testing"
-
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func mustCreatePreviousEventsTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tab tables.PreviousEvents, closeDb func()) {

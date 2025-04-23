@@ -16,6 +16,7 @@ package setup
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/syncapi"
 	userAPI "github.com/antinvestor/matrix/userapi/api"
 

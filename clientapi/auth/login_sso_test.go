@@ -2,10 +2,11 @@ package auth
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/test/testrig"
 	"net/url"
 	"reflect"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/setup/config"
 )

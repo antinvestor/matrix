@@ -16,9 +16,10 @@ package routing_test
 
 import (
 	"encoding/json"
-	"github.com/antinvestor/matrix/test/testrig"
 	"net/http"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"

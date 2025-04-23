@@ -2,10 +2,11 @@ package sync
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/test/testrig"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"

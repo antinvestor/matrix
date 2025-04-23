@@ -2,16 +2,15 @@ package tables_test
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/test/testrig"
-	"reflect"
-	"testing"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
+	"reflect"
+	"testing"
 )
 
 func mustCreateOutboundpeeksTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.FederationOutboundPeeks, func()) {

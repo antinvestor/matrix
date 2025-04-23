@@ -3,9 +3,10 @@ package sqlutil
 import (
 	"database/sql"
 	"errors"
-	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )

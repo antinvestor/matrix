@@ -92,8 +92,8 @@ func (s *accountDataStatements) SelectAccountData(
 	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 ) (
-/* global */ map[string]json.RawMessage,
-/* rooms */ map[string]map[string]json.RawMessage,
+	/* global */ map[string]json.RawMessage,
+	/* rooms */ map[string]map[string]json.RawMessage,
 	error,
 ) {
 	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart, serverName)

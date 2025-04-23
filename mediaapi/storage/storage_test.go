@@ -2,9 +2,10 @@ package storage_test
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/test/testrig"
 	"reflect"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage"
@@ -18,7 +19,7 @@ func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOpti
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
-	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
+	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
 	db, err := storage.NewMediaAPIDatasource(ctx, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,

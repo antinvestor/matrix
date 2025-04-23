@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //go:build !bimg
-// +build !bimg
 
 package thumbnailer
 

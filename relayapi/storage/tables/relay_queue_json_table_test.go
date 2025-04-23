@@ -18,17 +18,16 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"github.com/antinvestor/matrix/relayapi/storage"
-	"github.com/antinvestor/matrix/test/testrig"
-	"testing"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/relayapi/storage"
 	"github.com/antinvestor/matrix/relayapi/storage/postgres"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 const (

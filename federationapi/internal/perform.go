@@ -30,7 +30,7 @@ func (r *FederationInternalAPI) PerformDirectoryLookup(
 	response *api.PerformDirectoryLookupResponse,
 ) (err error) {
 	if !r.shouldAttemptDirectFederation(ctx, request.ServerName) {
-		return fmt.Errorf("relay servers have no meaningful response for directory lookup.")
+		return fmt.Errorf("relay servers have no meaningful response for directory lookup")
 	}
 
 	dir, err := r.federation.LookupRoomAlias(
@@ -144,7 +144,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	unsigned map[string]interface{},
 ) error {
 	if !r.shouldAttemptDirectFederation(ctx, serverName) {
-		return fmt.Errorf("relay servers have no meaningful response for join.")
+		return fmt.Errorf("relay servers have no meaningful response for join")
 	}
 
 	user, err := spec.NewUserID(userID, true)
@@ -203,7 +203,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	}
 	r.statistics.ForServer(ctx, serverName).Success(ctx, statistics.SendDirect)
 	if response == nil {
-		return fmt.Errorf("Received nil response from gomatrixserverlib.PerformJoin")
+		return fmt.Errorf("received nil response from gomatrixserverlib.PerformJoin")
 	}
 
 	// We need to immediately update our list of joined hosts for this room now as we are technically
@@ -214,12 +214,12 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// The events are trusted now as we performed auth checks above.
 	joinedHosts, err := consumers.JoinedHostsFromEvents(ctx, response.StateSnapshot.GetStateEvents().TrustedEvents(response.JoinEvent.Version(), false), r.rsAPI)
 	if err != nil {
-		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
+		return fmt.Errorf("joinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
 
 	logrus.WithField("room", roomID).Infof("Joined federated room with %d hosts", len(joinedHosts))
 	if _, err = r.db.UpdateRoom(ctx, roomID, joinedHosts, nil, true); err != nil {
-		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
+		return fmt.Errorf("updatedRoom: failed to update room with joined hosts: %s", err)
 	}
 
 	// TODO: Can I change this to not take respState but instead just take an opaque list of events?
@@ -325,7 +325,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	supportedVersions []gomatrixserverlib.RoomVersion,
 ) error {
 	if !r.shouldAttemptDirectFederation(ctx, serverName) {
-		return fmt.Errorf("relay servers have no meaningful response for outbound peek.")
+		return fmt.Errorf("relay servers have no meaningful response for outbound peek")
 	}
 
 	// create a unique ID for this peek.
@@ -565,7 +565,7 @@ func (r *FederationInternalAPI) SendInvite(
 	// TODO (devon): This should be allowed via a relay. Currently only transactions
 	// can be sent to relays. Would need to extend relays to handle invites.
 	if !r.shouldAttemptDirectFederation(ctx, destination) {
-		return nil, fmt.Errorf("relay servers have no meaningful response for invite.")
+		return nil, fmt.Errorf("relay servers have no meaningful response for invite")
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -622,7 +622,7 @@ func (r *FederationInternalAPI) SendInviteV3(
 	// TODO (devon): This should be allowed via a relay. Currently only transactions
 	// can be sent to relays. Would need to extend relays to handle invites.
 	if !r.shouldAttemptDirectFederation(ctx, invitee.Domain()) {
-		return nil, fmt.Errorf("relay servers have no meaningful response for invite.")
+		return nil, fmt.Errorf("relay servers have no meaningful response for invite")
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -724,7 +724,7 @@ func checkEventsContainCreateEvent(events []gomatrixserverlib.PDU) error {
 
 // federatedEventProvider is an event provider which fetches events from the server provided
 func federatedEventProvider(
-	ctx context.Context, federation fclient.FederationClient,
+	_ context.Context, federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier, origin, server spec.ServerName,
 	userIDForSender spec.UserIDForSender,
 ) gomatrixserverlib.EventProvider {

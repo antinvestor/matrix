@@ -16,9 +16,10 @@ package acls
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/test/testrig"
 	"regexp"
 	"testing"
+
+	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
