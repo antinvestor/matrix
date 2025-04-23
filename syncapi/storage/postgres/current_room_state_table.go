@@ -70,6 +70,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_current_room_state_eventid_idx ON sync
 CREATE INDEX IF NOT EXISTS syncapi_current_room_state_type_state_key_idx ON syncapi_current_room_state(type, state_key);
 `
 
+const currentRoomStateSchemaRevert = `DROP TABLE IF EXISTS syncapi_current_room_state;`
+
 const upsertRoomStateSQL = "" +
 	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at, history_visibility)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
@@ -141,17 +143,12 @@ type currentRoomStateStatements struct {
 
 func NewPostgresCurrentRoomStateTable(ctx context.Context, db *sql.DB) (tables.CurrentRoomState, error) {
 	s := &currentRoomStateStatements{}
-	_, err := db.Exec(currentRoomStateSchema)
-	if err != nil {
-		return nil, err
-	}
-
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations(sqlutil.Migration{
 		Version: "syncapi: add history visibility column (current_room_state)",
 		Up:      deltas.UpAddHistoryVisibilityColumnCurrentRoomState,
 	})
-	err = m.Up(ctx)
+	err := m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}

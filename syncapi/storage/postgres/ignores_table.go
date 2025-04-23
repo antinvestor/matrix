@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS syncapi_ignores (
 );
 `
 
+const ignoresSchemaRevert = `DROP TABLE IF EXISTS syncapi_ignores;`
+
 const selectIgnoresSQL = "" +
 	"SELECT ignores_json FROM syncapi_ignores WHERE user_id = $1"
 
@@ -47,12 +49,7 @@ type ignoresStatements struct {
 }
 
 func NewPostgresIgnoresTable(ctx context.Context, db *sql.DB) (tables.Ignores, error) {
-	_, err := db.Exec(ignoresSchema)
-	if err != nil {
-		return nil, err
-	}
 	s := &ignoresStatements{}
-
 	return s, sqlutil.StatementList{
 		{&s.selectIgnoresStmt, selectIgnoresSQL},
 		{&s.upsertIgnoresStmt, upsertIgnoresSQL},

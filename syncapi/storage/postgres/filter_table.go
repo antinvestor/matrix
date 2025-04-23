@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS syncapi_filter (
 CREATE INDEX IF NOT EXISTS syncapi_filter_localpart ON syncapi_filter(localpart);
 `
 
+const filterSchemaRevert = `DROP TABLE IF EXISTS syncapi_filter; DROP INDEX IF EXISTS syncapi_filter_localpart;`
+
 const selectFilterSQL = "" +
 	"SELECT filter FROM syncapi_filter WHERE localpart = $1 AND id = $2"
 
@@ -58,10 +60,6 @@ type filterStatements struct {
 }
 
 func NewPostgresFilterTable(ctx context.Context, db *sql.DB) (tables.Filter, error) {
-	_, err := db.Exec(filterSchema)
-	if err != nil {
-		return nil, err
-	}
 	s := &filterStatements{}
 	return s, sqlutil.StatementList{
 		{&s.selectFilterStmt, selectFilterSQL},

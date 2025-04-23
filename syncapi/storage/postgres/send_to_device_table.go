@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS syncapi_send_to_device (
 CREATE INDEX IF NOT EXISTS syncapi_send_to_device_user_id_device_id_idx ON syncapi_send_to_device(user_id, device_id);
 `
 
+const sendToDeviceSchemaRevert = `DROP TABLE IF EXISTS syncapi_send_to_device;`
+
 const insertSendToDeviceMessageSQL = `
 	INSERT INTO syncapi_send_to_device (user_id, device_id, content)
 	  VALUES ($1, $2, $3)
@@ -75,19 +77,6 @@ type sendToDeviceStatements struct {
 
 func NewPostgresSendToDeviceTable(ctx context.Context, db *sql.DB) (tables.SendToDevice, error) {
 	s := &sendToDeviceStatements{}
-	_, err := db.Exec(sendToDeviceSchema)
-	if err != nil {
-		return nil, err
-	}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "syncapi: drop sent_by_token",
-		Up:      deltas.UpRemoveSendToDeviceSentColumn,
-	})
-	err = m.Up(ctx)
-	if err != nil {
-		return nil, err
-	}
 	return s, sqlutil.StatementList{
 		{&s.insertSendToDeviceMessageStmt, insertSendToDeviceMessageSQL},
 		{&s.selectSendToDeviceMessagesStmt, selectSendToDeviceMessagesSQL},

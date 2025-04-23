@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS syncapi_memberships (
 );
 `
 
+const membershipsSchemaRevert = `DROP TABLE IF EXISTS syncapi_memberships;`
+
 const upsertMembershipSQL = "" +
 	"INSERT INTO syncapi_memberships (room_id, user_id, membership, event_id, stream_pos, topological_pos)" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
@@ -87,10 +89,6 @@ type membershipsStatements struct {
 
 func NewPostgresMembershipsTable(ctx context.Context, db *sql.DB) (tables.Memberships, error) {
 	s := &membershipsStatements{}
-	_, err := db.Exec(membershipsSchema)
-	if err != nil {
-		return nil, err
-	}
 	return s, sqlutil.StatementList{
 		{&s.upsertMembershipStmt, upsertMembershipSQL},
 		{&s.selectMembershipCountStmt, selectMembershipCountSQL},

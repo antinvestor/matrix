@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS syncapi_presence (
 CREATE INDEX IF NOT EXISTS syncapi_presence_user_id ON syncapi_presence(user_id);
 `
 
+const presenceSchemaRevert = `DROP TABLE IF EXISTS syncapi_presence;`
+
 const upsertPresenceSQL = "" +
 	"INSERT INTO syncapi_presence AS p" +
 	" (user_id, presence, status_msg, last_active_ts)" +
@@ -88,10 +90,6 @@ type presenceStatements struct {
 }
 
 func NewPostgresPresenceTable(ctx context.Context, db *sql.DB) (*presenceStatements, error) {
-	_, err := db.Exec(presenceSchema)
-	if err != nil {
-		return nil, err
-	}
 	s := &presenceStatements{}
 	return s, sqlutil.StatementList{
 		{&s.upsertPresenceStmt, upsertPresenceSQL},

@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS syncapi_backward_extremities (
 );
 `
 
+const backwardExtremitiesSchemaRevert = `DROP TABLE IF EXISTS syncapi_backward_extremities;`
+
 const insertBackwardExtremitySQL = "" +
 	"INSERT INTO syncapi_backward_extremities (room_id, event_id, prev_event_id)" +
 	" VALUES ($1, $2, $3)" +
@@ -59,10 +61,6 @@ type backwardExtremitiesStatements struct {
 
 func NewPostgresBackwardsExtremitiesTable(ctx context.Context, db *sql.DB) (tables.BackwardsExtremities, error) {
 	s := &backwardExtremitiesStatements{}
-	_, err := db.Exec(backwardExtremitiesSchema)
-	if err != nil {
-		return nil, err
-	}
 	return s, sqlutil.StatementList{
 		{&s.insertBackwardExtremityStmt, insertBackwardExtremitySQL},
 		{&s.selectBackwardExtremitiesForRoomStmt, selectBackwardExtremitiesForRoomSQL},

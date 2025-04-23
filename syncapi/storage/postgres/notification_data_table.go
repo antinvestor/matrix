@@ -28,10 +28,6 @@ import (
 )
 
 func NewPostgresNotificationDataTable(ctx context.Context, db *sql.DB) (tables.NotificationData, error) {
-	_, err := db.Exec(notificationDataSchema)
-	if err != nil {
-		return nil, err
-	}
 	r := &notificationDataStatements{}
 	return r, sqlutil.StatementList{
 		{&r.upsertRoomUnreadCounts, upsertRoomUnreadNotificationCountsSQL},
@@ -57,6 +53,8 @@ CREATE TABLE IF NOT EXISTS syncapi_notification_data (
 	highlight_count BIGINT NOT NULL DEFAULT 0,
 	CONSTRAINT syncapi_notification_data_unique UNIQUE (user_id, room_id)
 );`
+
+const notificationDataSchemaRevert = `DROP TABLE IF EXISTS syncapi_notification_data;`
 
 const upsertRoomUnreadNotificationCountsSQL = `INSERT INTO syncapi_notification_data
   (user_id, room_id, notification_count, highlight_count)

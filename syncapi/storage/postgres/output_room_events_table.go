@@ -94,6 +94,8 @@ WITH (
     );
 `
 
+const outputRoomEventsSchemaRevert = `DROP TABLE IF EXISTS syncapi_output_room_events;`
+
 const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
 	"room_id, event_id, headered_event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync, history_visibility" +
@@ -224,41 +226,6 @@ type outputRoomEventsStatements struct {
 
 func NewPostgresEventsTable(ctx context.Context, db *sql.DB) (tables.Events, error) {
 	s := &outputRoomEventsStatements{db: db}
-	_, err := db.Exec(outputRoomEventsSchema)
-	if err != nil {
-		return nil, err
-	}
-
-	migrationName := "syncapi: rename dupe index (output_room_events)"
-
-	var cName string
-	err = db.QueryRowContext(ctx, "select constraint_name from information_schema.table_constraints where table_name = 'syncapi_output_room_events' AND constraint_name = 'syncapi_event_id_idx'").Scan(&cName)
-	switch {
-	case errors.Is(err, sql.ErrNoRows): // migration was already executed, as the index was renamed
-		if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
-			return nil, fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
-		}
-	case err == nil:
-	default:
-		return nil, err
-	}
-
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(
-		sqlutil.Migration{
-			Version: "syncapi: add history visibility column (output_room_events)",
-			Up:      deltas.UpAddHistoryVisibilityColumnOutputRoomEvents,
-		},
-		sqlutil.Migration{
-			Version: migrationName,
-			Up:      deltas.UpRenameOutputRoomEventsIndex,
-		},
-	)
-	err = m.Up(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	return s, sqlutil.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventsStmt, selectEventsSQL},
@@ -348,6 +315,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, nil, err
 		}
+
 		needSet := stateNeeded[ev.RoomID().String()]
 		if needSet == nil { // make set if required
 			needSet = make(map[string]bool)

@@ -41,6 +41,8 @@ CREATE INDEX IF NOT EXISTS syncapi_peeks_room_id_idx ON syncapi_peeks(room_id);
 CREATE INDEX IF NOT EXISTS syncapi_peeks_user_id_device_id_idx ON syncapi_peeks(user_id, device_id);
 `
 
+const peeksSchemaRevert = `DROP TABLE IF EXISTS syncapi_peeks;`
+
 const insertPeekSQL = "" +
 	"INSERT INTO syncapi_peeks" +
 	" (room_id, user_id, device_id, creation_ts)" +
@@ -80,10 +82,6 @@ type peekStatements struct {
 }
 
 func NewPostgresPeeksTable(ctx context.Context, db *sql.DB) (tables.Peeks, error) {
-	_, err := db.Exec(peeksSchema)
-	if err != nil {
-		return nil, err
-	}
 	s := &peekStatements{
 		db: db,
 	}

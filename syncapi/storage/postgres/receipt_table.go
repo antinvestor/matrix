@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS syncapi_receipts (
 CREATE INDEX IF NOT EXISTS syncapi_receipts_room_id ON syncapi_receipts(room_id);
 `
 
+const receiptSchemaRevert = `DROP TABLE IF EXISTS syncapi_receipts;`
+
 const upsertReceipt = "" +
 	"INSERT INTO syncapi_receipts" +
 	" (room_id, receipt_type, user_id, event_id, receipt_ts)" +
@@ -74,19 +76,6 @@ type receiptStatements struct {
 }
 
 func NewPostgresReceiptsTable(ctx context.Context, db *sql.DB) (tables.Receipts, error) {
-	_, err := db.Exec(receiptsSchema)
-	if err != nil {
-		return nil, err
-	}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "syncapi: fix sequences",
-		Up:      deltas.UpFixSequences,
-	})
-	err = m.Up(ctx)
-	if err != nil {
-		return nil, err
-	}
 	r := &receiptStatements{
 		db: db,
 	}

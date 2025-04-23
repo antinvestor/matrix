@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events_topology (
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_topological_position_idx ON syncapi_output_room_events_topology(topological_position, stream_position, room_id);
 `
 
+const outputRoomEventsTopologySchemaRevert = `DROP TABLE IF EXISTS syncapi_output_room_events_topology;`
+
 const insertEventInTopologySQL = "" +
 	"INSERT INTO syncapi_output_room_events_topology (event_id, topological_position, room_id, stream_position)" +
 	" VALUES ($1, $2, $3, $4)" +
@@ -87,10 +89,6 @@ type outputRoomEventsTopologyStatements struct {
 
 func NewPostgresTopologyTable(ctx context.Context, db *sql.DB) (tables.Topology, error) {
 	s := &outputRoomEventsTopologyStatements{}
-	_, err := db.Exec(outputRoomEventsTopologySchema)
-	if err != nil {
-		return nil, err
-	}
 	return s, sqlutil.StatementList{
 		{&s.insertEventInTopologyStmt, insertEventInTopologySQL},
 		{&s.selectEventIDsInRangeASCStmt, selectEventIDsInRangeASCSQL},

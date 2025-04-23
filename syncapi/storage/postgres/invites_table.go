@@ -46,6 +46,8 @@ CREATE INDEX IF NOT EXISTS syncapi_invites_event_id_idx
 	ON syncapi_invite_events (event_id);
 `
 
+const invitesSchemaRevert = `DROP TABLE IF EXISTS syncapi_invite_events;`
+
 const insertInviteEventSQL = "" +
 	"INSERT INTO syncapi_invite_events (" +
 	" room_id, event_id, target_user_id, headered_event_json, deleted" +
@@ -75,10 +77,6 @@ type inviteEventsStatements struct {
 
 func NewPostgresInvitesTable(ctx context.Context, db *sql.DB) (tables.Invites, error) {
 	s := &inviteEventsStatements{}
-	_, err := db.Exec(inviteEventsSchema)
-	if err != nil {
-		return nil, err
-	}
 	return s, sqlutil.StatementList{
 		{&s.insertInviteEventStmt, insertInviteEventSQL},
 		{&s.selectInviteEventsInRangeStmt, selectInviteEventsInRangeSQL},

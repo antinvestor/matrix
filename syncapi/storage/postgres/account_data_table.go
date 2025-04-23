@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account_data_type(id, type);
 `
 
+const accountDataSchemaRevert = `DROP TABLE IF EXISTS syncapi_account_data_type; DROP SEQUENCE IF EXISTS syncapi_stream_id; DROP INDEX IF EXISTS syncapi_account_data_id_idx;`
+
 const insertAccountDataSQL = "" +
 	"INSERT INTO syncapi_account_data_type (user_id, room_id, type) VALUES ($1, $2, $3)" +
 	" ON CONFLICT ON CONSTRAINT syncapi_account_data_unique" +
@@ -74,10 +76,6 @@ type accountDataStatements struct {
 
 func NewPostgresAccountDataTable(ctx context.Context, db *sql.DB) (tables.AccountData, error) {
 	s := &accountDataStatements{}
-	_, err := db.Exec(accountDataSchema)
-	if err != nil {
-		return nil, err
-	}
 	return s, sqlutil.StatementList{
 		{&s.insertAccountDataStmt, insertAccountDataSQL},
 		{&s.selectAccountDataInRangeStmt, selectAccountDataInRangeSQL},

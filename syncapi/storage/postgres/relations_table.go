@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS syncapi_relations (
 );
 `
 
+const relationsSchemaRevert = `DROP TABLE IF EXISTS syncapi_relations;`
+
 const insertRelationSQL = "" +
 	"INSERT INTO syncapi_relations (" +
 	"  room_id, event_id, child_event_id, child_event_type, rel_type" +
@@ -76,10 +78,6 @@ type relationsStatements struct {
 
 func NewPostgresRelationsTable(ctx context.Context, db *sql.DB) (tables.Relations, error) {
 	s := &relationsStatements{}
-	_, err := db.Exec(relationsSchema)
-	if err != nil {
-		return nil, err
-	}
 	return s, sqlutil.StatementList{
 		{&s.insertRelationStmt, insertRelationSQL},
 		{&s.selectRelationsInRangeAscStmt, selectRelationsInRangeAscSQL},
