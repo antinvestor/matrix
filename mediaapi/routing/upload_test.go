@@ -58,7 +58,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	}
 	defer closeDb()
 
-	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
+	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
 	db, err := storage.NewMediaAPIDatasource(ctx, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,

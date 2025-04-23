@@ -37,7 +37,7 @@ func mustCreateFederationDatabase(ctx context.Context, t *testing.T, _ test.Depe
 		t.Fatalf("failed to open database: %s", err)
 	}
 
-	cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
+	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
 	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,

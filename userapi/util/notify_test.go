@@ -91,7 +91,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 			t.Fatalf("failed to open database: %s", err)
 		}
 		defer closeDb()
-		cm := sqlutil.NewConnectionManager(nil, config.DatabaseOptions{ConnectionString: connStr})
+		cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
 		db, err := storage.NewUserDatabase(ctx, nil, cm, &config.DatabaseOptions{
 			ConnectionString: connStr,
 		}, "test", bcrypt.MinCost, 0, 0, "")
