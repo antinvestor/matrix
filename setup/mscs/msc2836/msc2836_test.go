@@ -191,7 +191,7 @@ func TestMSC2836(t *testing.T) {
 		router := injectEvents(ctx, t, testOpts, nopUserAPI, nopRsAPI, []*types.HeaderedEvent{
 			eventA, eventB, eventC, eventD, eventE, eventF, eventG, eventH,
 		})
-		cancel := runServer(t, router)
+		cancel := runServer(ctx, t, router)
 		defer cancel()
 
 		t.Run("returns 403 on invalid event IDs", func(t *testing.T) {
@@ -401,7 +401,7 @@ func newReq(t *testing.T, jsonBody map[string]interface{}) *msc2836.EventRelatio
 	return r
 }
 
-func runServer(t *testing.T, router *mux.Router) func() {
+func runServer(ctx context.Context, t *testing.T, router *mux.Router) func() {
 	t.Helper()
 	externalServ := &http.Server{
 		Addr:         string("127.0.0.1:8009"),
@@ -414,7 +414,7 @@ func runServer(t *testing.T, router *mux.Router) func() {
 	// wait to listen on the port
 	time.Sleep(500 * time.Millisecond)
 	return func() {
-		externalServ.Shutdown(context.TODO())
+		externalServ.Shutdown(ctx)
 	}
 }
 

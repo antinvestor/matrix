@@ -171,7 +171,7 @@ func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOpti
 		t.Fatalf("failed to open database: %s", err)
 	}
 
-	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(context.TODO())
+	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
 	if err != nil {
 		t.Fatalf("Could not create redis container %s", err)
 	}

@@ -38,10 +38,9 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateFederationDatabase(t *testing.T, realDatabase bool) (storage.Database, context.Context, func()) {
+func mustCreateFederationDatabase(ctx context.Context, t *testing.T, realDatabase bool) (storage.Database, func()) {
 	if realDatabase {
 		// Real Database/s
-		ctx := testrig.NewContext(t)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 
 		dbOptions := cfg.Global.DatabaseOptions
@@ -56,11 +55,11 @@ func mustCreateFederationDatabase(t *testing.T, realDatabase bool) (storage.Data
 		if err != nil {
 			t.Fatalf("NewDatabase failed with : %s", err)
 		}
-		return db, ctx, closeRig
+		return db, closeRig
 	} else {
 		// Fake Database
 		db := test.NewInMemoryFederationDatabase()
-		return db, context.TODO(), func() {}
+		return db, func() {}
 	}
 }
 
@@ -108,7 +107,9 @@ func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {
 }
 
 func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, realDatabase bool) (context.Context, storage.Database, *stubFederationClient, *OutgoingQueues, func()) {
-	db, ctx, closeFn := mustCreateFederationDatabase(t, realDatabase)
+
+	ctx := testrig.NewContext(t)
+	db, closeFn := mustCreateFederationDatabase(ctx, t, realDatabase)
 
 	fc := &stubFederationClient{
 		shouldTxSucceed:      shouldTxSucceed,

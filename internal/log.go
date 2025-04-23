@@ -161,9 +161,6 @@ func CloseAndLogIfError(ctx context.Context, closer io.Closer, message string) {
 		return
 	}
 	err := closer.Close()
-	if ctx == nil {
-		ctx = context.TODO()
-	}
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error(message)
 	}
