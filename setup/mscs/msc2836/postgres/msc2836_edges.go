@@ -49,10 +49,10 @@ func NewPostgresMSC2836Repository(ctx context.Context, db *sql.DB, writer sqluti
 		return nil, err
 	}
 
-	if d.selectChildrenForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenSQL + "ASC"); err != nil {
+	if d.selectChildrenForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenSQL + " ASC"); err != nil {
 		return nil, err
 	}
-	if d.selectChildrenForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenSQL + "DESC"); err != nil {
+	if d.selectChildrenForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenSQL + " DESC"); err != nil {
 		return nil, err
 	}
 	if d.selectParentForChildStmt, err = d.db.Prepare(`

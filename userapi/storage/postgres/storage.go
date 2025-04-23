@@ -46,26 +46,6 @@ var Migrations = []sqlutil.Migration{
 		QueryDown: devicesSchemaRevert,
 	},
 	{
-		Version:   "userapi_004_device_keys",
-		QueryUp:   deviceKeysSchema,
-		QueryDown: deviceKeysSchemaRevert,
-	},
-	{
-		Version:   "userapi_005_one_time_keys",
-		QueryUp:   oneTimeKeysSchema,
-		QueryDown: oneTimeKeysSchemaRevert,
-	},
-	{
-		Version:   "userapi_006_cross_signing_keys",
-		QueryUp:   crossSigningKeysSchema,
-		QueryDown: crossSigningKeysSchemaRevert,
-	},
-	{
-		Version:   "userapi_007_cross_signing_sigs",
-		QueryUp:   crossSigningSigsSchema,
-		QueryDown: crossSigningSigsSchemaRevert,
-	},
-	{
 		Version:   "userapi_008_key_backup",
 		QueryUp:   keyBackupTableSchema,
 		QueryDown: keyBackupTableSchemaRevert,
@@ -105,11 +85,7 @@ var Migrations = []sqlutil.Migration{
 		QueryUp:   registrationTokensSchema,
 		QueryDown: registrationTokensSchemaRevert,
 	},
-	{
-		Version:   "userapi_016_stale_device_lists",
-		QueryUp:   staleDeviceListsSchema,
-		QueryDown: staleDeviceListsSchemaRevert,
-	},
+
 	{
 		Version:   "userapi_017_stats_daily_visits",
 		QueryUp:   userDailyVisitsSchema,
@@ -124,11 +100,6 @@ var Migrations = []sqlutil.Migration{
 		Version:   "userapi_019_threepid",
 		QueryUp:   threepidSchema,
 		QueryDown: threepidSchemaRevert,
-	},
-	{
-		Version:   "userapi_020_key_changes",
-		QueryUp:   keyChangesSchema,
-		QueryDown: keyChangesSchemaRevert,
 	},
 }
 
@@ -221,11 +192,51 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	}, nil
 }
 
+var MigrationsKeys = []sqlutil.Migration{
+	{
+		Version:   "userapi_004_device_keys",
+		QueryUp:   deviceKeysSchema,
+		QueryDown: deviceKeysSchemaRevert,
+	},
+	{
+		Version:   "userapi_005_one_time_keys",
+		QueryUp:   oneTimeKeysSchema,
+		QueryDown: oneTimeKeysSchemaRevert,
+	},
+	{
+		Version:   "userapi_006_cross_signing_keys",
+		QueryUp:   crossSigningKeysSchema,
+		QueryDown: crossSigningKeysSchemaRevert,
+	},
+	{
+		Version:   "userapi_007_cross_signing_sigs",
+		QueryUp:   crossSigningSigsSchema,
+		QueryDown: crossSigningSigsSchemaRevert,
+	},
+	{
+		Version:   "userapi_016_stale_device_lists",
+		QueryUp:   staleDeviceListsSchema,
+		QueryDown: staleDeviceListsSchemaRevert,
+	},
+	{
+		Version:   "userapi_020_key_changes",
+		QueryUp:   keyChangesSchema,
+		QueryDown: keyChangesSchemaRevert,
+	},
+}
+
 func NewKeyDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
 	db, writer, err := conMan.Connection(ctx, dbProperties)
 	if err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(MigrationsKeys...)
+	if err = m.Up(ctx); err != nil {
+		return nil, err
+	}
+
 	otk, err := NewPostgresOneTimeKeysTable(ctx, db)
 	if err != nil {
 		return nil, err

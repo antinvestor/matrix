@@ -55,326 +55,332 @@ func TestMSC2836(t *testing.T) {
 	bob := "@bob:localhost"
 	charlie := "@charlie:localhost"
 	roomID := "!alice:localhost"
-	// give access tokens to all three users
-	nopUserAPI := &testUserAPI{
-		accessTokens: make(map[string]userapi.Device),
-	}
-	nopUserAPI.accessTokens["alice"] = userapi.Device{
-		AccessToken: "alice",
-		DisplayName: "Alice",
-		UserID:      alice,
-	}
-	nopUserAPI.accessTokens["bob"] = userapi.Device{
-		AccessToken: "bob",
-		DisplayName: "Bob",
-		UserID:      bob,
-	}
-	nopUserAPI.accessTokens["charlie"] = userapi.Device{
-		AccessToken: "charlie",
-		DisplayName: "Charles",
-		UserID:      charlie,
-	}
-	eventA := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomID,
-		Sender: alice,
-		Type:   "m.room.message",
-		Content: map[string]interface{}{
-			"body": "[A] Do you know shelties?",
-		},
-	})
-	eventB := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomID,
-		Sender: bob,
-		Type:   "m.room.message",
-		Content: map[string]interface{}{
-			"body": "[B] I <3 shelties",
-			"m.relationship": map[string]string{
-				"rel_type": "m.reference",
-				"event_id": eventA.EventID(),
-			},
-		},
-	})
-	eventC := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomID,
-		Sender: bob,
-		Type:   "m.room.message",
-		Content: map[string]interface{}{
-			"body": "[C] like so much",
-			"m.relationship": map[string]string{
-				"rel_type": "m.reference",
-				"event_id": eventB.EventID(),
-			},
-		},
-	})
-	eventD := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomID,
-		Sender: alice,
-		Type:   "m.room.message",
-		Content: map[string]interface{}{
-			"body": "[D] but what are shelties???",
-			"m.relationship": map[string]string{
-				"rel_type": "m.reference",
-				"event_id": eventB.EventID(),
-			},
-		},
-	})
-	eventE := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomID,
-		Sender: bob,
-		Type:   "m.room.message",
-		Content: map[string]interface{}{
-			"body": "[E] seriously???",
-			"m.relationship": map[string]string{
-				"rel_type": "m.reference",
-				"event_id": eventD.EventID(),
-			},
-		},
-	})
-	eventF := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomID,
-		Sender: charlie,
-		Type:   "m.room.message",
-		Content: map[string]interface{}{
-			"body": "[F] omg how do you not know what shelties are",
-			"m.relationship": map[string]string{
-				"rel_type": "m.reference",
-				"event_id": eventD.EventID(),
-			},
-		},
-	})
-	eventG := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomID,
-		Sender: alice,
-		Type:   "m.room.message",
-		Content: map[string]interface{}{
-			"body": "[G] looked it up, it's a sheltered person?",
-			"m.relationship": map[string]string{
-				"rel_type": "m.reference",
-				"event_id": eventD.EventID(),
-			},
-		},
-	})
-	eventH := mustCreateEvent(t, fledglingEvent{
-		RoomID: roomID,
-		Sender: bob,
-		Type:   "m.room.message",
-		Content: map[string]interface{}{
-			"body": "[H] it's a dog!!!!!",
-			"m.relationship": map[string]string{
-				"rel_type": "m.reference",
-				"event_id": eventE.EventID(),
-			},
-		},
-	})
-	// make everyone joined to each other's rooms
-	nopRsAPI := &testRoomserverAPI{
-		userToJoinedRooms: map[string][]string{
-			alice:   {roomID},
-			bob:     {roomID},
-			charlie: {roomID},
-		},
-		events: map[string]*types.HeaderedEvent{
-			eventA.EventID(): eventA,
-			eventB.EventID(): eventB,
-			eventC.EventID(): eventC,
-			eventD.EventID(): eventD,
-			eventE.EventID(): eventE,
-			eventF.EventID(): eventF,
-			eventG.EventID(): eventG,
-			eventH.EventID(): eventH,
-		},
-	}
-	router := injectEvents(t, nopUserAPI, nopRsAPI, []*types.HeaderedEvent{
-		eventA, eventB, eventC, eventD, eventE, eventF, eventG, eventH,
-	})
-	cancel := runServer(t, router)
-	defer cancel()
 
-	t.Run("returns 403 on invalid event IDs", func(t *testing.T) {
-		_ = postRelationships(t, 403, "alice", newReq(t, map[string]interface{}{
-			"event_id": "$invalid",
-		}))
-	})
-	t.Run("returns 403 if not joined to the room of specified event in request", func(t *testing.T) {
-		nopUserAPI.accessTokens["frank"] = userapi.Device{
-			AccessToken: "frank",
-			DisplayName: "Frank Not In Room",
-			UserID:      "@frank:localhost",
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+
+		ctx := testrig.NewContext(t)
+		// give access tokens to all three users
+		nopUserAPI := &testUserAPI{
+			accessTokens: make(map[string]userapi.Device),
 		}
-		_ = postRelationships(t, 403, "frank", newReq(t, map[string]interface{}{
-			"event_id":       eventB.EventID(),
-			"limit":          1,
-			"include_parent": true,
-		}))
-	})
-	t.Run("returns the parent if include_parent is true", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":       eventB.EventID(),
-			"include_parent": true,
-			"limit":          2,
-		}))
-		assertContains(t, body, []string{eventB.EventID(), eventA.EventID()})
-	})
-	t.Run("returns the children in the right order if include_children is true", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":         eventD.EventID(),
-			"include_children": true,
-			"recent_first":     true,
-			"limit":            4,
-		}))
-		assertContains(t, body, []string{eventD.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID()})
-		body = postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":         eventD.EventID(),
-			"include_children": true,
-			"recent_first":     false,
-			"limit":            4,
-		}))
-		assertContains(t, body, []string{eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
-	})
-	t.Run("walks the graph depth first", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":     eventB.EventID(),
-			"recent_first": false,
-			"depth_first":  true,
-			"limit":        6,
-		}))
-		// Oldest first so:
-		//   A
-		//   |
-		//   B1
-		//  / \
-		// C2  D3
-		//    /| \
-		//  4E 6F G
-		//   |
-		//  5H
-		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventH.EventID(), eventF.EventID()})
-		body = postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":     eventB.EventID(),
-			"recent_first": true,
-			"depth_first":  true,
-			"limit":        6,
-		}))
-		// Recent first so:
-		//   A
-		//   |
-		//   B1
-		//  / \
-		// C   D2
-		//    /| \
-		//  E5 F4 G3
-		//   |
-		//  H6
-		assertContains(t, body, []string{eventB.EventID(), eventD.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID(), eventH.EventID()})
-	})
-	t.Run("walks the graph breadth first", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":     eventB.EventID(),
-			"recent_first": false,
-			"depth_first":  false,
-			"limit":        6,
-		}))
-		// Oldest first so:
-		//   A
-		//   |
-		//   B1
-		//  / \
-		// C2  D3
-		//    /| \
-		//  E4 F5 G6
-		//   |
-		//   H
-		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
-		body = postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":     eventB.EventID(),
-			"recent_first": true,
-			"depth_first":  false,
-			"limit":        6,
-		}))
-		// Recent first so:
-		//   A
-		//   |
-		//   B1
-		//  / \
-		// C3  D2
-		//    /| \
-		//  E6 F5 G4
-		//   |
-		//   H
-		assertContains(t, body, []string{eventB.EventID(), eventD.EventID(), eventC.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID()})
-	})
-	t.Run("caps via max_breadth", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":     eventB.EventID(),
-			"recent_first": false,
-			"depth_first":  false,
-			"max_breadth":  2,
-			"limit":        10,
-		}))
-		// Event G gets omitted because of max_breadth
-		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventH.EventID()})
-	})
-	t.Run("caps via max_depth", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":     eventB.EventID(),
-			"recent_first": false,
-			"depth_first":  false,
-			"max_depth":    2,
-			"limit":        10,
-		}))
-		// Event H gets omitted because of max_depth
-		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
-	})
-	t.Run("terminates when reaching the limit", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":     eventB.EventID(),
-			"recent_first": false,
-			"depth_first":  false,
-			"limit":        4,
-		}))
-		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID()})
-	})
-	t.Run("returns all events with a high enough limit", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":     eventB.EventID(),
-			"recent_first": false,
-			"depth_first":  false,
-			"limit":        400,
-		}))
-		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID(), eventH.EventID()})
-	})
-	t.Run("can navigate up the graph with direction: up", func(t *testing.T) {
-		//   A4
-		//   |
-		//   B3
-		//  / \
-		// C   D2
-		//    /| \
-		//   E F1 G
-		//   |
-		//   H
-		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":     eventF.EventID(),
-			"recent_first": false,
-			"depth_first":  true,
-			"direction":    "up",
-		}))
-		assertContains(t, body, []string{eventF.EventID(), eventD.EventID(), eventB.EventID(), eventA.EventID()})
-	})
-	t.Run("includes children and children_hash in unsigned", func(t *testing.T) {
-		body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
-			"event_id":     eventB.EventID(),
-			"recent_first": false,
-			"depth_first":  false,
-			"limit":        3,
-		}))
-		// event B has C,D as children
-		// event C has no children
-		// event D has 3 children (not included in response)
-		assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID()})
-		assertUnsignedChildren(t, body.Events[0], "m.reference", 2, []string{eventC.EventID(), eventD.EventID()})
-		assertUnsignedChildren(t, body.Events[1], "", 0, nil)
-		assertUnsignedChildren(t, body.Events[2], "m.reference", 3, []string{eventE.EventID(), eventF.EventID(), eventG.EventID()})
+		nopUserAPI.accessTokens["alice"] = userapi.Device{
+			AccessToken: "alice",
+			DisplayName: "Alice",
+			UserID:      alice,
+		}
+		nopUserAPI.accessTokens["bob"] = userapi.Device{
+			AccessToken: "bob",
+			DisplayName: "Bob",
+			UserID:      bob,
+		}
+		nopUserAPI.accessTokens["charlie"] = userapi.Device{
+			AccessToken: "charlie",
+			DisplayName: "Charles",
+			UserID:      charlie,
+		}
+		eventA := mustCreateEvent(t, fledglingEvent{
+			RoomID: roomID,
+			Sender: alice,
+			Type:   "m.room.message",
+			Content: map[string]interface{}{
+				"body": "[A] Do you know shelties?",
+			},
+		})
+		eventB := mustCreateEvent(t, fledglingEvent{
+			RoomID: roomID,
+			Sender: bob,
+			Type:   "m.room.message",
+			Content: map[string]interface{}{
+				"body": "[B] I <3 shelties",
+				"m.relationship": map[string]string{
+					"rel_type": "m.reference",
+					"event_id": eventA.EventID(),
+				},
+			},
+		})
+		eventC := mustCreateEvent(t, fledglingEvent{
+			RoomID: roomID,
+			Sender: bob,
+			Type:   "m.room.message",
+			Content: map[string]interface{}{
+				"body": "[C] like so much",
+				"m.relationship": map[string]string{
+					"rel_type": "m.reference",
+					"event_id": eventB.EventID(),
+				},
+			},
+		})
+		eventD := mustCreateEvent(t, fledglingEvent{
+			RoomID: roomID,
+			Sender: alice,
+			Type:   "m.room.message",
+			Content: map[string]interface{}{
+				"body": "[D] but what are shelties???",
+				"m.relationship": map[string]string{
+					"rel_type": "m.reference",
+					"event_id": eventB.EventID(),
+				},
+			},
+		})
+		eventE := mustCreateEvent(t, fledglingEvent{
+			RoomID: roomID,
+			Sender: bob,
+			Type:   "m.room.message",
+			Content: map[string]interface{}{
+				"body": "[E] seriously???",
+				"m.relationship": map[string]string{
+					"rel_type": "m.reference",
+					"event_id": eventD.EventID(),
+				},
+			},
+		})
+		eventF := mustCreateEvent(t, fledglingEvent{
+			RoomID: roomID,
+			Sender: charlie,
+			Type:   "m.room.message",
+			Content: map[string]interface{}{
+				"body": "[F] omg how do you not know what shelties are",
+				"m.relationship": map[string]string{
+					"rel_type": "m.reference",
+					"event_id": eventD.EventID(),
+				},
+			},
+		})
+		eventG := mustCreateEvent(t, fledglingEvent{
+			RoomID: roomID,
+			Sender: alice,
+			Type:   "m.room.message",
+			Content: map[string]interface{}{
+				"body": "[G] looked it up, it's a sheltered person?",
+				"m.relationship": map[string]string{
+					"rel_type": "m.reference",
+					"event_id": eventD.EventID(),
+				},
+			},
+		})
+		eventH := mustCreateEvent(t, fledglingEvent{
+			RoomID: roomID,
+			Sender: bob,
+			Type:   "m.room.message",
+			Content: map[string]interface{}{
+				"body": "[H] it's a dog!!!!!",
+				"m.relationship": map[string]string{
+					"rel_type": "m.reference",
+					"event_id": eventE.EventID(),
+				},
+			},
+		})
+		// make everyone joined to each other's rooms
+		nopRsAPI := &testRoomserverAPI{
+			userToJoinedRooms: map[string][]string{
+				alice:   {roomID},
+				bob:     {roomID},
+				charlie: {roomID},
+			},
+			events: map[string]*types.HeaderedEvent{
+				eventA.EventID(): eventA,
+				eventB.EventID(): eventB,
+				eventC.EventID(): eventC,
+				eventD.EventID(): eventD,
+				eventE.EventID(): eventE,
+				eventF.EventID(): eventF,
+				eventG.EventID(): eventG,
+				eventH.EventID(): eventH,
+			},
+		}
+		router := injectEvents(ctx, t, testOpts, nopUserAPI, nopRsAPI, []*types.HeaderedEvent{
+			eventA, eventB, eventC, eventD, eventE, eventF, eventG, eventH,
+		})
+		cancel := runServer(t, router)
+		defer cancel()
+
+		t.Run("returns 403 on invalid event IDs", func(t *testing.T) {
+			_ = postRelationships(t, 403, "alice", newReq(t, map[string]interface{}{
+				"event_id": "$invalid",
+			}))
+		})
+		t.Run("returns 403 if not joined to the room of specified event in request", func(t *testing.T) {
+			nopUserAPI.accessTokens["frank"] = userapi.Device{
+				AccessToken: "frank",
+				DisplayName: "Frank Not In Room",
+				UserID:      "@frank:localhost",
+			}
+			_ = postRelationships(t, 403, "frank", newReq(t, map[string]interface{}{
+				"event_id":       eventB.EventID(),
+				"limit":          1,
+				"include_parent": true,
+			}))
+		})
+		t.Run("returns the parent if include_parent is true", func(t *testing.T) {
+			body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":       eventB.EventID(),
+				"include_parent": true,
+				"limit":          2,
+			}))
+			assertContains(t, body, []string{eventB.EventID(), eventA.EventID()})
+		})
+		t.Run("returns the children in the right order if include_children is true", func(t *testing.T) {
+			body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":         eventD.EventID(),
+				"include_children": true,
+				"recent_first":     true,
+				"limit":            4,
+			}))
+			assertContains(t, body, []string{eventD.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID()})
+			body = postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":         eventD.EventID(),
+				"include_children": true,
+				"recent_first":     false,
+				"limit":            4,
+			}))
+			assertContains(t, body, []string{eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
+		})
+		t.Run("walks the graph depth first", func(t *testing.T) {
+			body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":     eventB.EventID(),
+				"recent_first": false,
+				"depth_first":  true,
+				"limit":        6,
+			}))
+			// Oldest first so:
+			//   A
+			//   |
+			//   B1
+			//  / \
+			// C2  D3
+			//    /| \
+			//  4E 6F G
+			//   |
+			//  5H
+			assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventH.EventID(), eventF.EventID()})
+			body = postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":     eventB.EventID(),
+				"recent_first": true,
+				"depth_first":  true,
+				"limit":        6,
+			}))
+			// Recent first so:
+			//   A
+			//   |
+			//   B1
+			//  / \
+			// C   D2
+			//    /| \
+			//  E5 F4 G3
+			//   |
+			//  H6
+			assertContains(t, body, []string{eventB.EventID(), eventD.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID(), eventH.EventID()})
+		})
+		t.Run("walks the graph breadth first", func(t *testing.T) {
+			body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":     eventB.EventID(),
+				"recent_first": false,
+				"depth_first":  false,
+				"limit":        6,
+			}))
+			// Oldest first so:
+			//   A
+			//   |
+			//   B1
+			//  / \
+			// C2  D3
+			//    /| \
+			//  E4 F5 G6
+			//   |
+			//   H
+			assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
+			body = postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":     eventB.EventID(),
+				"recent_first": true,
+				"depth_first":  false,
+				"limit":        6,
+			}))
+			// Recent first so:
+			//   A
+			//   |
+			//   B1
+			//  / \
+			// C3  D2
+			//    /| \
+			//  E6 F5 G4
+			//   |
+			//   H
+			assertContains(t, body, []string{eventB.EventID(), eventD.EventID(), eventC.EventID(), eventG.EventID(), eventF.EventID(), eventE.EventID()})
+		})
+		t.Run("caps via max_breadth", func(t *testing.T) {
+			body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":     eventB.EventID(),
+				"recent_first": false,
+				"depth_first":  false,
+				"max_breadth":  2,
+				"limit":        10,
+			}))
+			// Event G gets omitted because of max_breadth
+			assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventH.EventID()})
+		})
+		t.Run("caps via max_depth", func(t *testing.T) {
+			body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":     eventB.EventID(),
+				"recent_first": false,
+				"depth_first":  false,
+				"max_depth":    2,
+				"limit":        10,
+			}))
+			// Event H gets omitted because of max_depth
+			assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID()})
+		})
+		t.Run("terminates when reaching the limit", func(t *testing.T) {
+			body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":     eventB.EventID(),
+				"recent_first": false,
+				"depth_first":  false,
+				"limit":        4,
+			}))
+			assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID()})
+		})
+		t.Run("returns all events with a high enough limit", func(t *testing.T) {
+			body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":     eventB.EventID(),
+				"recent_first": false,
+				"depth_first":  false,
+				"limit":        400,
+			}))
+			assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID(), eventE.EventID(), eventF.EventID(), eventG.EventID(), eventH.EventID()})
+		})
+		t.Run("can navigate up the graph with direction: up", func(t *testing.T) {
+			//   A4
+			//   |
+			//   B3
+			//  / \
+			// C   D2
+			//    /| \
+			//   E F1 G
+			//   |
+			//   H
+			body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":     eventF.EventID(),
+				"recent_first": false,
+				"depth_first":  true,
+				"direction":    "up",
+			}))
+			assertContains(t, body, []string{eventF.EventID(), eventD.EventID(), eventB.EventID(), eventA.EventID()})
+		})
+		t.Run("includes children and children_hash in unsigned", func(t *testing.T) {
+			body := postRelationships(t, 200, "alice", newReq(t, map[string]interface{}{
+				"event_id":     eventB.EventID(),
+				"recent_first": false,
+				"depth_first":  false,
+				"limit":        3,
+			}))
+			// event B has C,D as children
+			// event C has no children
+			// event D has 3 children (not included in response)
+			assertContains(t, body, []string{eventB.EventID(), eventC.EventID(), eventD.EventID()})
+			assertUnsignedChildren(t, body.Events[0], "m.reference", 2, []string{eventC.EventID(), eventD.EventID()})
+			assertUnsignedChildren(t, body.Events[1], "", 0, nil)
+			assertUnsignedChildren(t, body.Events[2], "m.reference", 3, []string{eventE.EventID(), eventF.EventID(), eventG.EventID()})
+		})
+
 	})
 }
 
@@ -558,11 +564,10 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 	return nil
 }
 
-func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
+func injectEvents(ctx context.Context, t *testing.T, testOpts test.DependancyOption, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
+	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 	t.Cleanup(closeRig)
 
 	cfg.Global.ServerName = "localhost"

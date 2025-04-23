@@ -67,7 +67,7 @@ const selectKeyByAlgorithmSQL = "" +
 	"SELECT key_id, key_json FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 LIMIT 1"
 
 const deleteOneTimeKeysSQL = "" +
-	"DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND deviceID = $2"
+	"DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2"
 
 type oneTimeKeysStatements struct {
 	db                       *sql.DB

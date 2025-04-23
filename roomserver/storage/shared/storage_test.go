@@ -3,6 +3,8 @@ package shared_test
 import (
 	"context"
 	"crypto/ed25519"
+	"database/sql"
+	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/test/testrig"
 	"testing"
 
@@ -20,15 +22,26 @@ import (
 	ed255192 "golang.org/x/crypto/ed25519"
 )
 
-func mustCreateRoomServerDatabase(t *testing.T, _ test.DependancyOption) (context.Context, *shared.Database, func()) {
+func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, sqlutil.Writer, func()) {
+
+	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
+	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	_, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync DB: %s", err)
+	}
+
+	writer := sqlutil.NewExclusiveWriter()
+	db, err := sqlutil.Open(&cfg.RoomServer.Database, writer)
+	assert.NoError(t, err)
+
+	return db, writer, closeDB
+}
+
+func mustCreateRoomServerDatabase(ctx context.Context, t *testing.T, dep test.DependancyOption) (*shared.Database, func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
-	connStr, clearDB, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	dbOpts := &config.DatabaseOptions{ConnectionString: connStr}
+	db, writer, closeDb := migrateDatabase(ctx, t, dep)
 
 	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
 	if err != nil {
@@ -42,35 +55,19 @@ func mustCreateRoomServerDatabase(t *testing.T, _ test.DependancyOption) (contex
 		t.Fatalf("Could not create cache %s", err)
 	}
 
-	writer := sqlutil.NewExclusiveWriter()
-	db, err := sqlutil.Open(dbOpts, writer)
+	roomsTable, err := postgres.NewPostgresRoomsTable(ctx, db)
 	assert.NoError(t, err)
-
-	var membershipTable tables.Membership
-	var stateKeyTable tables.EventStateKeys
-	var userRoomKeys tables.UserRoomKeys
-	var roomsTable tables.Rooms
-	err = postgres.CreateRoomsTable(ctx, db)
+	membershipTable, err := postgres.NewPostgresMembershipTable(ctx, db)
 	assert.NoError(t, err)
-	err = postgres.CreateEventStateKeysTable(ctx, db)
+	stateKeyTable, err := postgres.NewPostgresEventStateKeysTable(ctx, db)
 	assert.NoError(t, err)
-	err = postgres.CreateMembershipTable(ctx, db)
-	assert.NoError(t, err)
-	err = postgres.CreateUserRoomKeysTable(ctx, db)
-	assert.NoError(t, err)
-	roomsTable, err = postgres.PrepareRoomsTable(ctx, db)
-	assert.NoError(t, err)
-	membershipTable, err = postgres.PrepareMembershipTable(ctx, db)
-	assert.NoError(t, err)
-	stateKeyTable, err = postgres.PrepareEventStateKeysTable(ctx, db)
-	assert.NoError(t, err)
-	userRoomKeys, err = postgres.PrepareUserRoomKeysTable(ctx, db)
+	userRoomKeys, err := postgres.NewPostgresUserRoomKeysTable(ctx, db)
 
 	assert.NoError(t, err)
 
 	evDb := shared.EventDatabase{EventStateKeysTable: stateKeyTable, Cache: cache, Writer: writer}
 
-	return ctx, &shared.Database{
+	return &shared.Database{
 			DB:               db,
 			EventDatabase:    evDb,
 			MembershipTable:  membershipTable,
@@ -80,7 +77,7 @@ func mustCreateRoomServerDatabase(t *testing.T, _ test.DependancyOption) (contex
 			Cache:            cache,
 		}, func() {
 			closeCache()
-			clearDB()
+			closeDb()
 			err = db.Close()
 			assert.NoError(t, err)
 		}
@@ -92,7 +89,9 @@ func Test_GetLeftUsers(t *testing.T) {
 	charlie := test.NewUser(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, db, closeDb := mustCreateRoomServerDatabase(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateRoomServerDatabase(ctx, t, testOpts)
 		defer closeDb()
 
 		// Create dummy entries
@@ -128,7 +127,9 @@ func TestUserRoomKeys(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, db, closeDb := mustCreateRoomServerDatabase(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateRoomServerDatabase(ctx, t, testOpts)
 		defer closeDb()
 
 		// create a room NID so we can query the room
@@ -207,7 +208,9 @@ func TestAssignRoomNID(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, db, closeDb := mustCreateRoomServerDatabase(t, testOpts)
+
+		ctx := testrig.NewContext(t)
+		db, closeDb := mustCreateRoomServerDatabase(ctx, t, testOpts)
 		defer closeDb()
 
 		nid, err := db.AssignRoomNID(ctx, *roomID, room.Version)

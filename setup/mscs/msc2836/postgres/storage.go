@@ -10,14 +10,14 @@ import (
 // Migrations Centralized migrations for msc2836 tables
 var Migrations = []sqlutil.Migration{
 	{
-		Version:   "msc2836_001_edges",
-		QueryUp:   msc2836EdgesSchema,
-		QueryDown: msc2836EdgesSchemaRevert,
-	},
-	{
-		Version:   "msc2836_002_nodes",
+		Version:   "msc2836_001_nodes",
 		QueryUp:   msc2836NodesSchema,
 		QueryDown: msc2836NodesSchemaRevert,
+	},
+	{
+		Version:   "msc2836_002_edges",
+		QueryUp:   msc2836EdgesSchema,
+		QueryDown: msc2836EdgesSchemaRevert,
 	},
 }
 

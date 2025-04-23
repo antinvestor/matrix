@@ -18,9 +18,11 @@ func mustCreateMembershipTable(ctx context.Context, t *testing.T, dep test.Depen
 
 	db, closeDb := migrateDatabase(ctx, t, dep)
 
-	stateKeyTab, err := postgres.NewPostgresEventStateKeysTable(ctx, db)
-
+	tab, err := postgres.NewPostgresMembershipTable(ctx, db)
 	assert.NoError(t, err)
+
+	stateKeyTab, err0 := postgres.NewPostgresEventStateKeysTable(ctx, db)
+	assert.NoError(t, err0)
 
 	return tab, stateKeyTab, closeDb
 }
