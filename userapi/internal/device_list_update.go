@@ -25,13 +25,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -417,6 +417,12 @@ func (u *DeviceListUpdater) worker(ctx context.Context, ch chan spec.ServerName,
 	go func() {
 		var serversToRetry []spec.ServerName
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			// nuke serversToRetry by re-slicing it to be "empty".
 			// The capacity of the slice is unchanged, which ensures we can reuse the memory.
 			serversToRetry = serversToRetry[:0]
@@ -448,37 +454,53 @@ func (u *DeviceListUpdater) worker(ctx context.Context, ch chan spec.ServerName,
 
 			for _, srv := range serversToRetry {
 				deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Inc()
-				ch <- srv
+
+				select {
+				case <-ctx.Done():
+					return
+				case ch <- srv:
+				}
 			}
 		}
 	}()
-	for serverName := range ch {
-		retriesMu.Lock()
-		_, exists := retries[serverName]
-		retriesMu.Unlock()
-
-		// If the serverName is coming from retries, maybe it was
-		// blacklisted in the meantime.
-		_, err := u.isBlacklistedOrBackingOffFn(ctx, serverName)
-		var federationClientError *fedsenderapi.FederationClientError
-		// unwrap errors and check for FederationClientError, if found, federationClientError will be not nil
-		errors.As(err, &federationClientError)
-		isBlacklisted := federationClientError != nil && federationClientError.Blacklisted
-
-		// Don't retry a server that we're already waiting for or is blacklisted by now.
-		if exists || isBlacklisted {
-			deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Dec()
-			continue
-		}
-		waitTime, shouldRetry := u.processServer(ctx, serverName)
-		if shouldRetry {
-			retriesMu.Lock()
-			if _, exists = retries[serverName]; !exists {
-				retries[serverName] = time.Now().Add(waitTime)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case serverName, ok := <-ch:
+			if !ok {
+				return
 			}
+			retriesMu.Lock()
+			_, exists := retries[serverName]
 			retriesMu.Unlock()
+
+			// If the serverName is coming from retries, maybe it was
+			// blacklisted in the meantime.
+			_, err := u.isBlacklistedOrBackingOffFn(ctx, serverName)
+			if err != nil && errors.Is(err, context.Canceled) {
+				return
+			}
+			var federationClientError *fedsenderapi.FederationClientError
+			// unwrap errors and check for FederationClientError, if found, federationClientError will be not nil
+			errors.As(err, &federationClientError)
+			isBlacklisted := federationClientError != nil && federationClientError.Blacklisted
+
+			// Don't retry a server that we're already waiting for or is blacklisted by now.
+			if exists || isBlacklisted {
+				deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Dec()
+				continue
+			}
+			waitTime, shouldRetry := u.processServer(ctx, serverName)
+			if shouldRetry {
+				retriesMu.Lock()
+				if _, exists = retries[serverName]; !exists {
+					retries[serverName] = time.Now().Add(waitTime)
+				}
+				retriesMu.Unlock()
+			}
+			deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Dec()
 		}
-		deviceListUpdaterBackpressure.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Dec()
 	}
 }
 
