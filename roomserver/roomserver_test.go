@@ -795,7 +795,6 @@ func TestUpgrade(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 	charlie := test.NewUser(t)
-	ctx := testrig.NewContext(t)
 
 	spaceChild := test.NewRoom(t, alice)
 	validateTuples := []gomatrixserverlib.StateKeyTuple{
@@ -811,7 +810,7 @@ func TestUpgrade(t *testing.T) {
 		{EventType: spec.MRoomMember, StateKey: charlie.ID}, // ban should be transferred
 	}
 
-	validate := func(t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI) {
+	validate := func(ctx context.Context, t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI) {
 
 		oldRoomState := &api.QueryCurrentStateResponse{}
 		if err := rsAPI.QueryCurrentState(ctx, &api.QueryCurrentStateRequest{
@@ -871,21 +870,21 @@ func TestUpgrade(t *testing.T) {
 	testCases := []struct {
 		name         string
 		upgradeUser  string
-		roomFunc     func(rsAPI api.RoomserverInternalAPI) string
-		validateFunc func(t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI)
+		roomFunc     func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string
+		validateFunc func(ctx context.Context, t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI)
 		wantNewRoom  bool
 	}{
 		{
 			name:        "invalid roomID",
 			upgradeUser: alice.ID,
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				return "!doesnotexist:test"
 			},
 		},
 		{
 			name:        "powerlevel too low",
 			upgradeUser: bob.ID,
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				room := test.NewRoom(t, alice)
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Errorf("failed to send events: %v", err)
@@ -896,7 +895,7 @@ func TestUpgrade(t *testing.T) {
 		{
 			name:        "successful upgrade on new room",
 			upgradeUser: alice.ID,
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				room := test.NewRoom(t, alice)
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Errorf("failed to send events: %v", err)
@@ -909,7 +908,7 @@ func TestUpgrade(t *testing.T) {
 		{
 			name:        "successful upgrade on new room with other state events",
 			upgradeUser: alice.ID,
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice)
 				r.CreateAndInsert(t, alice, spec.MRoomName, map[string]interface{}{
 					"name": "my new name",
@@ -939,7 +938,7 @@ func TestUpgrade(t *testing.T) {
 		{
 			name:        "with published room",
 			upgradeUser: alice.ID,
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice)
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Errorf("failed to send events: %v", err)
@@ -955,8 +954,8 @@ func TestUpgrade(t *testing.T) {
 				return r.ID
 			},
 			wantNewRoom: true,
-			validateFunc: func(t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI) {
-				validate(t, oldRoomID, newRoomID, rsAPI)
+			validateFunc: func(ctx context.Context, t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI) {
+				validate(ctx, t, oldRoomID, newRoomID, rsAPI)
 				// check that the new room is published
 				res := &api.QueryPublishedRoomsResponse{}
 				if err := rsAPI.QueryPublishedRooms(ctx, &api.QueryPublishedRoomsRequest{RoomID: newRoomID}, res); err != nil {
@@ -970,7 +969,7 @@ func TestUpgrade(t *testing.T) {
 		{
 			name:        "with alias",
 			upgradeUser: alice.ID,
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice)
 				roomID, err := spec.NewRoomID(r.ID)
 				if err != nil {
@@ -989,8 +988,8 @@ func TestUpgrade(t *testing.T) {
 				return r.ID
 			},
 			wantNewRoom: true,
-			validateFunc: func(t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI) {
-				validate(t, oldRoomID, newRoomID, rsAPI)
+			validateFunc: func(ctx context.Context, t *testing.T, oldRoomID, newRoomID string, rsAPI api.RoomserverInternalAPI) {
+				validate(ctx, t, oldRoomID, newRoomID, rsAPI)
 				// check that the old room has no aliases
 				res := &api.GetAliasesForRoomIDResponse{}
 				if err := rsAPI.GetAliasesForRoomID(ctx, &api.GetAliasesForRoomIDRequest{RoomID: oldRoomID}, res); err != nil {
@@ -1012,7 +1011,7 @@ func TestUpgrade(t *testing.T) {
 		{
 			name:        "bans are transferred",
 			upgradeUser: alice.ID,
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice)
 				r.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
 					"membership": spec.Ban,
@@ -1028,7 +1027,7 @@ func TestUpgrade(t *testing.T) {
 		{
 			name:        "space childs are transferred",
 			upgradeUser: alice.ID,
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice)
 
 				r.CreateAndInsert(t, alice, "m.space.child", map[string]interface{}{}, test.WithStateKey(spaceChild.ID))
@@ -1043,7 +1042,7 @@ func TestUpgrade(t *testing.T) {
 		{
 			name:        "custom state is not taken to the new room", // https://github.com/antinvestor/matrix/issues/2912
 			upgradeUser: charlie.ID,
-			roomFunc: func(rsAPI api.RoomserverInternalAPI) string {
+			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice, test.RoomVersion(gomatrixserverlib.RoomVersionV6))
 				// Bob and Charlie join
 				r.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{"membership": spec.Join}, test.WithStateKey(bob.ID))
@@ -1074,9 +1073,12 @@ func TestUpgrade(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
+		ctx := testrig.NewContext(t)
+
 		cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-		natsInstance := jetstream.NATSInstance{}
 		defer closeRig()
+
+		natsInstance := jetstream.NATSInstance{}
 
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -1097,7 +1099,7 @@ func TestUpgrade(t *testing.T) {
 				if tc.upgradeUser == "" {
 					tc.upgradeUser = alice.ID
 				}
-				roomID := tc.roomFunc(rsAPI)
+				roomID := tc.roomFunc(ctx, rsAPI)
 
 				userID, err := spec.NewUserID(tc.upgradeUser, true)
 				if err != nil {
@@ -1115,7 +1117,7 @@ func TestUpgrade(t *testing.T) {
 					t.Fatalf("expected no new room, but the upgrade succeeded")
 				}
 				if tc.validateFunc != nil {
-					tc.validateFunc(t, roomID, newRoomID, rsAPI)
+					tc.validateFunc(ctx, t, roomID, newRoomID, rsAPI)
 				}
 			})
 		}
