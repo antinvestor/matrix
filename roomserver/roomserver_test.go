@@ -1073,26 +1073,27 @@ func TestUpgrade(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-
-		cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-		defer closeRig()
-
-		natsInstance := jetstream.NATSInstance{}
-
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
-		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
-		}
-
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userapiV := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-		rsAPI.SetUserAPI(ctx, userapiV)
-
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
+
+				ctx := testrig.NewContext(t)
+
+				cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
+				defer closeRig()
+
+				natsInstance := jetstream.NATSInstance{}
+
+				cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+				caches, err := caching.NewCache(&cfg.Global.Cache)
+				if err != nil {
+					t.Fatalf("failed to create a cache: %v", err)
+				}
+
+				rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+				rsAPI.SetFederationAPI(ctx, nil, nil)
+				userapiV := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+				rsAPI.SetUserAPI(ctx, userapiV)
+
 				if tc.roomFunc == nil {
 					t.Fatalf("missing roomFunc")
 				}
