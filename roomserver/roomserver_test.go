@@ -975,11 +975,11 @@ func TestUpgrade(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
+				if err = api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Errorf("failed to send events: %v", err)
 				}
 
-				if _, err := rsAPI.SetRoomAlias(ctx, spec.SenderID(alice.ID),
+				if _, err = rsAPI.SetRoomAlias(ctx, spec.SenderID(alice.ID),
 					*roomID,
 					"#myroomalias:test"); err != nil {
 					t.Fatal(err)
@@ -1073,26 +1073,24 @@ func TestUpgrade(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
+		ctx := testrig.NewContext(t)
+
+		cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
+		defer closeRig()
+
+		natsInstance := jetstream.NATSInstance{}
+
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		assert.NoError(t, err, "failed to create a cache")
+
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(ctx, nil, nil)
+		userapiV := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		rsAPI.SetUserAPI(ctx, userapiV)
+
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-
-				ctx := testrig.NewContext(t)
-
-				cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-				defer closeRig()
-
-				natsInstance := jetstream.NATSInstance{}
-
-				cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-				caches, err := caching.NewCache(&cfg.Global.Cache)
-				if err != nil {
-					t.Fatalf("failed to create a cache: %v", err)
-				}
-
-				rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-				rsAPI.SetFederationAPI(ctx, nil, nil)
-				userapiV := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-				rsAPI.SetUserAPI(ctx, userapiV)
 
 				if tc.roomFunc == nil {
 					t.Fatalf("missing roomFunc")
@@ -1102,13 +1100,14 @@ func TestUpgrade(t *testing.T) {
 				}
 				roomID := tc.roomFunc(ctx, rsAPI)
 
-				userID, err := spec.NewUserID(tc.upgradeUser, true)
-				if err != nil {
-					t.Fatalf("upgrade userID is invalid")
+				userID, err0 := spec.NewUserID(tc.upgradeUser, true)
+				if err0 != nil {
+					t.Fatalf("upgrade userID is invalid : %v", err0)
 				}
-				newRoomID, err := rsAPI.PerformRoomUpgrade(ctx, roomID, *userID, rsAPI.DefaultRoomVersion())
-				if err != nil && tc.wantNewRoom {
-					t.Fatal(err)
+
+				newRoomID, err1 := rsAPI.PerformRoomUpgrade(ctx, roomID, *userID, rsAPI.DefaultRoomVersion())
+				if err1 != nil && tc.wantNewRoom {
+					t.Fatalf("failed to upgrade room: %v", err1)
 				}
 
 				if tc.wantNewRoom && newRoomID == "" {

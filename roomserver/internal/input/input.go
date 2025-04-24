@@ -32,7 +32,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
 	fedapi "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/roomserver/acls"
@@ -123,7 +123,7 @@ func (r *Inputer) startWorkerForRoom(ctx context.Context, roomID string) {
 		consumer := r.Cfg.Matrix.JetStream.Prefixed("RoomInput" + jetstream.Tokenise(w.roomID))
 		subject := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEventSubj(w.roomID))
 
-		logger := logrus.WithFields(logrus.Fields{
+		logger := log.WithFields(log.Fields{
 			"stream_name": streamName,
 			"consumer":    consumer,
 		})
@@ -253,7 +253,7 @@ func (r *Inputer) Start(ctx context.Context) error {
 		case consumer.Config.InactiveThreshold != inactiveThreshold:
 			consumer.Config.InactiveThreshold = inactiveThreshold
 			if _, cerr := r.JetStream.UpdateConsumer(stream, &consumer.Config); cerr != nil {
-				logrus.WithError(cerr).Warnf("Failed to update inactive threshold on consumer %q", consumer.Name)
+				log.WithError(cerr).Warnf("Failed to update inactive threshold on consumer %q", consumer.Name)
 			}
 		}
 	}
@@ -265,12 +265,12 @@ func (r *Inputer) Start(ctx context.Context) error {
 // by the actor embedded into the worker.
 func (w *worker) _next(ctx context.Context) {
 	// Look up what the next event is that's waiting to be processed.
-	fetchCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	fctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	w.sentryHub.ConfigureScope(func(scope *sentry.Scope) {
 		scope.SetTag("room_id", w.roomID)
 	})
-	msgs, err := w.subscription.Fetch(1, nats.Context(fetchCtx))
+	msgs, err := w.subscription.Fetch(1, nats.Context(fctx))
 
 	switch {
 	case err == nil:
@@ -289,7 +289,7 @@ func (w *worker) _next(ctx context.Context) {
 		// down the subscriber to free up resources. It'll get started
 		// again if new activity happens.
 		if err = w.subscription.Unsubscribe(); err != nil {
-			logrus.WithError(err).Errorf("Failed to unsubscribe to stream for room %q", w.roomID)
+			log.WithError(err).Errorf("Failed to unsubscribe to stream for room %q", w.roomID)
 		}
 		w.Lock()
 		w.subscription = nil
@@ -300,9 +300,10 @@ func (w *worker) _next(ctx context.Context) {
 		// from the queue. In which case, we'll shut down the subscriber
 		// and wait to be notified about new room activity again. Maybe
 		// the problem will be corrected by then.
-		logrus.WithError(err).Errorf("Failed to get next stream message for room %q", w.roomID)
-		if err = w.subscription.Unsubscribe(); err != nil {
-			logrus.WithError(err).Errorf("Failed to unsubscribe to stream for room %q", w.roomID)
+		log.WithError(err).Errorf("Failed to get next stream message for room %q", w.roomID)
+		err = w.subscription.Unsubscribe()
+		if err != nil {
+			log.WithError(err).Errorf("Failed to unsubscribe to stream for room %q", w.roomID)
 		}
 		w.Lock()
 		w.subscription = nil
@@ -342,7 +343,7 @@ func (w *worker) _next(ctx context.Context) {
 		switch {
 		case errors.As(err, &rejectedError):
 			// Don't send events that were rejected to Sentry
-			logrus.WithError(err).WithFields(logrus.Fields{
+			log.WithError(err).WithFields(log.Fields{
 				"room_id":  w.roomID,
 				"event_id": inputRoomEvent.Event.EventID(),
 				"type":     inputRoomEvent.Event.Type(),
@@ -351,7 +352,7 @@ func (w *worker) _next(ctx context.Context) {
 			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 				w.sentryHub.CaptureException(err)
 			}
-			logrus.WithError(err).WithFields(logrus.Fields{
+			log.WithError(err).WithFields(log.Fields{
 				"room_id":  w.roomID,
 				"event_id": inputRoomEvent.Event.EventID(),
 				"type":     inputRoomEvent.Event.Type(),
@@ -361,7 +362,7 @@ func (w *worker) _next(ctx context.Context) {
 		// the message may already have been queued for redelivery or will be, so this makes sure that we still reprocess the msg
 		// after restarting. We only Ack if the context was not yet canceled.
 		if ctx.Err() == nil {
-			_ = msg.AckSync()
+			_ = msg.Nak()
 		}
 		errString = err.Error()
 	} else {
@@ -376,7 +377,7 @@ func (w *worker) _next(ctx context.Context) {
 	// that everything was OK.
 	if replyTo := msg.Header.Get("sync"); replyTo != "" {
 		if err = w.r.NATSClient.Publish(replyTo, []byte(errString)); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
+			log.WithError(err).WithFields(log.Fields{
 				"room_id":  w.roomID,
 				"event_id": inputRoomEvent.Event.EventID(),
 				"type":     inputRoomEvent.Event.Type(),
@@ -413,7 +414,6 @@ func (r *Inputer) queueInputRoomEvents(
 	// For each event, marshal the input room event and then
 	// send it into the input queue.
 	for _, e := range request.InputRoomEvents {
-
 		roomID := e.Event.RoomID().String()
 		subj := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEventSubj(roomID))
 		msg := &nats.Msg{
@@ -430,7 +430,7 @@ func (r *Inputer) queueInputRoomEvents(
 			return nil, fmt.Errorf("json.Marshal: %w", err)
 		}
 		if _, err = r.JetStream.PublishMsg(msg, nats.Context(ctx)); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
+			log.WithError(err).WithFields(log.Fields{
 				"room_id":  roomID,
 				"event_id": e.Event.EventID(),
 				"subj":     subj,
@@ -469,6 +469,7 @@ func (r *Inputer) InputRoomEvents(
 	// be the one returned as the error string.
 	defer replySub.Drain() // nolint:errcheck
 	for i := 0; i < len(request.InputRoomEvents); i++ {
+
 		msg, err := replySub.NextMsgWithContext(ctx)
 		if err != nil {
 			response.ErrMsg = err.Error()

@@ -112,48 +112,53 @@ func NewInternalAPI(
 	updater := internal.NewDeviceListUpdater(ctx, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn)
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
-	if err := updater.CleanUp(ctx); err != nil {
+	if err = updater.CleanUp(ctx); err != nil {
 		logrus.WithError(err).Error("failed to cleanup stale device lists")
 	}
 
-	go func() {
-		if err := updater.Start(ctx); err != nil {
-			logrus.WithError(err).Panicf("failed to start device list updater")
+	go func(ctx context.Context) {
+		err0 := updater.Start(ctx)
+		if err0 != nil {
+			logrus.WithError(err0).Panicf("failed to start device list updater")
 		}
-	}()
+	}(ctx)
 
 	dlConsumer := consumers.NewDeviceListUpdateConsumer(
 		ctx, &dendriteCfg.UserAPI, js, updater,
 	)
-	if err := dlConsumer.Start(ctx); err != nil {
+	if err = dlConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start device list consumer")
 	}
 
 	sigConsumer := consumers.NewSigningKeyUpdateConsumer(
 		ctx, &dendriteCfg.UserAPI, js, userAPI,
 	)
-	if err := sigConsumer.Start(ctx); err != nil {
+	err = sigConsumer.Start(ctx)
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start signing key consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
 		ctx, &dendriteCfg.UserAPI, js, db, syncProducer, pgClient,
 	)
-	if err := receiptConsumer.Start(ctx); err != nil {
+	err = receiptConsumer.Start(ctx)
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start user API receipt consumer")
 	}
 
 	eventConsumer := consumers.NewOutputRoomEventConsumer(
 		ctx, &dendriteCfg.UserAPI, js, db, pgClient, rsAPI, syncProducer,
 	)
-	if err := eventConsumer.Start(ctx); err != nil {
+	err = eventConsumer.Start(ctx)
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
 	}
 
 	var cleanOldNotifs func()
 	cleanOldNotifs = func() {
 		logrus.Infof("Cleaning old notifications")
-		if err := db.DeleteOldNotifications(ctx); err != nil {
+		err = db.DeleteOldNotifications(ctx)
+		if err != nil {
 			logrus.WithError(err).Error("Failed to clean old notifications")
 		}
 		time.AfterFunc(time.Hour, cleanOldNotifs)
