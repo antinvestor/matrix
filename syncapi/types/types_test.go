@@ -1,17 +1,18 @@
-package types
+package types_test
 
 import (
 	"context"
 	"encoding/json"
-	"github.com/antinvestor/matrix/test/testrig"
 	"math"
 	"reflect"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/roomserver/types"
+	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
+	sytypes "github.com/antinvestor/matrix/syncapi/types"
+	"github.com/antinvestor/matrix/test/testrig"
 )
 
 type FakeRoomserverAPI struct{}
@@ -31,12 +32,12 @@ func (f *FakeRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spe
 
 func TestSyncTokens(t *testing.T) {
 	shouldPass := map[string]string{
-		"s4_0_0_0_0_0_0_0_3": StreamingToken{4, 0, 0, 0, 0, 0, 0, 0, 3}.String(),
-		"s3_1_0_0_0_0_2_0_5": StreamingToken{3, 1, 0, 0, 0, 0, 2, 0, 5}.String(),
-		"s3_1_2_3_5_0_0_0_6": StreamingToken{3, 1, 2, 3, 5, 0, 0, 0, 6}.String(),
-		"t3_1":               TopologyToken{3, 1}.String(),
-		"t9223372036854775807_9223372036854775807": TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}.String(),
-		"s9223372036854775807_1_2_3_5_0_0_0_6":     StreamingToken{math.MaxInt64, 1, 2, 3, 5, 0, 0, 0, 6}.String(),
+		"s4_0_0_0_0_0_0_0_3": sytypes.StreamingToken{4, 0, 0, 0, 0, 0, 0, 0, 3}.String(),
+		"s3_1_0_0_0_0_2_0_5": sytypes.StreamingToken{3, 1, 0, 0, 0, 0, 2, 0, 5}.String(),
+		"s3_1_2_3_5_0_0_0_6": sytypes.StreamingToken{3, 1, 2, 3, 5, 0, 0, 0, 6}.String(),
+		"t3_1":               sytypes.TopologyToken{3, 1}.String(),
+		"t9223372036854775807_9223372036854775807": sytypes.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}.String(),
+		"s9223372036854775807_1_2_3_5_0_0_0_6":     sytypes.StreamingToken{math.MaxInt64, 1, 2, 3, 5, 0, 0, 0, 6}.String(),
 	}
 
 	for a, b := range shouldPass {
@@ -46,14 +47,14 @@ func TestSyncTokens(t *testing.T) {
 
 		// parse as topology token
 		if a[0] == 't' {
-			if _, err := NewTopologyTokenFromString(a); err != nil {
+			if _, err := sytypes.NewTopologyTokenFromString(a); err != nil {
 				t.Errorf("expected %q to pass, but got %q", a, err)
 			}
 		}
 
 		// parse as sync token
 		if a[0] == 's' {
-			if _, err := NewStreamTokenFromString(a); err != nil {
+			if _, err := sytypes.NewStreamTokenFromString(a); err != nil {
 				t.Errorf("expected %q to pass, but got %q", a, err)
 			}
 		}
@@ -70,13 +71,13 @@ func TestSyncTokens(t *testing.T) {
 	}
 
 	for _, f := range append(shouldFail, "t1_2") {
-		if _, err := NewStreamTokenFromString(f); err == nil {
+		if _, err := sytypes.NewStreamTokenFromString(f); err == nil {
 			t.Errorf("NewStreamTokenFromString %q should have failed", f)
 		}
 	}
 
 	for _, f := range append(shouldFail, "s1_2_3_4") {
-		if _, err := NewTopologyTokenFromString(f); err == nil {
+		if _, err := sytypes.NewTopologyTokenFromString(f); err == nil {
 			t.Errorf("NewTopologyTokenFromString %q should have failed", f)
 		}
 	}
@@ -95,7 +96,7 @@ func TestNewInviteResponse(t *testing.T) {
 	}
 
 	rsAPI := FakeRoomserverAPI{}
-	res, err := NewInviteResponse(ctx, &rsAPI, &types.HeaderedEvent{PDU: ev}, synctypes.FormatSync)
+	res, err := sytypes.NewInviteResponse(ctx, &rsAPI, &rstypes.HeaderedEvent{PDU: ev}, synctypes.FormatSync)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,12 +112,12 @@ func TestNewInviteResponse(t *testing.T) {
 
 func TestJoinResponse_MarshalJSON(t *testing.T) {
 	type fields struct {
-		Summary             *Summary
-		State               *ClientEvents
-		Timeline            *Timeline
-		Ephemeral           *ClientEvents
-		AccountData         *ClientEvents
-		UnreadNotifications *UnreadNotifications
+		Summary             *sytypes.Summary
+		State               *sytypes.ClientEvents
+		Timeline            *sytypes.Timeline
+		Ephemeral           *sytypes.ClientEvents
+		AccountData         *sytypes.ClientEvents
+		UnreadNotifications *sytypes.UnreadNotifications
 	}
 	tests := []struct {
 		name    string
@@ -127,57 +128,57 @@ func TestJoinResponse_MarshalJSON(t *testing.T) {
 		{
 			name: "empty state is removed",
 			fields: fields{
-				State: &ClientEvents{},
+				State: &sytypes.ClientEvents{},
 			},
 			want: []byte("{}"),
 		},
 		{
 			name: "empty accountdata is removed",
 			fields: fields{
-				AccountData: &ClientEvents{},
+				AccountData: &sytypes.ClientEvents{},
 			},
 			want: []byte("{}"),
 		},
 		{
 			name: "empty ephemeral is removed",
 			fields: fields{
-				Ephemeral: &ClientEvents{},
+				Ephemeral: &sytypes.ClientEvents{},
 			},
 			want: []byte("{}"),
 		},
 		{
 			name: "empty timeline is removed",
 			fields: fields{
-				Timeline: &Timeline{},
+				Timeline: &sytypes.Timeline{},
 			},
 			want: []byte("{}"),
 		},
 		{
 			name: "empty summary is removed",
 			fields: fields{
-				Summary: &Summary{},
+				Summary: &sytypes.Summary{},
 			},
 			want: []byte("{}"),
 		},
 		{
 			name: "unread notifications are removed, if everything else is empty",
 			fields: fields{
-				UnreadNotifications: &UnreadNotifications{},
+				UnreadNotifications: &sytypes.UnreadNotifications{},
 			},
 			want: []byte("{}"),
 		},
 		{
 			name: "unread notifications are NOT removed, if state is set",
 			fields: fields{
-				State:               &ClientEvents{Events: []synctypes.ClientEvent{{Content: []byte("{}")}}},
-				UnreadNotifications: &UnreadNotifications{NotificationCount: 1},
+				State:               &sytypes.ClientEvents{Events: []synctypes.ClientEvent{{Content: []byte("{}")}}},
+				UnreadNotifications: &sytypes.UnreadNotifications{NotificationCount: 1},
 			},
 			want: []byte(`{"state":{"events":[{"content":{},"type":""}]},"unread_notifications":{"highlight_count":0,"notification_count":1}}`),
 		},
 		{
 			name: "roomID is removed from EDUs",
 			fields: fields{
-				Ephemeral: &ClientEvents{
+				Ephemeral: &sytypes.ClientEvents{
 					Events: []synctypes.ClientEvent{
 						{RoomID: "!someRandomRoomID:test", Content: []byte("{}")},
 					},
@@ -188,7 +189,7 @@ func TestJoinResponse_MarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jr := JoinResponse{
+			jr := sytypes.JoinResponse{
 				Summary:             tt.fields.Summary,
 				State:               tt.fields.State,
 				Timeline:            tt.fields.Timeline,
