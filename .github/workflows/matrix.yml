@@ -57,6 +57,9 @@ jobs:
         uses: hoverkraft-tech/compose-action@v2.2.0
         with:
           compose-file: "./docker-compose.yml"
+          up-flags: |
+            --wait
+            --wait-timeout 60
           services: |
             datastore
             cachestore
