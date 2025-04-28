@@ -341,7 +341,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				// Only try to get OTKs if the context isn't already done.
 				if syncReq.Context.Err() == nil {
 					err = internal.DeviceOTKCounts(syncReq.Context, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
-					if err != nil && !errors.Is(context.Canceled, err) {
+					if err != nil && !errors.Is(err, context.Canceled) {
 						syncReq.Log.WithError(err).Warn("failed to get OTK counts")
 					}
 				}
