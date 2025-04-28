@@ -2227,70 +2227,6 @@ func TestGetMembership(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 
-	testCases := []struct {
-		name             string
-		roomID           string
-		user             *test.User
-		additionalEvents func(t *testing.T, room *test.Room)
-		request          func(t *testing.T, room *test.Room, accessToken string) *http.Request
-		wantOK           bool
-		wantMemberCount  int
-	}{
-
-		{
-			name: "/joined_members - Bob never joined",
-			user: bob,
-			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
-				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": accessToken,
-				}))
-			},
-			wantOK: false,
-		},
-		{
-			name: "/joined_members - Alice joined",
-			user: alice,
-			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
-				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": accessToken,
-				}))
-			},
-			wantOK:          true,
-			wantMemberCount: 1,
-		},
-		{
-			name: "/joined_members - Alice leaves, shouldn't be able to see members ",
-			user: alice,
-			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
-				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": accessToken,
-				}))
-			},
-			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
-					"membership": "leave",
-				}, test.WithStateKey(alice.ID))
-			},
-			wantOK: false,
-		},
-		{
-			name: "/joined_members - Bob joins, Alice sees two members",
-			user: alice,
-			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
-				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": accessToken,
-				}))
-			},
-			additionalEvents: func(t *testing.T, room *test.Room) {
-				room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
-					"membership": "join",
-				}, test.WithStateKey(bob.ID))
-			},
-			wantOK:          true,
-			wantMemberCount: 2,
-		},
-	}
-
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
 		ctx := testrig.NewContext(t)
@@ -2320,6 +2256,70 @@ func TestGetMembership(t *testing.T) {
 			bob:   {},
 		}
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+
+		testCases := []struct {
+			name             string
+			roomID           string
+			user             *test.User
+			additionalEvents func(t *testing.T, room *test.Room)
+			request          func(t *testing.T, room *test.Room, accessToken string) *http.Request
+			wantOK           bool
+			wantMemberCount  int
+		}{
+
+			{
+				name: "/joined_members - Bob never joined",
+				user: bob,
+				request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
+					return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
+						"access_token": accessToken,
+					}))
+				},
+				wantOK: false,
+			},
+			{
+				name: "/joined_members - Alice joined",
+				user: alice,
+				request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
+					return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
+						"access_token": accessToken,
+					}))
+				},
+				wantOK:          true,
+				wantMemberCount: 1,
+			},
+			{
+				name: "/joined_members - Alice leaves, shouldn't be able to see members ",
+				user: alice,
+				request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
+					return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
+						"access_token": accessToken,
+					}))
+				},
+				additionalEvents: func(t *testing.T, room *test.Room) {
+					room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{
+						"membership": "leave",
+					}, test.WithStateKey(alice.ID))
+				},
+				wantOK: false,
+			},
+			{
+				name: "/joined_members - Bob joins, Alice sees two members",
+				user: alice,
+				request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
+					return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
+						"access_token": accessToken,
+					}))
+				},
+				additionalEvents: func(t *testing.T, room *test.Room) {
+					room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
+						"membership": "join",
+					}, test.WithStateKey(bob.ID))
+				},
+				wantOK:          true,
+				wantMemberCount: 2,
+			},
+		}
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
