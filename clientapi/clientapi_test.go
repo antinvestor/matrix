@@ -2224,7 +2224,6 @@ func TestKeyBackup(t *testing.T) {
 }
 
 func TestGetMembership(t *testing.T) {
-	t.Parallel()
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 

@@ -399,7 +399,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	return
 }
 
-// selectRecentEvents returns the most recent events in the given room, up to a maximum of 'limit'.
+// SelectRecentEvents returns the most recent events in the given room, up to a maximum of 'limit'.
 // If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude
 // from sync.
 func (s *outputRoomEventsStatements) SelectRecentEvents(

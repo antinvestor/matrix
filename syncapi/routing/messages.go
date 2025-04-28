@@ -146,7 +146,7 @@ func OnIncomingMessagesRequest(
 	}
 	// A boolean is easier to handle in this case, especially since dir is sure
 	// to have one of the two accepted values (so dir == "f" <=> !backwardOrdering).
-	backwardOrdering := (dir == "b")
+	backwardOrdering := dir == "b"
 
 	emptyFromSupplied := fromQuery == ""
 	if emptyFromSupplied {

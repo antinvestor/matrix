@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 
 		ctx := context.TODO()
 
-		defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx)
+		defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx, test.DependancyOption{})
 		if err != nil {
 			panic(fmt.Errorf("could not create default connections %s", err))
 		}

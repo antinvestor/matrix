@@ -332,7 +332,7 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 			})
 
 			since := res.NextBatch.String()
-			w := httptest.NewRecorder()
+			w = httptest.NewRecorder()
 			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 				"access_token": alice.AccessToken,
 				"timeout":      "0",
@@ -426,6 +426,7 @@ func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
 				t.Errorf("failed to decode response body: %s", err)
 			}
 			sinceTokens[i] = res.NextBatch.String()
+			t.Logf(" current : %v  - %v  next: %v", i, "", res.NextBatch.String())
 			if i == 0 { // create event does not produce a room section
 				if res.Rooms != nil && len(res.Rooms.Join) != 0 {
 					t.Fatalf("i=%v got %d joined rooms, want 0", i, len(res.Rooms.Join))
@@ -460,15 +461,17 @@ func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
 			}
 			//t.Logf("since=%s res state:%+v res timeline:%+v", since, res.Rooms.Join[room.ID].State, res.Rooms.Join[room.ID].Timeline.Events)
 			gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
-			t.Logf("****-- %v : -- %v -----------%v ------------------------------------", i, room.ID, since)
 			timeline := res.Rooms.Join[room.ID].Timeline
 			for j, ev := range timeline.Events {
 				gotEventIDs[j] = ev.EventID
-				t.Logf(" %s :  ---------  %v  [%v] ", ev.EventID, ev.Type, timeline.PrevBatch.String())
 			}
 
-			test.AssertEventIDsEqual(t, gotEventIDs, room.Events()[i:])
-			t.Logf("-------------------------------------------------------------------****")
+			if since == "s1_0_0_0_0_0_0_0_0" {
+				test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
+			} else {
+				test.AssertEventIDsEqual(t, gotEventIDs, room.Events()[i:])
+			}
+
 		}
 	})
 }
