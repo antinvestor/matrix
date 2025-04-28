@@ -378,9 +378,6 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 		return fmt.Errorf("unknown room version: %s", respPeek.RoomVersion)
 	}
 
-	// we have the peek state now so let's process regardless of whether upstream gives up
-	ctx = context.Background()
-
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
 	userIDProvider := func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {

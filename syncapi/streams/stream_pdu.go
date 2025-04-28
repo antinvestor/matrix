@@ -149,7 +149,7 @@ func (p *PDUStreamProvider) CompleteSync(
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
-				if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
+				if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || errors.Is(err, sql.ErrTxDone) {
 					return from
 				}
 				continue
@@ -227,7 +227,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 		var pos types.StreamPosition
 		if pos, err = p.addRoomDeltaToResponse(ctx, snapshot, req.Device, newRange, delta, &eventFilter, &stateFilter, req, dbEvents); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
-			if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || errors.Is(err, sql.ErrTxDone) {
 				return newPos
 			}
 			continue

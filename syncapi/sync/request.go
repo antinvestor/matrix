@@ -38,6 +38,9 @@ const defaultSyncTimeout = time.Duration(0)
 const DefaultTimelineLimit = 20
 
 func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Database) (*types.SyncRequest, error) {
+
+	ctx := req.Context()
+
 	timeout := getTimeout(req.URL.Query().Get("timeout"))
 	fullState := req.URL.Query().Get("full_state")
 	wantFullState := fullState != "" && fullState != "false"
@@ -63,11 +66,11 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			// Try to load the filter from the database
 			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 			if err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+				util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 				return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 			}
-			if err := syncDB.GetFilter(req.Context(), &filter, localpart, filterQuery); err != nil && !errors.Is(err, sql.ErrNoRows) {
-				util.GetLogger(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
+			if err := syncDB.GetFilter(ctx, &filter, localpart, filterQuery); err != nil && !errors.Is(err, sql.ErrNoRows) {
+				util.GetLogger(ctx).WithError(err).Error("syncDB.GetFilter failed")
 				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
 			}
 		}
@@ -83,7 +86,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		filter.Room.AccountData.Limit = math.MaxInt32
 	}
 
-	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
+	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
 		"user_id":   device.UserID,
 		"device_id": device.ID,
 		"since":     since,
@@ -92,7 +95,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	})
 
 	return &types.SyncRequest{
-		Context:           req.Context(),             //
+		Context:           ctx,                       //
 		Log:               logger,                    //
 		Device:            &device,                   //
 		Response:          types.NewResponse(),       // Populated by all streams

@@ -109,6 +109,8 @@ type DeviceListUpdater struct {
 	rsAPI          rsapi.KeyserverRoomserverAPI
 
 	isBlacklistedOrBackingOffFn func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error)
+
+	waitTime time.Duration // debounce interval
 }
 
 // DeviceListUpdaterDatabase is the subset of functionality from storage.Database required for the updater.
@@ -172,6 +174,7 @@ func NewDeviceListUpdater(
 	thisServer spec.ServerName,
 	enableMetrics bool,
 	isBlacklistedOrBackingOffFn func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error),
+	waitTime time.Duration, // debounce interval
 ) *DeviceListUpdater {
 	if enableMetrics {
 		prometheus.MustRegister(deviceListUpdaterBackpressure, deviceListUpdaterServersRetrying)
@@ -189,6 +192,7 @@ func NewDeviceListUpdater(
 		userIDToChanMu:              &sync.Mutex{},
 		rsAPI:                       rsAPI,
 		isBlacklistedOrBackingOffFn: isBlacklistedOrBackingOffFn,
+		waitTime:                    waitTime, // debounce interval
 	}
 }
 
@@ -310,14 +314,14 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 		}
 		keys := []api.DeviceMessage{
 			{
-				Type: api.TypeDeviceKeyUpdate,
+				Type:     api.TypeDeviceKeyUpdate,
+				StreamID: event.StreamID,
 				DeviceKeys: &api.DeviceKeys{
 					DeviceID:    event.DeviceID,
 					DisplayName: event.DeviceDisplayName,
 					KeyJSON:     k,
 					UserID:      event.UserID,
 				},
-				StreamID: event.StreamID,
 			},
 		}
 
@@ -508,14 +512,14 @@ func (u *DeviceListUpdater) processServer(ctx context.Context, serverName spec.S
 	// If the process.Context is canceled, there is no need to go further.
 	// This avoids spamming the logs when shutting down
 	if errors.Is(ctx.Err(), context.Canceled) {
-		return defaultWaitTime, false
+		return u.waitTime, false
 	}
 
 	logger := util.GetLogger(ctx).WithField("server_name", serverName)
 	deviceListUpdateCount.WithLabelValues(string(serverName)).Inc()
 
-	waitTime := defaultWaitTime // How long should we wait to try again?
-	successCount := 0           // How many user requests failed?
+	waitTime := u.waitTime
+	successCount := 0 // How many user requests failed?
 
 	userIDs, err := u.db.StaleDeviceLists(ctx, []spec.ServerName{serverName})
 	if err != nil {
@@ -566,7 +570,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 		switch e := err.(type) {
 		case *json.UnmarshalTypeError, *json.SyntaxError:
 			logger.WithError(err).Debugf("Device list update for %q contained invalid JSON", userID)
-			return defaultWaitTime, nil
+			return u.waitTime, nil
 		case *fedsenderapi.FederationClientError:
 			if e.RetryAfter > 0 {
 				return e.RetryAfter, err
@@ -585,7 +589,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 			// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
 			if e.Code >= 300 {
 				logger.WithError(e).Debug("GetUserDevices returned gomatrix.HTTPError")
-				return hourWaitTime, err
+				return time.Minute * 60, err
 			}
 		default:
 			// Something else failed
@@ -595,7 +599,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 	}
 	if res.UserID != userID {
 		logger.WithError(err).Debugf("User ID %q in device list update response doesn't match expected %q", res.UserID, userID)
-		return defaultWaitTime, nil
+		return u.waitTime, nil
 	}
 	if res.MasterKey != nil || res.SelfSigningKey != nil {
 		uploadReq := &api.PerformUploadDeviceKeysRequest{
@@ -617,9 +621,9 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 	err = u.updateDeviceList(iCtx, &res)
 	if err != nil {
 		logger.WithError(err).Error("Fetched device list but failed to store/emit it")
-		return defaultWaitTime, err
+		return u.waitTime, err
 	}
-	return defaultWaitTime, nil
+	return u.waitTime, nil
 }
 
 func (u *DeviceListUpdater) updateDeviceList(ctx context.Context, res *fclient.RespUserDevices) error {
@@ -642,7 +646,7 @@ func (u *DeviceListUpdater) updateDeviceList(ctx context.Context, res *fclient.R
 			},
 		}
 		existingKeys[i] = api.DeviceMessage{
-			Type: api.TypeDeviceKeyUpdate,
+			Type: keys[0].Type,
 			DeviceKeys: &api.DeviceKeys{
 				UserID:   res.UserID,
 				DeviceID: device.DeviceID,

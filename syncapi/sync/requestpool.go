@@ -292,7 +292,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	// Extract values from request
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
-		if err == types.ErrMalformedSyncToken {
+		if errors.Is(err, types.ErrMalformedSyncToken) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.InvalidParam(err.Error()),
@@ -315,7 +315,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	// Clean up old send-to-device messages from before this stream position.
 	// This is needed to avoid sending the same message multiple times
-	if err = rp.db.CleanSendToDeviceUpdates(syncReq.Context, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
+	if err = rp.db.CleanSendToDeviceUpdates(ctx, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
 		syncReq.Log.WithError(err).Error("p.DB.CleanSendToDeviceUpdates failed")
 	}
 
@@ -341,7 +341,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				// Only try to get OTKs if the context isn't already done.
 				if syncReq.Context.Err() == nil {
 					err = internal.DeviceOTKCounts(syncReq.Context, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
-					if err != nil && err != context.Canceled {
+					if err != nil && !errors.Is(context.Canceled, err) {
 						syncReq.Log.WithError(err).Warn("failed to get OTK counts")
 					}
 				}
@@ -352,7 +352,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			}
 
 			select {
-			case <-syncReq.Context.Done(): // Caller gave up
+			case <-ctx.Done(): // Caller gave up
 				return giveup()
 
 			case <-timer.C: // Timeout reached
@@ -545,7 +545,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				),
 			}
 			// it's possible for there to be no updates for this user even though since < current pos,
-			// e.g busy servers with a quiet user. In this scenario, we don't want to return a no-op
+			// e.g. busy servers with a quiet user. In this scenario, we don't want to return a no-op
 			// response immediately, so let's try this again but pretend they bumped their since token.
 			// If the incremental sync was processed very quickly then we expect the next loop to block
 			// with a notifier, but if things are slow it's entirely possible that currentPos is no

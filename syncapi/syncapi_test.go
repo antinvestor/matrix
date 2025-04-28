@@ -375,101 +375,102 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 // been sent to the syncapi
 func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		testSyncAPICreateRoomSyncEarly(t, testOpts)
-	})
-}
-
-func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption) {
-	t.Skip("Skipped, possibly fixed")
-	user := test.NewUser(t)
-	room := test.NewRoom(t, user)
-	alice := userapi.Device{
-		ID:          "ALICEID",
-		UserID:      user.ID,
-		AccessToken: "ALICE_BEARER_TOKEN",
-		DisplayName: "Alice",
-		AccountType: userapi.AccountTypeUser,
-	}
-
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
-
-	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	caches, err := caching.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
-	natsInstance := jetstream.NATSInstance{}
-
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
-	// order is:
-	// m.room.create
-	// m.room.member
-	// m.room.power_levels
-	// m.room.join_rules
-	// m.room.history_visibility
-	msgs := toNATSMsgs(t, cfg, room.Events()...)
-	sinceTokens := make([]string, len(msgs))
-	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
-	for i, msg := range msgs {
-		testrig.MustPublishMsgs(t, jsctx, msg)
-		time.Sleep(100 * time.Millisecond)
-		w := httptest.NewRecorder()
-		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-			"access_token": alice.AccessToken,
-			"timeout":      "0",
-		})))
-		if w.Code != 200 {
-			t.Errorf("got HTTP %d want 200", w.Code)
-			continue
+		//t.Skip("Skipped, possibly fixed")
+		user := test.NewUser(t)
+		room := test.NewRoom(t, user)
+		alice := userapi.Device{
+			ID:          "ALICEID",
+			UserID:      user.ID,
+			AccessToken: "ALICE_BEARER_TOKEN",
+			DisplayName: "Alice",
+			AccountType: userapi.AccountTypeUser,
 		}
-		var res types.Response
-		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-			t.Errorf("failed to decode response body: %s", err)
+
+		ctx := testrig.NewContext(t)
+		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
+		defer closeRig()
+
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
 		}
-		sinceTokens[i] = res.NextBatch.String()
-		if i == 0 { // create event does not produce a room section
-			if len(res.Rooms.Join) != 0 {
-				t.Fatalf("i=%v got %d joined rooms, want 0", i, len(res.Rooms.Join))
+		natsInstance := jetstream.NATSInstance{}
+
+		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+		// order is:
+		// m.room.create
+		// m.room.member
+		// m.room.power_levels
+		// m.room.join_rules
+		// m.room.history_visibility
+		msgs := toNATSMsgs(t, cfg, room.Events()...)
+		sinceTokens := make([]string, len(msgs))
+		AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
+		for i, msg := range msgs {
+			testrig.MustPublishMsgs(t, jsctx, msg)
+			time.Sleep(100 * time.Millisecond)
+			w := httptest.NewRecorder()
+			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+				"access_token": alice.AccessToken,
+				"timeout":      "0",
+			})))
+			if w.Code != 200 {
+				t.Errorf("got HTTP %d want 200", w.Code)
+				continue
 			}
-		} else { // we should have that room somewhere
+			var res types.Response
+			if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
+				t.Errorf("failed to decode response body: %s", err)
+			}
+			sinceTokens[i] = res.NextBatch.String()
+			if i == 0 { // create event does not produce a room section
+				if res.Rooms != nil && len(res.Rooms.Join) != 0 {
+					t.Fatalf("i=%v got %d joined rooms, want 0", i, len(res.Rooms.Join))
+				}
+			} else { // we should have that room somewhere
+				if len(res.Rooms.Join) != 1 {
+					t.Fatalf("i=%v got %d joined rooms, want 1", i, len(res.Rooms.Join))
+				}
+			}
+		}
+
+		// sync with no token "" and with the penultimate token and this should neatly return room events in the timeline block
+		sinceTokens = append([]string{""}, sinceTokens[:len(sinceTokens)-1]...)
+
+		t.Logf("waited for events to be consumed; syncing with %v", sinceTokens)
+		for i, since := range sinceTokens {
+			w := httptest.NewRecorder()
+			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+				"access_token": alice.AccessToken,
+				"timeout":      "0",
+				"since":        since,
+			})))
+			if w.Code != 200 {
+				t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+			}
+			var res types.Response
+			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+				t.Errorf("failed to decode response body: %s", err)
+			}
 			if len(res.Rooms.Join) != 1 {
-				t.Fatalf("i=%v got %d joined rooms, want 1", i, len(res.Rooms.Join))
+				t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
 			}
-		}
-	}
+			//t.Logf("since=%s res state:%+v res timeline:%+v", since, res.Rooms.Join[room.ID].State, res.Rooms.Join[room.ID].Timeline.Events)
+			gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+			t.Logf("****-- %v : -- %v -----------%v ------------------------------------", i, room.ID, since)
+			timeline := res.Rooms.Join[room.ID].Timeline
+			for j, ev := range timeline.Events {
+				gotEventIDs[j] = ev.EventID
+				t.Logf(" %s :  ---------  %v  [%v] ", ev.EventID, ev.Type, timeline.PrevBatch.String())
+			}
 
-	// sync with no token "" and with the penultimate token and this should neatly return room events in the timeline block
-	sinceTokens = append([]string{""}, sinceTokens[:len(sinceTokens)-1]...)
-
-	t.Logf("waited for events to be consumed; syncing with %v", sinceTokens)
-	for i, since := range sinceTokens {
-		w := httptest.NewRecorder()
-		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-			"access_token": alice.AccessToken,
-			"timeout":      "0",
-			"since":        since,
-		})))
-		if w.Code != 200 {
-			t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+			test.AssertEventIDsEqual(t, gotEventIDs, room.Events()[i:])
+			t.Logf("-------------------------------------------------------------------****")
 		}
-		var res types.Response
-		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-			t.Errorf("failed to decode response body: %s", err)
-		}
-		if len(res.Rooms.Join) != 1 {
-			t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
-		}
-		t.Logf("since=%s res state:%+v res timeline:%+v", since, res.Rooms.Join[room.ID].State.Events, res.Rooms.Join[room.ID].Timeline.Events)
-		gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
-		for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
-			gotEventIDs[j] = ev.EventID
-		}
-		test.AssertEventIDsEqual(t, gotEventIDs, room.Events()[i:])
-	}
+	})
 }
 
 // Test that if we hit /sync we get back presence: online, regardless of whether messages get delivered

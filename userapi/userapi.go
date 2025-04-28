@@ -38,6 +38,8 @@ import (
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 )
 
+const defaultWaitTime = time.Minute
+
 // NewInternalAPI returns a concrete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 //
@@ -109,7 +111,7 @@ func NewInternalAPI(
 		FedClient:            fedClient,
 	}
 
-	updater := internal.NewDeviceListUpdater(ctx, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn)
+	updater := internal.NewDeviceListUpdater(ctx, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn, defaultWaitTime)
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
 	if err = updater.CleanUp(ctx); err != nil {

@@ -6,7 +6,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 )
 
-func PrepareDefaultDSConnections(ctx context.Context) (config.DefaultOpts, func(), error) {
+func PrepareDefaultDSConnections(ctx context.Context, testOpts DependancyOption) (config.DefaultOpts, func(), error) {
 
 	cacheConnStr, closeCache, err := PrepareRedisDataSourceConnection(ctx)
 	if err != nil {

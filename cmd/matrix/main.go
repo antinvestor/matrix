@@ -50,6 +50,7 @@ func main() {
 	cfg := setup.ParseFlags(true)
 	globalCfg := cfg.Global
 
+	// setup logging
 	ctx, service := frame.NewService(serviceName, frame.Config(&globalCfg))
 	defer service.Stop(ctx)
 

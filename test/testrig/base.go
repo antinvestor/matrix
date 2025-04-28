@@ -32,7 +32,7 @@ func NewContext(t *testing.T) context.Context {
 
 func CreateConfig(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*config.Dendrite, func()) {
 
-	defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx)
+	defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx, testOpts)
 	if err != nil {
 		t.Fatalf("Could not create default connections %s", err)
 	}
@@ -51,7 +51,7 @@ func CreateConfig(ctx context.Context, t *testing.T, testOpts test.DependancyOpt
 	cfg.Global.ServerName = "test"
 	// use a distinct prefix else concurrent postgres runs will clash since NATS will use
 	// the file system event with InMemory=true :(
-	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%s", util.RandomString(8))
+	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%s_", util.RandomString(8))
 	cfg.SyncAPI.Fulltext.InMemory = true
 
 	return &cfg, func() {
