@@ -2238,7 +2238,7 @@ func TestGetMembership(t *testing.T) {
 	}{
 
 		{
-			name: "/joined_members - Bob never joined",
+			name: "joined_members - Bob never joined",
 			user: bob,
 			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
 				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
@@ -2248,7 +2248,7 @@ func TestGetMembership(t *testing.T) {
 			wantOK: false,
 		},
 		{
-			name: "/joined_members - Alice joined",
+			name: "joined_members - Alice joined",
 			user: alice,
 			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
 				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
@@ -2259,7 +2259,7 @@ func TestGetMembership(t *testing.T) {
 			wantMemberCount: 1,
 		},
 		{
-			name: "/joined_members - Alice leaves, shouldn't be able to see members ",
+			name: "joined_members - Alice leaves, shouldn't be able to see members ",
 			user: alice,
 			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
 				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
@@ -2274,7 +2274,7 @@ func TestGetMembership(t *testing.T) {
 			wantOK: false,
 		},
 		{
-			name: "/joined_members - Bob joins, Alice sees two members",
+			name: "joined_members - Bob joins, Alice sees two members",
 			user: alice,
 			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
 				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{

@@ -241,9 +241,9 @@ func TestPurgeRoom(t *testing.T) {
 	bob := test.NewUser(t)
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
 
-	roomID, err := spec.NewRoomID(room.ID)
-	if err != nil {
-		t.Fatal(err)
+	roomID, err0 := spec.NewRoomID(room.ID)
+	if err0 != nil {
+		t.Fatal(err0)
 	}
 
 	// Invite Bob
@@ -259,6 +259,7 @@ func TestPurgeRoom(t *testing.T) {
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
+
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
