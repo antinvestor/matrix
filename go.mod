@@ -8,7 +8,7 @@ require (
 	github.com/Arceliar/phony v0.0.0-20220903101357-530938a4b13d
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/MFAshby/stdemuxerhook v1.0.0
-	github.com/antinvestor/apis/go/common v1.33.0
+	github.com/antinvestor/apis/go/common v1.34.0
 	github.com/antinvestor/apis/go/partition v1.33.0
 	github.com/antinvestor/apis/go/profile v1.33.1
 	github.com/antinvestor/gomatrix v0.1.2
@@ -48,7 +48,7 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.4-20250130201111-63bb56e20495.1 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250425153114-8976f5be98c1.1 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
@@ -111,7 +111,7 @@ require (
 	google.golang.org/api v0.228.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250324211829-b45e905df463 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
-	google.golang.org/grpc v1.71.1 // indirect
+	google.golang.org/grpc v1.72.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
 	gorm.io/datatypes v1.2.5 // indirect
