@@ -2,7 +2,6 @@ package federationapi
 
 import (
 	"bytes"
-	"context"
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
@@ -43,7 +42,7 @@ func (s *server) renew() {
 	// server C's cases which have validity either as now or
 	// in the past.
 	s.validity = time.Hour
-	s.config.Matrix.KeyValidityPeriod = s.validity
+	s.config.Global.KeyValidityPeriod = s.validity
 }
 
 var (
@@ -64,20 +63,20 @@ func TestMain(m *testing.M) {
 	// will use in our tests.
 	os.Exit(func() int {
 
-		ctx := context.TODO()
+		ctx, svc := testrig.NewServiceWithoutT()
 
 		defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx, test.DependancyOption{})
 		if err != nil {
 			panic(fmt.Errorf("could not create default connections %s", err))
 		}
-		defer closeDSConns()
+		defer closeDSConns(ctx)
 
 		for _, s := range servers {
 
-			// Draw up just enough Dendrite config for the server key
+			// Draw up just enough Matrix config for the server key
 			// API to work.
 
-			cfg := &config.Dendrite{}
+			cfg := &config.Matrix{}
 			cfg.Defaults(defaultOpts)
 			cfg.Global.ServerName = s.name
 
@@ -111,13 +110,13 @@ func TestMain(m *testing.M) {
 
 			// Create the federation client.
 			s.fedclient = fclient.NewFederationClient(
-				s.config.Matrix.SigningIdentities(),
+				s.config.Global.SigningIdentities(),
 				fclient.WithTransport(transport),
 			)
 
 			// Finally, build the server key APIs.
 
-			cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+			cm := sqlutil.NewConnectionManager(svc)
 			s.api = NewInternalAPI(ctx, cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)
 		}
 
@@ -162,7 +161,7 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 func TestServersRequestOwnKeys(t *testing.T) {
 	// Each server will request its own keys. There's no reason
 	// for this to fail as each server should know its own keys.
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 
 	for name, s := range servers {
 		req := gomatrixserverlib.PublicKeyLookupRequest{
@@ -189,7 +188,7 @@ func TestRenewalBehaviour(t *testing.T) {
 	// Server A will request Server C's key but their validity period
 	// is an hour in the past. We'll retrieve the key as, even though it's
 	// past its validity, it will be able to verify past events.
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 
 	req := gomatrixserverlib.PublicKeyLookupRequest{
 		ServerName: serverC.name,

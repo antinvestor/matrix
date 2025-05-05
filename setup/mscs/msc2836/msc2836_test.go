@@ -7,6 +7,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"sort"
@@ -58,7 +60,9 @@ func TestMSC2836(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
 		// give access tokens to all three users
 		nopUserAPI := &testUserAPI{
 			accessTokens: make(map[string]userapi.Device),
@@ -188,7 +192,7 @@ func TestMSC2836(t *testing.T) {
 				eventH.EventID(): eventH,
 			},
 		}
-		router := injectEvents(ctx, t, testOpts, nopUserAPI, nopRsAPI, []*types.HeaderedEvent{
+		router := injectEvents(ctx, svc, cfg, t, testOpts, nopUserAPI, nopRsAPI, []*types.HeaderedEvent{
 			eventA, eventB, eventC, eventD, eventE, eventF, eventG, eventH,
 		})
 		cancel := runServer(ctx, t, router)
@@ -564,16 +568,14 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 	return nil
 }
 
-func injectEvents(ctx context.Context, t *testing.T, testOpts test.DependancyOption, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
+func injectEvents(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, testOpts test.DependancyOption, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
 	t.Helper()
-
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	t.Cleanup(closeRig)
 
 	cfg.Global.ServerName = "localhost"
 	cfg.MSCs.MSCs = []string{"msc2836"}
 
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
+
 	routers := httputil.NewRouters()
 	err := msc2836.Enable(ctx, cfg, cm, routers, rsAPI, nil, userAPI, nil)
 	if err != nil {

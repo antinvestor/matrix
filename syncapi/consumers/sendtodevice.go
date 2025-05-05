@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -60,11 +60,11 @@ func NewOutputSendToDeviceEventConsumer(
 ) *OutputSendToDeviceEventConsumer {
 	return &OutputSendToDeviceEventConsumer{
 		jetstream:         js,
-		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		durable:           cfg.Matrix.JetStream.Durable("SyncAPISendToDeviceConsumer"),
+		topic:             cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		durable:           cfg.Global.JetStream.Durable("SyncAPISendToDeviceConsumer"),
 		db:                store,
 		userAPI:           userAPI,
-		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		isLocalServerName: cfg.Global.IsLocalServerName,
 		notifier:          notifier,
 		stream:            stream,
 	}

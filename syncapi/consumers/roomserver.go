@@ -25,7 +25,6 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -58,7 +57,7 @@ type OutputRoomEventConsumer struct {
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
-	ctx context.Context,
+	_ context.Context,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
 	store storage.Database,
@@ -69,11 +68,10 @@ func NewOutputRoomEventConsumer(
 	asProducer *producers.AppserviceEventProducer,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
-		ctx:          ctx,
 		cfg:          cfg,
 		jetstream:    js,
-		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		durable:      cfg.Matrix.JetStream.Durable("SyncAPIRoomServerConsumer"),
+		topic:        cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		durable:      cfg.Global.JetStream.Durable("SyncAPIRoomServerConsumer"),
 		db:           store,
 		notifier:     notifier,
 		pduStream:    pduStream,
@@ -86,7 +84,7 @@ func NewOutputRoomEventConsumer(
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 	return jetstream.Consumer(
-		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
@@ -248,13 +246,13 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}
 	}
 
-	ev, err := s.updateStateEvent(ev)
+	ev, err := s.updateStateEvent(ctx, ev)
 	if err != nil {
 		return err
 	}
 
 	for i := range addsStateEvents {
-		addsStateEvents[i], err = s.updateStateEvent(addsStateEvents[i])
+		addsStateEvents[i], err = s.updateStateEvent(ctx, addsStateEvents[i])
 		if err != nil {
 			return err
 		}
@@ -387,7 +385,7 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *rst
 		if err != nil || userID == nil {
 			return sp, fmt.Errorf("failed getting userID for sender: %w", err)
 		}
-		if !s.cfg.Matrix.IsLocalServerName(userID.Domain()) {
+		if !s.cfg.Global.IsLocalServerName(userID.Domain()) {
 			return sp, nil
 		}
 
@@ -414,7 +412,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if err != nil || userID == nil {
 		return
 	}
-	if !s.cfg.Matrix.IsLocalServerName(userID.Domain()) {
+	if !s.cfg.Global.IsLocalServerName(userID.Domain()) {
 		return
 	}
 
@@ -533,24 +531,22 @@ func (s *OutputRoomEventConsumer) onPurgeRoom(
 	}
 }
 
-func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent) (*rstypes.HeaderedEvent, error) {
+func (s *OutputRoomEventConsumer) updateStateEvent(ctx context.Context, event *rstypes.HeaderedEvent) (*rstypes.HeaderedEvent, error) {
 	event.StateKeyResolved = event.StateKey()
 	if event.StateKey() == nil {
 		return event, nil
 	}
 	stateKey := *event.StateKey()
 
-	snapshot, err := s.db.NewDatabaseSnapshot(s.ctx)
+	snapshot, err := s.db.NewDatabaseSnapshot(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	sKeyUser := ""
 	if stateKey != "" {
 		var sku *spec.UserID
-		sku, err = s.rsAPI.QueryUserIDForSender(s.ctx, event.RoomID(), spec.SenderID(stateKey))
+		sku, err = s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), spec.SenderID(stateKey))
 		if err == nil && sku != nil {
 			sKeyUser = sku.String()
 			event.StateKeyResolved = &sKeyUser
@@ -558,13 +554,13 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 	}
 
 	prevEvent, err := snapshot.GetStateEvent(
-		s.ctx, event.RoomID().String(), event.Type(), sKeyUser,
+		ctx, event.RoomID().String(), event.Type(), sKeyUser,
 	)
 	if err != nil {
 		return event, err
 	}
 
-	userID, err := s.rsAPI.QueryUserIDForSender(s.ctx, event.RoomID(), event.SenderID())
+	userID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err != nil {
 		return event, err
 	}
@@ -582,7 +578,6 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 	}
 
 	event.PDU, err = event.SetUnsigned(prev)
-	succeeded = true
 	return event, err
 }
 

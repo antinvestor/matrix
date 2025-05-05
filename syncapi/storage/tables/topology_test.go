@@ -33,7 +33,8 @@ func TestTopologyTable(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		tab, db, closeDb := newTopologyTable(ctx, t, testOpts)
 		defer closeDb()

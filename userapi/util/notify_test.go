@@ -17,7 +17,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/antinvestor/matrix/internal/pushgateway"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
@@ -38,7 +37,6 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ctx := testrig.NewContext(t)
 
 	// Create a test room, just used to provide events
 	room := test.NewRoom(t, alice)
@@ -48,6 +46,10 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 	pushKey := util.RandomString(8)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
 		receivedRequest := make(chan bool, 1)
 		// create a test server which responds to our /notify call
 		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -85,16 +87,8 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		// Create DB and Dendrite base
-		connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-		if err != nil {
-			t.Fatalf("failed to open database: %s", err)
-		}
-		defer closeDb()
-		cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-		db, err := storage.NewUserDatabase(ctx, nil, cm, &config.DatabaseOptions{
-			ConnectionString: connStr,
-		}, "test", bcrypt.MinCost, 0, 0, "")
+		cm := sqlutil.NewConnectionManager(svc)
+		db, err := storage.NewUserDatabase(ctx, nil, cm, "test", bcrypt.MinCost, 0, 0, "")
 		if err != nil {
 			t.Error(err)
 		}

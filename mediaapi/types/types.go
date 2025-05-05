@@ -42,7 +42,7 @@ type MediaID string
 // RequestMethod is an HTTP request method i.e. GET, POST, etc
 type RequestMethod string
 
-// MatrixUserID is a Matrix user ID string in the form @user:domain e.g. @alice:matrix.org
+// MatrixUserID is a Global user ID string in the form @user:domain e.g. @alice:matrix.org
 type MatrixUserID string
 
 // MediaMetadata is metadata associated with a media file

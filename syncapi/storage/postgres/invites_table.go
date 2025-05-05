@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
@@ -67,120 +66,130 @@ const selectMaxInviteIDSQL = "" +
 const purgeInvitesSQL = "" +
 	"DELETE FROM syncapi_invite_events WHERE room_id = $1"
 
-type inviteEventsStatements struct {
-	insertInviteEventStmt         *sql.Stmt
-	selectInviteEventsInRangeStmt *sql.Stmt
-	deleteInviteEventStmt         *sql.Stmt
-	selectMaxInviteIDStmt         *sql.Stmt
-	purgeInvitesStmt              *sql.Stmt
+// inviteEventsTable implements tables.Invites using a connection manager and SQL constants.
+type inviteEventsTable struct {
+	cm                           *sqlutil.Connections
+	insertInviteEventSQL         string
+	selectInviteEventsInRangeSQL string
+	deleteInviteEventSQL         string
+	selectMaxInviteIDSQL         string
+	purgeInvitesSQL              string
 }
 
-func NewPostgresInvitesTable(ctx context.Context, db *sql.DB) (tables.Invites, error) {
-	s := &inviteEventsStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertInviteEventStmt, insertInviteEventSQL},
-		{&s.selectInviteEventsInRangeStmt, selectInviteEventsInRangeSQL},
-		{&s.deleteInviteEventStmt, deleteInviteEventSQL},
-		{&s.selectMaxInviteIDStmt, selectMaxInviteIDSQL},
-		{&s.purgeInvitesStmt, purgeInvitesSQL},
-	}.Prepare(db)
+// NewPostgresInvitesTable creates a new Invites table using a connection manager.
+func NewPostgresInvitesTable(cm *sqlutil.Connections) tables.Invites {
+	return &inviteEventsTable{
+		cm:                           cm,
+		insertInviteEventSQL:         insertInviteEventSQL,
+		selectInviteEventsInRangeSQL: selectInviteEventsInRangeSQL,
+		deleteInviteEventSQL:         deleteInviteEventSQL,
+		selectMaxInviteIDSQL:         selectMaxInviteIDSQL,
+		purgeInvitesSQL:              purgeInvitesSQL,
+	}
 }
 
-func (s *inviteEventsStatements) InsertInviteEvent(
-	ctx context.Context, txn *sql.Tx, inviteEvent *rstypes.HeaderedEvent,
+// InsertInviteEvent stores a new invite event for a user.
+// The invite event is marshaled as JSON and stored in the database.
+// Returns the stream position of the inserted invite event.
+func (t *inviteEventsTable) InsertInviteEvent(
+	ctx context.Context,
+	inviteEvent *rstypes.HeaderedEvent,
 ) (streamPos types.StreamPosition, err error) {
-	var headeredJSON []byte
-	headeredJSON, err = json.Marshal(inviteEvent)
+	// Marshal the invite event to JSON for storage.
+	headeredJSON, err := json.Marshal(inviteEvent)
 	if err != nil {
 		return
 	}
-
-	err = sqlutil.TxStmt(txn, s.insertInviteEventStmt).QueryRowContext(
-		ctx,
+	// Insert the invite event using the defined SQL constant.
+	db := t.cm.Connection(ctx, false)
+	err = db.Raw(
+		t.insertInviteEventSQL,
 		inviteEvent.RoomID().String(),
 		inviteEvent.EventID(),
-		inviteEvent.UserID.String(),
-		headeredJSON,
-	).Scan(&streamPos)
+		inviteEvent.StateKey(),
+		string(headeredJSON),
+	).Row().Scan(&streamPos)
 	return
 }
 
-func (s *inviteEventsStatements) DeleteInviteEvent(
-	ctx context.Context, txn *sql.Tx, inviteEventID string,
+// DeleteInviteEvent removes an invite event by its ID.
+// Marks the invite as deleted and updates its stream position.
+func (t *inviteEventsTable) DeleteInviteEvent(
+	ctx context.Context,
+	inviteEventID string,
 ) (sp types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, s.deleteInviteEventStmt)
-	err = stmt.QueryRowContext(ctx, inviteEventID).Scan(&sp)
+	// Update the invite event as deleted using the defined SQL constant.
+	db := t.cm.Connection(ctx, false)
+	err = db.Raw(t.deleteInviteEventSQL, inviteEventID).Row().Scan(&sp)
 	return
 }
 
-// selectInviteEventsInRange returns a map of room ID to invite event for the
-// active invites for the target user ID in the supplied range.
-func (s *inviteEventsStatements) SelectInviteEventsInRange(
-	ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range,
-) (map[string]*rstypes.HeaderedEvent, map[string]*rstypes.HeaderedEvent, types.StreamPosition, error) {
-	var lastPos types.StreamPosition
-	stmt := sqlutil.TxStmt(txn, s.selectInviteEventsInRangeStmt)
-	rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
+// SelectInviteEventsInRange returns invites and retired (deleted) invites for a user in a given range.
+// The returned maps are keyed by room ID. The maxID is the highest stream position in the result set.
+func (t *inviteEventsTable) SelectInviteEventsInRange(
+	ctx context.Context,
+	targetUserID string,
+	r types.Range,
+) (invites map[string]*rstypes.HeaderedEvent, retired map[string]*rstypes.HeaderedEvent, maxID types.StreamPosition, err error) {
+	invites = make(map[string]*rstypes.HeaderedEvent)
+	retired = make(map[string]*rstypes.HeaderedEvent)
+	// Query for invite events in the specified range.
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectInviteEventsInRangeSQL, targetUserID, r.Low(), r.High()).Rows()
 	if err != nil {
-		return nil, nil, lastPos, err
+		return
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteEventsInRange: rows.close() failed")
-	result := map[string]*rstypes.HeaderedEvent{}
-	retired := map[string]*rstypes.HeaderedEvent{}
+	defer rows.Close()
+	var (
+		id                types.StreamPosition
+		roomID            string
+		headeredEventJSON string
+		deleted           bool
+	)
 	for rows.Next() {
-		var (
-			id        types.StreamPosition
-			roomID    string
-			eventJSON []byte
-			deleted   bool
-		)
-		if err = rows.Scan(&id, &roomID, &eventJSON, &deleted); err != nil {
-			return nil, nil, lastPos, err
+		if err = rows.Scan(&id, &roomID, &headeredEventJSON, &deleted); err != nil {
+			return
 		}
-		if id > lastPos {
-			lastPos = id
+		// Unmarshal the stored JSON back into a HeaderedEvent.
+		var event rstypes.HeaderedEvent
+		if err = json.Unmarshal([]byte(headeredEventJSON), &event); err != nil {
+			return
 		}
-
-		// if we have seen this room before, it has a higher stream position and hence takes priority
-		// because the query is ORDER BY id DESC so drop them
-		_, isRetired := retired[roomID]
-		_, isInvited := result[roomID]
-		if isRetired || isInvited {
-			continue
-		}
-
-		var event *rstypes.HeaderedEvent
-		if err := json.Unmarshal(eventJSON, &event); err != nil {
-			return nil, nil, lastPos, err
-		}
-
+		// Place in the correct map depending on deleted status.
 		if deleted {
-			retired[roomID] = event
+			retired[roomID] = &event
 		} else {
-			result[roomID] = event
+			invites[roomID] = &event
+		}
+		// Track the highest stream position seen.
+		if id > maxID {
+			maxID = id
 		}
 	}
-	if lastPos == 0 {
-		lastPos = r.To
-	}
-	return result, retired, lastPos, rows.Err()
+	return invites, retired, maxID, rows.Err()
 }
 
-func (s *inviteEventsStatements) SelectMaxInviteID(
-	ctx context.Context, txn *sql.Tx,
+// SelectMaxInviteID returns the maximum stream position for invites.
+func (t *inviteEventsTable) SelectMaxInviteID(
+	ctx context.Context,
 ) (id int64, err error) {
+	// Query for the maximum invite ID using the defined SQL constant.
+	db := t.cm.Connection(ctx, true)
 	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxInviteIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	err = db.Raw(t.selectMaxInviteIDSQL).Row().Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}
 	return
 }
 
-func (s *inviteEventsStatements) PurgeInvites(
-	ctx context.Context, txn *sql.Tx, roomID string,
+// PurgeInvites removes all invites for a given room.
+// This is typically used during room cleanup.
+func (t *inviteEventsTable) PurgeInvites(
+	ctx context.Context,
+	roomID string,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeInvitesStmt).ExecContext(ctx, roomID)
-	return err
+	// Execute the purge using the defined SQL constant.
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.purgeInvitesSQL, roomID).Error
 }

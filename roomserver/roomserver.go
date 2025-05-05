@@ -34,13 +34,14 @@ import (
 // you may wish to call `SetFederationAPI` on the returned struct to avoid nil-dereference errors.
 func NewInternalAPI(
 	ctx context.Context,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	caches caching.RoomServerCaches,
 	enableMetrics bool,
 ) api.RoomserverInternalAPI {
-	roomserverDB, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, caches)
+
+	roomserverDB, err := storage.Open(ctx, cm, caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/antinvestor/matrix/internal/caching"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -72,8 +71,6 @@ func NewSyncStreamProviders(ctx context.Context,
 	if err != nil {
 		panic(err)
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	streams.PDUStreamProvider.Setup(ctx, snapshot)
 	streams.TypingStreamProvider.Setup(ctx, snapshot)
@@ -85,7 +82,6 @@ func NewSyncStreamProviders(ctx context.Context,
 	streams.DeviceListStreamProvider.Setup(ctx, snapshot)
 	streams.PresenceStreamProvider.Setup(ctx, snapshot)
 
-	succeeded = true
 	return streams
 }
 

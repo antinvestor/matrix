@@ -21,7 +21,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
@@ -29,7 +28,7 @@ import (
 const profilesSchema = `
 -- Stores data about accounts profiles.
 CREATE TABLE IF NOT EXISTS userapi_profiles (
-    -- The Matrix user ID localpart for this account
+    -- The Global user ID localpart for this account
     localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
     -- The display name for this account
@@ -66,101 +65,109 @@ const setDisplayNameSQL = "" +
 const selectProfilesBySearchSQL = "" +
 	"SELECT localpart, server_name, display_name, avatar_url FROM userapi_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
 
-type profilesStatements struct {
-	serverNoticesLocalpart       string
-	insertProfileStmt            *sql.Stmt
-	selectProfileByLocalpartStmt *sql.Stmt
-	setAvatarURLStmt             *sql.Stmt
-	setDisplayNameStmt           *sql.Stmt
-	selectProfilesBySearchStmt   *sql.Stmt
+// profilesTable implements tables.ProfileTable using GORM and a connection manager.
+type profilesTable struct {
+	cm                     *sqlutil.Connections
+	serverNoticesLocalpart string
+
+	insertProfileSQL            string
+	selectProfileByLocalpartSQL string
+	setAvatarURLSQL             string
+	setDisplayNameSQL           string
+	selectProfilesBySearchSQL   string
 }
 
-func NewPostgresProfilesTable(db *sql.DB, serverNoticesLocalpart string) (tables.ProfileTable, error) {
-	s := &profilesStatements{
-		serverNoticesLocalpart: serverNoticesLocalpart,
+// NewPostgresProfilesTable returns a new ProfileTable using the provided connection manager.
+func NewPostgresProfilesTable(cm *sqlutil.Connections, serverNoticesLocalpart string) tables.ProfileTable {
+	return &profilesTable{
+		cm:                          cm,
+		serverNoticesLocalpart:      serverNoticesLocalpart,
+		insertProfileSQL:            insertProfileSQL,
+		selectProfileByLocalpartSQL: selectProfileByLocalpartSQL,
+		setAvatarURLSQL:             setAvatarURLSQL,
+		setDisplayNameSQL:           setDisplayNameSQL,
+		selectProfilesBySearchSQL:   selectProfilesBySearchSQL,
 	}
-	// Removed db.Exec(profilesSchema) from constructor. Schema handled by migrator.
-	return s, sqlutil.StatementList{
-		{&s.insertProfileStmt, insertProfileSQL},
-		{&s.selectProfileByLocalpartStmt, selectProfileByLocalpartSQL},
-		{&s.setAvatarURLStmt, setAvatarURLSQL},
-		{&s.setDisplayNameStmt, setDisplayNameSQL},
-		{&s.selectProfilesBySearchStmt, selectProfilesBySearchSQL},
-	}.Prepare(db)
 }
 
-func (s *profilesStatements) InsertProfile(
-	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName spec.ServerName,
-) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.insertProfileStmt).ExecContext(ctx, localpart, serverName, "", "")
-	return
+func (t *profilesTable) InsertProfile(ctx context.Context, localpart string, serverName spec.ServerName) error {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.insertProfileSQL, localpart, serverName, "", "")
+	return result.Error
 }
 
-func (s *profilesStatements) SelectProfileByLocalpart(
-	ctx context.Context,
-	localpart string, serverName spec.ServerName,
-) (*authtypes.Profile, error) {
+func (t *profilesTable) SelectProfileByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName) (*authtypes.Profile, error) {
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectProfileByLocalpartSQL, localpart, serverName).Row()
 	var profile authtypes.Profile
-	err := s.selectProfileByLocalpartStmt.QueryRowContext(ctx, localpart, serverName).Scan(
-		&profile.Localpart, &profile.ServerName, &profile.DisplayName, &profile.AvatarURL,
-	)
-	if err != nil {
+	var displayName, avatarURL sql.NullString
+	if err := row.Scan(&profile.Localpart, &profile.ServerName, &displayName, &avatarURL); err != nil {
 		return nil, err
+	}
+	if displayName.Valid {
+		profile.DisplayName = displayName.String
+	}
+	if avatarURL.Valid {
+		profile.AvatarURL = avatarURL.String
 	}
 	return &profile, nil
 }
 
-func (s *profilesStatements) SetAvatarURL(
-	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName spec.ServerName,
-	avatarURL string,
-) (*authtypes.Profile, bool, error) {
+func (t *profilesTable) SetAvatarURL(ctx context.Context, localpart string, serverName spec.ServerName, avatarURL string) (*authtypes.Profile, bool, error) {
+	db := t.cm.Connection(ctx, false)
 	profile := &authtypes.Profile{
 		Localpart:  localpart,
 		ServerName: string(serverName),
 		AvatarURL:  avatarURL,
 	}
+	var displayName sql.NullString
 	var changed bool
-	stmt := sqlutil.TxStmt(txn, s.setAvatarURLStmt)
-	err := stmt.QueryRowContext(ctx, avatarURL, localpart, serverName).Scan(&profile.DisplayName, &changed)
+	row := db.Raw(t.setAvatarURLSQL, avatarURL, localpart, serverName).Row()
+	err := row.Scan(&displayName, &changed)
+	if displayName.Valid {
+		profile.DisplayName = displayName.String
+	}
 	return profile, changed, err
 }
 
-func (s *profilesStatements) SetDisplayName(
-	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName spec.ServerName,
-	displayName string,
-) (*authtypes.Profile, bool, error) {
+func (t *profilesTable) SetDisplayName(ctx context.Context, localpart string, serverName spec.ServerName, displayName string) (*authtypes.Profile, bool, error) {
+	db := t.cm.Connection(ctx, false)
 	profile := &authtypes.Profile{
 		Localpart:   localpart,
 		ServerName:  string(serverName),
 		DisplayName: displayName,
 	}
+	var avatarURL sql.NullString
 	var changed bool
-	stmt := sqlutil.TxStmt(txn, s.setDisplayNameStmt)
-	err := stmt.QueryRowContext(ctx, displayName, localpart, serverName).Scan(&profile.AvatarURL, &changed)
+	row := db.Raw(t.setDisplayNameSQL, displayName, localpart, serverName).Row()
+	err := row.Scan(&avatarURL, &changed)
+	if avatarURL.Valid {
+		profile.AvatarURL = avatarURL.String
+	}
 	return profile, changed, err
 }
 
-func (s *profilesStatements) SelectProfilesBySearch(
-	ctx context.Context, _, searchString string, limit int,
-) ([]authtypes.Profile, error) {
-	var profiles []authtypes.Profile
-	// The fmt.Sprintf directive below is building a parameter for the
-	// "LIKE" condition in the SQL query. %% escapes the % char, so the
-	// statement in the end will look like "LIKE %searchString%".
-	rows, err := s.selectProfilesBySearchStmt.QueryContext(ctx, fmt.Sprintf("%%%s%%", searchString), limit)
+func (t *profilesTable) SelectProfilesBySearch(ctx context.Context, localpart, searchString string, limit int) ([]authtypes.Profile, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectProfilesBySearchSQL, fmt.Sprintf("%%%s%%", searchString), limit).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectProfilesBySearch: rows.close() failed")
+	defer rows.Close()
+	var profiles []authtypes.Profile
 	for rows.Next() {
 		var profile authtypes.Profile
-		if err := rows.Scan(&profile.Localpart, &profile.ServerName, &profile.DisplayName, &profile.AvatarURL); err != nil {
+		var displayName, avatarURL sql.NullString
+		if err := rows.Scan(&profile.Localpart, &profile.ServerName, &displayName, &avatarURL); err != nil {
 			return nil, err
 		}
-		if profile.Localpart != s.serverNoticesLocalpart {
+		if displayName.Valid {
+			profile.DisplayName = displayName.String
+		}
+		if avatarURL.Valid {
+			profile.AvatarURL = avatarURL.String
+		}
+		if profile.Localpart != t.serverNoticesLocalpart {
 			profiles = append(profiles, profile)
 		}
 	}

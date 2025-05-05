@@ -61,8 +61,8 @@ func NewOutputRoomEventConsumer(
 		cfg:          cfg,
 		jetstream:    js,
 		db:           store,
-		durable:      cfg.Matrix.JetStream.Durable("UserAPIRoomServerConsumer"),
-		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		durable:      cfg.Global.JetStream.Durable("UserAPIRoomServerConsumer"),
+		topic:        cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		pgClient:     pgClient,
 		rsAPI:        rsAPI,
 		syncProducer: syncProducer,
@@ -70,7 +70,7 @@ func NewOutputRoomEventConsumer(
 		roomCounts:   map[spec.ServerName]map[string]bool{},
 		lastUpdate:   time.Now(),
 		countsLock:   sync.Mutex{},
-		serverName:   cfg.Matrix.ServerName,
+		serverName:   cfg.Global.ServerName,
 	}
 }
 
@@ -120,7 +120,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		return true
 	}
 
-	if s.cfg.Matrix.ReportStats.Enabled {
+	if s.cfg.Global.ReportStats.Enabled {
 		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID().String())
 	}
 
@@ -319,7 +319,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 		if err != nil {
 			return fmt.Errorf("newLocalMembership: %w", err)
 		}
-		if member.Membership == spec.Invite && member.Domain == s.cfg.Matrix.ServerName {
+		if member.Membership == spec.Invite && member.Domain == s.cfg.Global.ServerName {
 			// localRoomMembers only adds joined members. An invite
 			// should also be pushed to the target user.
 			members = append(members, member)
@@ -810,7 +810,7 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 		if mem, memberErr := event.Membership(); memberErr == nil {
 			req.Notification.Membership = mem
 		}
-		userID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", localpart, s.cfg.Matrix.ServerName), true)
+		userID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", localpart, s.cfg.Global.ServerName), true)
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to convert local user to userID %s", localpart)
 			return nil, err

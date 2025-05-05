@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/lib/pq"
@@ -66,37 +65,41 @@ const selectMaxReceiptIDSQL = "" +
 const purgeReceiptsSQL = "" +
 	"DELETE FROM syncapi_receipts WHERE room_id = $1"
 
-type receiptStatements struct {
-	db                 *sql.DB
-	upsertReceipt      *sql.Stmt
-	selectRoomReceipts *sql.Stmt
-	selectMaxReceiptID *sql.Stmt
-	purgeReceiptsStmt  *sql.Stmt
+// receiptTable implements tables.Receipts using a connection manager and SQL constants.
+// This table stores receipts and provides methods for upserting and querying them.
+type receiptTable struct {
+	cm                    *sqlutil.Connections
+	upsertReceiptSQL      string
+	selectRoomReceiptsSQL string
+	selectMaxReceiptIDSQL string
+	purgeReceiptsSQL      string
 }
 
-func NewPostgresReceiptsTable(ctx context.Context, db *sql.DB) (tables.Receipts, error) {
-	r := &receiptStatements{
-		db: db,
+// NewPostgresReceiptsTable creates a new Receipts table using a connection manager.
+func NewPostgresReceiptsTable(cm *sqlutil.Connections) tables.Receipts {
+	return &receiptTable{
+		cm:                    cm,
+		upsertReceiptSQL:      upsertReceipt,
+		selectRoomReceiptsSQL: selectRoomReceipts,
+		selectMaxReceiptIDSQL: selectMaxReceiptIDSQL,
+		purgeReceiptsSQL:      purgeReceiptsSQL,
 	}
-	return r, sqlutil.StatementList{
-		{&r.upsertReceipt, upsertReceipt},
-		{&r.selectRoomReceipts, selectRoomReceipts},
-		{&r.selectMaxReceiptID, selectMaxReceiptIDSQL},
-		{&r.purgeReceiptsStmt, purgeReceiptsSQL},
-	}.Prepare(db)
 }
 
-func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, r.upsertReceipt)
-	err = stmt.QueryRowContext(ctx, roomId, receiptType, userId, eventId, timestamp).Scan(&pos)
+// UpsertReceipt inserts or updates a receipt for a user in a room.
+func (t *receiptTable) UpsertReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error) {
+	db := t.cm.Connection(ctx, false)
+	err = db.Raw(t.upsertReceiptSQL, roomId, receiptType, userId, eventId, timestamp).Row().Scan(&pos)
 	return
 }
 
-func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, txn *sql.Tx, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
+// SelectRoomReceiptsAfter returns receipts for a set of rooms after a given stream position.
+func (t *receiptTable) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
 	var lastPos types.StreamPosition
-	rows, err := sqlutil.TxStmt(txn, r.selectRoomReceipts).QueryContext(ctx, pq.Array(roomIDs), streamPos)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectRoomReceiptsSQL, pq.Array(roomIDs), streamPos).Rows()
 	if err != nil {
-		return 0, nil, fmt.Errorf("unable to query room receipts: %w", err)
+		return 0, nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomReceiptsAfter: rows.close() failed")
 	var res []types.OutputReceiptEvent
@@ -115,21 +118,15 @@ func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, txn *sq
 	return lastPos, res, rows.Err()
 }
 
-func (s *receiptStatements) SelectMaxReceiptID(
-	ctx context.Context, txn *sql.Tx,
-) (id int64, err error) {
-	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxReceiptID)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
-	if nullableID.Valid {
-		id = nullableID.Int64
-	}
+// SelectMaxReceiptID returns the maximum stream position for receipts.
+func (t *receiptTable) SelectMaxReceiptID(ctx context.Context) (id int64, err error) {
+	db := t.cm.Connection(ctx, true)
+	err = db.Raw(t.selectMaxReceiptIDSQL).Row().Scan(&id)
 	return
 }
 
-func (s *receiptStatements) PurgeReceipts(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeReceiptsStmt).ExecContext(ctx, roomID)
-	return err
+// PurgeReceipts removes all receipts for a given room.
+func (t *receiptTable) PurgeReceipts(ctx context.Context, roomID string) error {
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.purgeReceiptsSQL, roomID).Error
 }

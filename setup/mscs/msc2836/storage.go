@@ -8,15 +8,14 @@ import (
 	"github.com/antinvestor/matrix/setup/mscs/msc2836/shared"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 // NewDatabase loads the database for msc2836
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbOpts *config.DatabaseOptions) (shared.Database, error) {
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections) (shared.Database, error) {
 
 	switch {
-	case dbOpts.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(ctx, conMan, dbOpts)
+	case cm.DS().IsPostgres():
+		return postgres.NewDatabase(ctx, cm)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

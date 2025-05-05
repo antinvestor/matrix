@@ -1,4 +1,4 @@
-// Copyright 2021 The Matrix.org Foundation C.I.C.
+// Copyright 2021 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,101 +45,110 @@ CREATE UNIQUE INDEX IF NOT EXISTS userapi_key_backup_versions_idx ON userapi_key
 
 const keyBackupVersionTableSchemaRevert = "DROP TABLE IF EXISTS userapi_key_backup_versions CASCADE; DROP SEQUENCE IF EXISTS userapi_key_backup_versions_seq; DROP INDEX IF EXISTS userapi_key_backup_versions_idx;"
 
-const insertKeyBackupSQL = "" +
-	"INSERT INTO userapi_key_backup_versions(user_id, algorithm, auth_data, etag) VALUES ($1, $2, $3, $4) RETURNING version"
+// SQL: Insert key backup version
+const insertKeyBackupSQL = "INSERT INTO userapi_key_backup_versions(user_id, algorithm, auth_data, etag) VALUES ($1, $2, $3, $4) RETURNING version"
 
-const updateKeyBackupAuthDataSQL = "" +
-	"UPDATE userapi_key_backup_versions SET auth_data = $1 WHERE user_id = $2 AND version = $3"
+// SQL: Update key backup version auth data
+const updateKeyBackupAuthDataSQL = "UPDATE userapi_key_backup_versions SET auth_data = $1 WHERE user_id = $2 AND version = $3"
 
-const updateKeyBackupETagSQL = "" +
-	"UPDATE userapi_key_backup_versions SET etag = $1 WHERE user_id = $2 AND version = $3"
+// SQL: Update key backup version etag
+const updateKeyBackupETagSQL = "UPDATE userapi_key_backup_versions SET etag = $1 WHERE user_id = $2 AND version = $3"
 
-const deleteKeyBackupSQL = "" +
-	"UPDATE userapi_key_backup_versions SET deleted=1 WHERE user_id = $1 AND version = $2"
+// SQL: Delete key backup version
+const deleteKeyBackupSQL = "UPDATE userapi_key_backup_versions SET deleted=1 WHERE user_id = $1 AND version = $2"
 
-const selectKeyBackupSQL = "" +
-	"SELECT algorithm, auth_data, etag, deleted FROM userapi_key_backup_versions WHERE user_id = $1 AND version = $2"
+// SQL: Select key backup version
+const selectKeyBackupSQL = "SELECT algorithm, auth_data, etag, deleted FROM userapi_key_backup_versions WHERE user_id = $1 AND version = $2"
 
-const selectLatestVersionSQL = "" +
-	"SELECT MAX(version) FROM userapi_key_backup_versions WHERE user_id = $1"
+// SQL: Select latest version
+const selectLatestVersionSQL = "SELECT MAX(version) FROM userapi_key_backup_versions WHERE user_id = $1"
 
-type keyBackupVersionStatements struct {
-	insertKeyBackupStmt         *sql.Stmt
-	updateKeyBackupAuthDataStmt *sql.Stmt
-	deleteKeyBackupStmt         *sql.Stmt
-	selectKeyBackupStmt         *sql.Stmt
-	selectLatestVersionStmt     *sql.Stmt
-	updateKeyBackupETagStmt     *sql.Stmt
+// keyBackupVersionTable implements tables.KeyBackupVersionTable using GORM and a connection manager.
+type keyBackupVersionTable struct {
+	cm *sqlutil.Connections
+
+	insertKeyBackupSQL         string
+	updateKeyBackupAuthDataSQL string
+	updateKeyBackupETagSQL     string
+	deleteKeyBackupSQL         string
+	selectKeyBackupSQL         string
+	selectLatestVersionSQL     string
 }
 
-func NewPostgresKeyBackupVersionTable(ctx context.Context, db *sql.DB) (tables.KeyBackupVersionTable, error) {
-	s := &keyBackupVersionStatements{}
-	// Removed db.Exec(keyBackupVersionTableSchema) from constructor. Schema handled by migrator.
-	return s, sqlutil.StatementList{
-		{&s.insertKeyBackupStmt, insertKeyBackupSQL},
-		{&s.updateKeyBackupAuthDataStmt, updateKeyBackupAuthDataSQL},
-		{&s.deleteKeyBackupStmt, deleteKeyBackupSQL},
-		{&s.selectKeyBackupStmt, selectKeyBackupSQL},
-		{&s.selectLatestVersionStmt, selectLatestVersionSQL},
-		{&s.updateKeyBackupETagStmt, updateKeyBackupETagSQL},
-	}.Prepare(db)
+// NewPostgresKeyBackupVersionTable returns a new KeyBackupVersionTable using the provided connection manager.
+func NewPostgresKeyBackupVersionTable(cm *sqlutil.Connections) tables.KeyBackupVersionTable {
+	return &keyBackupVersionTable{
+		cm:                         cm,
+		insertKeyBackupSQL:         insertKeyBackupSQL,
+		updateKeyBackupAuthDataSQL: updateKeyBackupAuthDataSQL,
+		updateKeyBackupETagSQL:     updateKeyBackupETagSQL,
+		deleteKeyBackupSQL:         deleteKeyBackupSQL,
+		selectKeyBackupSQL:         selectKeyBackupSQL,
+		selectLatestVersionSQL:     selectLatestVersionSQL,
+	}
 }
 
-func (s *keyBackupVersionStatements) InsertKeyBackup(
-	ctx context.Context, txn *sql.Tx, userID, algorithm string, authData json.RawMessage, etag string,
+// InsertKeyBackup inserts a new key backup version.
+func (t *keyBackupVersionTable) InsertKeyBackup(
+	ctx context.Context, userID, algorithm string, authData json.RawMessage, etag string,
 ) (version string, err error) {
+	db := t.cm.Connection(ctx, false)
 	var versionInt int64
-	err = txn.Stmt(s.insertKeyBackupStmt).QueryRowContext(ctx, userID, algorithm, string(authData), etag).Scan(&versionInt)
+	err = db.Raw(t.insertKeyBackupSQL, userID, algorithm, string(authData), etag).Row().Scan(&versionInt)
 	return strconv.FormatInt(versionInt, 10), err
 }
 
-func (s *keyBackupVersionStatements) UpdateKeyBackupAuthData(
-	ctx context.Context, txn *sql.Tx, userID, version string, authData json.RawMessage,
+// UpdateKeyBackupAuthData updates an existing key backup version auth data.
+func (t *keyBackupVersionTable) UpdateKeyBackupAuthData(
+	ctx context.Context, userID, version string, authData json.RawMessage,
 ) error {
 	versionInt, err := strconv.ParseInt(version, 10, 64)
 	if err != nil {
 		return fmt.Errorf("invalid version")
 	}
-	_, err = txn.Stmt(s.updateKeyBackupAuthDataStmt).ExecContext(ctx, string(authData), userID, versionInt)
-	return err
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.updateKeyBackupAuthDataSQL, string(authData), userID, versionInt)
+	return result.Error
 }
 
-func (s *keyBackupVersionStatements) UpdateKeyBackupETag(
-	ctx context.Context, txn *sql.Tx, userID, version, etag string,
+// UpdateKeyBackupETag updates an existing key backup version etag.
+func (t *keyBackupVersionTable) UpdateKeyBackupETag(
+	ctx context.Context, userID, version, etag string,
 ) error {
 	versionInt, err := strconv.ParseInt(version, 10, 64)
 	if err != nil {
 		return fmt.Errorf("invalid version")
 	}
-	_, err = txn.Stmt(s.updateKeyBackupETagStmt).ExecContext(ctx, etag, userID, versionInt)
-	return err
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.updateKeyBackupETagSQL, etag, userID, versionInt)
+	return result.Error
 }
 
-func (s *keyBackupVersionStatements) DeleteKeyBackup(
-	ctx context.Context, txn *sql.Tx, userID, version string,
+// DeleteKeyBackup deletes a key backup version.
+func (t *keyBackupVersionTable) DeleteKeyBackup(
+	ctx context.Context, userID, version string,
 ) (bool, error) {
 	versionInt, err := strconv.ParseInt(version, 10, 64)
 	if err != nil {
 		return false, fmt.Errorf("invalid version")
 	}
-	result, err := txn.Stmt(s.deleteKeyBackupStmt).ExecContext(ctx, userID, versionInt)
-	if err != nil {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.deleteKeyBackupSQL, userID, versionInt)
+	if err = result.Error; err != nil {
 		return false, err
 	}
-	ra, err := result.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-	return ra == 1, nil
+	return result.RowsAffected == 1, nil
 }
 
-func (s *keyBackupVersionStatements) SelectKeyBackup(
-	ctx context.Context, txn *sql.Tx, userID, version string,
+// SelectKeyBackup retrieves a key backup version.
+func (t *keyBackupVersionTable) SelectKeyBackup(
+	ctx context.Context, userID, version string,
 ) (versionResult, algorithm string, authData json.RawMessage, etag string, deleted bool, err error) {
+	db := t.cm.Connection(ctx, true)
 	var versionInt int64
 	if version == "" {
 		var v *int64 // allows nulls
-		if err = txn.Stmt(s.selectLatestVersionStmt).QueryRowContext(ctx, userID).Scan(&v); err != nil {
+		if err = db.Raw(t.selectLatestVersionSQL, userID).Row().Scan(&v); err != nil {
 			return
 		}
 		if v == nil {
@@ -155,7 +164,7 @@ func (s *keyBackupVersionStatements) SelectKeyBackup(
 	versionResult = strconv.FormatInt(versionInt, 10)
 	var deletedInt int
 	var authDataStr string
-	err = txn.Stmt(s.selectKeyBackupStmt).QueryRowContext(ctx, userID, versionInt).Scan(&algorithm, &authDataStr, &etag, &deletedInt)
+	err = db.Raw(t.selectKeyBackupSQL, userID, versionInt).Row().Scan(&algorithm, &authDataStr, &etag, &deletedInt)
 	deleted = deletedInt == 1
 	authData = json.RawMessage(authDataStr)
 	return

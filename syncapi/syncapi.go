@@ -42,7 +42,7 @@ import (
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	dendriteCfg *config.Dendrite,
+	dendriteCfg *config.Matrix,
 	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.SyncUserAPI,
@@ -52,7 +52,12 @@ func AddPublicRoutes(
 ) {
 	js, natsClient := natsInstance.Prepare(ctx, &dendriteCfg.Global.JetStream)
 
-	syncDB, err := storage.NewSyncServerDatasource(ctx, cm, &dendriteCfg.SyncAPI.Database)
+	syncApiCM, err := cm.FromOptions(ctx, &dendriteCfg.SyncAPI.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to obtain a connection manager for sync db")
+	}
+
+	syncDB, err := storage.NewSyncServerDatasource(ctx, syncApiCM)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}

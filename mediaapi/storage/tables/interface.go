@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,31 +16,29 @@ package tables
 
 import (
 	"context"
-	"database/sql"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/mediaapi/types"
 )
 
 type Thumbnails interface {
-	InsertThumbnail(ctx context.Context, txn *sql.Tx, thumbnailMetadata *types.ThumbnailMetadata) error
+	InsertThumbnail(ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata) error
 	SelectThumbnail(
-		ctx context.Context, txn *sql.Tx,
+		ctx context.Context,
 		mediaID types.MediaID, mediaOrigin spec.ServerName,
 		width, height int,
 		resizeMethod string,
 	) (*types.ThumbnailMetadata, error)
 	SelectThumbnails(
-		ctx context.Context, txn *sql.Tx, mediaID types.MediaID,
+		ctx context.Context, mediaID types.MediaID,
 		mediaOrigin spec.ServerName,
 	) ([]*types.ThumbnailMetadata, error)
 }
 
 type MediaRepository interface {
-	InsertMedia(ctx context.Context, txn *sql.Tx, mediaMetadata *types.MediaMetadata) error
-	SelectMedia(ctx context.Context, txn *sql.Tx, mediaID types.MediaID, mediaOrigin spec.ServerName) (*types.MediaMetadata, error)
+	InsertMedia(ctx context.Context, mediaMetadata *types.MediaMetadata) error
+	SelectMedia(ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName) (*types.MediaMetadata, error)
 	SelectMediaByHash(
-		ctx context.Context, txn *sql.Tx,
+		ctx context.Context,
 		mediaHash types.Base64Hash, mediaOrigin spec.ServerName,
 	) (*types.MediaMetadata, error)
 }

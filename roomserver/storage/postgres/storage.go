@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,16 +17,10 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-
-	// Import the postgres database driver.
-	_ "github.com/lib/pq"
-
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
-	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 )
 
 // A Database is used to store room events and stream offsets.
@@ -34,180 +28,139 @@ type Database struct {
 	shared.Database
 }
 
-var Migrations = []sqlutil.Migration{
+var Migrations = []frame.MigrationPatch{
 	{
-		Version:   "roomserver_001_create_event_json_table",
-		QueryUp:   eventJSONSchema,
-		QueryDown: eventJSONSchemaRevert,
+		Name:        "roomserver_001_create_event_json_table",
+		Patch:       eventJSONSchema,
+		RevertPatch: eventJSONSchemaRevert,
 	},
 	{
-		Version:   "roomserver_002_create_event_state_keys_table",
-		QueryUp:   eventStateKeysSchema,
-		QueryDown: eventStateKeysSchemaRevert,
+		Name:        "roomserver_002_create_event_state_keys_table",
+		Patch:       eventStateKeysSchema,
+		RevertPatch: eventStateKeysSchemaRevert,
 	},
 	{
-		Version:   "roomserver_003_create_event_types_table",
-		QueryUp:   eventTypesSchema,
-		QueryDown: eventTypesSchemaRevert,
+		Name:        "roomserver_003_create_event_types_table",
+		Patch:       eventTypesSchema,
+		RevertPatch: eventTypesSchemaRevert,
 	},
 	{
-		Version:   "roomserver_004_create_events_table",
-		QueryUp:   eventsSchema,
-		QueryDown: eventsSchemaRevert,
+		Name:        "roomserver_004_create_events_table",
+		Patch:       eventsSchema,
+		RevertPatch: eventsSchemaRevert,
 	},
 	{
-		Version:   "roomserver_005_create_invite_table",
-		QueryUp:   inviteSchema,
-		QueryDown: inviteSchemaRevert,
+		Name:        "roomserver_005_create_invite_table",
+		Patch:       inviteSchema,
+		RevertPatch: inviteSchemaRevert,
 	},
 	{
-		Version:   "roomserver_006_create_membership_table",
-		QueryUp:   membershipSchema,
-		QueryDown: membershipSchemaRevert,
+		Name:        "roomserver_006_create_membership_table",
+		Patch:       membershipSchema,
+		RevertPatch: membershipSchemaRevert,
 	},
 	{
-		Version:   "roomserver_007_create_previous_events_table",
-		QueryUp:   previousEventSchema,
-		QueryDown: previousEventSchemaRevert,
+		Name:        "roomserver_007_create_previous_events_table",
+		Patch:       previousEventSchema,
+		RevertPatch: previousEventSchemaRevert,
 	},
 	{
-		Version:   "roomserver_008_create_published_table",
-		QueryUp:   publishedSchema,
-		QueryDown: publishedSchemaRevert,
+		Name:        "roomserver_008_create_published_table",
+		Patch:       publishedSchema,
+		RevertPatch: publishedSchemaRevert,
 	},
 	{
-		Version:   "roomserver_009_create_redactions_table",
-		QueryUp:   redactionsSchema,
-		QueryDown: redactionsSchemaRevert,
+		Name:        "roomserver_009_create_redactions_table",
+		Patch:       redactionsSchema,
+		RevertPatch: redactionsSchemaRevert,
 	},
 	{
-		Version:   "roomserver_010_create_reported_events_table",
-		QueryUp:   reportedEventsSchema,
-		QueryDown: reportedEventsSchemaRevert,
+		Name:        "roomserver_010_create_reported_events_table",
+		Patch:       reportedEventsSchema,
+		RevertPatch: reportedEventsSchemaRevert,
 	},
 	{
-		Version:   "roomserver_011_create_room_aliases_table",
-		QueryUp:   roomAliasesSchema,
-		QueryDown: roomAliasesSchemaRevert,
+		Name:        "roomserver_011_create_room_aliases_table",
+		Patch:       roomAliasesSchema,
+		RevertPatch: roomAliasesSchemaRevert,
 	},
 	{
-		Version:   "roomserver_012_create_rooms_table",
-		QueryUp:   roomsSchema,
-		QueryDown: roomsSchemaRevert,
+		Name:        "roomserver_012_create_rooms_table",
+		Patch:       roomsSchema,
+		RevertPatch: roomsSchemaRevert,
 	},
 	{
-		Version:   "roomserver_013_create_state_block_table",
-		QueryUp:   stateDataSchema,
-		QueryDown: stateDataSchemaRevert,
+		Name:        "roomserver_013_create_state_block_table",
+		Patch:       stateDataSchema,
+		RevertPatch: stateDataSchemaRevert,
 	},
 	{
-		Version:   "roomserver_014_create_state_snapshot_table",
-		QueryUp:   stateSnapshotSchema,
-		QueryDown: stateSnapshotSchemaRevert,
+		Name:        "roomserver_014_create_state_snapshot_table",
+		Patch:       stateSnapshotSchema,
+		RevertPatch: stateSnapshotSchemaRevert,
 	},
 	{
-		Version:   "roomserver_015_create_user_room_keys_table",
-		QueryUp:   userRoomKeysSchema,
-		QueryDown: userRoomKeysSchemaRevert,
+		Name:        "roomserver_015_create_user_room_keys_table",
+		Patch:       userRoomKeysSchema,
+		RevertPatch: userRoomKeysSchemaRevert,
 	},
 }
 
 // Open a postgres database.
-func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
+func Open(ctx context.Context, cm *sqlutil.Connections, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
-	var err error
-	db, writer, err := conMan.Connection(ctx, dbProperties)
-	if err != nil {
-		return nil, fmt.Errorf("sqlutil.Open: %w", err)
-	}
 
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(Migrations...)
-	if err = m.Up(ctx); err != nil {
+	err := cm.MigrateStrings(ctx, Migrations...)
+	if err != nil {
 		return nil, err
 	}
 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
-	if err = d.prepare(ctx, db, writer, cache); err != nil {
+	if err := d.prepare(ctx, cm, cache); err != nil {
 		return nil, err
 	}
 
 	return &d, nil
 }
 
-func (d *Database) prepare(ctx context.Context, db *sql.DB, writer sqlutil.Writer, cache caching.RoomServerCaches) error {
-	eventStateKeys, err := NewPostgresEventStateKeysTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	eventTypes, err := NewPostgresEventTypesTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	eventJSON, err := NewPostgresEventJSONTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	events, err := NewPostgresEventsTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	rooms, err := NewPostgresRoomsTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	stateBlock, err := NewPostgresStateBlockTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	stateSnapshot, err := NewPostgresStateSnapshotTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	prevEvents, err := NewPostgresPreviousEventsTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	roomAliases, err := NewPostgresRoomAliasesTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	invites, err := NewPostgresInvitesTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	membership, err := NewPostgresMembershipTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	published, err := NewPostgresPublishedTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	redactions, err := NewPostgresRedactionsTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	purge, err := NewPostgresPurgeStatements(db)
-	if err != nil {
-		return err
-	}
-	userRoomKeys, err := NewPostgresUserRoomKeysTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	reportedEvents, err := NewPostgresReportedEventsTable(ctx, db)
-	if err != nil {
-		return err
-	}
+func (d *Database) prepare(ctx context.Context, cm *sqlutil.Connections, cache caching.RoomServerCaches) error {
+	eventStateKeys := NewPostgresEventStateKeysTable(cm)
+
+	eventTypes := NewPostgresEventTypesTable(cm)
+
+	eventJSON := NewPostgresEventJSONTable(cm)
+
+	events := NewPostgresEventsTable(cm)
+
+	rooms := NewPostgresRoomsTable(cm)
+
+	stateBlock := NewPostgresStateBlockTable(cm)
+
+	stateSnapshot := NewPostgresStateSnapshotTable(cm)
+
+	prevEvents := NewPostgresPreviousEventsTable(cm)
+
+	roomAliases := NewPostgresRoomAliasesTable(cm)
+
+	invites := NewPostgresInvitesTable(cm)
+
+	membership := NewPostgresMembershipTable(cm)
+
+	published := NewPostgresPublishedTable(cm)
+
+	redactions := NewPostgresRedactionsTable(cm)
+
+	purge := NewPostgresPurgeTable(cm)
+	userRoomKeys := NewPostgresUserRoomKeysTable(cm)
+
+	reportedEvents := NewPostgresReportedEventsTable(cm)
 
 	d.Database = shared.Database{
-		DB: db,
+		Pool: cm,
 		EventDatabase: shared.EventDatabase{
-			DB:                  db,
+			Pool:                cm,
 			Cache:               cache,
-			Writer:              writer,
 			EventsTable:         events,
 			EventJSONTable:      eventJSON,
 			EventTypesTable:     eventTypes,
@@ -217,7 +170,6 @@ func (d *Database) prepare(ctx context.Context, db *sql.DB, writer sqlutil.Write
 			ReportedEventsTable: reportedEvents,
 		},
 		Cache:              cache,
-		Writer:             writer,
 		RoomsTable:         rooms,
 		StateBlockTable:    stateBlock,
 		StateSnapshotTable: stateSnapshot,

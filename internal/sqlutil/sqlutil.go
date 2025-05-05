@@ -53,7 +53,7 @@ func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) 
 			return nil, fmt.Errorf("failed to find reserved connections: %w", err)
 		}
 		if configured, allowed := dbProperties.MaxOpenConns(), maxVal-reserved; configured > allowed {
-			logrus.Errorf("ERROR: The configured 'max_open_conns' is greater than the %d non-superuser connections that PostgreSQL is configured to allow. This can result in bad performance or deadlocks. Please pay close attention to your configured database connection counts. If you REALLY know what you are doing and want to override this error, pass the --skip-db-sanity option to Dendrite.", allowed)
+			logrus.Errorf("ERROR: The configured 'max_open_conns' is greater than the %d non-superuser connections that PostgreSQL is configured to allow. This can result in bad performance or deadlocks. Please pay close attention to your configured database connection counts. If you REALLY know what you are doing and want to override this error, pass the --skip-db-sanity option to Matrix.", allowed)
 			return nil, fmt.Errorf("database sanity checks failed")
 		}
 

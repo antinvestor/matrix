@@ -70,7 +70,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, dev *userapi.Device, db sto
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: uploadResponse{
-			ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.Matrix.ServerName, r.MediaMetadata.MediaID),
+			ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.Global.ServerName, r.MediaMetadata.MediaID),
 		},
 	}
 }
@@ -81,13 +81,13 @@ func Upload(req *http.Request, cfg *config.MediaAPI, dev *userapi.Device, db sto
 func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI, dev *userapi.Device) (*uploadRequest, *util.JSONResponse) {
 	r := &uploadRequest{
 		MediaMetadata: &types.MediaMetadata{
-			Origin:        cfg.Matrix.ServerName,
+			Origin:        cfg.Global.ServerName,
 			FileSizeBytes: types.FileSizeBytes(req.ContentLength),
 			ContentType:   types.ContentType(req.Header.Get("Content-Type")),
 			UploadName:    types.Filename(url.PathEscape(req.FormValue("filename"))),
 			UserID:        types.MatrixUserID(dev.UserID),
 		},
-		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Matrix.ServerName),
+		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Global.ServerName),
 	}
 
 	if resErr := r.Validate(cfg.MaxFileSizeBytes); resErr != nil {

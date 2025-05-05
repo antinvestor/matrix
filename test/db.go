@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -126,7 +126,7 @@ func generateNewDBName() (string, error) {
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config.DataSource, close func(), err error) {
+func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config.DataSource, close func(ctx context.Context), err error) {
 
 	var connectionUri *url.URL
 	postgresUriStr := os.Getenv("TESTING_DATABASE_URI")
@@ -136,21 +136,21 @@ func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config
 
 	parsedPostgresUri, err := url.Parse(postgresUriStr)
 	if err != nil {
-		return "", func() {}, err
+		return "", func(ctx context.Context) {}, err
 	}
 
 	newDatabaseName, err := generateNewDBName()
 	if err != nil {
-		return "", func() {}, err
+		return "", func(ctx context.Context) {}, err
 	}
 
 	connectionUri, err = ensureDatabaseExists(ctx, parsedPostgresUri, newDatabaseName)
 	if err != nil {
-		return "", func() {}, err
+		return "", func(ctx context.Context) {}, err
 	}
 
 	postgresUriStr = connectionUri.String()
-	return config.DataSource(postgresUriStr), func() {
+	return config.DataSource(postgresUriStr), func(ctx context.Context) {
 		_ = clearDatabase(ctx, postgresUriStr)
 	}, nil
 }

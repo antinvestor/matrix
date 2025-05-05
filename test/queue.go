@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ import (
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareNatsDataSourceConnection(_ context.Context) (connStr config.DataSource, close func(), err error) {
+func PrepareNatsDataSourceConnection(_ context.Context) (connStr config.DataSource, close func(ctx context.Context), err error) {
 
 	natsUriStr := os.Getenv("TESTING_QUEUE_URI")
 	if natsUriStr == "" {
@@ -67,11 +67,11 @@ func PrepareNatsDataSourceConnection(_ context.Context) (connStr config.DataSour
 
 	parsedNatsUri, err := url.Parse(natsUriStr)
 	if err != nil {
-		return "", func() {}, err
+		return "", func(ctx context.Context) {}, err
 	}
 
 	natsUriStr = parsedNatsUri.String()
 
-	return config.DataSource(natsUriStr), func() {
+	return config.DataSource(natsUriStr), func(ctx context.Context) {
 	}, nil
 }

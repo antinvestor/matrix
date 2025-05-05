@@ -3,6 +3,7 @@ package tables_test
 import (
 	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
@@ -14,48 +15,44 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventStateKeysTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.EventStateKeys, func()) {
+func mustCreateEventStateKeysTable(ctx context.Context, svc *frame.Service, t *testing.T) tables.EventStateKeys {
 	t.Helper()
 
-	db, closeDb := migrateDatabase(ctx, t, dep)
+	cm := migrateDatabase(ctx, svc, t)
 
-	tab, err := postgres.NewPostgresEventStateKeysTable(ctx, db)
-
-	assert.NoError(t, err)
-
-	return tab, closeDb
+	return postgres.NewPostgresEventStateKeysTable(cm)
 }
 
 func Test_EventStateKeysTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		tab, closeDb := mustCreateEventStateKeysTable(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		tab := mustCreateEventStateKeysTable(ctx, svc, t)
 
 		var stateKeyNID, gotEventStateKey types.EventStateKeyNID
 		var err error
 		// create some dummy data
 		for i := 0; i < 10; i++ {
 			stateKey := fmt.Sprintf("@user%d:localhost", i)
-			stateKeyNID, err = tab.InsertEventStateKeyNID(ctx, nil, stateKey)
+			stateKeyNID, err = tab.InsertEventStateKeyNID(ctx, stateKey)
 			assert.NoError(t, err)
-			gotEventStateKey, err = tab.SelectEventStateKeyNID(ctx, nil, stateKey)
+			gotEventStateKey, err = tab.SelectEventStateKeyNID(ctx, stateKey)
 			assert.NoError(t, err)
 			assert.Equal(t, stateKeyNID, gotEventStateKey)
 		}
 		// This should fail, since @user0:localhost already exists
 		stateKey := fmt.Sprintf("@user%d:localhost", 0)
-		_, err = tab.InsertEventStateKeyNID(ctx, nil, stateKey)
+		_, err = tab.InsertEventStateKeyNID(ctx, stateKey)
 		assert.Error(t, err)
 
-		stateKeyNIDsMap, err := tab.BulkSelectEventStateKeyNID(ctx, nil, []string{"@user0:localhost", "@user1:localhost"})
+		stateKeyNIDsMap, err := tab.BulkSelectEventStateKeyNID(ctx, []string{"@user0:localhost", "@user1:localhost"})
 		assert.NoError(t, err)
 		wantStateKeyNIDs := make([]types.EventStateKeyNID, 0, len(stateKeyNIDsMap))
 		for _, nid := range stateKeyNIDsMap {
 			wantStateKeyNIDs = append(wantStateKeyNIDs, nid)
 		}
-		stateKeyNIDs, err := tab.BulkSelectEventStateKey(ctx, nil, wantStateKeyNIDs)
+		stateKeyNIDs, err := tab.BulkSelectEventStateKey(ctx, wantStateKeyNIDs)
 		assert.NoError(t, err)
 		// verify that BulkSelectEventStateKeyNID and BulkSelectEventStateKey return the same values
 		for userID, nid := range stateKeyNIDsMap {

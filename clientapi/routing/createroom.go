@@ -149,7 +149,7 @@ func createRoom(
 			JSON: spec.InternalServerError{},
 		}
 	}
-	if !cfg.Matrix.IsLocalServerName(userID.Domain()) {
+	if !cfg.Global.IsLocalServerName(userID.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden(fmt.Sprintf("User domain %q not configured locally", userID.Domain())),
@@ -202,8 +202,8 @@ func createRoom(
 	userDisplayName := profile.DisplayName
 	userAvatarURL := profile.AvatarURL
 
-	keyID := cfg.Matrix.KeyID
-	privateKey := cfg.Matrix.PrivateKey
+	keyID := cfg.Global.KeyID
+	privateKey := cfg.Global.PrivateKey
 
 	req := roomserverAPI.PerformCreateRoomRequest{
 		InvitedUsers:              createRequest.Invite,

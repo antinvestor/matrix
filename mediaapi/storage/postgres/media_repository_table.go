@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -46,7 +45,7 @@ CREATE TABLE IF NOT EXISTS mediaapi_media_repository (
     upload_name TEXT NOT NULL,
     -- Alternate RFC 4648 unpadded base64 encoding string representation of a SHA-256 hash sum of the file data.
     base64hash TEXT NOT NULL,
-    -- The user who uploaded the file. Should be a Matrix user ID.
+    -- The user who uploaded the file. Should be a Global user ID.
     user_id TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);
@@ -68,26 +67,28 @@ SELECT content_type, file_size_bytes, creation_ts, upload_name, media_id, user_i
 `
 
 type mediaStatements struct {
-	insertMediaStmt       *sql.Stmt
-	selectMediaStmt       *sql.Stmt
-	selectMediaByHashStmt *sql.Stmt
+	cm              *sqlutil.Connections
+	InsertSQL       string
+	SelectSQL       string
+	SelectByHashSQL string
 }
 
-func NewPostgresMediaRepositoryTable(ctx context.Context, db *sql.DB) (tables.MediaRepository, error) {
-	s := &mediaStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertMediaStmt, insertMediaSQL},
-		{&s.selectMediaStmt, selectMediaSQL},
-		{&s.selectMediaByHashStmt, selectMediaByHashSQL},
-	}.Prepare(db)
+// Refactored mediaStatements to use connection manager and GORM-style logic, removing *sql.Tx from all methods but preserving function names and signatures as per updated table interface.
+// NewPostgresMediaRepositoryTable initializes a mediaStatements with SQL constants and a connection manager
+func NewPostgresMediaRepositoryTable(cm *sqlutil.Connections) tables.MediaRepository {
+	return &mediaStatements{
+		cm:              cm,
+		InsertSQL:       insertMediaSQL,
+		SelectSQL:       selectMediaSQL,
+		SelectByHashSQL: selectMediaByHashSQL,
+	}
 }
 
-func (s *mediaStatements) InsertMedia(
-	ctx context.Context, txn *sql.Tx, mediaMetadata *types.MediaMetadata,
-) error {
+func (s *mediaStatements) InsertMedia(ctx context.Context, mediaMetadata *types.MediaMetadata) error {
+	db := s.cm.Connection(ctx, false)
 	mediaMetadata.CreationTimestamp = spec.AsTimestamp(time.Now())
-	_, err := sqlutil.TxStmtContext(ctx, txn, s.insertMediaStmt).ExecContext(
-		ctx,
+	return db.Exec(
+		s.InsertSQL,
 		mediaMetadata.MediaID,
 		mediaMetadata.Origin,
 		mediaMetadata.ContentType,
@@ -96,46 +97,29 @@ func (s *mediaStatements) InsertMedia(
 		mediaMetadata.UploadName,
 		mediaMetadata.Base64Hash,
 		mediaMetadata.UserID,
-	)
-	return err
+	).Error
 }
 
-func (s *mediaStatements) SelectMedia(
-	ctx context.Context, txn *sql.Tx, mediaID types.MediaID, mediaOrigin spec.ServerName,
-) (*types.MediaMetadata, error) {
-	mediaMetadata := types.MediaMetadata{
-		MediaID: mediaID,
-		Origin:  mediaOrigin,
+func (s *mediaStatements) SelectMedia(ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName) (*types.MediaMetadata, error) {
+	db := s.cm.Connection(ctx, true)
+	row := db.Raw(s.SelectSQL, mediaID, mediaOrigin).Row()
+	var meta types.MediaMetadata
+	meta.MediaID = mediaID
+	meta.Origin = mediaOrigin
+	if err := row.Scan(&meta.ContentType, &meta.FileSizeBytes, &meta.CreationTimestamp, &meta.UploadName, &meta.Base64Hash, &meta.UserID); err != nil {
+		return nil, err
 	}
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectMediaStmt).QueryRowContext(
-		ctx, mediaMetadata.MediaID, mediaMetadata.Origin,
-	).Scan(
-		&mediaMetadata.ContentType,
-		&mediaMetadata.FileSizeBytes,
-		&mediaMetadata.CreationTimestamp,
-		&mediaMetadata.UploadName,
-		&mediaMetadata.Base64Hash,
-		&mediaMetadata.UserID,
-	)
-	return &mediaMetadata, err
+	return &meta, nil
 }
 
-func (s *mediaStatements) SelectMediaByHash(
-	ctx context.Context, txn *sql.Tx, mediaHash types.Base64Hash, mediaOrigin spec.ServerName,
-) (*types.MediaMetadata, error) {
-	mediaMetadata := types.MediaMetadata{
-		Base64Hash: mediaHash,
-		Origin:     mediaOrigin,
+func (s *mediaStatements) SelectMediaByHash(ctx context.Context, mediaHash types.Base64Hash, mediaOrigin spec.ServerName) (*types.MediaMetadata, error) {
+	db := s.cm.Connection(ctx, true)
+	row := db.Raw(s.SelectByHashSQL, mediaHash, mediaOrigin).Row()
+	var meta types.MediaMetadata
+	meta.Base64Hash = mediaHash
+	meta.Origin = mediaOrigin
+	if err := row.Scan(&meta.ContentType, &meta.FileSizeBytes, &meta.CreationTimestamp, &meta.UploadName, &meta.MediaID, &meta.UserID); err != nil {
+		return nil, err
 	}
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectMediaByHashStmt).QueryRowContext(
-		ctx, mediaMetadata.Base64Hash, mediaMetadata.Origin,
-	).Scan(
-		&mediaMetadata.ContentType,
-		&mediaMetadata.FileSizeBytes,
-		&mediaMetadata.CreationTimestamp,
-		&mediaMetadata.UploadName,
-		&mediaMetadata.MediaID,
-		&mediaMetadata.UserID,
-	)
-	return &mediaMetadata, err
+	return &meta, nil
 }

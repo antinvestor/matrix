@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,11 +52,12 @@ func (t *testFedClient) ClaimKeys(ctx context.Context, origin, s spec.ServerName
 }
 
 func TestFederationClientQueryKeys(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
@@ -67,7 +68,7 @@ func TestFederationClientQueryKeys(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -84,13 +85,14 @@ func TestFederationClientQueryKeys(t *testing.T) {
 
 func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 	err := testDB.AddServerToBlacklist(ctx, "server")
 	assert.Nil(t, err)
 
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
@@ -101,7 +103,7 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -117,11 +119,12 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 }
 
 func TestFederationClientQueryKeysFailure(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
@@ -132,7 +135,7 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -149,11 +152,12 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 
 func TestFederationClientClaimKeys(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
@@ -164,7 +168,7 @@ func TestFederationClientClaimKeys(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -180,13 +184,14 @@ func TestFederationClientClaimKeys(t *testing.T) {
 }
 
 func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 	err := testDB.AddServerToBlacklist(ctx, "server")
 	assert.Nil(t, err)
 
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
@@ -197,7 +202,7 @@ func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -107,10 +107,16 @@ func toClientResponse(ctx context.Context, res *MSC2836EventRelationshipsRespons
 
 // Enable this MSC
 func Enable(
-	ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
+	ctx context.Context, cfg *config.Matrix, cm *sqlutil.Connections, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
-	db, err := NewDatabase(ctx, cm, &cfg.MSCs.Database)
+
+	msc2836CM, err := cm.FromOptions(ctx, &cfg.MSCs.Database)
+	if err != nil {
+		return fmt.Errorf("cannot create MSC2836 connection manager: %w", err)
+	}
+
+	db, err := NewDatabase(ctx, msc2836CM)
 	if err != nil {
 		return fmt.Errorf("cannot enable MSC2836: %w", err)
 	}

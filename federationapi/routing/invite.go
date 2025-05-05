@@ -48,7 +48,7 @@ func InviteV3(
 			JSON: spec.BadJSON(err.Error()),
 		}
 	}
-	if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
+	if !cfg.Global.IsLocalServerName(invitedUser.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
@@ -60,8 +60,8 @@ func InviteV3(
 			RoomVersion:       inviteReq.RoomVersion(),
 			RoomID:            roomID,
 			InvitedUser:       invitedUser,
-			KeyID:             cfg.Matrix.KeyID,
-			PrivateKey:        cfg.Matrix.PrivateKey,
+			KeyID:             cfg.Global.KeyID,
+			PrivateKey:        cfg.Global.PrivateKey,
 			Verifier:          keys,
 			RoomQuerier:       rsAPI,
 			MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
@@ -137,7 +137,7 @@ func InviteV2(
 				JSON: spec.InvalidParam("The user ID is invalid"),
 			}
 		}
-		if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
+		if !cfg.Global.IsLocalServerName(invitedUser.Domain()) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
@@ -155,8 +155,8 @@ func InviteV2(
 			RoomVersion:       inviteReq.RoomVersion(),
 			RoomID:            roomID,
 			InvitedUser:       *invitedUser,
-			KeyID:             cfg.Matrix.KeyID,
-			PrivateKey:        cfg.Matrix.PrivateKey,
+			KeyID:             cfg.Global.KeyID,
+			PrivateKey:        cfg.Global.PrivateKey,
 			Verifier:          keys,
 			RoomQuerier:       rsAPI,
 			MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
@@ -230,7 +230,7 @@ func InviteV1(
 			JSON: spec.InvalidParam("The user ID is invalid"),
 		}
 	}
-	if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
+	if !cfg.Global.IsLocalServerName(invitedUser.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
@@ -248,8 +248,8 @@ func InviteV1(
 		RoomVersion:       roomVer,
 		RoomID:            roomID,
 		InvitedUser:       *invitedUser,
-		KeyID:             cfg.Matrix.KeyID,
-		PrivateKey:        cfg.Matrix.PrivateKey,
+		KeyID:             cfg.Global.KeyID,
+		PrivateKey:        cfg.Global.PrivateKey,
 		Verifier:          keys,
 		RoomQuerier:       rsAPI,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},

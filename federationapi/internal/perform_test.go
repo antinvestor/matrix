@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,8 @@ func (t *testFedClient) LookupRoomAlias(ctx context.Context, origin, s spec.Serv
 
 func TestPerformWakeupServers(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 
 	server := spec.ServerName("wakeup")
@@ -60,7 +61,7 @@ func TestPerformWakeupServers(t *testing.T) {
 	_, key, err := ed25519.GenerateKey(nil)
 	assert.NoError(t, err)
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
 				KeyID:      "ed25519:1",
@@ -73,7 +74,7 @@ func TestPerformWakeupServers(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -97,7 +98,8 @@ func TestPerformWakeupServers(t *testing.T) {
 
 func TestQueryRelayServers(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 
 	server := spec.ServerName("wakeup")
@@ -108,7 +110,7 @@ func TestQueryRelayServers(t *testing.T) {
 	_, key, err := ed25519.GenerateKey(nil)
 	assert.NoError(t, err)
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
 				KeyID:      "ed25519:1",
@@ -121,7 +123,7 @@ func TestQueryRelayServers(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -140,7 +142,8 @@ func TestQueryRelayServers(t *testing.T) {
 
 func TestRemoveRelayServers(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	testDB := test.NewInMemoryFederationDatabase()
 
@@ -152,7 +155,7 @@ func TestRemoveRelayServers(t *testing.T) {
 	_, key, err := ed25519.GenerateKey(nil)
 	assert.NoError(t, err)
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
 				KeyID:      "ed25519:1",
@@ -165,7 +168,7 @@ func TestRemoveRelayServers(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -188,14 +191,15 @@ func TestRemoveRelayServers(t *testing.T) {
 
 func TestPerformDirectoryLookup(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	testDB := test.NewInMemoryFederationDatabase()
 
 	_, key, err := ed25519.GenerateKey(nil)
 	assert.NoError(t, err)
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
 				KeyID:      "ed25519:1",
@@ -208,7 +212,7 @@ func TestPerformDirectoryLookup(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
@@ -226,7 +230,8 @@ func TestPerformDirectoryLookup(t *testing.T) {
 
 func TestPerformDirectoryLookupRelaying(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	testDB := test.NewInMemoryFederationDatabase()
 
@@ -237,7 +242,7 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 	_, key, err := ed25519.GenerateKey(nil)
 	assert.NoError(t, err)
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "relay",
 				KeyID:      "ed25519:1",
@@ -250,7 +255,7 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(

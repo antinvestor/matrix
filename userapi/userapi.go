@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,9 +45,10 @@ const defaultWaitTime = time.Minute
 //
 // Creating a new instance of the user API requires a roomserver API with a federation API set
 // using its `SetFederationAPI` method, other you may get nil-dereference errors.
+// cm should use :  &dendriteCfg.UserAPI.AccountDatabase,
 func NewInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Dendrite,
+	dendriteCfg *config.Matrix,
 	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	rsAPI rsapi.UserRoomserverAPI,
@@ -63,22 +64,31 @@ func NewInternalAPI(
 
 	pgClient := pushgateway.NewHTTPClient(dendriteCfg.UserAPI.PushGatewayDisableTLSValidation)
 
+	userApiCM, err := cm.FromOptions(ctx, &dendriteCfg.UserAPI.AccountDatabase)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to configured userapi db")
+	}
+
 	db, err := storage.NewUserDatabase(
 		ctx,
 		profileCli,
-		cm,
-		&dendriteCfg.UserAPI.AccountDatabase,
+		userApiCM,
 		dendriteCfg.Global.ServerName,
 		dendriteCfg.UserAPI.BCryptCost,
 		dendriteCfg.UserAPI.OpenIDTokenLifetimeMS,
 		api.DefaultLoginTokenLifetime,
-		dendriteCfg.UserAPI.Matrix.ServerNotices.LocalPart,
+		dendriteCfg.UserAPI.Global.ServerNotices.LocalPart,
 	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
-	keyDB, err := storage.NewKeyDatabase(ctx, cm, &dendriteCfg.KeyServer.Database)
+	keyServerCM, err := cm.FromOptions(ctx, &dendriteCfg.KeyServer.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to configured keyserver db")
+	}
+
+	keyDB, err := storage.NewKeyDatabase(ctx, keyServerCM)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key db")
 	}

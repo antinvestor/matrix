@@ -22,9 +22,9 @@ func main() {
 	normalise := flag.String("normalise", "", "Normalise an existing configuration file by adding new/missing options and defaults")
 	flag.Parse()
 
-	var cfg *config.Dendrite
+	var cfg *config.Matrix
 	if *normalise == "" {
-		cfg = &config.Dendrite{
+		cfg = &config.Matrix{
 			Version: config.Version,
 		}
 		cfg.Defaults(config.DefaultOpts{

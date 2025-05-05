@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/matrix/clientapi/httputil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -71,8 +70,6 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			JSON: spec.InternalServerError{},
 		}
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	// only search rooms the user is actually joined to
 	joinedRooms, err := snapshot.RoomIDsWithMembership(ctx, device.UserID, "join")
@@ -279,7 +276,6 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 
 	logrus.Debugf("Full search request took %v", time.Since(start))
 
-	succeeded = true
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,

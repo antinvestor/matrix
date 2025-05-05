@@ -28,72 +28,55 @@ CREATE TABLE IF NOT EXISTS msc2836_edges (
 const msc2836EdgesSchemaRevert = `DROP TABLE IF EXISTS msc2836_edges;`
 
 const insertEdgeSQL = `
-		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type, parent_room_id, parent_servers)
-		VALUES($1, $2, $3, $4, $5)
-		ON CONFLICT DO NOTHING`
+INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type, parent_room_id, parent_servers)
+VALUES($1, $2, $3, $4, $5)
+ON CONFLICT DO NOTHING`
 
 const selectChildrenSQL = `SELECT child_event_id, origin_server_ts, room_id FROM msc2836_edges
-	LEFT JOIN msc2836_nodes ON msc2836_edges.child_event_id = msc2836_nodes.event_id
-	WHERE parent_event_id = $1 AND rel_type = $2
-	ORDER BY origin_server_ts`
+LEFT JOIN msc2836_nodes ON msc2836_edges.child_event_id = msc2836_nodes.event_id
+WHERE parent_event_id = $1 AND rel_type = $2
+ORDER BY origin_server_ts`
 
-func NewPostgresMSC2836Repository(ctx context.Context, db *sql.DB, writer sqlutil.Writer) (shared.Database, error) {
+const selectParentSQL = `SELECT parent_event_id, parent_room_id FROM msc2836_edges WHERE child_event_id = $1 AND rel_type = $2`
+const updateChildMetadataSQL = `UPDATE msc2836_nodes SET unsigned_children_count=$1, unsigned_children_hash=$2, explored=$3 WHERE event_id=$4`
+const selectChildMetadataSQL = `SELECT unsigned_children_count, unsigned_children_hash, explored FROM msc2836_nodes WHERE event_id=$1`
+const updateChildMetadataExploredSQL = `UPDATE msc2836_nodes SET explored=$1 WHERE event_id=$2`
 
-	var err error
-	d := DB{db: db, writer: writer}
+// msc2836EdgeTable implements the shared.Database interface for MSC2836 edges
+// All DB access uses the connection manager and GORM-style API
+// All SQL is referenced via struct fields
+// No *sql.Stmt, *sql.Tx, or direct transaction logic
+// Struct is unexported, only constructor is exported
 
-	if d.insertEdgeStmt, err = d.db.Prepare(insertEdgeSQL); err != nil {
-		return nil, err
-	}
+type msc2836EdgeTable struct {
+	*msc2836NodeTable
 
-	if d.insertNodeStmt, err = d.db.Prepare(insertNodeSQL); err != nil {
-		return nil, err
-	}
-
-	if d.selectChildrenForParentOldestFirstStmt, err = d.db.Prepare(selectChildrenSQL + " ASC"); err != nil {
-		return nil, err
-	}
-	if d.selectChildrenForParentRecentFirstStmt, err = d.db.Prepare(selectChildrenSQL + " DESC"); err != nil {
-		return nil, err
-	}
-	if d.selectParentForChildStmt, err = d.db.Prepare(`
-		SELECT parent_event_id, parent_room_id FROM msc2836_edges
-		WHERE child_event_id = $1 AND rel_type = $2
-	`); err != nil {
-		return nil, err
-	}
-	if d.updateChildMetadataStmt, err = d.db.Prepare(`
-		UPDATE msc2836_nodes SET unsigned_children_count=$1, unsigned_children_hash=$2, explored=$3 WHERE event_id=$4
-	`); err != nil {
-		return nil, err
-	}
-	if d.selectChildMetadataStmt, err = d.db.Prepare(`
-		SELECT unsigned_children_count, unsigned_children_hash, explored FROM msc2836_nodes WHERE event_id=$1
-	`); err != nil {
-		return nil, err
-	}
-	if d.updateChildMetadataExploredStmt, err = d.db.Prepare(`
-		UPDATE msc2836_nodes SET explored=$1 WHERE event_id=$2
-	`); err != nil {
-		return nil, err
-	}
-	return &d, nil
+	cm                             *sqlutil.Connections
+	insertEdgeSQL                  string
+	selectChildrenSQL              string
+	selectParentSQL                string
+	updateChildMetadataSQL         string
+	selectChildMetadataSQL         string
+	updateChildMetadataExploredSQL string
 }
 
-type DB struct {
-	db                                     *sql.DB
-	writer                                 sqlutil.Writer
-	insertEdgeStmt                         *sql.Stmt
-	insertNodeStmt                         *sql.Stmt
-	selectChildrenForParentOldestFirstStmt *sql.Stmt
-	selectChildrenForParentRecentFirstStmt *sql.Stmt
-	selectParentForChildStmt               *sql.Stmt
-	updateChildMetadataStmt                *sql.Stmt
-	selectChildMetadataStmt                *sql.Stmt
-	updateChildMetadataExploredStmt        *sql.Stmt
+// NewPostgresMSC2836EdgeTable returns a new shared.Database implementation for MSC2836 edges
+func NewPostgresMSC2836EdgeTable(cm *sqlutil.Connections) shared.Database {
+	nodeTable := NewPostgresMSC2836NodeTable(cm)
+
+	return &msc2836EdgeTable{
+		msc2836NodeTable:               nodeTable,
+		cm:                             cm,
+		insertEdgeSQL:                  insertEdgeSQL,
+		selectChildrenSQL:              selectChildrenSQL,
+		selectParentSQL:                selectParentSQL,
+		updateChildMetadataSQL:         updateChildMetadataSQL,
+		selectChildMetadataSQL:         selectChildMetadataSQL,
+		updateChildMetadataExploredSQL: updateChildMetadataExploredSQL,
+	}
 }
 
-func (p *DB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent) error {
+func (t *msc2836EdgeTable) StoreRelation(ctx context.Context, ev *types.HeaderedEvent) error {
 	parent, child, relType := shared.ParentChildEventIDs(ev)
 	if parent == "" || child == "" {
 		return nil
@@ -104,39 +87,39 @@ func (p *DB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent) error {
 		return err
 	}
 	count, hash := extractChildMetadata(ev)
-	return p.writer.Do(p.db, nil, func(txn *sql.Tx) error {
-		_, err := txn.Stmt(p.insertEdgeStmt).ExecContext(ctx, parent, child, relType, relationRoomID, string(relationServersJSON))
-		if err != nil {
-			return err
-		}
-		util.GetLogger(ctx).Infof("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
-		_, err = txn.Stmt(p.insertNodeStmt).ExecContext(ctx, ev.EventID(), ev.OriginServerTS(), ev.RoomID().String(), count, base64.RawStdEncoding.EncodeToString(hash), 0)
+	db := t.cm.Connection(ctx, false)
+	err = db.Exec(t.insertEdgeSQL, parent, child, relType, relationRoomID, string(relationServersJSON)).Error
+	if err != nil {
 		return err
-	})
+	}
+	util.GetLogger(ctx).Infof("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
+	return db.Exec(insertNodeSQL, ev.EventID(), ev.OriginServerTS(), ev.RoomID().String(), count, base64.RawStdEncoding.EncodeToString(hash), 0).Error
 }
 
-func (p *DB) UpdateChildMetadata(ctx context.Context, ev *types.HeaderedEvent) error {
+func (t *msc2836EdgeTable) UpdateChildMetadata(ctx context.Context, ev *types.HeaderedEvent) error {
 	eventCount, eventHash := extractChildMetadata(ev)
 	if eventCount == 0 {
 		return nil // nothing to update with
 	}
 
 	// extract current children count/hash, if they are less than the current event then update the columns and set to unexplored
-	count, hash, _, err := p.ChildMetadata(ctx, ev.EventID())
+	count, hash, _, err := t.ChildMetadata(ctx, ev.EventID())
 	if err != nil {
 		return err
 	}
 	if eventCount > count || (eventCount == count && !bytes.Equal(hash, eventHash)) {
-		_, err = p.updateChildMetadataStmt.ExecContext(ctx, eventCount, base64.RawStdEncoding.EncodeToString(eventHash), 0, ev.EventID())
-		return err
+		db := t.cm.Connection(ctx, false)
+		return db.Exec(t.updateChildMetadataSQL, eventCount, base64.RawStdEncoding.EncodeToString(eventHash), 0, ev.EventID()).Error
 	}
 	return nil
 }
 
-func (p *DB) ChildMetadata(ctx context.Context, eventID string) (count int, hash []byte, explored bool, err error) {
+func (t *msc2836EdgeTable) ChildMetadata(ctx context.Context, eventID string) (count int, hash []byte, explored bool, err error) {
 	var b64hash string
 	var exploredInt int
-	if err = p.selectChildMetadataStmt.QueryRowContext(ctx, eventID).Scan(&count, &b64hash, &exploredInt); err != nil {
+	db := t.cm.Connection(ctx, false)
+	err = db.Raw(t.selectChildMetadataSQL, eventID).Row().Scan(&count, &b64hash, &exploredInt)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			err = nil
 		}
@@ -147,18 +130,19 @@ func (p *DB) ChildMetadata(ctx context.Context, eventID string) (count int, hash
 	return
 }
 
-func (p *DB) MarkChildrenExplored(ctx context.Context, eventID string) error {
-	_, err := p.updateChildMetadataExploredStmt.ExecContext(ctx, 1, eventID)
-	return err
+func (t *msc2836EdgeTable) MarkChildrenExplored(ctx context.Context, eventID string) error {
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.updateChildMetadataExploredSQL, 1, eventID).Error
 }
 
-func (p *DB) ChildrenForParent(ctx context.Context, eventID, relType string, recentFirst bool) ([]shared.EventInfo, error) {
+func (t *msc2836EdgeTable) ChildrenForParent(ctx context.Context, eventID, relType string, recentFirst bool) ([]shared.EventInfo, error) {
 	var rows *sql.Rows
 	var err error
+	db := t.cm.Connection(ctx, false)
 	if recentFirst {
-		rows, err = p.selectChildrenForParentRecentFirstStmt.QueryContext(ctx, eventID, relType)
+		rows, err = db.Raw(t.selectChildrenSQL+" DESC", eventID, relType).Rows()
 	} else {
-		rows, err = p.selectChildrenForParentOldestFirstStmt.QueryContext(ctx, eventID, relType)
+		rows, err = db.Raw(t.selectChildrenSQL+" ASC", eventID, relType).Rows()
 	}
 	if err != nil {
 		return nil, err
@@ -175,9 +159,10 @@ func (p *DB) ChildrenForParent(ctx context.Context, eventID, relType string, rec
 	return children, rows.Err()
 }
 
-func (p *DB) ParentForChild(ctx context.Context, eventID, relType string) (*shared.EventInfo, error) {
+func (t *msc2836EdgeTable) ParentForChild(ctx context.Context, eventID, relType string) (*shared.EventInfo, error) {
 	var ei shared.EventInfo
-	err := p.selectParentForChildStmt.QueryRowContext(ctx, eventID, relType).Scan(&ei.EventID, &ei.RoomID)
+	db := t.cm.Connection(ctx, false)
+	err := db.Raw(t.selectParentSQL, eventID, relType).Row().Scan(&ei.EventID, &ei.RoomID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {

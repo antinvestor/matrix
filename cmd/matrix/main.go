@@ -71,7 +71,7 @@ func main() {
 		log.Fatalf("Failed to start due to configuration errors")
 	}
 
-	log.Infof("Matrix version %s", internal.VersionString())
+	log.Infof("Global version %s", internal.VersionString())
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
 		log.Warn("Open registration is enabled")
 	}
@@ -170,7 +170,11 @@ func main() {
 	httpClient := basepkg.CreateClient(cfg, dnsCache)
 
 	// prepare required dependencies
-	cm := sqlutil.NewConnectionManager(ctx, globalCfg.DatabaseOptions)
+	cm, err := sqlutil.NewConnectionManagerWithOptions(ctx, service, &cfg.Global.DatabaseOptions)
+	if err != nil {
+		log.WithError(err).Error("failed to initialize the default database")
+	}
+
 	routers := httputil.NewRouters()
 
 	globalCfg.Cache.EnablePrometheus = caching.EnableMetrics

@@ -44,7 +44,7 @@ func (r *Unpeeker) PerformUnpeek(
 	if err != nil {
 		return api.ErrInvalidID{Err: fmt.Errorf("supplied user ID %q in incorrect format", userID)}
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		return api.ErrInvalidID{Err: fmt.Errorf("user %q does not belong to this homeserver", userID)}
 	}
 	if strings.HasPrefix(roomID, "!") {

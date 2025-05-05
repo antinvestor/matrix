@@ -2,62 +2,52 @@ package tables_test
 
 import (
 	"context"
-	"database/sql"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
 
-func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, func()) {
+func migrateDatabase(ctx context.Context, svc *frame.Service, t *testing.T) *sqlutil.Connections {
 
-	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	_, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, spec.ServerName("test"), 4, 0, 0, "")
+	cm := sqlutil.NewConnectionManager(svc)
+
+	_, err := storage.NewUserDatabase(ctx, nil, cm, spec.ServerName("test"), 4, 0, 0, "")
 	if err != nil {
 		t.Fatalf("failed to create user api DB: %s", err)
 	}
 
-	_, err = storage.NewKeyDatabase(ctx, cm, &cfg.UserAPI.AccountDatabase)
+	_, err = storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
 		t.Fatalf("failed to create key api DB: %s", err)
 	}
 
-	db, err := sqlutil.Open(&cfg.UserAPI.AccountDatabase, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-
-	return db, closeDB
+	return cm
 }
 
-func mustCreateTable(t *testing.T, dep test.DependancyOption) (tab tables.StaleDeviceLists, closeDb func()) {
-	ctx := testrig.NewContext(t)
-
-	db, closeDb := migrateDatabase(ctx, t, dep)
-
-	tab, err := postgres.NewPostgresStaleDeviceListsTable(ctx, db)
-
-	if err != nil {
-		t.Fatalf("failed to create new table: %s", err)
-	}
-	return tab, closeDb
+func mustCreateTable(ctx context.Context, svc *frame.Service, t *testing.T, dep test.DependancyOption) tables.StaleDeviceLists {
+	cm := migrateDatabase(ctx, svc, t)
+	tab := postgres.NewPostgresStaleDeviceListsTable(cm)
+	return tab
 }
 
 func TestStaleDeviceLists(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 	charlie := "@charlie:localhost"
-	ctx := testrig.NewContext(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDB := mustCreateTable(t, testOpts)
-		defer closeDB()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		tab := mustCreateTable(ctx, svc, t, testOpts)
 
 		if err := tab.InsertStaleDeviceList(ctx, alice.ID, true); err != nil {
 			t.Fatalf("failed to insert stale device: %s", err)
@@ -91,7 +81,7 @@ func TestStaleDeviceLists(t *testing.T) {
 
 		// Delete stale devices
 		deleteUsers := []string{alice.ID, bob.ID}
-		if err = tab.DeleteStaleDeviceLists(ctx, nil, deleteUsers); err != nil {
+		if err = tab.DeleteStaleDeviceLists(ctx, deleteUsers); err != nil {
 			t.Fatalf("failed to delete stale device lists: %s", err)
 		}
 

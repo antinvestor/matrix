@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"sort"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
 const eventsSchema = `
@@ -154,56 +154,56 @@ const selectEventRejectedSQL = "" +
 
 const selectRoomsWithEventTypeNIDSQL = `SELECT DISTINCT room_nid FROM roomserver_events WHERE event_type_nid = $1`
 
-type eventStatements struct {
-	insertEventStmt                               *sql.Stmt
-	selectEventStmt                               *sql.Stmt
-	bulkSelectSnapshotsForEventIDsStmt            *sql.Stmt
-	bulkSelectStateEventByIDStmt                  *sql.Stmt
-	bulkSelectStateEventByIDExcludingRejectedStmt *sql.Stmt
-	bulkSelectStateEventByNIDStmt                 *sql.Stmt
-	bulkSelectStateAtEventByIDStmt                *sql.Stmt
-	updateEventStateStmt                          *sql.Stmt
-	selectEventSentToOutputStmt                   *sql.Stmt
-	updateEventSentToOutputStmt                   *sql.Stmt
-	selectEventIDStmt                             *sql.Stmt
-	bulkSelectStateAtEventAndReferenceStmt        *sql.Stmt
-	bulkSelectEventIDStmt                         *sql.Stmt
-	bulkSelectEventNIDStmt                        *sql.Stmt
-	bulkSelectUnsentEventNIDStmt                  *sql.Stmt
-	selectMaxEventDepthStmt                       *sql.Stmt
-	selectRoomNIDsForEventNIDsStmt                *sql.Stmt
-	selectEventRejectedStmt                       *sql.Stmt
-	selectRoomsWithEventTypeNIDStmt               *sql.Stmt
+type eventsTable struct {
+	cm                                           *sqlutil.Connections
+	insertEventSQL                               string
+	selectEventSQL                               string
+	bulkSelectSnapshotsForEventIDsSQL            string
+	bulkSelectStateEventByIDSQL                  string
+	bulkSelectStateEventByIDExcludingRejectedSQL string
+	bulkSelectStateEventByNIDSQL                 string
+	bulkSelectStateAtEventByIDSQL                string
+	updateEventStateSQL                          string
+	selectEventSentToOutputSQL                   string
+	updateEventSentToOutputSQL                   string
+	selectEventIDSQL                             string
+	bulkSelectStateAtEventAndReferenceSQL        string
+	bulkSelectEventIDSQL                         string
+	bulkSelectEventNIDSQL                        string
+	bulkSelectUnsentEventNIDSQL                  string
+	selectMaxEventDepthSQL                       string
+	selectRoomNIDsForEventNIDsSQL                string
+	selectEventRejectedSQL                       string
+	selectRoomsWithEventTypeNIDSQL               string
 }
 
-func NewPostgresEventsTable(ctx context.Context, db *sql.DB) (tables.Events, error) {
-	s := &eventStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertEventStmt, insertEventSQL},
-		{&s.selectEventStmt, selectEventSQL},
-		{&s.bulkSelectSnapshotsForEventIDsStmt, bulkSelectSnapshotsForEventIDsSQL},
-		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
-		{&s.bulkSelectStateEventByIDExcludingRejectedStmt, bulkSelectStateEventByIDExcludingRejectedSQL},
-		{&s.bulkSelectStateEventByNIDStmt, bulkSelectStateEventByNIDSQL},
-		{&s.bulkSelectStateAtEventByIDStmt, bulkSelectStateAtEventByIDSQL},
-		{&s.updateEventStateStmt, updateEventStateSQL},
-		{&s.updateEventSentToOutputStmt, updateEventSentToOutputSQL},
-		{&s.selectEventSentToOutputStmt, selectEventSentToOutputSQL},
-		{&s.selectEventIDStmt, selectEventIDSQL},
-		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
-		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
-		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
-		{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
-		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
-		{&s.selectRoomNIDsForEventNIDsStmt, selectRoomNIDsForEventNIDsSQL},
-		{&s.selectEventRejectedStmt, selectEventRejectedSQL},
-		{&s.selectRoomsWithEventTypeNIDStmt, selectRoomsWithEventTypeNIDSQL},
-	}.Prepare(db)
+func NewPostgresEventsTable(cm *sqlutil.Connections) tables.Events {
+	return &eventsTable{
+		cm:                                cm,
+		insertEventSQL:                    insertEventSQL,
+		selectEventSQL:                    selectEventSQL,
+		bulkSelectSnapshotsForEventIDsSQL: bulkSelectSnapshotsForEventIDsSQL,
+		bulkSelectStateEventByIDSQL:       bulkSelectStateEventByIDSQL,
+		bulkSelectStateEventByIDExcludingRejectedSQL: bulkSelectStateEventByIDExcludingRejectedSQL,
+		bulkSelectStateEventByNIDSQL:                 bulkSelectStateEventByNIDSQL,
+		bulkSelectStateAtEventByIDSQL:                bulkSelectStateAtEventByIDSQL,
+		updateEventStateSQL:                          updateEventStateSQL,
+		selectEventSentToOutputSQL:                   selectEventSentToOutputSQL,
+		updateEventSentToOutputSQL:                   updateEventSentToOutputSQL,
+		selectEventIDSQL:                             selectEventIDSQL,
+		bulkSelectStateAtEventAndReferenceSQL:        bulkSelectStateAtEventAndReferenceSQL,
+		bulkSelectEventIDSQL:                         bulkSelectEventIDSQL,
+		bulkSelectEventNIDSQL:                        bulkSelectEventNIDSQL,
+		bulkSelectUnsentEventNIDSQL:                  bulkSelectUnsentEventNIDSQL,
+		selectMaxEventDepthSQL:                       selectMaxEventDepthSQL,
+		selectRoomNIDsForEventNIDsSQL:                selectRoomNIDsForEventNIDsSQL,
+		selectEventRejectedSQL:                       selectEventRejectedSQL,
+		selectRoomsWithEventTypeNIDSQL:               selectRoomsWithEventTypeNIDSQL,
+	}
 }
 
-func (s *eventStatements) InsertEvent(
+func (t *eventsTable) InsertEvent(
 	ctx context.Context,
-	txn *sql.Tx,
 	roomNID types.RoomNID,
 	eventTypeNID types.EventTypeNID,
 	eventStateKeyNID types.EventStateKeyNID,
@@ -212,32 +212,32 @@ func (s *eventStatements) InsertEvent(
 	depth int64,
 	isRejected bool,
 ) (types.EventNID, types.StateSnapshotNID, error) {
+	db := t.cm.Connection(ctx, false)
 	var eventNID int64
 	var stateNID int64
-	stmt := sqlutil.TxStmt(txn, s.insertEventStmt)
-	err := stmt.QueryRowContext(
-		ctx, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
+	err := db.Raw(t.insertEventSQL, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
 		eventID, eventNIDsAsArray(authEventNIDs), depth,
 		isRejected,
-	).Scan(&eventNID, &stateNID)
+	).Row().Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
-func (s *eventStatements) SelectEvent(
-	ctx context.Context, txn *sql.Tx, eventID string,
+func (t *eventsTable) SelectEvent(
+	ctx context.Context, eventID string,
 ) (types.EventNID, types.StateSnapshotNID, error) {
+	db := t.cm.Connection(ctx, true)
 	var eventNID int64
 	var stateNID int64
-	err := s.selectEventStmt.QueryRowContext(ctx, eventID).Scan(&eventNID, &stateNID)
+	err := db.Raw(t.selectEventSQL, eventID).Row().Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
-func (s *eventStatements) BulkSelectSnapshotsFromEventIDs(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+func (t *eventsTable) BulkSelectSnapshotsFromEventIDs(
+	ctx context.Context, eventIDs []string,
 ) (map[types.StateSnapshotNID][]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectSnapshotsForEventIDsStmt)
-
-	rows, err := stmt.QueryContext(ctx, pq.Array(eventIDs))
+	db := t.cm.Connection(ctx, true)
+	stmt := db.Raw(t.bulkSelectSnapshotsForEventIDsSQL, pq.StringArray(eventIDs))
+	rows, err := stmt.Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -260,16 +260,17 @@ func (s *eventStatements) BulkSelectSnapshotsFromEventIDs(
 // If not excluding rejected events, and any of the requested events are missing from
 // the database it returns a types.MissingEventError. If excluding rejected events,
 // the events will be silently omitted without error.
-func (s *eventStatements) BulkSelectStateEventByID(
-	ctx context.Context, txn *sql.Tx, eventIDs []string, excludeRejected bool,
+func (t *eventsTable) BulkSelectStateEventByID(
+	ctx context.Context, eventIDs []string, excludeRejected bool,
 ) ([]types.StateEntry, error) {
-	var stmt *sql.Stmt
+	db := t.cm.Connection(ctx, true)
+	var stmt *gorm.DB
 	if excludeRejected {
-		stmt = sqlutil.TxStmt(txn, s.bulkSelectStateEventByIDExcludingRejectedStmt)
+		stmt = db.Raw(t.bulkSelectStateEventByIDExcludingRejectedSQL, pq.StringArray(eventIDs))
 	} else {
-		stmt = sqlutil.TxStmt(txn, s.bulkSelectStateEventByIDStmt)
+		stmt = db.Raw(t.bulkSelectStateEventByIDSQL, pq.StringArray(eventIDs))
 	}
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
+	rows, err := stmt.Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -309,15 +310,16 @@ func (s *eventStatements) BulkSelectStateEventByID(
 
 // bulkSelectStateEventByNID lookups a list of state events by event NID.
 // If any of the requested events are missing from the database it returns a types.MissingEventError
-func (s *eventStatements) BulkSelectStateEventByNID(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
+func (t *eventsTable) BulkSelectStateEventByNID(
+	ctx context.Context, eventNIDs []types.EventNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntry, error) {
+	db := t.cm.Connection(ctx, true)
 	tuples := types.StateKeyTupleSorter(stateKeyTuples)
 	sort.Sort(tuples)
 	eventTypeNIDArray, eventStateKeyNIDArray := tuples.TypesAndStateKeysAsArrays()
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateEventByNIDStmt)
-	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs), pq.Int64Array(eventTypeNIDArray), pq.Int64Array(eventStateKeyNIDArray))
+	stmt := db.Raw(t.bulkSelectStateEventByNIDSQL, eventNIDsAsArray(eventNIDs), pq.Int64Array(eventTypeNIDArray), pq.Int64Array(eventStateKeyNIDArray))
+	rows, err := stmt.Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -347,11 +349,12 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 // bulkSelectStateAtEventByID lookups the state at a list of events by event ID.
 // If any of the requested events are missing from the database it returns a types.MissingEventError.
 // If we do not have the state for any of the requested events it returns a types.MissingEventError.
-func (s *eventStatements) BulkSelectStateAtEventByID(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+func (t *eventsTable) BulkSelectStateAtEventByID(
+	ctx context.Context, eventIDs []string,
 ) ([]types.StateAtEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateAtEventByIDStmt)
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
+	db := t.cm.Connection(ctx, true)
+	stmt := db.Raw(t.bulkSelectStateAtEventByIDSQL, pq.StringArray(eventIDs))
+	rows, err := stmt.Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -388,41 +391,42 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 	return results, nil
 }
 
-func (s *eventStatements) UpdateEventState(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, stateNID types.StateSnapshotNID,
+func (t *eventsTable) UpdateEventState(
+	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.updateEventStateStmt)
-	_, err := stmt.ExecContext(ctx, int64(eventNID), int64(stateNID))
+	db := t.cm.Connection(ctx, false)
+	err := db.Exec(t.updateEventStateSQL, int64(eventNID), int64(stateNID)).Error
 	return err
 }
 
-func (s *eventStatements) SelectEventSentToOutput(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
+func (t *eventsTable) SelectEventSentToOutput(
+	ctx context.Context, eventNID types.EventNID,
 ) (sentToOutput bool, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectEventSentToOutputStmt)
-	err = stmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
+	db := t.cm.Connection(ctx, true)
+	err = db.Raw(t.selectEventSentToOutputSQL, int64(eventNID)).Row().Scan(&sentToOutput)
 	return
 }
 
-func (s *eventStatements) UpdateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error {
-	stmt := sqlutil.TxStmt(txn, s.updateEventSentToOutputStmt)
-	_, err := stmt.ExecContext(ctx, int64(eventNID))
+func (t *eventsTable) UpdateEventSentToOutput(ctx context.Context, eventNID types.EventNID) error {
+	db := t.cm.Connection(ctx, false)
+	err := db.Exec(t.updateEventSentToOutputSQL, int64(eventNID)).Error
 	return err
 }
 
-func (s *eventStatements) SelectEventID(
-	ctx context.Context, txn *sql.Tx, eventNID types.EventNID,
+func (t *eventsTable) SelectEventID(
+	ctx context.Context, eventNID types.EventNID,
 ) (eventID string, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectEventIDStmt)
-	err = stmt.QueryRowContext(ctx, int64(eventNID)).Scan(&eventID)
+	db := t.cm.Connection(ctx, true)
+	err = db.Raw(t.selectEventIDSQL, int64(eventNID)).Row().Scan(&eventID)
 	return
 }
 
-func (s *eventStatements) BulkSelectStateAtEventAndReference(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
+func (t *eventsTable) BulkSelectStateAtEventAndReference(
+	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]types.StateAtEventAndReference, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateAtEventAndReferenceStmt)
-	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
+	db := t.cm.Connection(ctx, true)
+	stmt := db.Raw(t.bulkSelectStateAtEventAndReferenceSQL, eventNIDsAsArray(eventNIDs))
+	rows, err := stmt.Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -459,9 +463,10 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 }
 
 // bulkSelectEventID returns a map from numeric event ID to string event ID.
-func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventIDStmt)
-	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
+func (t *eventsTable) BulkSelectEventID(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
+	db := t.cm.Connection(ctx, true)
+	stmt := db.Raw(t.bulkSelectEventIDSQL, eventNIDsAsArray(eventNIDs))
+	rows, err := stmt.Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -487,27 +492,28 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 
 // BulkSelectEventNIDs returns a map from string event ID to numeric event ID.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) BulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventMetadata, error) {
-	return s.bulkSelectEventNID(ctx, txn, eventIDs, false)
+func (t *eventsTable) BulkSelectEventNID(ctx context.Context, eventIDs []string) (map[string]types.EventMetadata, error) {
+	return t.bulkSelectEventNID(ctx, eventIDs, false)
 }
 
 // BulkSelectEventNIDs returns a map from string event ID to numeric event ID
 // only for events that haven't already been sent to the roomserver output.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) BulkSelectUnsentEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventMetadata, error) {
-	return s.bulkSelectEventNID(ctx, txn, eventIDs, true)
+func (t *eventsTable) BulkSelectUnsentEventNID(ctx context.Context, eventIDs []string) (map[string]types.EventMetadata, error) {
+	return t.bulkSelectEventNID(ctx, eventIDs, true)
 }
 
 // bulkSelectEventNIDs returns a map from string event ID to numeric event ID.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string, onlyUnsent bool) (map[string]types.EventMetadata, error) {
-	var stmt *sql.Stmt
+func (t *eventsTable) bulkSelectEventNID(ctx context.Context, eventIDs []string, onlyUnsent bool) (map[string]types.EventMetadata, error) {
+	db := t.cm.Connection(ctx, true)
+	var stmt *gorm.DB
 	if onlyUnsent {
-		stmt = sqlutil.TxStmt(txn, s.bulkSelectUnsentEventNIDStmt)
+		stmt = db.Raw(t.bulkSelectUnsentEventNIDSQL, pq.StringArray(eventIDs))
 	} else {
-		stmt = sqlutil.TxStmt(txn, s.bulkSelectEventNIDStmt)
+		stmt = db.Raw(t.bulkSelectEventNIDSQL, pq.StringArray(eventIDs))
 	}
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
+	rows, err := stmt.Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -528,21 +534,22 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 	return results, rows.Err()
 }
 
-func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error) {
+func (t *eventsTable) SelectMaxEventDepth(ctx context.Context, eventNIDs []types.EventNID) (int64, error) {
+	db := t.cm.Connection(ctx, true)
 	var result int64
-	stmt := s.selectMaxEventDepthStmt
-	err := stmt.QueryRowContext(ctx, eventNIDsAsArray(eventNIDs)).Scan(&result)
+	err := db.Raw(t.selectMaxEventDepthSQL, eventNIDsAsArray(eventNIDs)).Row().Scan(&result)
 	if err != nil {
 		return 0, err
 	}
 	return result, nil
 }
 
-func (s *eventStatements) SelectRoomNIDsForEventNIDs(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
+func (t *eventsTable) SelectRoomNIDsForEventNIDs(
+	ctx context.Context, eventNIDs []types.EventNID,
 ) (map[types.EventNID]types.RoomNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomNIDsForEventNIDsStmt)
-	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
+	db := t.cm.Connection(ctx, true)
+	stmt := db.Raw(t.selectRoomNIDsForEventNIDsSQL, eventNIDsAsArray(eventNIDs))
+	rows, err := stmt.Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -567,19 +574,20 @@ func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {
 	return nids
 }
 
-func (s *eventStatements) SelectEventRejected(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventID string,
+func (t *eventsTable) SelectEventRejected(
+	ctx context.Context, roomNID types.RoomNID, eventID string,
 ) (rejected bool, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectEventRejectedStmt)
-	err = stmt.QueryRowContext(ctx, roomNID, eventID).Scan(&rejected)
+	db := t.cm.Connection(ctx, true)
+	err = db.Raw(t.selectEventRejectedSQL, roomNID, eventID).Row().Scan(&rejected)
 	return
 }
 
-func (s *eventStatements) SelectRoomsWithEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventTypeNID types.EventTypeNID,
+func (t *eventsTable) SelectRoomsWithEventTypeNID(
+	ctx context.Context, eventTypeNID types.EventTypeNID,
 ) ([]types.RoomNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomsWithEventTypeNIDStmt)
-	rows, err := stmt.QueryContext(ctx, eventTypeNID)
+	db := t.cm.Connection(ctx, true)
+	stmt := db.Raw(t.selectRoomsWithEventTypeNIDSQL, eventTypeNID)
+	rows, err := stmt.Rows()
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomsWithEventTypeNID: rows.close() failed")
 	if err != nil {
 		return nil, err

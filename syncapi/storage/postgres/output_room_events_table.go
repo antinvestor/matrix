@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
@@ -202,98 +201,100 @@ const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_o
 
 const excludeEventsFromIndexSQL = `UPDATE syncapi_output_room_events SET exclude_from_search = TRUE WHERE event_id = ANY($1)`
 
-type outputRoomEventsStatements struct {
-	db                             *sql.DB
-	insertEventStmt                *sql.Stmt
-	selectEventsStmt               *sql.Stmt
-	selectEventsWitFilterStmt      *sql.Stmt
-	selectMaxEventIDStmt           *sql.Stmt
-	selectRecentEventsStmt         *sql.Stmt
-	selectRecentEventsForSyncStmt  *sql.Stmt
-	selectStateInRangeFilteredStmt *sql.Stmt
-	selectStateInRangeStmt         *sql.Stmt
-	updateEventJSONStmt            *sql.Stmt
-	deleteEventsForRoomStmt        *sql.Stmt
-	selectContextEventStmt         *sql.Stmt
-	selectContextBeforeEventStmt   *sql.Stmt
-	selectContextAfterEventStmt    *sql.Stmt
-	purgeEventsStmt                *sql.Stmt
-	selectSearchStmt               *sql.Stmt
-	excludeEventsFromIndexStmt     *sql.Stmt
+// outputRoomEventsTable implements tables.Events using a connection manager and SQL constants.
+// This table stores output room events received from the roomserver, including all event metadata and
+// provides methods for querying, inserting, and updating events for sync responses, event context, and search.
+type outputRoomEventsTable struct {
+	// cm is the connection manager for obtaining DB handles.
+	cm *sqlutil.Connections
+	// SQL constants for queries and statements.
+	insertEventSQL                string // SQL for inserting an event, see insertEventSQL
+	selectEventsSQL               string // SQL for selecting events by event IDs, see selectEventsSQL
+	selectEventsWithFilterSQL     string // SQL for selecting events with filters, see selectEventsWithFilterSQL
+	selectMaxEventIDSQL           string // SQL for selecting max event ID, see selectMaxEventIDSQL
+	selectRecentEventsSQL         string // SQL for selecting recent events for a room, see selectRecentEventsSQL
+	selectRecentEventsForSyncSQL  string // SQL for selecting recent events for sync, see selectRecentEventsForSyncSQL
+	selectStateInRangeFilteredSQL string // SQL for selecting state events in range with filters, see selectStateInRangeFilteredSQL
+	selectStateInRangeSQL         string // SQL for selecting state events in range, see selectStateInRangeSQL
+	updateEventJSONSQL            string // SQL for updating event JSON, see updateEventJSONSQL
+	deleteEventsForRoomSQL        string // SQL for deleting all events for a room, see deleteEventsForRoomSQL
+	selectContextEventSQL         string // SQL for selecting a context event, see selectContextEventSQL
+	selectContextBeforeEventSQL   string // SQL for selecting events before a context event, see selectContextBeforeEventSQL
+	selectContextAfterEventSQL    string // SQL for selecting events after a context event, see selectContextAfterEventSQL
+	purgeEventsSQL                string // SQL for purging all events for a room, see purgeEventsSQL
+	selectSearchSQL               string // SQL for selecting events for reindexing, see selectSearchSQL
+	excludeEventsFromIndexSQL     string // SQL for excluding events from the search index, see excludeEventsFromIndexSQL
 }
 
-func NewPostgresEventsTable(ctx context.Context, db *sql.DB) (tables.Events, error) {
-	s := &outputRoomEventsStatements{db: db}
-	return s, sqlutil.StatementList{
-		{&s.insertEventStmt, insertEventSQL},
-		{&s.selectEventsStmt, selectEventsSQL},
-		{&s.selectEventsWitFilterStmt, selectEventsWithFilterSQL},
-		{&s.selectMaxEventIDStmt, selectMaxEventIDSQL},
-		{&s.selectRecentEventsStmt, selectRecentEventsSQL},
-		{&s.selectRecentEventsForSyncStmt, selectRecentEventsForSyncSQL},
-		{&s.selectStateInRangeFilteredStmt, selectStateInRangeFilteredSQL},
-		{&s.selectStateInRangeStmt, selectStateInRangeSQL},
-		{&s.updateEventJSONStmt, updateEventJSONSQL},
-		{&s.deleteEventsForRoomStmt, deleteEventsForRoomSQL},
-		{&s.selectContextEventStmt, selectContextEventSQL},
-		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
-		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
-		{&s.purgeEventsStmt, purgeEventsSQL},
-		{&s.selectSearchStmt, selectSearchSQL},
-		{&s.excludeEventsFromIndexStmt, excludeEventsFromIndexSQL},
-	}.Prepare(db)
+// NewPostgresEventsTable returns a new outputRoomEventsTable instance.
+func NewPostgresEventsTable(cm *sqlutil.Connections) tables.Events {
+	return &outputRoomEventsTable{
+		cm:                            cm,
+		insertEventSQL:                insertEventSQL,
+		selectEventsSQL:               selectEventsSQL,
+		selectEventsWithFilterSQL:     selectEventsWithFilterSQL,
+		selectMaxEventIDSQL:           selectMaxEventIDSQL,
+		selectRecentEventsSQL:         selectRecentEventsSQL,
+		selectRecentEventsForSyncSQL:  selectRecentEventsForSyncSQL,
+		selectStateInRangeFilteredSQL: selectStateInRangeFilteredSQL,
+		selectStateInRangeSQL:         selectStateInRangeSQL,
+		updateEventJSONSQL:            updateEventJSONSQL,
+		deleteEventsForRoomSQL:        deleteEventsForRoomSQL,
+		selectContextEventSQL:         selectContextEventSQL,
+		selectContextBeforeEventSQL:   selectContextBeforeEventSQL,
+		selectContextAfterEventSQL:    selectContextAfterEventSQL,
+		purgeEventsSQL:                purgeEventsSQL,
+		selectSearchSQL:               selectSearchSQL,
+		excludeEventsFromIndexSQL:     excludeEventsFromIndexSQL,
+	}
 }
 
-func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, txn *sql.Tx, event *rstypes.HeaderedEvent) error {
+// UpdateEventJSON updates the JSON representation of an event in the database.
+func (t *outputRoomEventsTable) UpdateEventJSON(ctx context.Context, event *rstypes.HeaderedEvent) error {
+	// Marshal the event to JSON.
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
-	_, err = sqlutil.TxStmt(txn, s.updateEventJSONStmt).ExecContext(ctx, headeredJSON, event.EventID())
-	return err
+	// Update the event JSON in the database.
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.updateEventJSONSQL, headeredJSON, event.EventID()).Error
 }
 
-// selectStateInRange returns the state events between the two given PDU stream positions, exclusive of oldPos, inclusive of newPos.
-// Results are bucketed based on the room ID. If the same state is overwritten multiple times between the
-// two positions, only the most recent state is returned.
-func (s *outputRoomEventsStatements) SelectStateInRange(
-	ctx context.Context, txn *sql.Tx, r types.Range,
-	stateFilter *synctypes.StateFilter, roomIDs []string,
+// SelectStateInRange returns the state events between two stream positions, bucketed by room ID.
+// If the same state is overwritten multiple times between the two positions, only the most recent state is returned.
+// Returns: map[roomID][eventID]bool (needed state), and eventID->StreamEvent map.
+func (t *outputRoomEventsTable) SelectStateInRange(
+	ctx context.Context, r types.Range, stateFilter *synctypes.StateFilter, roomIDs []string,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
+	// Query for state change events between two positions for a set of rooms.
+	db := t.cm.Connection(ctx, true)
 	var rows *sql.Rows
 	var err error
 	if stateFilter != nil {
-		stmt := sqlutil.TxStmt(txn, s.selectStateInRangeFilteredStmt)
 		senders, notSenders := getSendersStateFilterFilter(stateFilter)
-		rows, err = stmt.QueryContext(
-			ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
+		rows, err = db.Raw(
+			t.selectStateInRangeFilteredSQL,
+			r.Low(), r.High(), pq.StringArray(roomIDs),
 			pq.StringArray(senders),
 			pq.StringArray(notSenders),
 			pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
 			pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
 			stateFilter.ContainsURL,
-		)
+		).Rows()
 	} else {
-		stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
-		rows, err = stmt.QueryContext(
-			ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
-		)
+		rows, err = db.Raw(
+			t.selectStateInRangeSQL,
+			r.Low(), r.High(), pq.StringArray(roomIDs),
+		).Rows()
 	}
-
 	if err != nil {
 		return nil, nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectStateInRange: rows.close() failed")
-	// Fetch all the state change events for all rooms between the two positions then loop each event and:
-	//  - Keep a cache of the event by ID (99% of state change events are for the event itself)
-	//  - For each room ID, build up an array of event IDs which represents cumulative adds/removes
-	// For each room, map cumulative event IDs to events and return. This may need to a batch SELECT based on event ID
-	// if they aren't in the event ID cache. We don't handle state deletion yet.
+	defer rows.Close()
+	// Process state change events for all rooms between the two positions.
 	eventIDToEvent := make(map[string]types.StreamEvent)
-
-	// RoomID => A set (map[string]bool) of state event IDs which are between the two positions
 	stateNeeded := make(map[string]map[string]bool)
-
 	for rows.Next() {
 		var (
 			eventID           string
@@ -307,15 +308,12 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &excludeFromSync, &addIDs, &delIDs, &historyVisibility); err != nil {
 			return nil, nil, err
 		}
-
-		// TODO: Handle redacted events
 		var ev rstypes.HeaderedEvent
 		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, nil, err
 		}
-
 		needSet := stateNeeded[ev.RoomID().String()]
-		if needSet == nil { // make set if required
+		if needSet == nil {
 			needSet = make(map[string]bool)
 		}
 		for _, id := range delIDs {
@@ -326,63 +324,55 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		}
 		stateNeeded[ev.RoomID().String()] = needSet
 		ev.Visibility = historyVisibility
-
 		eventIDToEvent[eventID] = types.StreamEvent{
 			HeaderedEvent:   &ev,
 			StreamPosition:  streamPos,
 			ExcludeFromSync: excludeFromSync,
 		}
 	}
-
 	return stateNeeded, eventIDToEvent, rows.Err()
 }
 
-// SelectMaxEventID returns the ID of the last inserted event in this table. 'txn' is optional. If it is not supplied,
-// then this function should only ever be used at startup, as it will race with inserting events if it is
-// done afterwards. If there are no inserted events, 0 is returned.
-func (s *outputRoomEventsStatements) SelectMaxEventID(
-	ctx context.Context, txn *sql.Tx,
-) (id int64, err error) {
+// SelectMaxEventID returns the maximum event ID in the database.
+func (t *outputRoomEventsTable) SelectMaxEventID(ctx context.Context) (id int64, err error) {
+	// Query for the maximum event ID.
+	db := t.cm.Connection(ctx, true)
 	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxEventIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	row := db.Raw(t.selectMaxEventIDSQL).Row()
+	err = row.Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}
 	return
 }
 
-// InsertEvent into the output_room_events table. addState and removeState are an optional list of state event IDs. Returns the position
-// of the inserted event.
-func (s *outputRoomEventsStatements) InsertEvent(
-	ctx context.Context, txn *sql.Tx,
-	event *rstypes.HeaderedEvent, addState, removeState []string,
-	transactionID *api.TransactionID, excludeFromSync bool, historyVisibility gomatrixserverlib.HistoryVisibility,
+// InsertEvent inserts an event into the output_room_events table.
+// addState and removeState are optional lists of state event IDs.
+// Returns the stream position of the inserted event.
+func (t *outputRoomEventsTable) InsertEvent(
+	ctx context.Context, event *rstypes.HeaderedEvent, addState, removeState []string, transactionID *api.TransactionID, excludeFromSync bool, historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (streamPos types.StreamPosition, err error) {
+	// Prepare transaction/session IDs if available.
 	var txnID *string
 	var sessionID *int64
 	if transactionID != nil {
 		sessionID = &transactionID.SessionID
 		txnID = &transactionID.TransactionID
 	}
-
-	// Parse content as JSON and search for an "url" key
+	// Detect if event content contains a URL for search optimizations.
 	containsURL := false
 	var content map[string]interface{}
 	if json.Unmarshal(event.Content(), &content) == nil {
-		// Set containsURL to true if url is present
 		_, containsURL = content["url"]
 	}
-
-	var headeredJSON []byte
-	headeredJSON, err = json.Marshal(event)
+	// Marshal the event to JSON for storage.
+	headeredJSON, err := json.Marshal(event)
 	if err != nil {
 		return
 	}
-
-	stmt := sqlutil.TxStmt(txn, s.insertEventStmt)
-	err = stmt.QueryRowContext(
-		ctx,
+	db := t.cm.Connection(ctx, false)
+	row := db.Raw(
+		t.insertEventSQL,
 		event.RoomID().String(),
 		event.EventID(),
 		headeredJSON,
@@ -395,41 +385,50 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		txnID,
 		excludeFromSync,
 		historyVisibility,
-	).Scan(&streamPos)
+	)
+	err = row.Row().Scan(&streamPos)
 	return
 }
 
-// SelectRecentEvents returns the most recent events in the given room, up to a maximum of 'limit'.
-// If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude
-// from sync.
-func (s *outputRoomEventsStatements) SelectRecentEvents(
-	ctx context.Context, txn *sql.Tx,
+// SelectRecentEvents returns the most recent events in the given room(s), up to a maximum of 'limit'.
+// If onlySyncEvents is true, only returns events not marked to be excluded from sync.
+// Results are bucketed by room ID. Events are sorted from newest to oldest unless chronologicalOrder is true.
+func (t *outputRoomEventsTable) SelectRecentEvents(
+	ctx context.Context,
 	roomIDs []string, ra types.Range, eventFilter *synctypes.RoomEventFilter,
 	chronologicalOrder bool, onlySyncEvents bool,
 ) (map[string]types.RecentEvents, error) {
-	var stmt *sql.Stmt
-	if onlySyncEvents {
-		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsForSyncStmt)
-	} else {
-		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsStmt)
-	}
+	// Get DB handle for read.
+	db := t.cm.Connection(ctx, true)
+	var rows *sql.Rows
+	var err error
 	senders, notSenders := getSendersRoomEventFilter(eventFilter)
-
-	rows, err := stmt.QueryContext(
-		ctx, pq.StringArray(roomIDs), ra.Low(), ra.High(),
-		pq.StringArray(senders),
-		pq.StringArray(notSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.NotTypes)),
-		eventFilter.Limit+1,
-	)
+	if onlySyncEvents {
+		rows, err = db.Raw(
+			t.selectRecentEventsForSyncSQL,
+			pq.StringArray(roomIDs), ra.Low(), ra.High(),
+			pq.StringArray(senders),
+			pq.StringArray(notSenders),
+			pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.Types)),
+			pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.NotTypes)),
+			eventFilter.Limit+1,
+		).Rows()
+	} else {
+		rows, err = db.Raw(
+			t.selectRecentEventsSQL,
+			roomIDs[0], ra.Low(), ra.High(),
+			pq.StringArray(senders),
+			pq.StringArray(notSenders),
+			pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.Types)),
+			pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.NotTypes)),
+			eventFilter.Limit+1,
+		).Rows()
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
-
+	defer rows.Close()
 	result := make(map[string]types.RecentEvents)
-
 	for rows.Next() {
 		var (
 			roomID            string
@@ -445,21 +444,17 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		if err := rows.Scan(&roomID, &eventID, &streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID, &historyVisibility); err != nil {
 			return nil, err
 		}
-		// TODO: Handle redacted events
 		var ev rstypes.HeaderedEvent
 		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
 		}
-
 		if sessionID != nil && txnID != nil {
 			transactionID = &api.TransactionID{
 				SessionID:     *sessionID,
 				TransactionID: *txnID,
 			}
 		}
-
 		r := result[roomID]
-
 		ev.Visibility = historyVisibility
 		r.Events = append(r.Events, types.StreamEvent{
 			HeaderedEvent:   &ev,
@@ -467,24 +462,18 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 			TransactionID:   transactionID,
 			ExcludeFromSync: excludeFromSync,
 		})
-
 		result[roomID] = r
 	}
-
+	// Sorting and limiting logic as before.
 	if chronologicalOrder {
 		for roomID, evs := range result {
-			// The events need to be returned from oldest to latest, which isn't
-			// necessary the way the SQL query returns them, so a sort is necessary to
-			// ensure the events are in the right order in the slice.
-			sort.SliceStable(evs.Events, func(i int, j int) bool {
+			sort.SliceStable(evs.Events, func(i, j int) bool {
 				return evs.Events[i].StreamPosition < evs.Events[j].StreamPosition
 			})
-
 			if len(evs.Events) > eventFilter.Limit {
 				evs.Limited = true
 				evs.Events = evs.Events[1:]
 			}
-
 			result[roomID] = evs
 		}
 	} else {
@@ -493,30 +482,28 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 				evs.Limited = true
 				evs.Events = evs.Events[:len(evs.Events)-1]
 			}
-
 			result[roomID] = evs
 		}
 	}
 	return result, rows.Err()
 }
 
-// SelectEvents returns the events for the given event IDs. If an event is
-// missing from the database, it will be omitted.
-func (s *outputRoomEventsStatements) SelectEvents(
-	ctx context.Context, txn *sql.Tx, eventIDs []string, filter *synctypes.RoomEventFilter, preserveOrder bool,
+// SelectEvents returns the events with the given event IDs.
+// If a filter is provided, only returns events that match the filter.
+// If preserveOrder is true, returns events in the order of the event IDs.
+func (t *outputRoomEventsTable) SelectEvents(
+	ctx context.Context, eventIDs []string, filter *synctypes.RoomEventFilter, preserveOrder bool,
 ) ([]types.StreamEvent, error) {
-	var (
-		stmt *sql.Stmt
-		rows *sql.Rows
-		err  error
-	)
+	// Get DB handle for read.
+	db := t.cm.Connection(ctx, true)
+	var rows *sql.Rows
+	var err error
 	if filter == nil {
-		stmt = sqlutil.TxStmt(txn, s.selectEventsStmt)
-		rows, err = stmt.QueryContext(ctx, pq.StringArray(eventIDs))
+		rows, err = db.Raw(t.selectEventsSQL, pq.StringArray(eventIDs)).Rows()
 	} else {
 		senders, notSenders := getSendersRoomEventFilter(filter)
-		stmt = sqlutil.TxStmt(txn, s.selectEventsWitFilterStmt)
-		rows, err = stmt.QueryContext(ctx,
+		rows, err = db.Raw(
+			t.selectEventsWithFilterSQL,
 			pq.StringArray(eventIDs),
 			pq.StringArray(senders),
 			pq.StringArray(notSenders),
@@ -524,12 +511,12 @@ func (s *outputRoomEventsStatements) SelectEvents(
 			pq.StringArray(filterConvertTypeWildcardToSQL(filter.NotTypes)),
 			filter.ContainsURL,
 			filter.Limit,
-		)
+		).Rows()
 	}
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
+	defer rows.Close()
 	streamEvents, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -541,8 +528,7 @@ func (s *outputRoomEventsStatements) SelectEvents(
 		}
 		var returnEvents []types.StreamEvent
 		for _, eventID := range eventIDs {
-			ev, ok := eventMap[eventID]
-			if ok {
+			if ev, ok := eventMap[eventID]; ok {
 				returnEvents = append(returnEvents, ev)
 			}
 		}
@@ -551,22 +537,24 @@ func (s *outputRoomEventsStatements) SelectEvents(
 	return streamEvents, nil
 }
 
-func (s *outputRoomEventsStatements) DeleteEventsForRoom(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.deleteEventsForRoomStmt).ExecContext(ctx, roomID)
-	return err
+// DeleteEventsForRoom deletes all events for a given room.
+func (t *outputRoomEventsTable) DeleteEventsForRoom(ctx context.Context, roomID string) error {
+	// Delete all events for the room.
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.deleteEventsForRoomSQL, roomID).Error
 }
 
-func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn *sql.Tx, roomID, eventID string) (id int, evt rstypes.HeaderedEvent, err error) {
-	row := sqlutil.TxStmt(txn, s.selectContextEventStmt).QueryRowContext(ctx, roomID, eventID)
-
+// SelectContextEvent returns the event with the given event ID in the given room.
+func (t *outputRoomEventsTable) SelectContextEvent(ctx context.Context, roomID, eventID string) (id int, evt rstypes.HeaderedEvent, err error) {
+	// Query for the event.
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectContextEventSQL, roomID, eventID).Row()
 	var eventAsString string
 	var historyVisibility gomatrixserverlib.HistoryVisibility
-	if err = row.Scan(&id, &eventAsString, &historyVisibility); err != nil {
+	err = row.Scan(&id, &eventAsString, &historyVisibility)
+	if err != nil {
 		return 0, evt, err
 	}
-
 	if err = json.Unmarshal([]byte(eventAsString), &evt); err != nil {
 		return 0, evt, err
 	}
@@ -574,93 +562,103 @@ func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn
 	return id, evt, nil
 }
 
-func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
-	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *synctypes.RoomEventFilter,
+// SelectContextBeforeEvent returns the events before the given event in the given room.
+func (t *outputRoomEventsTable) SelectContextBeforeEvent(
+	ctx context.Context, id int, roomID string, filter *synctypes.RoomEventFilter,
 ) (evts []*rstypes.HeaderedEvent, err error) {
+	// Query for events before the given event.
+	db := t.cm.Connection(ctx, true)
 	senders, notSenders := getSendersRoomEventFilter(filter)
-	rows, err := sqlutil.TxStmt(txn, s.selectContextBeforeEventStmt).QueryContext(
-		ctx, roomID, id, filter.Limit,
+	rows, err := db.Raw(
+		t.selectContextBeforeEventSQL,
+		roomID, id, filter.Limit,
 		pq.StringArray(senders),
 		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(filter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(filter.NotTypes)),
-	)
+	).Rows()
 	if err != nil {
 		return
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
-
+	defer rows.Close()
 	for rows.Next() {
 		var (
 			eventBytes        []byte
-			evt               *rstypes.HeaderedEvent
+			outEvt            rstypes.HeaderedEvent
 			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
 		if err = rows.Scan(&eventBytes, &historyVisibility); err != nil {
 			return evts, err
 		}
-		if err = json.Unmarshal(eventBytes, &evt); err != nil {
+		if err = json.Unmarshal(eventBytes, &outEvt); err != nil {
 			return evts, err
 		}
-		evt.Visibility = historyVisibility
-		evts = append(evts, evt)
+		outEvt.Visibility = historyVisibility
+		evts = append(evts, &outEvt)
 	}
-
 	return evts, rows.Err()
 }
 
-func (s *outputRoomEventsStatements) SelectContextAfterEvent(
-	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *synctypes.RoomEventFilter,
+// SelectContextAfterEvent returns the events after the given event in the given room.
+func (t *outputRoomEventsTable) SelectContextAfterEvent(
+	ctx context.Context, id int, roomID string, filter *synctypes.RoomEventFilter,
 ) (lastID int, evts []*rstypes.HeaderedEvent, err error) {
+	// Query for events after the given event.
+	db := t.cm.Connection(ctx, true)
 	senders, notSenders := getSendersRoomEventFilter(filter)
-	rows, err := sqlutil.TxStmt(txn, s.selectContextAfterEventStmt).QueryContext(
-		ctx, roomID, id, filter.Limit,
+	rows, err := db.Raw(
+		t.selectContextAfterEventSQL,
+		roomID, id, filter.Limit,
 		pq.StringArray(senders),
 		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(filter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(filter.NotTypes)),
-	)
+	).Rows()
 	if err != nil {
 		return
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
-
+	defer rows.Close()
 	for rows.Next() {
 		var (
+			rowID             int
 			eventBytes        []byte
-			evt               *rstypes.HeaderedEvent
+			outEvt            rstypes.HeaderedEvent
 			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
-		if err = rows.Scan(&lastID, &eventBytes, &historyVisibility); err != nil {
+		if err = rows.Scan(&rowID, &eventBytes, &historyVisibility); err != nil {
 			return 0, evts, err
 		}
-		if err = json.Unmarshal(eventBytes, &evt); err != nil {
+		if err = json.Unmarshal(eventBytes, &outEvt); err != nil {
 			return 0, evts, err
 		}
-		evt.Visibility = historyVisibility
-		evts = append(evts, evt)
+		outEvt.Visibility = historyVisibility
+		lastID = rowID
+		evts = append(evts, &outEvt)
 	}
-
 	return lastID, evts, rows.Err()
 }
 
-func (s *outputRoomEventsStatements) PurgeEvents(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeEventsStmt).ExecContext(ctx, roomID)
-	return err
+// PurgeEvents deletes all events for a given room.
+func (t *outputRoomEventsTable) PurgeEvents(ctx context.Context, roomID string) error {
+	// Delete all events for the room.
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.purgeEventsSQL, roomID).Error
 }
 
-func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]rstypes.HeaderedEvent, error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectSearchStmt).QueryContext(ctx, afterID, pq.StringArray(types), limit)
+// ReIndex returns the events for reindexing.
+func (t *outputRoomEventsTable) ReIndex(ctx context.Context, limit, afterID int64, types []string) (map[int64]rstypes.HeaderedEvent, error) {
+	// Query for events for reindexing.
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectSearchSQL, afterID, pq.StringArray(types), limit).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
-
-	var eventID string
-	var id int64
-	result := make(map[int64]rstypes.HeaderedEvent)
+	defer rows.Close()
+	var (
+		eventID string
+		id      int64
+		result  = make(map[int64]rstypes.HeaderedEvent)
+	)
 	for rows.Next() {
 		var ev rstypes.HeaderedEvent
 		var eventBytes []byte
@@ -675,22 +673,15 @@ func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, l
 	return result, rows.Err()
 }
 
-// escapeSpecialCharacters escapes the special characters in a query term.
-func (s *outputRoomEventsStatements) escapeSpecialCharacters(input string) string {
-	specialChars := "+,^`,:{},\"[],()<>,~!\\* "
-	escaped := strings.Builder{}
-
-	for _, char := range input {
-		if strings.ContainsRune(specialChars, char) {
-			escaped.WriteRune('\\')
-		}
-		escaped.WriteRune(char)
-	}
-
-	return escaped.String()
+// ExcludeEventsFromSearchIndex excludes the given events from the search index.
+func (t *outputRoomEventsTable) ExcludeEventsFromSearchIndex(ctx context.Context, eventIDs []string) error {
+	// Exclude the events from the search index.
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.excludeEventsFromIndexSQL, pq.StringArray(eventIDs)).Error
 }
 
-func (s *outputRoomEventsStatements) SearchEvents(
+// SearchEvents returns the search results for the given search term.
+func (t *outputRoomEventsTable) SearchEvents(
 	ctx context.Context, searchTerm string, roomIDs []string,
 	keys []string, limit, offset int,
 ) (*types.SearchResult, error) {
@@ -711,7 +702,7 @@ func (s *outputRoomEventsStatements) SearchEvents(
 
 	escapedRoomIDs := make([]string, len(roomIDs))
 	for i, roomID := range roomIDs {
-		escapedRoomIDs[i] = s.escapeSpecialCharacters(roomID)
+		escapedRoomIDs[i] = t.escapeSpecialCharacters(roomID)
 	}
 	whereParams = append(whereParams, strings.Join(escapedRoomIDs, " "))
 
@@ -739,8 +730,8 @@ func (s *outputRoomEventsStatements) SearchEvents(
 	finalWhereStr := fmt.Sprintf("%s %s AND event_id @@@ paradedb.boolean(  %s )", whereRoomIDQueryStr, whereExclusionQueryStr, whereShouldQueryStr)
 
 	totalCountQuery := fmt.Sprintf(searchEventsCountSQL, finalWhereStr)
-	totalsRow := s.db.QueryRowContext(ctx, totalCountQuery, whereParams...)
-	err = totalsRow.Scan(&totalCount)
+	totalsRow := t.cm.Connection(ctx, true).Raw(totalCountQuery, whereParams...)
+	err = totalsRow.Scan(&totalCount).Error
 	if err != nil {
 		return nil, err
 	}
@@ -750,12 +741,12 @@ func (s *outputRoomEventsStatements) SearchEvents(
 
 	whereParams = append(whereParams, limit, offset)
 
-	rows, err = s.db.QueryContext(ctx, finalQuery, whereParams...)
+	rows, err = t.cm.Connection(ctx, true).Raw(finalQuery, whereParams...).Rows()
 	if err != nil {
 		return nil, err
 	}
 
-	defer internal.CloseAndLogIfError(ctx, rows, "SearchEvents: rows.close() failed")
+	defer rows.Close()
 	resultHits, err := rowsToSearchResult(rows)
 	if err != nil {
 		return nil, err
@@ -764,6 +755,22 @@ func (s *outputRoomEventsStatements) SearchEvents(
 	return &types.SearchResult{Results: resultHits, Total: totalCount}, nil
 }
 
+// escapeSpecialCharacters escapes special characters in the given string.
+func (t *outputRoomEventsTable) escapeSpecialCharacters(input string) string {
+	specialChars := "+,^`,:{},\"[],()<>,~!\\* "
+	escaped := strings.Builder{}
+
+	for _, char := range input {
+		if strings.ContainsRune(specialChars, char) {
+			escaped.WriteRune('\\')
+		}
+		escaped.WriteRune(char)
+	}
+
+	return escaped.String()
+}
+
+// rowsToStreamEvents converts the given rows to stream events.
 func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 	var result []types.StreamEvent
 	for rows.Next() {
@@ -780,7 +787,6 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 		if err := rows.Scan(&streamPos, &eventID, &eventBytes, &sessionID, &excludeFromSync, &txnID, &historyVisibility); err != nil {
 			return nil, err
 		}
-		// TODO: Handle redacted events
 		var ev rstypes.HeaderedEvent
 		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
@@ -803,6 +809,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 	return result, rows.Err()
 }
 
+// rowsToSearchResult converts the given rows to search results.
 func rowsToSearchResult(rows *sql.Rows) ([]*types.SearchResultHit, error) {
 	var result []*types.SearchResultHit
 
@@ -818,7 +825,6 @@ func rowsToSearchResult(rows *sql.Rows) ([]*types.SearchResultHit, error) {
 		if err := rows.Scan(&streamPos, &eventID, &eventBytes, &historyVisibility, &highlight, &score); err != nil {
 			return nil, err
 		}
-		// TODO: Handle redacted events
 		var ev rstypes.HeaderedEvent
 		if err := json.Unmarshal(eventBytes, &ev); err != nil {
 			return nil, err
@@ -838,9 +844,4 @@ func rowsToSearchResult(rows *sql.Rows) ([]*types.SearchResultHit, error) {
 		})
 	}
 	return result, rows.Err()
-}
-
-func (s *outputRoomEventsStatements) ExcludeEventsFromSearchIndex(ctx context.Context, txn *sql.Tx, eventIDs []string) error {
-	_, err := sqlutil.TxStmt(txn, s.excludeEventsFromIndexStmt).ExecContext(ctx, pq.StringArray(eventIDs))
-	return err
 }

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ func (e ErrRoomNoExists) Unwrap() error {
 	return errRoomNoExists
 }
 
-// QueryAndBuildEvent builds a Matrix event using the event builder and roomserver query
+// QueryAndBuildEvent builds a Global event using the event builder and roomserver query
 // API client provided. If also fills roomserver query API response (if provided)
 // in case the function calling FillBuilder needs to use it.
 // Returns ErrRoomNoExists if the state of the room could not be retrieved because
@@ -67,7 +67,7 @@ func QueryAndBuildEvent(
 	return BuildEvent(ctx, proto, identity, evTime, eventsNeeded, queryRes)
 }
 
-// BuildEvent builds a Matrix event from the builder and QueryLatestEventsAndStateResponse
+// BuildEvent builds a Global event from the builder and QueryLatestEventsAndStateResponse
 // provided.
 func BuildEvent(
 	ctx context.Context,

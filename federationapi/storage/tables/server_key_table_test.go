@@ -28,7 +28,8 @@ func mustCreateServerKeyDB(ctx context.Context, t *testing.T, dep test.Dependanc
 func TestServerKeysTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		ctx, cancel := context.WithCancel(ctx)
 		tab, closeKeyDb := mustCreateServerKeyDB(ctx, t, testOpts)
 		t.Cleanup(func() {

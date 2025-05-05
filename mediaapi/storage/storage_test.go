@@ -14,16 +14,16 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
+func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewMediaAPIDatasource(ctx, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	})
+	cm, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &config.DatabaseOptions{ConnectionString: connStr})
+	if err != nil {
+		t.Fatalf("failed to open test database: %s", err)
+	}
+	db, err := storage.NewMediaAPIDatasource(ctx, cm)
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
@@ -31,8 +31,9 @@ func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOpti
 }
 func TestMediaRepository(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db, closeDb := mustCreateDatabase(ctx, svc, t, testOpts)
 		defer closeDb()
 		t.Run("can insert media & query media", func(t *testing.T) {
 			metadata := &types.MediaMetadata{
@@ -69,8 +70,9 @@ func TestMediaRepository(t *testing.T) {
 
 func TestThumbnailsStorage(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db, closeDb := mustCreateDatabase(ctx, svc, t, testOpts)
 		defer closeDb()
 		t.Run("can insert thumbnails & query media", func(t *testing.T) {
 			thumbnails := []*types.ThumbnailMetadata{

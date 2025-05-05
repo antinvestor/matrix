@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,10 +47,10 @@ func NewDeviceListUpdateConsumer(
 ) *DeviceListUpdateConsumer {
 	return &DeviceListUpdateConsumer{
 		jetstream:         js,
-		durable:           cfg.Matrix.JetStream.Prefixed("KeyServerInputDeviceListConsumer"),
-		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		durable:           cfg.Global.JetStream.Prefixed("KeyServerInputDeviceListConsumer"),
+		topic:             cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
 		updater:           updater,
-		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		isLocalServerName: cfg.Global.IsLocalServerName,
 	}
 }
 

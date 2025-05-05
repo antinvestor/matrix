@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -118,118 +115,114 @@ WHERE re.event_id = ANY($2)
 
 `
 
-type stateSnapshotStatements struct {
-	insertStateStmt                               *sql.Stmt
-	bulkSelectStateBlockNIDsStmt                  *sql.Stmt
-	bulkSelectStateForHistoryVisibilityStmt       *sql.Stmt
-	bulktSelectMembershipForHistoryVisibilityStmt *sql.Stmt
+// Refactored table struct for GORM
+// All SQL strings are struct fields, set at initialization
+
+type stateSnapshotTable struct {
+	cm                                          *sqlutil.Connections
+	insertStateSQL                              string
+	bulkSelectStateBlockNIDsSQL                 string
+	bulkSelectStateForHistoryVisibilitySQL      string
+	bulkSelectMembershipForHistoryVisibilitySQL string
 }
 
-func NewPostgresStateSnapshotTable(ctx context.Context, db *sql.DB) (tables.StateSnapshot, error) {
-	s := &stateSnapshotStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertStateStmt, insertStateSQL},
-		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
-		{&s.bulkSelectStateForHistoryVisibilityStmt, bulkSelectStateForHistoryVisibilitySQL},
-		{&s.bulktSelectMembershipForHistoryVisibilityStmt, bulkSelectMembershipForHistoryVisibilitySQL},
-	}.Prepare(db)
+func NewPostgresStateSnapshotTable(cm *sqlutil.Connections) tables.StateSnapshot {
+	return &stateSnapshotTable{
+		cm:                                     cm,
+		insertStateSQL:                         insertStateSQL,
+		bulkSelectStateBlockNIDsSQL:            bulkSelectStateBlockNIDsSQL,
+		bulkSelectStateForHistoryVisibilitySQL: bulkSelectStateForHistoryVisibilitySQL,
+		bulkSelectMembershipForHistoryVisibilitySQL: bulkSelectMembershipForHistoryVisibilitySQL,
+	}
 }
 
-func (s *stateSnapshotStatements) InsertState(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, nids types.StateBlockNIDs,
+func (t *stateSnapshotTable) InsertState(
+	ctx context.Context, roomNID types.RoomNID, nids types.StateBlockNIDs,
 ) (stateNID types.StateSnapshotNID, err error) {
 	nids = nids[:util.SortAndUnique(nids)]
-	err = sqlutil.TxStmt(txn, s.insertStateStmt).QueryRowContext(ctx, nids.Hash(), int64(roomNID), stateBlockNIDsAsArray(nids)).Scan(&stateNID)
-	if err != nil {
-		return 0, err
-	}
+	db := t.cm.Connection(ctx, false)
+	row := db.Raw(t.insertStateSQL, nids.Hash(), int64(roomNID), stateBlockNIDsAsArray(nids)).Row()
+	err = row.Scan(&stateNID)
 	return
 }
 
-func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
-	ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID,
+func (t *stateSnapshotTable) BulkSelectStateBlockNIDs(
+	ctx context.Context, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
+	db := t.cm.Connection(ctx, true)
 	nids := make([]int64, len(stateNIDs))
 	for i := range stateNIDs {
 		nids[i] = int64(stateNIDs[i])
 	}
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateBlockNIDsStmt)
-	rows, err := stmt.QueryContext(ctx, pq.Int64Array(nids))
+	rows, err := db.Raw(t.bulkSelectStateBlockNIDsSQL, pq.Int64Array(nids)).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
-	results := make([]types.StateBlockNIDList, len(stateNIDs))
-	i := 0
-	var stateBlockNIDs pq.Int64Array
-	for ; rows.Next(); i++ {
-		result := &results[i]
-		if err = rows.Scan(&result.StateSnapshotNID, &stateBlockNIDs); err != nil {
+	defer rows.Close()
+	var results []types.StateBlockNIDList
+	for rows.Next() {
+		var snapshotNID int64
+		var blockNIDs pq.Int64Array
+		if err := rows.Scan(&snapshotNID, &blockNIDs); err != nil {
 			return nil, err
 		}
-		result.StateBlockNIDs = make([]types.StateBlockNID, len(stateBlockNIDs))
-		for k := range stateBlockNIDs {
-			result.StateBlockNIDs[k] = types.StateBlockNID(stateBlockNIDs[k])
+		entry := types.StateBlockNIDList{
+			StateSnapshotNID: types.StateSnapshotNID(snapshotNID),
+			StateBlockNIDs:   make([]types.StateBlockNID, len(blockNIDs)),
 		}
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	if i != len(stateNIDs) {
-		return nil, types.MissingStateError(fmt.Sprintf("storage: state NIDs missing from the database (%d != %d)", i, len(stateNIDs)))
+		for i, nid := range blockNIDs {
+			entry.StateBlockNIDs[i] = types.StateBlockNID(nid)
+		}
+		results = append(results, entry)
 	}
 	return results, nil
 }
 
-func (s *stateSnapshotStatements) BulkSelectStateForHistoryVisibility(
-	ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string,
+func (t *stateSnapshotTable) BulkSelectStateForHistoryVisibility(
+	ctx context.Context, stateSnapshotNID types.StateSnapshotNID, domain string,
 ) ([]types.EventNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateForHistoryVisibilityStmt)
-	rows, err := stmt.QueryContext(ctx, stateSnapshotNID, domain)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.bulkSelectStateForHistoryVisibilitySQL, stateSnapshotNID, domain).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
-	results := make([]types.EventNID, 0, 16)
+	defer rows.Close()
+	var results []types.EventNID
 	for rows.Next() {
 		var eventNID types.EventNID
-		if err = rows.Scan(&eventNID); err != nil {
+		if err := rows.Scan(&eventNID); err != nil {
 			return nil, err
 		}
 		results = append(results, eventNID)
 	}
-	return results, rows.Err()
+	return results, nil
 }
 
-func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(
-	ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
+func (t *stateSnapshotTable) BulkSelectMembershipForHistoryVisibility(
+	ctx context.Context, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
 ) (map[string]*types.HeaderedEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulktSelectMembershipForHistoryVisibilityStmt)
-	rows, err := stmt.QueryContext(ctx, userNID, pq.Array(eventIDs), roomInfo.RoomNID)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.bulkSelectMembershipForHistoryVisibilitySQL, userNID, pq.Array(eventIDs), roomInfo.RoomNID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer rows.Close()
 	result := make(map[string]*types.HeaderedEvent, len(eventIDs))
-	var evJson []byte
-	var eventID string
-	var membershipEventID string
-
 	knownEvents := make(map[string]*types.HeaderedEvent, len(eventIDs))
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomInfo.RoomVersion)
 	if err != nil {
 		return nil, err
 	}
-
 	for rows.Next() {
-		if err = rows.Scan(&eventID, &membershipEventID, &evJson); err != nil {
+		var eventID, membershipEventID string
+		var evJson []byte
+		if err := rows.Scan(&eventID, &membershipEventID, &evJson); err != nil {
 			return nil, err
 		}
 		if len(evJson) == 0 {
 			result[eventID] = &types.HeaderedEvent{}
 			continue
 		}
-		// If we already know this event, don't try to marshal the json again
 		if ev, ok := knownEvents[membershipEventID]; ok {
 			result[eventID] = ev
 			continue
@@ -237,12 +230,11 @@ func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(
 		event, err := verImpl.NewEventFromTrustedJSON(evJson, false)
 		if err != nil {
 			result[eventID] = &types.HeaderedEvent{}
-			// not fatal
 			continue
 		}
 		he := &types.HeaderedEvent{PDU: event}
 		result[eventID] = he
 		knownEvents[membershipEventID] = he
 	}
-	return result, rows.Err()
+	return result, nil
 }

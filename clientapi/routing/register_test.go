@@ -200,9 +200,8 @@ func TestValidationOfApplicationServices(t *testing.T) {
 		},
 	}
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	cfg.Global.ServerName = "localhost"
 	cfg.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService}
@@ -417,9 +416,8 @@ func Test_register(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -427,7 +425,7 @@ func Test_register(t *testing.T) {
 		}
 		natsInstance := jetstream.NATSInstance{}
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -593,9 +591,8 @@ func Test_register(t *testing.T) {
 
 func TestRegisterUserWithDisplayName(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg.Global.ServerName = "server"
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -603,7 +600,7 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		natsInstance := jetstream.NATSInstance{}
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -636,15 +633,14 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		natsInstance := jetstream.NATSInstance{}
 		cfg.Global.ServerName = "server"
 		sharedSecret := "dendritetest"
 		cfg.ClientAPI.RegistrationSharedSecret = sharedSecret
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)

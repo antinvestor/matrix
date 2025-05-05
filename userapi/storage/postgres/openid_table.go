@@ -2,15 +2,11 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-	log "github.com/sirupsen/logrus"
 )
 
 const openIDTokenSchema = `
@@ -18,7 +14,7 @@ const openIDTokenSchema = `
 CREATE TABLE IF NOT EXISTS userapi_openid_tokens (
 	-- The value of the token issued to a user
 	token TEXT NOT NULL PRIMARY KEY,
-    -- The Matrix user ID for this account
+    -- The Global user ID for this account
 	localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
 	-- When the token expires, as a unix timestamp (ms resolution).
@@ -34,55 +30,58 @@ const insertOpenIDTokenSQL = "" +
 const selectOpenIDTokenSQL = "" +
 	"SELECT localpart, server_name, token_expires_at_ms FROM userapi_openid_tokens WHERE token = $1"
 
-type openIDTokenStatements struct {
-	insertTokenStmt *sql.Stmt
-	selectTokenStmt *sql.Stmt
-	serverName      spec.ServerName
+const deleteOpenIDTokenSQL = "" +
+	"DELETE FROM userapi_openid_tokens WHERE token = $1"
+
+// openIDTable implements tables.OpenIDTable using GORM and a connection manager.
+type openIDTable struct {
+	cm *sqlutil.Connections
+
+	insertOpenIDTokenSQL string
+	selectOpenIDTokenSQL string
+	deleteOpenIDTokenSQL string
 }
 
-func NewPostgresOpenIDTable(ctx context.Context, db *sql.DB, serverName spec.ServerName) (tables.OpenIDTable, error) {
-	s := &openIDTokenStatements{
-		serverName: serverName,
+// NewPostgresOpenIDTable returns a new OpenIDTable using the provided connection manager.
+func NewPostgresOpenIDTable(cm *sqlutil.Connections) tables.OpenIDTable {
+	return &openIDTable{
+		cm:                   cm,
+		insertOpenIDTokenSQL: insertOpenIDTokenSQL,
+		selectOpenIDTokenSQL: selectOpenIDTokenSQL,
+		deleteOpenIDTokenSQL: deleteOpenIDTokenSQL,
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertTokenStmt, insertOpenIDTokenSQL},
-		{&s.selectTokenStmt, selectOpenIDTokenSQL},
-	}.Prepare(db)
 }
 
-// insertToken inserts a new OpenID Connect token to the DB.
-// Returns new token, otherwise returns error if the token already exists.
-func (s *openIDTokenStatements) InsertOpenIDToken(
-	ctx context.Context,
-	txn *sql.Tx,
-	token, localpart string, serverName spec.ServerName,
-	expiresAtMS int64,
-) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.insertTokenStmt)
-	_, err = stmt.ExecContext(ctx, token, localpart, serverName, expiresAtMS)
-	return
+// InsertOpenIDToken inserts a new OpenID token into the database.
+// The token is associated with a user and has an expiration timestamp (ms resolution).
+func (t *openIDTable) InsertOpenIDToken(ctx context.Context, token string, userID string, expiresAt int64) error {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.insertOpenIDTokenSQL, token, userID, expiresAt)
+	return result.Error
 }
 
-// selectOpenIDTokenAtrributes gets the attributes associated with an OpenID token from the DB
-// Returns the existing token's attributes, or err if no token is found
-func (s *openIDTokenStatements) SelectOpenIDTokenAtrributes(
-	ctx context.Context,
-	token string,
-) (*api.OpenIDTokenAttributes, error) {
-	var openIDTokenAttrs api.OpenIDTokenAttributes
+// SelectOpenIDToken retrieves an OpenID token's attributes by the token string.
+// Returns the user ID and expiration timestamp if found, or an error if not found.
+func (t *openIDTable) SelectOpenIDToken(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error) {
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectOpenIDTokenSQL, token).Row()
 	var localpart string
 	var serverName spec.ServerName
-	err := s.selectTokenStmt.QueryRowContext(ctx, token).Scan(
-		&localpart, &serverName,
-		&openIDTokenAttrs.ExpiresAtMS,
-	)
-	openIDTokenAttrs.UserID = fmt.Sprintf("@%s:%s", localpart, serverName)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			log.WithError(err).Error("Unable to retrieve token from the db")
-		}
+	var expiresAt int64
+	if err := row.Scan(&localpart, &serverName, &expiresAt); err != nil {
 		return nil, err
 	}
+	attrs := api.OpenIDTokenAttributes{
+		UserID:      fmt.Sprintf("@%s:%s", localpart, serverName),
+		ExpiresAtMS: expiresAt,
+	}
+	return &attrs, nil
+}
 
-	return &openIDTokenAttrs, nil
+// DeleteOpenIDToken deletes an OpenID token from the database by token string.
+// Returns an error if the operation fails.
+func (t *openIDTable) DeleteOpenIDToken(ctx context.Context, token string) error {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.deleteOpenIDTokenSQL, token)
+	return result.Error
 }

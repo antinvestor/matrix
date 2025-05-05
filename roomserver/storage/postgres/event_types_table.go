@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -86,6 +84,7 @@ const insertEventTypeNIDSQL = "" +
 	" ON CONFLICT ON CONSTRAINT roomserver_event_type_unique" +
 	" DO NOTHING RETURNING (event_type_nid)"
 
+// Lookup event type NID from string event type.
 const selectEventTypeNIDSQL = "" +
 	"SELECT event_type_nid FROM roomserver_event_types WHERE event_type = $1"
 
@@ -95,49 +94,43 @@ const bulkSelectEventTypeNIDSQL = "" +
 	"SELECT event_type, event_type_nid FROM roomserver_event_types" +
 	" WHERE event_type = ANY($1)"
 
-type eventTypeStatements struct {
-	insertEventTypeNIDStmt     *sql.Stmt
-	selectEventTypeNIDStmt     *sql.Stmt
-	bulkSelectEventTypeNIDStmt *sql.Stmt
+type eventTypesTable struct {
+	cm                        *sqlutil.Connections
+	insertEventTypeNIDSQL     string
+	selectEventTypeNIDSQL     string
+	bulkSelectEventTypeNIDSQL string
 }
 
-func NewPostgresEventTypesTable(ctx context.Context, db *sql.DB) (tables.EventTypes, error) {
-	s := &eventTypeStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
-		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
-		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
-	}.Prepare(db)
+func NewPostgresEventTypesTable(cm *sqlutil.Connections) tables.EventTypes {
+	return &eventTypesTable{
+		cm:                        cm,
+		insertEventTypeNIDSQL:     insertEventTypeNIDSQL,
+		selectEventTypeNIDSQL:     selectEventTypeNIDSQL,
+		bulkSelectEventTypeNIDSQL: bulkSelectEventTypeNIDSQL,
+	}
 }
 
-func (s *eventTypeStatements) InsertEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventType string,
-) (types.EventTypeNID, error) {
+func (t *eventTypesTable) InsertEventTypeNID(ctx context.Context, eventType string) (types.EventTypeNID, error) {
+	db := t.cm.Connection(ctx, false)
 	var eventTypeNID int64
-	stmt := sqlutil.TxStmt(txn, s.insertEventTypeNIDStmt)
-	err := stmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	err := db.Raw(t.insertEventTypeNIDSQL, eventType).Scan(&eventTypeNID).Error
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) SelectEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventType string,
-) (types.EventTypeNID, error) {
+func (t *eventTypesTable) SelectEventTypeNID(ctx context.Context, eventType string) (types.EventTypeNID, error) {
+	db := t.cm.Connection(ctx, true)
 	var eventTypeNID int64
-	stmt := sqlutil.TxStmt(txn, s.selectEventTypeNIDStmt)
-	err := stmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	err := db.Raw(t.selectEventTypeNIDSQL, eventType).Scan(&eventTypeNID).Error
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) BulkSelectEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventTypes []string,
-) (map[string]types.EventTypeNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventTypeNIDStmt)
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventTypes))
+func (t *eventTypesTable) BulkSelectEventTypeNID(ctx context.Context, eventTypes []string) (map[string]types.EventTypeNID, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.bulkSelectEventTypeNIDSQL, pq.StringArray(eventTypes)).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventTypeNID: rows.close() failed")
-
 	result := make(map[string]types.EventTypeNID, len(eventTypes))
 	var eventType string
 	var eventTypeNID int64

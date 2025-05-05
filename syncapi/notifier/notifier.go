@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -336,8 +335,6 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	if err != nil {
 		return err
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	roomToUsers, err := snapshot.AllJoinedUsersInRooms(ctx)
 	if err != nil {
@@ -351,7 +348,6 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	}
 	n.setPeekingDevices(roomToPeekingDevices)
 
-	succeeded = true
 	return nil
 }
 
@@ -364,8 +360,6 @@ func (n *Notifier) LoadRooms(ctx context.Context, db storage.Database, roomIDs [
 	if err != nil {
 		return err
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	roomToUsers, err := snapshot.AllJoinedUsersInRoom(ctx, roomIDs)
 	if err != nil {
@@ -373,7 +367,6 @@ func (n *Notifier) LoadRooms(ctx context.Context, db storage.Database, roomIDs [
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 
-	succeeded = true
 	return nil
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package testrig
 import (
 	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"testing"
 	"time"
 
@@ -26,18 +27,25 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func NewContext(t *testing.T) context.Context {
-	return t.Context()
+func NewService(t *testing.T) (context.Context, *frame.Service) {
+	ctx := t.Context()
+	opts := []frame.Option{frame.NoopDriver()}
+	return frame.NewServiceWithContext(ctx, "Test Srv", opts...)
 }
 
-func CreateConfig(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*config.Dendrite, func()) {
+func NewServiceWithoutT() (context.Context, *frame.Service) {
+	opts := []frame.Option{frame.NoopDriver()}
+	return frame.NewService("Test Srv", opts...)
+}
+
+func CreateConfig(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*config.Matrix, func(ctx context.Context)) {
 
 	defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx, testOpts)
 	if err != nil {
 		t.Fatalf("Could not create default connections %s", err)
 	}
 
-	var cfg config.Dendrite
+	var cfg config.Matrix
 	cfg.Defaults(defaultOpts)
 	cfg.FederationAPI.KeyPerspectives = nil
 
@@ -48,13 +56,38 @@ func CreateConfig(ctx context.Context, t *testing.T, testOpts test.DependancyOpt
 	cfg.Global.DatabaseOptions.MaxOpenConnections = 10
 	cfg.Global.DatabaseOptions.ConnMaxLifetimeSeconds = 60
 
+	for _, conn := range defaultOpts.DatabaseConnectionStr.ToArray() {
+		cfg.Global.DatabasePrimaryURL = append(cfg.Global.DatabasePrimaryURL, string(conn))
+	}
+
 	cfg.Global.ServerName = "test"
 	// use a distinct prefix else concurrent postgres runs will clash since NATS will use
 	// the file system event with InMemory=true :(
 	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%s_", util.RandomString(8))
 	cfg.SyncAPI.Fulltext.InMemory = true
 
-	return &cfg, func() {
-		closeDSConns()
+	return &cfg, func(ctx context.Context) {
+		closeDSConns(ctx)
 	}
+}
+
+func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *frame.Service, *config.Matrix) {
+
+	opts := test.DependancyOption{}
+	if len(testOpts) > 0 {
+		opts = testOpts[0]
+	}
+
+	ctx, srv := NewService(t)
+	cfg, clearConfig := CreateConfig(ctx, t, opts)
+
+	srv.AddCleanupMethod(clearConfig)
+
+	scfg := cfg.Global
+
+	srvOpts := []frame.Option{frame.Config(&scfg), frame.Datastore(ctx)}
+
+	srv.Init(srvOpts...)
+
+	return ctx, srv, cfg
 }

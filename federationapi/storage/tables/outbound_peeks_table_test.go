@@ -32,7 +32,8 @@ func TestOutboundPeeksTable(t *testing.T) {
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		tab, closeDB := mustCreateOutboundpeeksTable(ctx, t, testOpts)
 		defer closeDB()
 

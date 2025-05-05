@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,9 +43,9 @@ import (
 )
 
 // Monolith represents an instantiation of all dependencies required to build
-// all components of Dendrite, for use in monolith mode.
+// all components of Matrix, for use in monolith mode.
 type Monolith struct {
-	Config    *config.Dendrite
+	Config    *config.Matrix
 	Service   *frame.Service
 	KeyRing   *gomatrixserverlib.KeyRing
 	Client    *fclient.Client
@@ -67,7 +67,7 @@ type Monolith struct {
 // AddAllPublicRoutes attaches all public paths to the given router
 func (m *Monolith) AddAllPublicRoutes(
 	ctx context.Context,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	routers httputil.Routers,
 	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,

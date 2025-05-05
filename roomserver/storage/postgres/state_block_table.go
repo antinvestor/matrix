@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,10 +17,8 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -53,10 +51,6 @@ CREATE TABLE IF NOT EXISTS roomserver_state_block (
 
 const stateDataSchemaRevert = `DROP TABLE IF EXISTS roomserver_state_block;`
 
-// Insert a new state block. If we conflict on the hash column then
-// we must perform an update so that the RETURNING statement returns the
-// ID of the row that we conflicted with, so that we can then refer to
-// the original block.
 const insertStateDataSQL = "" +
 	"INSERT INTO roomserver_state_block (state_block_hash, event_nids)" +
 	" VALUES ($1, $2)" +
@@ -67,67 +61,30 @@ const bulkSelectStateBlockEntriesSQL = "" +
 	"SELECT state_block_nid, event_nids" +
 	" FROM roomserver_state_block WHERE state_block_nid = ANY($1) ORDER BY state_block_nid ASC"
 
-type stateBlockStatements struct {
-	insertStateDataStmt             *sql.Stmt
-	bulkSelectStateBlockEntriesStmt *sql.Stmt
+type stateBlockTable struct {
+	cm                             *sqlutil.Connections
+	insertStateDataSQL             string
+	bulkSelectStateBlockEntriesSQL string
 }
 
-func NewPostgresStateBlockTable(ctx context.Context, db *sql.DB) (tables.StateBlock, error) {
-	s := &stateBlockStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertStateDataStmt, insertStateDataSQL},
-		{&s.bulkSelectStateBlockEntriesStmt, bulkSelectStateBlockEntriesSQL},
-	}.Prepare(db)
+func NewPostgresStateBlockTable(cm *sqlutil.Connections) tables.StateBlock {
+	return &stateBlockTable{
+		cm:                             cm,
+		insertStateDataSQL:             insertStateDataSQL,
+		bulkSelectStateBlockEntriesSQL: bulkSelectStateBlockEntriesSQL,
+	}
 }
 
-func (s *stateBlockStatements) BulkInsertStateData(
-	ctx context.Context, txn *sql.Tx,
-	entries types.StateEntries,
-) (id types.StateBlockNID, err error) {
+func (t *stateBlockTable) BulkInsertStateData(ctx context.Context, entries types.StateEntries) (id types.StateBlockNID, err error) {
 	entries = entries[:util.SortAndUnique(entries)]
 	nids := make(types.EventNIDs, entries.Len())
 	for i := range entries {
 		nids[i] = entries[i].EventNID
 	}
-	stmt := sqlutil.TxStmt(txn, s.insertStateDataStmt)
-	err = stmt.QueryRowContext(
-		ctx, nids.Hash(), eventNIDsAsArray(nids),
-	).Scan(&id)
+	db := t.cm.Connection(ctx, false)
+	row := db.Raw(t.insertStateDataSQL, nids.Hash(), eventNIDsAsArray(nids)).Row()
+	err = row.Scan(&id)
 	return
-}
-
-func (s *stateBlockStatements) BulkSelectStateBlockEntries(
-	ctx context.Context, txn *sql.Tx, stateBlockNIDs types.StateBlockNIDs,
-) ([][]types.EventNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateBlockEntriesStmt)
-	rows, err := stmt.QueryContext(ctx, stateBlockNIDsAsArray(stateBlockNIDs))
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockEntries: rows.close() failed")
-
-	results := make([][]types.EventNID, len(stateBlockNIDs))
-	i := 0
-	var stateBlockNID types.StateBlockNID
-	var result pq.Int64Array
-	for ; rows.Next(); i++ {
-		if err = rows.Scan(&stateBlockNID, &result); err != nil {
-			return nil, err
-		}
-		r := make([]types.EventNID, len(result))
-		for x := range result {
-			r[x] = types.EventNID(result[x])
-		}
-		results[i] = r
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	if i != len(stateBlockNIDs) {
-		return nil, fmt.Errorf("storage: state data NIDs missing from the database (%d != %d)", i, len(stateBlockNIDs))
-	}
-	return results, err
 }
 
 func stateBlockNIDsAsArray(stateBlockNIDs []types.StateBlockNID) pq.Int64Array {
@@ -136,4 +93,32 @@ func stateBlockNIDsAsArray(stateBlockNIDs []types.StateBlockNID) pq.Int64Array {
 		nids[i] = int64(stateBlockNIDs[i])
 	}
 	return nids
+}
+
+func (t *stateBlockTable) BulkSelectStateBlockEntries(ctx context.Context, stateBlockNIDs types.StateBlockNIDs) ([][]types.EventNID, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.bulkSelectStateBlockEntriesSQL, stateBlockNIDsAsArray(stateBlockNIDs)).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	results := make([][]types.EventNID, len(stateBlockNIDs))
+	i := 0
+	for rows.Next() {
+		var blockNID int64
+		var eventNIDs pq.Int64Array
+		if err := rows.Scan(&blockNID, &eventNIDs); err != nil {
+			return nil, err
+		}
+		events := make([]types.EventNID, len(eventNIDs))
+		for j, nid := range eventNIDs {
+			events[j] = types.EventNID(nid)
+		}
+		results[i] = events
+		i++
+	}
+	if i != len(stateBlockNIDs) {
+		return nil, fmt.Errorf("storage: state data NIDs missing from the database (%d != %d)", i, len(stateBlockNIDs))
+	}
+	return results, nil
 }

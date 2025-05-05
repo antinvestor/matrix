@@ -16,15 +16,10 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-
-	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 )
 
 const threepidSchema = `
@@ -34,7 +29,7 @@ CREATE TABLE IF NOT EXISTS userapi_threepids (
 	threepid TEXT NOT NULL,
 	-- The 3PID medium
 	medium TEXT NOT NULL DEFAULT 'email',
-	-- The localpart of the Matrix user ID associated to this 3PID
+	-- The localpart of the Global user ID associated to this 3PID
 	localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
 
@@ -58,72 +53,80 @@ const insertThreePIDSQL = "" +
 const deleteThreePIDSQL = "" +
 	"DELETE FROM userapi_threepids WHERE threepid = $1 AND medium = $2"
 
-type threepidStatements struct {
-	selectLocalpartForThreePIDStmt  *sql.Stmt
-	selectThreePIDsForLocalpartStmt *sql.Stmt
-	insertThreePIDStmt              *sql.Stmt
-	deleteThreePIDStmt              *sql.Stmt
+// threepidTable implements tables.ThreePIDTable using GORM and a connection manager.
+type threepidTable struct {
+	cm *sqlutil.Connections
+
+	selectLocalpartForThreePIDSQL  string
+	selectThreePIDsForLocalpartSQL string
+	insertThreePIDSQL              string
+	deleteThreePIDSQL              string
 }
 
-func NewPostgresThreePIDTable(ctx context.Context, db *sql.DB) (tables.ThreePIDTable, error) {
-	s := &threepidStatements{}
-	return s, sqlutil.StatementList{
-		{&s.selectLocalpartForThreePIDStmt, selectLocalpartForThreePIDSQL},
-		{&s.selectThreePIDsForLocalpartStmt, selectThreePIDsForLocalpartSQL},
-		{&s.insertThreePIDStmt, insertThreePIDSQL},
-		{&s.deleteThreePIDStmt, deleteThreePIDSQL},
-	}.Prepare(db)
-}
-
-func (s *threepidStatements) SelectLocalpartForThreePID(
-	ctx context.Context, txn *sql.Tx, threepid string, medium string,
-) (localpart string, serverName spec.ServerName, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectLocalpartForThreePIDStmt)
-	err = stmt.QueryRowContext(ctx, threepid, medium).Scan(&localpart, &serverName)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", "", nil
+// NewPostgresThreePIDTable returns a new ThreePIDTable using the provided connection manager.
+func NewPostgresThreePIDTable(cm *sqlutil.Connections) tables.ThreePIDTable {
+	return &threepidTable{
+		cm:                             cm,
+		selectLocalpartForThreePIDSQL:  selectLocalpartForThreePIDSQL,
+		selectThreePIDsForLocalpartSQL: selectThreePIDsForLocalpartSQL,
+		insertThreePIDSQL:              insertThreePIDSQL,
+		deleteThreePIDSQL:              deleteThreePIDSQL,
 	}
-	return
 }
 
-func (s *threepidStatements) SelectThreePIDsForLocalpart(
-	ctx context.Context,
-	localpart string, serverName spec.ServerName,
-) (threepids []authtypes.ThreePID, err error) {
-	rows, err := s.selectThreePIDsForLocalpartStmt.QueryContext(ctx, localpart, serverName)
+// SelectLocalpartForThreePID returns the localpart and server name for a given 3PID and medium.
+func (t *threepidTable) SelectLocalpartForThreePID(ctx context.Context, threepid, medium string) (string, spec.ServerName, error) {
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectLocalpartForThreePIDSQL, threepid, medium).Row()
+	var localpart string
+	var serverName spec.ServerName
+	if err := row.Scan(&localpart, &serverName); err != nil {
+		return "", "", err
+	}
+	return localpart, serverName, nil
+}
+
+// SelectThreePIDsForLocalpart returns all 3PIDs for a given localpart and server name.
+func (t *threepidTable) SelectThreePIDsForLocalpart(ctx context.Context, localpart string, serverName spec.ServerName) ([]authtypes.ThreePID, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectThreePIDsForLocalpartSQL, localpart, serverName).Rows()
 	if err != nil {
-		return
+		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectThreePIDsForLocalpart: failed to close rows")
-
-	threepids = []authtypes.ThreePID{}
+	defer rows.Close()
+	var threepids []authtypes.ThreePID
 	for rows.Next() {
-		var threepid string
-		var medium string
-		if err = rows.Scan(&threepid, &medium); err != nil {
-			return
+		var pid authtypes.ThreePID
+		if err := rows.Scan(&pid.Address, &pid.Medium); err != nil {
+			return nil, err
 		}
-		threepids = append(threepids, authtypes.ThreePID{
-			Address: threepid,
-			Medium:  medium,
-		})
+		threepids = append(threepids, pid)
 	}
-	err = rows.Err()
-	return
+	return threepids, nil
 }
 
-func (s *threepidStatements) InsertThreePID(
-	ctx context.Context, txn *sql.Tx, threepid, medium,
-	localpart string, serverName spec.ServerName,
-) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.insertThreePIDStmt)
-	_, err = stmt.ExecContext(ctx, threepid, medium, localpart, serverName)
-	return
+// InsertThreePID inserts a new 3PID mapping.
+func (t *threepidTable) InsertThreePID(ctx context.Context, threepid, medium, localpart string, serverName spec.ServerName) error {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.insertThreePIDSQL, threepid, medium, localpart, serverName)
+	return result.Error
 }
 
-func (s *threepidStatements) DeleteThreePID(
-	ctx context.Context, txn *sql.Tx, threepid string, medium string) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.deleteThreePIDStmt)
-	_, err = stmt.ExecContext(ctx, threepid, medium)
-	return
+// DeleteThreePID deletes a 3PID mapping.
+func (t *threepidTable) DeleteThreePID(ctx context.Context, threepid, medium string) error {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.deleteThreePIDSQL, threepid, medium)
+	return result.Error
+}
+
+// AutoMigrate migrates the schema.
+func (t *threepidTable) AutoMigrate(ctx context.Context) error {
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(threepidSchema).Error
+}
+
+// AutoMigrateRevert reverts the schema migration.
+func (t *threepidTable) AutoMigrateRevert(ctx context.Context) error {
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(threepidSchemaRevert).Error
 }

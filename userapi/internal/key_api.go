@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ func (a *UserInternalAPI) PerformClaimKeys(ctx context.Context, req *api.Perform
 		domainToDeviceKeys[string(serverName)] = nested
 	}
 	for domain, local := range domainToDeviceKeys {
-		if !a.Config.Matrix.IsLocalServerName(spec.ServerName(domain)) {
+		if !a.Config.Global.IsLocalServerName(spec.ServerName(domain)) {
 			continue
 		}
 		// claim local keys
@@ -129,7 +129,7 @@ func (a *UserInternalAPI) claimRemoteKeys(
 			defer cancel()
 			defer wg.Done()
 
-			claimKeyRes, err := a.FedClient.ClaimKeys(fedCtx, a.Config.Matrix.ServerName, spec.ServerName(domain), keysToClaim)
+			claimKeyRes, err := a.FedClient.ClaimKeys(fedCtx, a.Config.Global.ServerName, spec.ServerName(domain), keysToClaim)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -245,7 +245,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 		}
 		domain := string(serverName)
 		// query local devices
-		if a.Config.Matrix.IsLocalServerName(serverName) {
+		if a.Config.Global.IsLocalServerName(serverName) {
 			deviceKeys, err := a.KeyDatabase.DeviceKeysForUser(ctx, userID, deviceIDs, false)
 			if err != nil {
 				res.Error = &api.KeyError{
@@ -423,13 +423,13 @@ func (a *UserInternalAPI) queryRemoteKeys(
 
 	domains := map[string]struct{}{}
 	for domain := range domainToDeviceKeys {
-		if a.Config.Matrix.IsLocalServerName(spec.ServerName(domain)) {
+		if a.Config.Global.IsLocalServerName(spec.ServerName(domain)) {
 			continue
 		}
 		domains[domain] = struct{}{}
 	}
 	for domain := range domainToCrossSigningKeys {
-		if a.Config.Matrix.IsLocalServerName(spec.ServerName(domain)) {
+		if a.Config.Global.IsLocalServerName(spec.ServerName(domain)) {
 			continue
 		}
 		domains[domain] = struct{}{}
@@ -541,7 +541,7 @@ func (a *UserInternalAPI) queryRemoteKeysOnServer(
 	if len(devKeys) == 0 {
 		return
 	}
-	queryKeysResp, err := a.FedClient.QueryKeys(fedCtx, a.Config.Matrix.ServerName, spec.ServerName(serverName), devKeys)
+	queryKeysResp, err := a.FedClient.QueryKeys(fedCtx, a.Config.Global.ServerName, spec.ServerName(serverName), devKeys)
 	if err == nil {
 		resultCh <- &queryKeysResp
 		return
@@ -675,7 +675,7 @@ func (a *UserInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Pe
 			if err != nil {
 				continue // ignore invalid users
 			}
-			if !a.Config.Matrix.IsLocalServerName(serverName) {
+			if !a.Config.Global.IsLocalServerName(serverName) {
 				continue // ignore remote users
 			}
 			if len(key.KeyJSON) == 0 {

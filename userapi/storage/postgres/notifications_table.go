@@ -16,28 +16,15 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
+	"github.com/antinvestor/matrix/internal"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
-
-type notificationsStatements struct {
-	insertStmt             *sql.Stmt
-	deleteUpToStmt         *sql.Stmt
-	updateReadStmt         *sql.Stmt
-	selectStmt             *sql.Stmt
-	selectCountStmt        *sql.Stmt
-	selectRoomCountsStmt   *sql.Stmt
-	cleanNotificationsStmt *sql.Stmt
-}
 
 const notificationSchema = `
 CREATE TABLE IF NOT EXISTS userapi_notifications (
@@ -87,79 +74,82 @@ const cleanNotificationsSQL = "" +
 	"DELETE FROM userapi_notifications WHERE" +
 	" (highlight = FALSE AND ts_ms < $1) OR (highlight = TRUE AND ts_ms < $2)"
 
-func NewPostgresNotificationTable(ctx context.Context, db *sql.DB) (tables.NotificationTable, error) {
-	s := &notificationsStatements{}
-	// Removed db.Exec(notificationSchema) from constructor. Schema handled by migrator.
-	return s, sqlutil.StatementList{
-		{&s.insertStmt, insertNotificationSQL},
-		{&s.deleteUpToStmt, deleteNotificationsUpToSQL},
-		{&s.updateReadStmt, updateNotificationReadSQL},
-		{&s.selectStmt, selectNotificationSQL},
-		{&s.selectCountStmt, selectNotificationCountSQL},
-		{&s.selectRoomCountsStmt, selectRoomNotificationCountsSQL},
-		{&s.cleanNotificationsStmt, cleanNotificationsSQL},
-	}.Prepare(db)
+// notificationsTable implements tables.NotificationsTable using GORM and a connection manager.
+type notificationsTable struct {
+	cm *sqlutil.Connections
+
+	insertNotificationSQL           string
+	deleteNotificationsUpToSQL      string
+	updateNotificationReadSQL       string
+	selectNotificationSQL           string
+	selectNotificationCountSQL      string
+	selectRoomNotificationCountsSQL string
+	cleanNotificationsSQL           string
 }
 
-func (s *notificationsStatements) Clean(ctx context.Context, txn *sql.Tx) error {
-	_, err := sqlutil.TxStmt(txn, s.cleanNotificationsStmt).ExecContext(
-		ctx,
-		time.Now().AddDate(0, 0, -1).UnixNano()/int64(time.Millisecond), // keep non-highlights for a day
-		time.Now().AddDate(0, -1, 0).UnixNano()/int64(time.Millisecond), // keep highlights for a month
-	)
-	return err
+// NewPostgresNotificationsTable returns a new NotificationsTable using the provided connection manager.
+func NewPostgresNotificationsTable(cm *sqlutil.Connections) tables.NotificationTable {
+	return &notificationsTable{
+		cm:                              cm,
+		insertNotificationSQL:           insertNotificationSQL,
+		deleteNotificationsUpToSQL:      deleteNotificationsUpToSQL,
+		updateNotificationReadSQL:       updateNotificationReadSQL,
+		selectNotificationSQL:           selectNotificationSQL,
+		selectNotificationCountSQL:      selectNotificationCountSQL,
+		selectRoomNotificationCountsSQL: selectRoomNotificationCountsSQL,
+		cleanNotificationsSQL:           cleanNotificationsSQL,
+	}
 }
 
 // Insert inserts a notification into the database.
-func (s *notificationsStatements) Insert(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, eventID string, pos uint64, highlight bool, n *api.Notification) error {
+func (t *notificationsTable) Insert(ctx context.Context, localpart string, serverName spec.ServerName, eventID string, pos uint64, highlight bool, n *api.Notification) error {
+	db := t.cm.Connection(ctx, false)
 	roomID, tsMS := n.RoomID, n.TS
 	nn := *n
-	// Clears out fields that have their own columns to (1) shrink the
-	// data and (2) avoid difficult-to-debug inconsistency bugs.
+	// Clears out fields that have their own columns to shrink the data and avoid inconsistency bugs.
 	nn.RoomID = ""
 	nn.TS, nn.Read = 0, false
 	bs, err := json.Marshal(nn)
 	if err != nil {
 		return err
 	}
-	_, err = sqlutil.TxStmt(txn, s.insertStmt).ExecContext(ctx, localpart, serverName, roomID, eventID, pos, tsMS, highlight, string(bs))
-	return err
+	result := db.Exec(t.insertNotificationSQL, localpart, serverName, roomID, eventID, pos, tsMS, highlight, string(bs))
+	return result.Error
 }
 
 // DeleteUpTo deletes all previous notifications, up to and including the event.
-func (s *notificationsStatements) DeleteUpTo(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, roomID string, pos uint64) (affected bool, _ error) {
-	res, err := sqlutil.TxStmt(txn, s.deleteUpToStmt).ExecContext(ctx, localpart, serverName, roomID, pos)
-	if err != nil {
-		return false, err
+// It returns true if any rows were affected, false otherwise.
+func (t *notificationsTable) DeleteUpTo(ctx context.Context, localpart string, serverName spec.ServerName, roomID string, pos uint64) (bool, error) {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.deleteNotificationsUpToSQL, localpart, serverName, roomID, pos)
+	// Return true if any rows were affected, false otherwise.
+	if result.Error != nil {
+		return false, result.Error
 	}
-	nrows, err := res.RowsAffected()
-	if err != nil {
-		return true, err
-	}
-	log.WithFields(log.Fields{"localpart": localpart, "room_id": roomID, "stream_pos": pos}).Tracef("DeleteUpTo: %d rows affected", nrows)
-	return nrows > 0, nil
+	return result.RowsAffected > 0, nil
 }
 
-// UpdateRead updates the "read" value for an event.
-func (s *notificationsStatements) UpdateRead(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, roomID string, pos uint64, v bool) (affected bool, _ error) {
-	res, err := sqlutil.TxStmt(txn, s.updateReadStmt).ExecContext(ctx, v, localpart, serverName, roomID, pos)
-	if err != nil {
-		return false, err
+// UpdateRead updates the "read" value for notifications up to a given stream position.
+// It returns true if any rows were affected, false otherwise.
+func (t *notificationsTable) UpdateRead(ctx context.Context, localpart string, serverName spec.ServerName, roomID string, pos uint64, v bool) (bool, error) {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.updateNotificationReadSQL, v, localpart, serverName, roomID, pos)
+	// Return true if any rows were affected, false otherwise.
+	if result.Error != nil {
+		return false, result.Error
 	}
-	nrows, err := res.RowsAffected()
-	if err != nil {
-		return true, err
-	}
-	log.WithFields(log.Fields{"localpart": localpart, "room_id": roomID, "stream_pos": pos}).Tracef("UpdateRead: %d rows affected", nrows)
-	return nrows > 0, nil
+	return result.RowsAffected > 0, nil
 }
 
-func (s *notificationsStatements) Select(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, fromID int64, limit int, filter tables.NotificationFilter) ([]*api.Notification, int64, error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectStmt).QueryContext(ctx, localpart, serverName, fromID, uint32(filter), limit)
-
+// Select retrieves notifications for a user after a given notification ID.
+// It returns a slice of notifications and the highest notification ID found.
+func (t *notificationsTable) Select(ctx context.Context, localpart string, serverName spec.ServerName, fromID int64, limit int, filter tables.NotificationFilter) ([]*api.Notification, int64, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectNotificationSQL, localpart, serverName, fromID, filter, limit).Rows()
 	if err != nil {
 		return nil, 0, err
 	}
+	// Use internal.CloseAndLogIfError to ensure rows are closed and errors are logged.
 	defer internal.CloseAndLogIfError(ctx, rows, "notifications.Select: rows.Close() failed")
 
 	var maxID int64 = -1
@@ -170,17 +160,14 @@ func (s *notificationsStatements) Select(ctx context.Context, txn *sql.Tx, local
 		var ts spec.Timestamp
 		var read bool
 		var jsonStr string
-		err = rows.Scan(
-			&id,
-			&roomID,
-			&ts,
-			&read,
-			&jsonStr)
+		// Scan the row values.
+		err = rows.Scan(&id, &roomID, &ts, &read, &jsonStr)
 		if err != nil {
 			return nil, 0, err
 		}
 
 		var n api.Notification
+		// Unmarshal the notification JSON into the struct.
 		err := json.Unmarshal([]byte(jsonStr), &n)
 		if err != nil {
 			return nil, 0, err
@@ -197,12 +184,33 @@ func (s *notificationsStatements) Select(ctx context.Context, txn *sql.Tx, local
 	return notifs, maxID, rows.Err()
 }
 
-func (s *notificationsStatements) SelectCount(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, filter tables.NotificationFilter) (count int64, err error) {
-	err = sqlutil.TxStmt(txn, s.selectCountStmt).QueryRowContext(ctx, localpart, serverName, uint32(filter)).Scan(&count)
-	return
+// SelectCount retrieves the count of unread notifications for a user.
+func (t *notificationsTable) SelectCount(ctx context.Context, localpart string, serverName spec.ServerName, filter tables.NotificationFilter) (int64, error) {
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectNotificationCountSQL, localpart, serverName, filter).Row()
+	var count int64
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
-func (s *notificationsStatements) SelectRoomCounts(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, roomID string) (total int64, highlight int64, err error) {
-	err = sqlutil.TxStmt(txn, s.selectRoomCountsStmt).QueryRowContext(ctx, localpart, serverName, roomID).Scan(&total, &highlight)
-	return
+// SelectRoomCounts retrieves notification counts for a user and room.
+func (t *notificationsTable) SelectRoomCounts(ctx context.Context, localpart string, serverName spec.ServerName, roomID string) (int64, int64, error) {
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectRoomNotificationCountsSQL, localpart, serverName, roomID).Row()
+	var total, highlights int64
+	if err := row.Scan(&total, &highlights); err != nil {
+		return 0, 0, err
+	}
+	return total, highlights, nil
+}
+
+// Clean removes old notifications based on highlight and timestamp.
+func (t *notificationsTable) Clean(ctx context.Context) error {
+	normalCutoff := time.Now().AddDate(0, 0, -1).UnixNano() / int64(time.Millisecond)
+	highlightCutoff := time.Now().AddDate(0, -1, 0).UnixNano() / int64(time.Millisecond)
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.cleanNotificationsSQL, normalCutoff, highlightCutoff)
+	return result.Error
 }

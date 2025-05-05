@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,14 +16,10 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
 )
@@ -67,81 +63,56 @@ const selectQueuePDUReferenceJSONCountSQL = "" +
 const selectQueuePDUServerNamesSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_queue_pdus"
 
-type queuePDUsStatements struct {
-	db                                   *sql.DB
-	insertQueuePDUStmt                   *sql.Stmt
-	deleteQueuePDUsStmt                  *sql.Stmt
-	selectQueuePDUsStmt                  *sql.Stmt
-	selectQueuePDUReferenceJSONCountStmt *sql.Stmt
-	selectQueuePDUServerNamesStmt        *sql.Stmt
+type queuePDUsTable struct {
+	cm                      *sqlutil.Connections
+	InsertSQL               string
+	DeleteSQL               string
+	SelectSQL               string
+	SelectReferenceCountSQL string
+	SelectServerNamesSQL    string
 }
 
-func NewPostgresQueuePDUsTable(ctx context.Context, db *sql.DB) (tables.FederationQueuePDUs, error) {
-	s := &queuePDUsStatements{
-		db: db,
+// NewPostgresQueuePDUsTable initializes a queuePDUsTable with SQL constants and a connection manager
+func NewPostgresQueuePDUsTable(cm *sqlutil.Connections) tables.FederationQueuePDUs {
+	return &queuePDUsTable{
+		cm:                      cm,
+		InsertSQL:               insertQueuePDUSQL,
+		DeleteSQL:               deleteQueuePDUSQL,
+		SelectSQL:               selectQueuePDUsSQL,
+		SelectReferenceCountSQL: selectQueuePDUReferenceJSONCountSQL,
+		SelectServerNamesSQL:    selectQueuePDUServerNamesSQL,
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertQueuePDUStmt, insertQueuePDUSQL},
-		{&s.deleteQueuePDUsStmt, deleteQueuePDUSQL},
-		{&s.selectQueuePDUsStmt, selectQueuePDUsSQL},
-		{&s.selectQueuePDUReferenceJSONCountStmt, selectQueuePDUReferenceJSONCountSQL},
-		{&s.selectQueuePDUServerNamesStmt, selectQueuePDUServerNamesSQL},
-	}.Prepare(db)
 }
 
-func (s *queuePDUsStatements) InsertQueuePDU(
-	ctx context.Context,
-	txn *sql.Tx,
-	transactionID gomatrixserverlib.TransactionID,
-	serverName spec.ServerName,
-	nid int64,
-) error {
-	stmt := sqlutil.TxStmt(txn, s.insertQueuePDUStmt)
-	_, err := stmt.ExecContext(
-		ctx,
-		transactionID, // the transaction ID that we initially attempted
-		serverName,    // destination server name
-		nid,           // JSON blob NID
-	)
-	return err
+func (t *queuePDUsTable) InsertQueuePDU(ctx context.Context, transactionID gomatrixserverlib.TransactionID, serverName spec.ServerName, nid int64) error {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.InsertSQL, transactionID, serverName, nid)
+	return result.Error
 }
 
-func (s *queuePDUsStatements) DeleteQueuePDUs(
-	ctx context.Context, txn *sql.Tx,
-	serverName spec.ServerName,
-	jsonNIDs []int64,
-) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteQueuePDUsStmt)
-	_, err := stmt.ExecContext(ctx, serverName, pq.Int64Array(jsonNIDs))
-	return err
+func (t *queuePDUsTable) DeleteQueuePDUs(ctx context.Context, serverName spec.ServerName, jsonNIDs []int64) error {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.DeleteSQL, serverName, pq.Int64Array(jsonNIDs))
+	return result.Error
 }
 
-func (s *queuePDUsStatements) SelectQueuePDUReferenceJSONCount(
-	ctx context.Context, txn *sql.Tx, jsonNID int64,
-) (int64, error) {
+func (t *queuePDUsTable) SelectQueuePDUReferenceJSONCount(ctx context.Context, jsonNID int64) (int64, error) {
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.SelectReferenceCountSQL, jsonNID).Row()
 	var count int64
-	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUReferenceJSONCountStmt)
-	err := stmt.QueryRowContext(ctx, jsonNID).Scan(&count)
-	if errors.Is(err, sql.ErrNoRows) {
-		// It's acceptable for there to be no rows referencing a given
-		// JSON NID but it's not an error condition. Just return as if
-		// there's a zero count.
-		return 0, nil
+	if err := row.Scan(&count); err != nil {
+		return 0, err
 	}
-	return count, err
+	return count, nil
 }
 
-func (s *queuePDUsStatements) SelectQueuePDUs(
-	ctx context.Context, txn *sql.Tx,
-	serverName spec.ServerName,
-	limit int,
-) ([]int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUsStmt)
-	rows, err := stmt.QueryContext(ctx, serverName, limit)
+func (t *queuePDUsTable) SelectQueuePDUs(ctx context.Context, serverName spec.ServerName, limit int) ([]int64, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.SelectSQL, serverName, limit).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
+	defer rows.Close()
 	var result []int64
 	for rows.Next() {
 		var nid int64
@@ -150,27 +121,23 @@ func (s *queuePDUsStatements) SelectQueuePDUs(
 		}
 		result = append(result, nid)
 	}
-
-	return result, rows.Err()
+	return result, nil
 }
 
-func (s *queuePDUsStatements) SelectQueuePDUServerNames(
-	ctx context.Context, txn *sql.Tx,
-) ([]spec.ServerName, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUServerNamesStmt)
-	rows, err := stmt.QueryContext(ctx)
+func (t *queuePDUsTable) SelectQueuePDUServerNames(ctx context.Context) ([]spec.ServerName, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.SelectServerNamesSQL).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
+	defer rows.Close()
 	var result []spec.ServerName
 	for rows.Next() {
-		var serverName spec.ServerName
-		if err = rows.Scan(&serverName); err != nil {
+		var name spec.ServerName
+		if err = rows.Scan(&name); err != nil {
 			return nil, err
 		}
-		result = append(result, serverName)
+		result = append(result, name)
 	}
-
-	return result, rows.Err()
+	return result, nil
 }

@@ -43,7 +43,7 @@ func GetProfile(
 		}
 	}
 
-	_, domain, err := cfg.Matrix.SplitLocalID('@', userID)
+	_, domain, err := cfg.Global.SplitLocalID('@', userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{

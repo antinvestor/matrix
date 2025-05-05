@@ -6,7 +6,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 )
 
-func PrepareDefaultDSConnections(ctx context.Context, testOpts DependancyOption) (config.DefaultOpts, func(), error) {
+func PrepareDefaultDSConnections(ctx context.Context, testOpts DependancyOption) (config.DefaultOpts, func(ctx context.Context), error) {
 
 	cacheConnStr, closeCache, err := PrepareRedisDataSourceConnection(ctx)
 	if err != nil {
@@ -15,14 +15,14 @@ func PrepareDefaultDSConnections(ctx context.Context, testOpts DependancyOption)
 
 	queueConnStr, closeQueue, err := PrepareNatsDataSourceConnection(ctx)
 	if err != nil {
-		defer closeCache()
+		defer closeCache(ctx)
 		return config.DefaultOpts{}, nil, err
 	}
 
 	dbConnStr, closeDb, err := PrepareDatabaseDSConnection(ctx)
 	if err != nil {
-		defer closeCache()
-		defer closeQueue()
+		defer closeCache(ctx)
+		defer closeQueue(ctx)
 		return config.DefaultOpts{}, nil, err
 	}
 
@@ -30,9 +30,9 @@ func PrepareDefaultDSConnections(ctx context.Context, testOpts DependancyOption)
 			DatabaseConnectionStr: dbConnStr,
 			QueueConnectionStr:    queueConnStr,
 			CacheConnectionStr:    cacheConnStr,
-		}, func() {
-			closeCache()
-			closeQueue()
-			closeDb()
+		}, func(ctx context.Context) {
+			closeCache(ctx)
+			closeQueue(ctx)
+			closeDb(ctx)
 		}, nil
 }

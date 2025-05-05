@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package mscs implements Matrix Spec Changes from https://github.com/matrix-org/matrix-doc
+// Package mscs implements Global Spec Changes from https://github.com/matrix-org/matrix-doc
 package mscs
 
 import (
@@ -29,7 +29,7 @@ import (
 )
 
 // Enable MSCs - returns an error on unknown MSCs
-func Enable(ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, caches *caching.Caches) error {
+func Enable(ctx context.Context, cfg *config.Matrix, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, caches *caching.Caches) error {
 	for _, msc := range cfg.MSCs.MSCs {
 		util.GetLogger(ctx).WithField("msc", msc).Info("Enabling MSC")
 		if err := EnableMSC(ctx, cfg, cm, routers, monolith, msc, caches); err != nil {
@@ -39,14 +39,14 @@ func Enable(ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, 
 	return nil
 }
 
-func EnableMSC(ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, msc string, caches *caching.Caches) error {
+func EnableMSC(ctx context.Context, cfg *config.Matrix, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, msc string, caches *caching.Caches) error {
 	switch msc {
 	case "msc2836":
 		return msc2836.Enable(ctx, cfg, cm, routers, monolith.RoomserverAPI, monolith.FederationAPI, monolith.UserAPI, monolith.KeyRing)
 	case "msc2444": // enabled inside federationapi
 	case "msc2753": // enabled inside clientapi
 	default:
-		logrus.Warnf("EnableMSC: unknown MSC '%s', this MSC is either not supported or is natively supported by Dendrite", msc)
+		logrus.Warnf("EnableMSC: unknown MSC '%s', this MSC is either not supported or is natively supported by Matrix", msc)
 	}
 	return nil
 }

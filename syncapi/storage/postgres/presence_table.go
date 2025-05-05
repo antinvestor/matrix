@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
@@ -24,7 +23,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/lib/pq"
 
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -36,7 +34,7 @@ CREATE SEQUENCE IF NOT EXISTS syncapi_presence_id;
 CREATE TABLE IF NOT EXISTS syncapi_presence (
 	-- The ID
 	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_presence_id'),
-	-- The Matrix user ID
+	-- The Global user ID
 	user_id TEXT NOT NULL,
 	-- The actual presence
 	presence INT NOT NULL,
@@ -83,59 +81,64 @@ const selectPresenceAfter = "" +
 	" WHERE id > $1 AND last_active_ts >= $2" +
 	" ORDER BY id ASC LIMIT $3"
 
-type presenceStatements struct {
-	upsertPresenceStmt         *sql.Stmt
-	upsertPresenceFromSyncStmt *sql.Stmt
-	selectPresenceForUsersStmt *sql.Stmt
-	selectMaxPresenceStmt      *sql.Stmt
-	selectPresenceAfterStmt    *sql.Stmt
+// presenceTable implements tables.Presence using a connection manager and SQL constants.
+// This table stores presence data for users and provides methods for upserting, querying, and streaming presence updates.
+type presenceTable struct {
+	// cm is the connection manager for obtaining DB handles.
+	cm *sqlutil.Connections
+	// SQL constants for queries and statements.
+	upsertPresenceSQL         string
+	upsertPresenceFromSyncSQL string
+	selectPresenceForUserSQL  string
+	selectMaxPresenceSQL      string
+	selectPresenceAfterSQL    string
 }
 
-func NewPostgresPresenceTable(ctx context.Context, db *sql.DB) (tables.Presence, error) {
-	s := &presenceStatements{}
-	return s, sqlutil.StatementList{
-		{&s.upsertPresenceStmt, upsertPresenceSQL},
-		{&s.upsertPresenceFromSyncStmt, upsertPresenceFromSyncSQL},
-		{&s.selectPresenceForUsersStmt, selectPresenceForUserSQL},
-		{&s.selectMaxPresenceStmt, selectMaxPresenceSQL},
-		{&s.selectPresenceAfterStmt, selectPresenceAfter},
-	}.Prepare(db)
+// NewPostgresPresenceTable returns a new presenceTable instance.
+func NewPostgresPresenceTable(cm *sqlutil.Connections) tables.Presence {
+	return &presenceTable{
+		cm:                        cm,
+		upsertPresenceSQL:         upsertPresenceSQL,
+		upsertPresenceFromSyncSQL: upsertPresenceFromSyncSQL,
+		selectPresenceForUserSQL:  selectPresenceForUserSQL,
+		selectMaxPresenceSQL:      selectMaxPresenceSQL,
+		selectPresenceAfterSQL:    selectPresenceAfter,
+	}
 }
 
 // UpsertPresence creates/updates a presence status.
-func (p *presenceStatements) UpsertPresence(
+func (t *presenceTable) UpsertPresence(
 	ctx context.Context,
-	txn *sql.Tx,
 	userID string,
 	statusMsg *string,
 	presence types.Presence,
 	lastActiveTS spec.Timestamp,
 	fromSync bool,
 ) (pos types.StreamPosition, err error) {
+	db := t.cm.Connection(ctx, false)
 	if fromSync {
-		stmt := sqlutil.TxStmt(txn, p.upsertPresenceFromSyncStmt)
-		err = stmt.QueryRowContext(ctx, userID, presence, lastActiveTS).Scan(&pos)
+		row := db.Raw(t.upsertPresenceFromSyncSQL, userID, presence, lastActiveTS)
+		err = row.Row().Scan(&pos)
 	} else {
-		stmt := sqlutil.TxStmt(txn, p.upsertPresenceStmt)
-		err = stmt.QueryRowContext(ctx, userID, presence, statusMsg, lastActiveTS).Scan(&pos)
+		row := db.Raw(t.upsertPresenceSQL, userID, presence, statusMsg, lastActiveTS)
+		err = row.Row().Scan(&pos)
 	}
 	return
 }
 
 // GetPresenceForUsers returns the current presence for a list of users.
 // If the user doesn't have a presence status yet, it is omitted from the response.
-func (p *presenceStatements) GetPresenceForUsers(
-	ctx context.Context, txn *sql.Tx,
+func (t *presenceTable) GetPresenceForUsers(
+	ctx context.Context,
 	userIDs []string,
 ) ([]*types.PresenceInternal, error) {
 	result := make([]*types.PresenceInternal, 0, len(userIDs))
-	stmt := sqlutil.TxStmt(txn, p.selectPresenceForUsersStmt)
-	rows, err := stmt.QueryContext(ctx, pq.Array(userIDs))
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectPresenceForUserSQL, pq.Array(userIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "GetPresenceForUsers: rows.close() failed")
-
+	defer rows.Close()
 	for rows.Next() {
 		presence := &types.PresenceInternal{}
 		if err = rows.Scan(&presence.UserID, &presence.Presence, &presence.ClientFields.StatusMsg, &presence.LastActiveTS); err != nil {
@@ -147,26 +150,27 @@ func (p *presenceStatements) GetPresenceForUsers(
 	return result, rows.Err()
 }
 
-func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, p.selectMaxPresenceStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&pos)
+// GetMaxPresenceID returns the maximum stream position for presence.
+func (t *presenceTable) GetMaxPresenceID(ctx context.Context) (pos types.StreamPosition, err error) {
+	db := t.cm.Connection(ctx, true)
+	err = db.Raw(t.selectMaxPresenceSQL).Row().Scan(&pos)
 	return
 }
 
-// GetPresenceAfter returns the changes presences after a given stream id
-func (p *presenceStatements) GetPresenceAfter(
-	ctx context.Context, txn *sql.Tx,
+// GetPresenceAfter returns the changed presences after a given stream id.
+func (t *presenceTable) GetPresenceAfter(
+	ctx context.Context,
 	after types.StreamPosition,
 	filter synctypes.EventFilter,
 ) (presences map[string]*types.PresenceInternal, err error) {
 	presences = make(map[string]*types.PresenceInternal)
-	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
+	db := t.cm.Connection(ctx, true)
 	afterTS := spec.AsTimestamp(time.Now().Add(time.Minute * -5))
-	rows, err := stmt.QueryContext(ctx, after, afterTS, filter.Limit)
+	rows, err := db.Raw(t.selectPresenceAfterSQL, after, afterTS, filter.Limit).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "GetPresenceAfter: failed to close rows")
+	defer rows.Close()
 	for rows.Next() {
 		qryRes := &types.PresenceInternal{}
 		if err := rows.Scan(&qryRes.StreamPos, &qryRes.UserID, &qryRes.Presence, &qryRes.ClientFields.StatusMsg, &qryRes.LastActiveTS); err != nil {

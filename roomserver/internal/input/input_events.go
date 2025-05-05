@@ -1,6 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
 // Copyright 2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,7 +43,6 @@ import (
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/hooks"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -194,16 +193,16 @@ func (r *Inputer) processRoomEvent(
 			servers[server] = struct{}{}
 		}
 		// Don't try to talk to ourselves.
-		delete(servers, r.Cfg.Matrix.ServerName)
+		delete(servers, r.Cfg.Global.ServerName)
 		// Now build up the list of servers.
 		serverRes.ServerNames = serverRes.ServerNames[:0]
-		if input.Origin != "" && input.Origin != r.Cfg.Matrix.ServerName {
+		if input.Origin != "" && input.Origin != r.Cfg.Global.ServerName {
 			serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
 			delete(servers, input.Origin)
 		}
 		// Only perform this check if the sender mxid_mapping can be resolved.
 		// Don't fail processing the event if we have no mxid_maping.
-		if sender != nil && senderDomain != input.Origin && senderDomain != r.Cfg.Matrix.ServerName {
+		if sender != nil && senderDomain != input.Origin && senderDomain != r.Cfg.Global.ServerName {
 			serverRes.ServerNames = append(serverRes.ServerNames, senderDomain)
 			delete(servers, senderDomain)
 		}
@@ -506,7 +505,7 @@ func (r *Inputer) processRoomEvent(
 		if membership == spec.Join {
 			_, serverName, _ := gomatrixserverlib.SplitID('@', *event.StateKey())
 			// only handle local membership events
-			if r.Cfg.Matrix.IsLocalServerName(serverName) {
+			if r.Cfg.Global.IsLocalServerName(serverName) {
 				var aclEvent *types.HeaderedEvent
 				aclEvent, err = r.DB.GetStateEvent(ctx, event.RoomID().String(), acls.MRoomServerACL, "")
 				if err != nil {
@@ -526,7 +525,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// Handle remote room upgrades, e.g. remove published room
-	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Matrix.IsLocalServerName(senderDomain) {
+	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Global.IsLocalServerName(senderDomain) {
 		if err = r.handleRemoteRoomUpgrade(ctx, event); err != nil {
 			return fmt.Errorf("failed to handle remote room upgrade: %w", err)
 		}
@@ -851,12 +850,11 @@ func (r *Inputer) calculateAndSetState(
 	trace, ctx := internal.StartRegion(ctx, "calculateAndSetState")
 	defer trace.EndRegion()
 
-	var succeeded bool
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
 	}
-	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
+
 	roomState := state.NewStateResolution(updater, roomInfo, r.Queryer)
 
 	if input.HasState {
@@ -882,7 +880,6 @@ func (r *Inputer) calculateAndSetState(
 	if err != nil {
 		return fmt.Errorf("r.DB.SetState: %w", err)
 	}
-	succeeded = true
 	return nil
 }
 

@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,11 +17,9 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/tables"
 	"github.com/antinvestor/matrix/mediaapi/types"
@@ -71,26 +69,27 @@ SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method 
 `
 
 type thumbnailStatements struct {
-	insertThumbnailStmt  *sql.Stmt
-	selectThumbnailStmt  *sql.Stmt
-	selectThumbnailsStmt *sql.Stmt
+	cm           *sqlutil.Connections
+	InsertSQL    string
+	SelectSQL    string
+	SelectAllSQL string
 }
 
-func NewPostgresThumbnailsTable(ctx context.Context, db *sql.DB) (tables.Thumbnails, error) {
-	s := &thumbnailStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertThumbnailStmt, insertThumbnailSQL},
-		{&s.selectThumbnailStmt, selectThumbnailSQL},
-		{&s.selectThumbnailsStmt, selectThumbnailsSQL},
-	}.Prepare(db)
+// NewPostgresThumbnailsTable initializes a thumbnailStatements with SQL constants and a connection manager
+func NewPostgresThumbnailsTable(cm *sqlutil.Connections) tables.Thumbnails {
+	return &thumbnailStatements{
+		cm:           cm,
+		InsertSQL:    insertThumbnailSQL,
+		SelectSQL:    selectThumbnailSQL,
+		SelectAllSQL: selectThumbnailsSQL,
+	}
 }
 
-func (s *thumbnailStatements) InsertThumbnail(
-	ctx context.Context, txn *sql.Tx, thumbnailMetadata *types.ThumbnailMetadata,
-) error {
+func (s *thumbnailStatements) InsertThumbnail(ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata) error {
+	db := s.cm.Connection(ctx, false)
 	thumbnailMetadata.MediaMetadata.CreationTimestamp = spec.AsTimestamp(time.Now())
-	_, err := sqlutil.TxStmtContext(ctx, txn, s.insertThumbnailStmt).ExecContext(
-		ctx,
+	return db.Exec(
+		s.InsertSQL,
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
 		thumbnailMetadata.MediaMetadata.ContentType,
@@ -99,76 +98,47 @@ func (s *thumbnailStatements) InsertThumbnail(
 		thumbnailMetadata.ThumbnailSize.Width,
 		thumbnailMetadata.ThumbnailSize.Height,
 		thumbnailMetadata.ThumbnailSize.ResizeMethod,
-	)
-	return err
+	).Error
 }
 
 func (s *thumbnailStatements) SelectThumbnail(
 	ctx context.Context,
-	txn *sql.Tx,
-	mediaID types.MediaID,
-	mediaOrigin spec.ServerName,
+	mediaID types.MediaID, mediaOrigin spec.ServerName,
 	width, height int,
 	resizeMethod string,
 ) (*types.ThumbnailMetadata, error) {
-	thumbnailMetadata := types.ThumbnailMetadata{
-		MediaMetadata: &types.MediaMetadata{
-			MediaID: mediaID,
-			Origin:  mediaOrigin,
-		},
-		ThumbnailSize: types.ThumbnailSize{
-			Width:        width,
-			Height:       height,
-			ResizeMethod: resizeMethod,
-		},
+	db := s.cm.Connection(ctx, true)
+	row := db.Raw(s.SelectSQL, mediaID, mediaOrigin, width, height, resizeMethod).Row()
+	var meta types.ThumbnailMetadata
+	meta.MediaMetadata.MediaID = mediaID
+	meta.MediaMetadata.Origin = mediaOrigin
+	meta.ThumbnailSize.Width = width
+	meta.ThumbnailSize.Height = height
+	meta.ThumbnailSize.ResizeMethod = resizeMethod
+	if err := row.Scan(&meta.MediaMetadata.ContentType, &meta.MediaMetadata.FileSizeBytes, &meta.MediaMetadata.CreationTimestamp); err != nil {
+		return nil, err
 	}
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectThumbnailStmt).QueryRowContext(
-		ctx,
-		thumbnailMetadata.MediaMetadata.MediaID,
-		thumbnailMetadata.MediaMetadata.Origin,
-		thumbnailMetadata.ThumbnailSize.Width,
-		thumbnailMetadata.ThumbnailSize.Height,
-		thumbnailMetadata.ThumbnailSize.ResizeMethod,
-	).Scan(
-		&thumbnailMetadata.MediaMetadata.ContentType,
-		&thumbnailMetadata.MediaMetadata.FileSizeBytes,
-		&thumbnailMetadata.MediaMetadata.CreationTimestamp,
-	)
-	return &thumbnailMetadata, err
+	return &meta, nil
 }
 
 func (s *thumbnailStatements) SelectThumbnails(
-	ctx context.Context, txn *sql.Tx, mediaID types.MediaID, mediaOrigin spec.ServerName,
+	ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName,
 ) ([]*types.ThumbnailMetadata, error) {
-	rows, err := sqlutil.TxStmtContext(ctx, txn, s.selectThumbnailsStmt).QueryContext(
-		ctx, mediaID, mediaOrigin,
-	)
+	db := s.cm.Connection(ctx, true)
+	rows, err := db.Raw(s.SelectAllSQL, mediaID, mediaOrigin).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectThumbnails: rows.close() failed")
-
-	var thumbnails []*types.ThumbnailMetadata
+	defer rows.Close()
+	var results []*types.ThumbnailMetadata
 	for rows.Next() {
-		thumbnailMetadata := types.ThumbnailMetadata{
-			MediaMetadata: &types.MediaMetadata{
-				MediaID: mediaID,
-				Origin:  mediaOrigin,
-			},
-		}
-		err = rows.Scan(
-			&thumbnailMetadata.MediaMetadata.ContentType,
-			&thumbnailMetadata.MediaMetadata.FileSizeBytes,
-			&thumbnailMetadata.MediaMetadata.CreationTimestamp,
-			&thumbnailMetadata.ThumbnailSize.Width,
-			&thumbnailMetadata.ThumbnailSize.Height,
-			&thumbnailMetadata.ThumbnailSize.ResizeMethod,
-		)
-		if err != nil {
+		var meta types.ThumbnailMetadata
+		meta.MediaMetadata.MediaID = mediaID
+		meta.MediaMetadata.Origin = mediaOrigin
+		if err := rows.Scan(&meta.MediaMetadata.ContentType, &meta.MediaMetadata.FileSizeBytes, &meta.MediaMetadata.CreationTimestamp, &meta.ThumbnailSize.Width, &meta.ThumbnailSize.Height, &meta.ThumbnailSize.ResizeMethod); err != nil {
 			return nil, err
 		}
-		thumbnails = append(thumbnails, &thumbnailMetadata)
+		results = append(results, &meta)
 	}
-
-	return thumbnails, rows.Err()
+	return results, rows.Err()
 }

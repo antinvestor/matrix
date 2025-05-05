@@ -3,7 +3,7 @@ package shared_test
 import (
 	"context"
 	"crypto/ed25519"
-	"database/sql"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -22,65 +22,46 @@ import (
 	ed255192 "golang.org/x/crypto/ed25519"
 )
 
-func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, sqlutil.Writer, func()) {
+func migrateDatabase(ctx context.Context, svc *frame.Service, t *testing.T) *sqlutil.Connections {
 
-	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	_, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, nil)
+	cm := sqlutil.NewConnectionManager(svc)
+
+	_, err := storage.Open(ctx, cm, nil)
 	if err != nil {
 		t.Fatalf("failed to create sync DB: %s", err)
 	}
 
-	writer := sqlutil.NewExclusiveWriter()
-	db, err := sqlutil.Open(&cfg.RoomServer.Database, writer)
-	assert.NoError(t, err)
-
-	return db, writer, closeDB
+	return cm
 }
 
-func mustCreateRoomServerDatabase(ctx context.Context, t *testing.T, dep test.DependancyOption) (*shared.Database, func()) {
+func mustCreateRoomServerDatabase(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T) *shared.Database {
 	t.Helper()
 
-	db, writer, closeDb := migrateDatabase(ctx, t, dep)
+	cm := migrateDatabase(ctx, svc, t)
 
-	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
-	if err != nil {
-		t.Fatalf("Could not create redis container %s", err)
-	}
-	cache, err := caching.NewCache(&config.CacheOptions{
-		ConnectionString: cacheConnStr,
-	})
+	cache, err := caching.NewCache(&cfg.Global.Cache)
 
 	if err != nil {
 		t.Fatalf("Could not create cache %s", err)
 	}
 
-	roomsTable, err := postgres.NewPostgresRoomsTable(ctx, db)
-	assert.NoError(t, err)
-	membershipTable, err := postgres.NewPostgresMembershipTable(ctx, db)
-	assert.NoError(t, err)
-	stateKeyTable, err := postgres.NewPostgresEventStateKeysTable(ctx, db)
-	assert.NoError(t, err)
-	userRoomKeys, err := postgres.NewPostgresUserRoomKeysTable(ctx, db)
+	roomsTable := postgres.NewPostgresRoomsTable(cm)
+	membershipTable := postgres.NewPostgresMembershipTable(cm)
+	stateKeyTable := postgres.NewPostgresEventStateKeysTable(cm)
+	userRoomKeys := postgres.NewPostgresUserRoomKeysTable(cm)
 
 	assert.NoError(t, err)
 
-	evDb := shared.EventDatabase{EventStateKeysTable: stateKeyTable, Cache: cache, Writer: writer}
+	evDb := shared.EventDatabase{EventStateKeysTable: stateKeyTable, Cache: cache}
 
 	return &shared.Database{
-			DB:               db,
-			EventDatabase:    evDb,
-			MembershipTable:  membershipTable,
-			UserRoomKeyTable: userRoomKeys,
-			RoomsTable:       roomsTable,
-			Writer:           writer,
-			Cache:            cache,
-		}, func() {
-			closeCache()
-			closeDb()
-			err = db.Close()
-			assert.NoError(t, err)
-		}
+		Pool:             cm,
+		EventDatabase:    evDb,
+		MembershipTable:  membershipTable,
+		UserRoomKeyTable: userRoomKeys,
+		RoomsTable:       roomsTable,
+		Cache:            cache,
+	}
 }
 
 func Test_GetLeftUsers(t *testing.T) {
@@ -90,22 +71,22 @@ func Test_GetLeftUsers(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateRoomServerDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateRoomServerDatabase(ctx, svc, cfg, t)
 
 		// Create dummy entries
 		for _, user := range []*test.User{alice, bob, charlie} {
-			nid, err := db.EventStateKeysTable.InsertEventStateKeyNID(ctx, nil, user.ID)
+			nid, err := db.EventStateKeysTable.InsertEventStateKeyNID(ctx, user.ID)
 			assert.NoError(t, err)
-			err = db.MembershipTable.InsertMembership(ctx, nil, 1, nid, true)
+			err = db.MembershipTable.InsertMembership(ctx, 1, nid, true)
 			assert.NoError(t, err)
 			// We must update the membership with a non-zero event NID or it will get filtered out in later queries
 			membershipNID := tables.MembershipStateLeaveOrBan
 			if user == alice {
 				membershipNID = tables.MembershipStateJoin
 			}
-			_, err = db.MembershipTable.UpdateMembership(ctx, nil, 1, nid, nid, membershipNID, 1, false)
+			_, err = db.MembershipTable.UpdateMembership(ctx, 1, nid, nid, membershipNID, 1, false)
 			assert.NoError(t, err)
 		}
 
@@ -128,16 +109,16 @@ func TestUserRoomKeys(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateRoomServerDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateRoomServerDatabase(ctx, svc, cfg, t)
 
 		// create a room NID so we can query the room
-		_, err = db.RoomsTable.InsertRoomNID(ctx, nil, roomID.String(), gomatrixserverlib.RoomVersionV10)
+		_, err = db.RoomsTable.InsertRoomNID(ctx, roomID.String(), gomatrixserverlib.RoomVersionV10)
 		assert.NoError(t, err)
 		doesNotExist, err := spec.NewRoomID("!doesnotexist:localhost")
 		assert.NoError(t, err)
-		_, err = db.RoomsTable.InsertRoomNID(ctx, nil, doesNotExist.String(), gomatrixserverlib.RoomVersionV10)
+		_, err = db.RoomsTable.InsertRoomNID(ctx, doesNotExist.String(), gomatrixserverlib.RoomVersionV10)
 		assert.NoError(t, err)
 
 		_, key, err := ed25519.GenerateKey(nil)
@@ -209,9 +190,10 @@ func TestAssignRoomNID(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateRoomServerDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateRoomServerDatabase(ctx, svc, cfg, t)
 
 		nid, err := db.AssignRoomNID(ctx, *roomID, room.Version)
 		assert.NoError(t, err)

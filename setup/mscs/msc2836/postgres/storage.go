@@ -2,38 +2,33 @@ package postgres
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/mscs/msc2836/shared"
 )
 
 // Migrations Centralised migrations for msc2836 tables
-var Migrations = []sqlutil.Migration{
+var Migrations = []frame.MigrationPatch{
 	{
-		Version:   "msc2836_001_nodes",
-		QueryUp:   msc2836NodesSchema,
-		QueryDown: msc2836NodesSchemaRevert,
+		Name:        "msc2836_001_nodes",
+		Patch:       msc2836NodesSchema,
+		RevertPatch: msc2836NodesSchemaRevert,
 	},
 	{
-		Version:   "msc2836_002_edges",
-		QueryUp:   msc2836EdgesSchema,
-		QueryDown: msc2836EdgesSchemaRevert,
+		Name:        "msc2836_002_edges",
+		Patch:       msc2836EdgesSchema,
+		RevertPatch: msc2836EdgesSchemaRevert,
 	},
 }
 
 // NewDatabase opens a postgres database.
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (shared.Database, error) {
-	db, writer, err := conMan.Connection(ctx, dbProperties)
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections) (shared.Database, error) {
+
+	err := cm.MigrateStrings(ctx, Migrations...)
 	if err != nil {
 		return nil, err
 	}
 
-	m := sqlutil.NewMigrator(db, Migrations...)
-	err = m.Up(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewPostgresMSC2836Repository(ctx, db, writer)
+	return NewPostgresMSC2836EdgeTable(cm), nil
 }

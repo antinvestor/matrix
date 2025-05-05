@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
@@ -68,47 +67,54 @@ const selectAccountDataInRangeSQL = "" +
 const selectMaxAccountDataIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_account_data_type"
 
-type accountDataStatements struct {
-	insertAccountDataStmt        *sql.Stmt
-	selectAccountDataInRangeStmt *sql.Stmt
-	selectMaxAccountDataIDStmt   *sql.Stmt
+// AccountDataTable implements tables.AccountData using a connection manager and SQL constants.
+type accountDataTable struct {
+	cm                          *sqlutil.Connections
+	insertAccountDataSQL        string
+	selectAccountDataInRangeSQL string
+	selectMaxAccountDataIDSQL   string
 }
 
-func NewPostgresAccountDataTable(ctx context.Context, db *sql.DB) (tables.AccountData, error) {
-	s := &accountDataStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertAccountDataStmt, insertAccountDataSQL},
-		{&s.selectAccountDataInRangeStmt, selectAccountDataInRangeSQL},
-		{&s.selectMaxAccountDataIDStmt, selectMaxAccountDataIDSQL},
-	}.Prepare(db)
+// NewPostgresAccountDataTable creates a new AccountData table using a connection manager.
+func NewPostgresAccountDataTable(cm *sqlutil.Connections) tables.AccountData {
+	return &accountDataTable{
+		cm:                          cm,
+		insertAccountDataSQL:        insertAccountDataSQL,
+		selectAccountDataInRangeSQL: selectAccountDataInRangeSQL,
+		selectMaxAccountDataIDSQL:   selectMaxAccountDataIDSQL,
+	}
 }
 
-func (s *accountDataStatements) InsertAccountData(
-	ctx context.Context, txn *sql.Tx,
+// InsertAccountData stores account data for a user, optionally scoped to a room.
+func (t *accountDataTable) InsertAccountData(
+	ctx context.Context,
 	userID, roomID, dataType string,
 ) (pos types.StreamPosition, err error) {
-	err = s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType).Scan(&pos)
+	db := t.cm.Connection(ctx, false)
+	err = db.Raw(t.insertAccountDataSQL, userID, roomID, dataType).Row().Scan(&pos)
 	return
 }
 
-func (s *accountDataStatements) SelectAccountDataInRange(
-	ctx context.Context, txn *sql.Tx,
+// SelectAccountDataInRange returns a map of room ID to a list of `dataType` for the given user in the given range.
+func (t *accountDataTable) SelectAccountDataInRange(
+	ctx context.Context,
 	userID string,
 	r types.Range,
 	accountDataEventFilter *synctypes.EventFilter,
 ) (data map[string][]string, pos types.StreamPosition, err error) {
 	data = make(map[string][]string)
-
-	rows, err := sqlutil.TxStmt(txn, s.selectAccountDataInRangeStmt).QueryContext(
-		ctx, userID, r.Low(), r.High(),
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(
+		t.selectAccountDataInRangeSQL,
+		userID, r.Low(), r.High(),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.NotTypes)),
 		accountDataEventFilter.Limit,
-	)
+	).Rows()
 	if err != nil {
 		return
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectAccountDataInRange: rows.close() failed")
+	defer rows.Close()
 
 	var dataType string
 	var roomID string
@@ -118,7 +124,6 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 		if err = rows.Scan(&id, &roomID, &dataType); err != nil {
 			return
 		}
-
 		if len(data[roomID]) > 0 {
 			data[roomID] = append(data[roomID], dataType)
 		} else {
@@ -134,12 +139,13 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	return data, pos, rows.Err()
 }
 
-func (s *accountDataStatements) SelectMaxAccountDataID(
-	ctx context.Context, txn *sql.Tx,
+// SelectMaxAccountDataID returns the maximum stream position for account data.
+func (t *accountDataTable) SelectMaxAccountDataID(
+	ctx context.Context,
 ) (id int64, err error) {
+	db := t.cm.Connection(ctx, true)
 	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxAccountDataIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	err = db.Raw(t.selectMaxAccountDataIDSQL).Row().Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}

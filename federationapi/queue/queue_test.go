@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -38,28 +40,25 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateFederationDatabase(ctx context.Context, t *testing.T, realDatabase bool) (storage.Database, func()) {
+func mustCreateFederationDatabase(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, realDatabase bool) storage.Database {
 	if realDatabase {
 		// Real Database/s
-		cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 
-		dbOptions := cfg.Global.DatabaseOptions
-
-		cm := sqlutil.NewConnectionManager(ctx, dbOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 
-		db, err := storage.NewDatabase(ctx, cm, &dbOptions, caches, cfg.Global.IsLocalServerName)
+		db, err := storage.NewDatabase(ctx, cm, caches, cfg.Global.IsLocalServerName)
 		if err != nil {
 			t.Fatalf("NewDatabase failed with : %s", err)
 		}
-		return db, closeRig
+		return db
 	} else {
 		// Fake Database
 		db := test.NewInMemoryFederationDatabase()
-		return db, func() {}
+		return db
 	}
 }
 
@@ -108,8 +107,9 @@ func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {
 
 func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, realDatabase bool) (context.Context, storage.Database, *stubFederationClient, *OutgoingQueues, func()) {
 
-	ctx := testrig.NewContext(t)
-	db, closeFn := mustCreateFederationDatabase(ctx, t, realDatabase)
+	ctx, svc, cfg := testrig.Init(t)
+
+	db := mustCreateFederationDatabase(ctx, svc, cfg, t, realDatabase)
 
 	fc := &stubFederationClient{
 		shouldTxSucceed:      shouldTxSucceed,
@@ -128,7 +128,9 @@ func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32
 	}
 	queues := NewOutgoingQueues(ctx, db, false, "localhost", fc, &stats, signingInfo)
 
-	return ctx, db, fc, queues, closeFn
+	return ctx, db, fc, queues, func() {
+		svc.Stop(ctx)
+	}
 }
 
 func TestSendPDUOnSuccessRemovedFromDB(t *testing.T) {

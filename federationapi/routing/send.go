@@ -119,16 +119,16 @@ func Send(
 	t := internal.NewTxnReq(
 		rsAPI,
 		keyAPI,
-		cfg.Matrix.ServerName,
+		cfg.Global.ServerName,
 		keys,
 		mu,
 		producer,
-		cfg.Matrix.Presence.EnableInbound,
+		cfg.Global.Presence.EnableInbound,
 		txnEvents.PDUs,
 		txnEvents.EDUs,
 		request.Origin(),
 		txnID,
-		cfg.Matrix.ServerName)
+		cfg.Global.ServerName)
 
 	util.GetLogger(httpReq.Context()).Debugf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, request.Origin(), len(t.PDUs), len(t.EDUs))
 

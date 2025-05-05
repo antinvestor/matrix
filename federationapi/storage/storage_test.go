@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"reflect"
 	"testing"
 	"time"
@@ -19,36 +20,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateFederationDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
+func mustCreateFederationDatabase(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T) storage.Database {
 
-	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
-	if err != nil {
-		t.Fatalf("Could not create redis container %s", err)
-	}
-	caches, err := caching.NewCache(&config.CacheOptions{
-		ConnectionString: cacheConnStr,
-	})
+	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("Could not create cache from options %s", err)
 	}
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, caches, func(server spec.ServerName) bool { return server == "localhost" })
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewDatabase(ctx, cm, caches, func(server spec.ServerName) bool { return server == "localhost" })
 	if err != nil {
 		t.Fatalf("NewDatabase returned %s", err)
 	}
-	return db, func() {
-		closeCache()
-		closeDb()
-	}
+	return db
 }
 
 func TestExpireEDUs(t *testing.T) {
@@ -59,10 +43,10 @@ func TestExpireEDUs(t *testing.T) {
 	destinations := map[spec.ServerName]struct{}{"localhost": {}}
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		db, closeDb := mustCreateFederationDatabase(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateFederationDatabase(ctx, svc, cfg, t)
 		// insert some data
 		for i := 0; i < 100; i++ {
 			receipt, err := db.StoreJSON(ctx, "{}")
@@ -111,9 +95,10 @@ func TestOutboundPeeking(t *testing.T) {
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateFederationDatabase(ctx, svc, cfg, t)
+
 		peekID := util.RandomString(8)
 		var renewalInterval int64 = 1000
 
@@ -191,11 +176,14 @@ func TestInboundPeeking(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
-	ctx := testrig.NewContext(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
-		defer closeDB()
+
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateFederationDatabase(ctx, svc, cfg, t)
+
 		peekID := util.RandomString(8)
 		var renewalInterval int64 = 1000
 
@@ -275,9 +263,9 @@ func TestServersAssumedOffline(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateFederationDatabase(ctx, svc, cfg, t)
 
 		// Set server1 & server2 as assumed offline.
 		err := db.SetServerAssumedOffline(ctx, server1)
@@ -334,9 +322,10 @@ func TestRelayServersStored(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateFederationDatabase(ctx, svc, cfg, t)
 
 		err := db.P2PAddRelayServersForServer(ctx, server, []spec.ServerName{relayServer1})
 		assert.Nil(t, err)

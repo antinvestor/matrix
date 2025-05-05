@@ -40,7 +40,8 @@ func TestPresence(t *testing.T) {
 	var txn *sql.Tx
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		tab, closeDB := mustPresenceTable(ctx, t, testOpts)
 		defer closeDB()

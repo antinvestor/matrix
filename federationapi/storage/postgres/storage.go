@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,76 +18,74 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/shared"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 )
 
 // Migrations All federationapi migrations for the postgres module
-var Migrations = []sqlutil.Migration{
+var Migrations = []frame.MigrationPatch{
 	{
-		Version:   "federationapi_001_create_queue_json_table",
-		QueryUp:   queueJSONSchema,
-		QueryDown: queueJSONSchemaRevert,
+		Name:        "federationapi_001_create_queue_json_table",
+		Patch:       queueJSONSchema,
+		RevertPatch: queueJSONSchemaRevert,
 	},
 	{
-		Version:   "federationapi_002_create_queue_pdus_table",
-		QueryUp:   queuePDUsSchema,
-		QueryDown: queuePDUsSchemaRevert,
+		Name:        "federationapi_002_create_queue_pdus_table",
+		Patch:       queuePDUsSchema,
+		RevertPatch: queuePDUsSchemaRevert,
 	},
 	{
-		Version:   "federationapi_003_create_queue_edus_table",
-		QueryUp:   queueEDUsSchema,
-		QueryDown: queueEDUsSchemaRevert,
+		Name:        "federationapi_003_create_queue_edus_table",
+		Patch:       queueEDUsSchema,
+		RevertPatch: queueEDUsSchemaRevert,
 	},
 	{
-		Version:   "federationapi_004_create_server_keys_table",
-		QueryUp:   serverSigningKeysSchema,
-		QueryDown: serverSigningKeysSchemaRevert,
+		Name:        "federationapi_004_create_server_keys_table",
+		Patch:       serverSigningKeysSchema,
+		RevertPatch: serverSigningKeysSchemaRevert,
 	},
 	{
-		Version:   "federationapi_005_create_blacklist_table",
-		QueryUp:   blacklistSchema,
-		QueryDown: blacklistSchemaRevert,
+		Name:        "federationapi_005_create_blacklist_table",
+		Patch:       blacklistSchema,
+		RevertPatch: blacklistSchemaRevert,
 	},
 	{
-		Version:   "federationapi_006_create_notary_server_keys_json_table",
-		QueryUp:   notaryServerKeysJSONSchema,
-		QueryDown: notaryServerKeysJSONSchemaRevert,
+		Name:        "federationapi_006_create_notary_server_keys_json_table",
+		Patch:       notaryServerKeysJSONSchema,
+		RevertPatch: notaryServerKeysJSONSchemaRevert,
 	},
 	{
-		Version:   "federationapi_007_create_joined_hosts_table",
-		QueryUp:   joinedHostsSchema,
-		QueryDown: joinedHostsSchemaRevert,
+		Name:        "federationapi_007_create_joined_hosts_table",
+		Patch:       joinedHostsSchema,
+		RevertPatch: joinedHostsSchemaRevert,
 	},
 	{
-		Version:   "federationapi_008_create_assumed_offline_table",
-		QueryUp:   assumedOfflineSchema,
-		QueryDown: assumedOfflineSchemaRevert,
+		Name:        "federationapi_008_create_assumed_offline_table",
+		Patch:       assumedOfflineSchema,
+		RevertPatch: assumedOfflineSchemaRevert,
 	},
 	{
-		Version:   "federationapi_009_create_inbound_peeks_table",
-		QueryUp:   inboundPeeksSchema,
-		QueryDown: inboundPeeksSchemaRevert,
+		Name:        "federationapi_009_create_inbound_peeks_table",
+		Patch:       inboundPeeksSchema,
+		RevertPatch: inboundPeeksSchemaRevert,
 	},
 	{
-		Version:   "federationapi_010_create_outbound_peeks_table",
-		QueryUp:   outboundPeeksSchema,
-		QueryDown: outboundPeeksSchemaRevert,
+		Name:        "federationapi_010_create_outbound_peeks_table",
+		Patch:       outboundPeeksSchema,
+		RevertPatch: outboundPeeksSchemaRevert,
 	},
 	{
-		Version:   "federationapi_011_create_relay_servers_table",
-		QueryUp:   relayServersSchema,
-		QueryDown: relayServersSchemaRevert,
+		Name:        "federationapi_011_create_relay_servers_table",
+		Patch:       relayServersSchema,
+		RevertPatch: relayServersSchemaRevert,
 	},
 	{
-		Version:   "federationapi_012_create_notary_server_keys_metadata_table",
-		QueryUp:   notaryServerKeysMetadataSchema,
-		QueryDown: notaryServerKeysMetadataSchemaRevert,
+		Name:        "federationapi_012_create_notary_server_keys_metadata_table",
+		Patch:       notaryServerKeysMetadataSchema,
+		RevertPatch: notaryServerKeysMetadataSchemaRevert,
 	},
 }
 
@@ -99,72 +97,27 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
 	var d Database
-	var err error
-	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
-		return nil, err
-	}
 
-	m := sqlutil.NewMigrator(d.db)
-	m.AddMigrations(Migrations...)
-	err = m.Up(ctx)
+	err := cm.MigrateStrings(ctx, Migrations...)
 	if err != nil {
 		return nil, err
 	}
 
-	blacklist, err := NewPostgresBlacklistTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	joinedHosts, err := NewPostgresJoinedHostsTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	queuePDUs, err := NewPostgresQueuePDUsTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	queueEDUs, err := NewPostgresQueueEDUsTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	queueJSON, err := NewPostgresQueueJSONTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	assumedOffline, err := NewPostgresAssumedOfflineTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	relayServers, err := NewPostgresRelayServersTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	inboundPeeks, err := NewPostgresInboundPeeksTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	outboundPeeks, err := NewPostgresOutboundPeeksTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, d.db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresNotaryServerKeysTable: %s", err)
-	}
-	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, d.db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresNotaryServerKeysMetadataTable: %s", err)
-	}
-	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
+	assumedOffline := NewPostgresAssumedOfflineTable(cm)
+	blacklist := NewPostgresBlacklistTable(cm)
+	inboundPeeks := NewPostgresInboundPeeksTable(cm)
+	joinedHosts := NewPostgresJoinedHostsTable(cm)
+	queuePDUs := NewPostgresQueuePDUsTable(cm)
+	queueEDUs := NewPostgresQueueEDUsTable(cm)
+	queueJSON := NewPostgresQueueJSONTable(cm)
+	relayServers := NewPostgresRelayServersTable(cm)
+	outboundPeeks := NewPostgresOutboundPeeksTable(cm)
+	notaryJSON := NewPostgresNotaryServerKeysJSONTable(cm)
+	notaryMetadata := NewPostgresNotaryServerKeysMetadataTable(cm)
+	serverSigningKeys := NewPostgresServerSigningKeysTable(cm)
 
-	if err = queueEDUs.Prepare(); err != nil {
-		return nil, err
-	}
 	d.Database = shared.Database{
 		DB:                       d.db,
 		IsLocalServerName:        isLocalServerName,

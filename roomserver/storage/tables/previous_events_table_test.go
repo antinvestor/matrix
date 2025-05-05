@@ -2,6 +2,7 @@ package tables_test
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
@@ -12,38 +13,36 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreatePreviousEventsTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tab tables.PreviousEvents, closeDb func()) {
+func mustCreatePreviousEventsTable(ctx context.Context, svc *frame.Service, t *testing.T) tables.PreviousEvents {
 	t.Helper()
 
-	db, closeDb := migrateDatabase(ctx, t, dep)
+	cm := migrateDatabase(ctx, svc, t)
 
-	tab, err := postgres.NewPostgresPreviousEventsTable(ctx, db)
+	tab := postgres.NewPostgresPreviousEventsTable(cm)
 
-	assert.NoError(t, err)
-
-	return tab, closeDb
+	return tab
 }
 
 func TestPreviousEventsTable(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		tab, closeFn := mustCreatePreviousEventsTable(ctx, t, testOpts)
-		defer closeFn()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		tab := mustCreatePreviousEventsTable(ctx, svc, t)
 
 		for _, x := range room.Events() {
 			for _, eventID := range x.PrevEventIDs() {
-				err := tab.InsertPreviousEvent(ctx, nil, eventID, 1)
+				err := tab.InsertPreviousEvent(ctx, eventID, 1)
 				assert.NoError(t, err)
 
-				err = tab.SelectPreviousEventExists(ctx, nil, eventID)
+				err = tab.SelectPreviousEventExists(ctx, eventID)
 				assert.NoError(t, err)
 			}
 		}
 
 		// RandomString should fail and return sql.ErrNoRows
-		err := tab.SelectPreviousEventExists(ctx, nil, util.RandomString(16))
+		err := tab.SelectPreviousEventExists(ctx, util.RandomString(16))
 		assert.Error(t, err)
 	})
 }

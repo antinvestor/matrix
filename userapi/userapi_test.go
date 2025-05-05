@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -68,24 +68,24 @@ func (d *dummyProducer) PublishMsg(msg *nats.Msg, _ ...nats.PubOpt) (*nats.PubAc
 	return &nats.PubAck{}, nil
 }
 
-func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, testOpts test.DependancyOption, publisher producers.JetStreamPublisher) (context.Context, api.UserInternalAPI, storage.UserDatabase, func()) {
+func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, testOpts test.DependancyOption, publisher producers.JetStreamPublisher) (context.Context, api.UserInternalAPI, storage.UserDatabase, func(ctx context.Context)) {
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+
 	sName := serverName
 	if opts.serverName != "" {
 		sName = spec.ServerName(opts.serverName)
 	}
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 
-	accountDB, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
+	accountDB, err := storage.NewUserDatabase(ctx, nil, cm, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
 	}
 
-	keyDB, err := storage.NewKeyDatabase(ctx, cm, &cfg.KeyServer.Database)
+	keyDB, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
 		t.Fatalf("failed to create key DB: %s", err)
 	}
@@ -106,8 +106,8 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, testOpts test.Dependanc
 			Config:            &cfg.UserAPI,
 			SyncProducer:      syncProducer,
 			KeyChangeProducer: keyChangeProducer,
-		}, accountDB, func() {
-			closeRig()
+		}, accountDB, func(ctx context.Context) {
+			svc.Stop(ctx)
 		}
 }
 
@@ -146,7 +146,7 @@ func TestQueryProfile(t *testing.T) {
 		}
 		for _, tc := range testCases {
 
-			ctx := testrig.NewContext(t)
+			ctx, _ := testrig.NewService(t)
 
 			profile, gotErr := testAPI.QueryProfile(ctx, tc.userID)
 			if tc.wantErr == nil && gotErr != nil || tc.wantErr != nil && gotErr == nil {
@@ -160,8 +160,8 @@ func TestQueryProfile(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, userAPI, accountDB, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-		defer closeDb()
+		ctx, userAPI, accountDB, closeFunc := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+		defer closeFunc(ctx)
 		_, err := accountDB.CreateAccount(ctx, "alice", serverName, "foobar", "", api.AccountTypeUser)
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
@@ -182,8 +182,8 @@ func TestQueryProfile(t *testing.T) {
 // for https://github.com/antinvestor/matrix/issues/2780).
 func TestPasswordlessLoginFails(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, userAPI, accountDB, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-		defer closeDb()
+		ctx, userAPI, accountDB, closeFunc := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+		defer closeFunc(ctx)
 		_, err := accountDB.CreateAccount(ctx, "auser", serverName, "", "", api.AccountTypeAppService)
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
@@ -207,8 +207,8 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("tokenLoginFlow", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-			ctx, userAPI, accountDB, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-			defer closeDb()
+			ctx, userAPI, accountDB, closeFunc := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+			defer closeFunc(ctx)
 			_, err := accountDB.CreateAccount(ctx, "auser", serverName, "apassword", "", api.AccountTypeUser)
 			if err != nil {
 				t.Fatalf("failed to make account: %s", err)
@@ -257,8 +257,8 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("expiredTokenIsNotReturned", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-			ctx, userAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, testOpts, nil)
-			defer closeFn()
+			ctx, userAPI, _, closeFunc := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, testOpts, nil)
+			defer closeFunc(ctx)
 
 			creq := api.PerformLoginTokenCreationRequest{
 				Data: api.LoginTokenData{UserID: "@auser:example.com"},
@@ -282,8 +282,8 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("deleteWorks", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-			ctx, userAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-			defer closeFn()
+			ctx, userAPI, _, closeFunc := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+			defer closeFunc(ctx)
 
 			creq := api.PerformLoginTokenCreationRequest{
 				Data: api.LoginTokenData{UserID: "@auser:example.com"},
@@ -313,8 +313,8 @@ func TestLoginToken(t *testing.T) {
 
 	t.Run("deleteUnknownIsNoOp", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-			ctx, userAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-			defer closeFn()
+			ctx, userAPI, _, closeFunc := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+			defer closeFunc(ctx)
 			dreq := api.PerformLoginTokenDeletionRequest{Token: "non-existent token"}
 			var dresp api.PerformLoginTokenDeletionResponse
 			if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
@@ -330,8 +330,8 @@ func TestQueryAccountByLocalpart(t *testing.T) {
 	localpart, userServername, _ := gomatrixserverlib.SplitID('@', alice.ID)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, intAPI, db, closeDb := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
-		defer closeDb()
+		ctx, intAPI, db, closeFunc := MustMakeInternalAPI(t, apiTestOpts{}, testOpts, nil)
+		defer closeFunc(ctx)
 
 		createdAcc, err := db.CreateAccount(ctx, localpart, userServername, "", "", alice.AccountType)
 		if err != nil {
@@ -408,8 +408,8 @@ func TestAccountData(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, intAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, nil)
-		defer closeFn()
+		ctx, intAPI, _, closeFunc := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, nil)
+		defer closeFunc(ctx)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -523,8 +523,8 @@ func TestDevices(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, intAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, nil)
-		defer closeFn()
+		ctx, intAPI, _, closeFunc := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, nil)
+		defer closeFunc(ctx)
 
 		for _, tc := range creationTests {
 			t.Run(tc.name, func(t *testing.T) {
@@ -628,8 +628,8 @@ func TestDevices(t *testing.T) {
 func TestDeviceIDReuse(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		publisher := &dummyProducer{t: t}
-		ctx, intAPI, _, closeFn := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, publisher)
-		defer closeFn()
+		ctx, intAPI, _, closeFunc := MustMakeInternalAPI(t, apiTestOpts{serverName: "test"}, testOpts, publisher)
+		defer closeFunc(ctx)
 
 		res := api.PerformDeviceCreationResponse{}
 		// create a first device

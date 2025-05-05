@@ -16,158 +16,113 @@ package postgres
 
 import (
 	"context"
-	"fmt"
+	"github.com/pitabwire/frame"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/storage/shared"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 )
 
-// Centralised migrations for userapi tables
-var Migrations = []sqlutil.Migration{
+// userapi_accounts Centralised migrations for userapi tables
+var Migrations = []frame.MigrationPatch{
 	{
-		Version:   "userapi_001_account_data",
-		QueryUp:   accountDataSchema,
-		QueryDown: accountDataSchemaRevert,
+		Name:        "userapi_001_account_data",
+		Patch:       accountDataSchema,
+		RevertPatch: accountDataSchemaRevert,
 	},
 	{
-		Version:   "userapi_002_accounts",
-		QueryUp:   accountsSchema,
-		QueryDown: accountsSchemaRevert,
+		Name:        "userapi_002_accounts",
+		Patch:       accountsSchema,
+		RevertPatch: accountsSchemaRevert,
 	},
 	{
-		Version:   "userapi_003_devices",
-		QueryUp:   devicesSchema,
-		QueryDown: devicesSchemaRevert,
+		Name:        "userapi_003_devices",
+		Patch:       devicesSchema,
+		RevertPatch: devicesSchemaRevert,
 	},
 	{
-		Version:   "userapi_008_key_backup",
-		QueryUp:   keyBackupTableSchema,
-		QueryDown: keyBackupTableSchemaRevert,
+		Name:        "userapi_008_key_backup",
+		Patch:       keyBackupTableSchema,
+		RevertPatch: keyBackupTableSchemaRevert,
 	},
 	{
-		Version:   "userapi_009_key_backup_version",
-		QueryUp:   keyBackupVersionTableSchema,
-		QueryDown: keyBackupVersionTableSchemaRevert,
+		Name:        "userapi_009_key_backup_version",
+		Patch:       keyBackupVersionTableSchema,
+		RevertPatch: keyBackupVersionTableSchemaRevert,
 	},
 	{
-		Version:   "userapi_010_logintoken",
-		QueryUp:   loginTokenSchema,
-		QueryDown: loginTokenSchemaRevert,
+		Name:        "userapi_010_logintoken",
+		Patch:       loginTokenSchema,
+		RevertPatch: loginTokenSchemaRevert,
 	},
 	{
-		Version:   "userapi_011_notifications",
-		QueryUp:   notificationSchema,
-		QueryDown: notificationsSchemaRevert,
+		Name:        "userapi_011_notifications",
+		Patch:       notificationSchema,
+		RevertPatch: notificationsSchemaRevert,
 	},
 	{
-		Version:   "userapi_012_openid",
-		QueryUp:   openIDTokenSchema,
-		QueryDown: openIDTokenSchemaRevert,
+		Name:        "userapi_012_openid",
+		Patch:       openIDTokenSchema,
+		RevertPatch: openIDTokenSchemaRevert,
 	},
 	{
-		Version:   "userapi_013_profile",
-		QueryUp:   profilesSchema,
-		QueryDown: profilesSchemaRevert,
+		Name:        "userapi_013_profile",
+		Patch:       profilesSchema,
+		RevertPatch: profilesSchemaRevert,
 	},
 	{
-		Version:   "userapi_014_pusher",
-		QueryUp:   pushersSchema,
-		QueryDown: pushersSchemaRevert,
+		Name:        "userapi_014_pusher",
+		Patch:       pushersSchema,
+		RevertPatch: pushersSchemaRevert,
 	},
 	{
-		Version:   "userapi_015_registration_tokens",
-		QueryUp:   registrationTokensSchema,
-		QueryDown: registrationTokensSchemaRevert,
+		Name:        "userapi_015_registration_tokens",
+		Patch:       registrationTokensSchema,
+		RevertPatch: registrationTokensSchemaRevert,
 	},
 
 	{
-		Version:   "userapi_017_stats_daily_visits",
-		QueryUp:   userDailyVisitsSchema,
-		QueryDown: userDailyVisitsSchemaRevert,
+		Name:        "userapi_017_stats_daily_visits",
+		Patch:       userDailyVisitsSchema,
+		RevertPatch: userDailyVisitsSchemaRevert,
 	},
 	{
-		Version:   "userapi_018_stats_daily_stats",
-		QueryUp:   messagesDailySchema,
-		QueryDown: messagesDailySchemaRevert,
+		Name:        "userapi_018_stats_daily_stats",
+		Patch:       messagesDailySchema,
+		RevertPatch: messagesDailySchemaRevert,
 	},
 	{
-		Version:   "userapi_019_threepid",
-		QueryUp:   threepidSchema,
-		QueryDown: threepidSchemaRevert,
+		Name:        "userapi_019_threepid",
+		Patch:       threepidSchema,
+		RevertPatch: threepidSchemaRevert,
 	},
 }
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
-	db, writer, err := conMan.Connection(ctx, dbProperties)
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+
+	err := cm.MigrateStrings(ctx, Migrations...)
 	if err != nil {
 		return nil, err
 	}
 
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(Migrations...)
-	if err = m.Up(ctx); err != nil {
-		return nil, err
-	}
-
-	registationTokensTable, err := NewPostgresRegistrationTokensTable(ctx, db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresRegistrationsTokenTable: %w", err)
-	}
-	accountsTable, err := NewPostgresAccountsTable(ctx, db, serverName)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresAccountsTable: %w", err)
-	}
-	accountDataTable, err := NewPostgresAccountDataTable(ctx, db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresAccountDataTable: %w", err)
-	}
-	devicesTable, err := NewPostgresDevicesTable(ctx, db, serverName)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresDevicesTable: %w", err)
-	}
-	keyBackupTable, err := NewPostgresKeyBackupTable(ctx, db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresKeyBackupTable: %w", err)
-	}
-	keyBackupVersionTable, err := NewPostgresKeyBackupVersionTable(ctx, db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresKeyBackupVersionTable: %w", err)
-	}
-	loginTokenTable, err := NewPostgresLoginTokenTable(ctx, db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresLoginTokenTable: %w", err)
-	}
-	openIDTable, err := NewPostgresOpenIDTable(ctx, db, serverName)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresOpenIDTable: %w", err)
-	}
-	profilesTable, err := NewPostgresProfilesTable(db, serverNoticesLocalpart)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresProfilesTable: %w", err)
-	}
-	threePIDTable, err := NewPostgresThreePIDTable(ctx, db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresThreePIDTable: %w", err)
-	}
-	pusherTable, err := NewPostgresPusherTable(ctx, db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresPusherTable: %w", err)
-	}
-	notificationsTable, err := NewPostgresNotificationTable(ctx, db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresNotificationTable: %w", err)
-	}
-	statsTable, err := NewPostgresStatsTable(ctx, db, serverName)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresStatsTable: %w", err)
-	}
+	registationTokensTable := NewPostgresRegistrationTokensTable(cm)
+	accountsTable := NewPostgresAccountsTable(cm)
+	accountDataTable := NewPostgresAccountDataTable(cm)
+	devicesTable := NewPostgresDevicesTable(cm, serverName)
+	keyBackupTable := NewPostgresKeyBackupTable(cm)
+	keyBackupVersionTable := NewPostgresKeyBackupVersionTable(cm)
+	loginTokenTable := NewPostgresLoginTokenTable(cm)
+	openIDTable := NewPostgresOpenIDTable(cm)
+	profilesTable := NewPostgresProfilesTable(cm, serverNoticesLocalpart)
+	threePIDTable := NewPostgresThreePIDTable(cm)
+	pusherTable := NewPostgresPusherTable(cm)
+	notificationsTable := NewPostgresNotificationsTable(cm)
+	statsTable := NewPostgresStatsTable(cm)
 
 	return &shared.Database{
 		AccountDatas:          accountDataTable,
@@ -184,83 +139,58 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 		RegistrationTokens:    registationTokensTable,
 		Stats:                 statsTable,
 		ServerName:            serverName,
-		DB:                    db,
-		Writer:                writer,
 		LoginTokenLifetime:    loginTokenLifetime,
 		BcryptCost:            bcryptCost,
 		OpenIDTokenLifetimeMS: openIDTokenLifetimeMS,
 	}, nil
 }
 
-var MigrationsKeys = []sqlutil.Migration{
+var MigrationsKeys = []frame.MigrationPatch{
 	{
-		Version:   "userapi_004_device_keys",
-		QueryUp:   deviceKeysSchema,
-		QueryDown: deviceKeysSchemaRevert,
+		Name:        "userapi_004_device_keys",
+		Patch:       deviceKeysSchema,
+		RevertPatch: deviceKeysSchemaRevert,
 	},
 	{
-		Version:   "userapi_005_one_time_keys",
-		QueryUp:   oneTimeKeysSchema,
-		QueryDown: oneTimeKeysSchemaRevert,
+		Name:        "userapi_005_one_time_keys",
+		Patch:       oneTimeKeysSchema,
+		RevertPatch: oneTimeKeysSchemaRevert,
 	},
 	{
-		Version:   "userapi_006_cross_signing_keys",
-		QueryUp:   crossSigningKeysSchema,
-		QueryDown: crossSigningKeysSchemaRevert,
+		Name:        "userapi_006_cross_signing_keys",
+		Patch:       crossSigningKeysSchema,
+		RevertPatch: crossSigningKeysSchemaRevert,
 	},
 	{
-		Version:   "userapi_007_cross_signing_sigs",
-		QueryUp:   crossSigningSigsSchema,
-		QueryDown: crossSigningSigsSchemaRevert,
+		Name:        "userapi_007_cross_signing_sigs",
+		Patch:       crossSigningSigsSchema,
+		RevertPatch: crossSigningSigsSchemaRevert,
 	},
 	{
-		Version:   "userapi_016_stale_device_lists",
-		QueryUp:   staleDeviceListsSchema,
-		QueryDown: staleDeviceListsSchemaRevert,
+		Name:        "userapi_016_stale_device_lists",
+		Patch:       staleDeviceListsSchema,
+		RevertPatch: staleDeviceListsSchemaRevert,
 	},
 	{
-		Version:   "userapi_020_key_changes",
-		QueryUp:   keyChangesSchema,
-		QueryDown: keyChangesSchemaRevert,
+		Name:        "userapi_020_key_changes",
+		Patch:       keyChangesSchema,
+		RevertPatch: keyChangesSchemaRevert,
 	},
 }
 
-func NewKeyDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
-	db, writer, err := conMan.Connection(ctx, dbProperties)
+func NewKeyDatabase(ctx context.Context, cm *sqlutil.Connections) (*shared.KeyDatabase, error) {
+
+	err := cm.MigrateStrings(ctx, MigrationsKeys...)
 	if err != nil {
 		return nil, err
 	}
 
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(MigrationsKeys...)
-	if err = m.Up(ctx); err != nil {
-		return nil, err
-	}
-
-	otk, err := NewPostgresOneTimeKeysTable(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	dk, err := NewPostgresDeviceKeysTable(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	kc, err := NewPostgresKeyChangesTable(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	sdl, err := NewPostgresStaleDeviceListsTable(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	csk, err := NewPostgresCrossSigningKeysTable(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	css, err := NewPostgresCrossSigningSigsTable(ctx, db)
-	if err != nil {
-		return nil, err
-	}
+	otk := NewPostgresOneTimeKeysTable(cm)
+	dk := NewPostgresDeviceKeysTable(cm)
+	kc := NewPostgresKeyChangesTable(cm)
+	sdl := NewPostgresStaleDeviceListsTable(cm)
+	csk := NewPostgresCrossSigningKeysTable(cm)
+	css := NewPostgresCrossSigningSigsTable(cm)
 
 	return &shared.KeyDatabase{
 		OneTimeKeysTable:      otk,
@@ -269,6 +199,5 @@ func NewKeyDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperti
 		StaleDeviceListsTable: sdl,
 		CrossSigningKeysTable: csk,
 		CrossSigningSigsTable: css,
-		Writer:                writer,
 	}, nil
 }

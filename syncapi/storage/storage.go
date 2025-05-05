@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,15 +19,14 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 )
 
 // NewSyncServerDatasource opens a database connection.
-func NewSyncServerDatasource(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
+func NewSyncServerDatasource(ctx context.Context, cm *sqlutil.Connections) (Database, error) {
 	switch {
-	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(ctx, conMan, dbProperties)
+	case cm.DS().IsPostgres():
+		return postgres.NewDatabase(ctx, cm)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

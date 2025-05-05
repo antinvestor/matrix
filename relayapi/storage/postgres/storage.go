@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,25 +17,25 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/shared"
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 // Migrations All relayapi migrations for the postgres module
-var Migrations = []sqlutil.Migration{
+var Migrations = []frame.MigrationPatch{
 	{
-		Version:   "relayapi_001_create_queue_json_table",
-		QueryUp:   relayQueueJSONSchema,
-		QueryDown: relayQueueJSONSchemaRevert,
+		Name:        "relayapi_001_create_queue_json_table",
+		Patch:       relayQueueJSONSchema,
+		RevertPatch: relayQueueJSONSchemaRevert,
 	},
 	{
-		Version:   "relayapi_002_create_queue_table",
-		QueryUp:   relayQueueSchema,
-		QueryDown: relayQueueSchemaRevert,
+		Name:        "relayapi_002_create_queue_table",
+		Patch:       relayQueueSchema,
+		RevertPatch: relayQueueSchemaRevert,
 	},
 }
 
@@ -49,36 +49,22 @@ type Database struct {
 // NewDatabase opens a new database
 func NewDatabase(
 	ctx context.Context,
-	conMan *sqlutil.Connections,
-	dbProperties *config.DatabaseOptions,
+	cm *sqlutil.Connections,
 	cache caching.FederationCache,
 	isLocalServerName func(spec.ServerName) bool,
 ) (*Database, error) {
 	var d Database
-	var err error
-	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
-		return nil, err
-	}
 
-	m := sqlutil.NewMigrator(d.db, Migrations...)
-	err = m.Up(ctx)
+	err := cm.MigrateStrings(ctx, Migrations...)
 	if err != nil {
 		return nil, err
 	}
 
-	queue, err := NewPostgresRelayQueueTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	queueJSON, err := NewPostgresRelayQueueJSONTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
+	queue := NewPostgresRelayQueueTable(cm)
+	queueJSON := NewPostgresRelayQueueJSONTable(cm)
 	d.Database = shared.Database{
-		DB:                d.db,
 		IsLocalServerName: isLocalServerName,
 		Cache:             cache,
-		Writer:            d.writer,
 		RelayQueue:        queue,
 		RelayQueueJSON:    queueJSON,
 	}

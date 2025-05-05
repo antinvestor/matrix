@@ -16,8 +16,6 @@ package distributed
 
 import (
 	"context"
-	"database/sql"
-
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -73,8 +71,7 @@ func (s *profilesApi) toContact(contact *profilev1.ContactObject) authtypes.Cont
 }
 
 func (s *profilesApi) InsertProfile(
-	_ context.Context, _ *sql.Tx,
-	_ string, _ spec.ServerName,
+	_ context.Context, _ string, _ spec.ServerName,
 ) (err error) {
 	return
 }
@@ -93,9 +90,7 @@ func (s *profilesApi) SelectProfileByLocalpart(
 }
 
 func (s *profilesApi) SetAvatarURL(
-	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName spec.ServerName,
-	avatarURL string,
+	ctx context.Context, localpart string, serverName spec.ServerName, avatarURL string,
 ) (*authtypes.Profile, bool, error) {
 
 	updateResponse, err := s.profileClient.Client.Update(ctx, &profilev1.UpdateRequest{
@@ -113,9 +108,7 @@ func (s *profilesApi) SetAvatarURL(
 }
 
 func (s *profilesApi) SetDisplayName(
-	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName spec.ServerName,
-	displayName string,
+	ctx context.Context, localpart string, serverName spec.ServerName, displayName string,
 ) (*authtypes.Profile, bool, error) {
 
 	updateResponse, err := s.profileClient.Client.Update(ctx, &profilev1.UpdateRequest{

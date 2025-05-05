@@ -6,7 +6,7 @@ import (
 )
 
 type ClientAPI struct {
-	Matrix  *Global  `yaml:"-"`
+	Global  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
 
 	// If set disables new users from registering (except via shared
@@ -101,8 +101,8 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
 				"(such as reCAPTCHA). By enabling open registration, you are SIGNIFICANTLY " +
 				"increasing the risk that your server will be used to send spam or abuse, and may result in " +
 				"your server being banned from some rooms. If you are ABSOLUTELY CERTAIN you want to do this, " +
-				"start Dendrite with the -really-enable-open-registration command line flag. Otherwise, you " +
-				"should set the registration_disabled option in your Dendrite config.",
+				"start Matrix with the -really-enable-open-registration command line flag. Otherwise, you " +
+				"should set the registration_disabled option in your Matrix config.",
 		)
 	}
 }
@@ -110,10 +110,10 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
 type LoginSSO struct {
 
 	// CallbackURL is the absolute URL where a user agent can reach
-	// the Dendrite `/_matrix/v3/login/sso/callback` endpoint. This is
+	// the Matrix `/_matrix/v3/login/sso/callback` endpoint. This is
 	// used to create LoginSSO redirect URLs passed to identity
 	// providers. If this is empty, a default is inferred from request
-	// headers. When Dendrite is running behind a proxy, this may not
+	// headers. When Matrix is running behind a proxy, this may not
 	// always be the right information.
 	CallbackURL string `yaml:"callback_url"`
 

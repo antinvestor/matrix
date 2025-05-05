@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
 	routers httputil.Routers,
-	dendriteCfg *config.Dendrite,
+	dendriteCfg *config.Matrix,
 	keyRing gomatrixserverlib.JSONVerifier,
 	relayAPI api.RelayInternalAPI,
 ) {
@@ -55,7 +55,7 @@ func AddPublicRoutes(
 
 func NewRelayInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Dendrite,
+	dendriteCfg *config.Matrix,
 	cm *sqlutil.Connections,
 	fedClient fclient.FederationClient,
 	rsAPI rsAPI.RoomserverInternalAPI,
@@ -64,7 +64,13 @@ func NewRelayInternalAPI(
 	relayingEnabled bool,
 	caches caching.FederationCache,
 ) api.RelayInternalAPI {
-	relayDB, err := storage.NewDatabase(ctx, cm, &dendriteCfg.RelayAPI.Database, caches, dendriteCfg.Global.IsLocalServerName)
+
+	relayApiCM, err := cm.FromOptions(ctx, &dendriteCfg.RelayAPI.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to configure relayapi connection manager")
+	}
+
+	relayDB, err := storage.NewDatabase(ctx, relayApiCM, caches, dendriteCfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to relay db")
 	}

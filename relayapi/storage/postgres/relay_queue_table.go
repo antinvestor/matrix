@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
 )
@@ -65,95 +64,93 @@ const selectQueueEntryCountSQL = "" +
 	"SELECT COUNT(*) FROM relayapi_queue" +
 	" WHERE server_name = $1"
 
+// relayQueueStatements implements the RelayQueue table for mapping server name/transaction ID to JSON NID.
+// Methods ensure correct handling of duplicates, deletion, and empty result sets as described in the interface.
 type relayQueueStatements struct {
-	db                        *sql.DB
-	insertQueueEntryStmt      *sql.Stmt
-	deleteQueueEntriesStmt    *sql.Stmt
-	selectQueueEntriesStmt    *sql.Stmt
-	selectQueueEntryCountStmt *sql.Stmt
+	cm             *sqlutil.Connections
+	InsertSQL      string
+	DeleteSQL      string
+	SelectSQL      string
+	SelectCountSQL string
 }
 
-func NewPostgresRelayQueueTable(
-	_ context.Context, db *sql.DB,
-) (tables.RelayQueue, error) {
-
-	s := &relayQueueStatements{
-		db: db,
+// NewPostgresRelayQueueTable creates a new RelayQueueStatements using the provided connection manager.
+func NewPostgresRelayQueueTable(cm *sqlutil.Connections) tables.RelayQueue {
+	return &relayQueueStatements{
+		cm:             cm,
+		InsertSQL:      insertQueueEntrySQL,
+		DeleteSQL:      deleteQueueEntriesSQL,
+		SelectSQL:      selectQueueEntriesSQL,
+		SelectCountSQL: selectQueueEntryCountSQL,
 	}
-
-	return s, sqlutil.StatementList{
-		{&s.insertQueueEntryStmt, insertQueueEntrySQL},
-		{&s.deleteQueueEntriesStmt, deleteQueueEntriesSQL},
-		{&s.selectQueueEntriesStmt, selectQueueEntriesSQL},
-		{&s.selectQueueEntryCountStmt, selectQueueEntryCountSQL},
-	}.Prepare(db)
 }
 
+// InsertQueueEntry adds a new transaction_id:server_name mapping with associated json table nid to the table.
+// Will ensure only one transaction id is present for each server_name:nid mapping. Adding duplicates will silently do nothing.
 func (s *relayQueueStatements) InsertQueueEntry(
 	ctx context.Context,
-	txn *sql.Tx,
 	transactionID gomatrixserverlib.TransactionID,
 	serverName spec.ServerName,
 	nid int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertQueueEntryStmt)
-	_, err := stmt.ExecContext(
-		ctx,
-		transactionID, // the transaction ID that we initially attempted
-		serverName,    // destination server name
-		nid,           // JSON blob NID
-	)
-	return err
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.InsertSQL, transactionID, serverName, nid).Error
 }
 
+// DeleteQueueEntries removes multiple entries from the table corresponding to the list of nids provided.
+// If any of the provided nids don't match a row in the table, that deletion is considered successful.
 func (s *relayQueueStatements) DeleteQueueEntries(
 	ctx context.Context,
-	txn *sql.Tx,
 	serverName spec.ServerName,
 	jsonNIDs []int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteQueueEntriesStmt)
-	_, err := stmt.ExecContext(ctx, serverName, pq.Int64Array(jsonNIDs))
-	return err
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.DeleteSQL, serverName, pq.Int64Array(jsonNIDs)).Error
 }
 
+// SelectQueueEntries gets a list of nids associated with the provided server name.
+// Returns up to `limit` nids, oldest first. Will return an empty slice if no matches were found.
 func (s *relayQueueStatements) SelectQueueEntries(
 	ctx context.Context,
-	txn *sql.Tx,
 	serverName spec.ServerName,
 	limit int,
 ) ([]int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectQueueEntriesStmt)
-	rows, err := stmt.QueryContext(ctx, serverName, limit)
+	db := s.cm.Connection(ctx, true)
+	rows, err := db.Raw(s.SelectSQL, serverName, limit).Rows()
 	if err != nil {
-		return nil, err
+		return []int64{}, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
-	var result []int64
+	defer rows.Close()
+	var nids []int64
 	for rows.Next() {
 		var nid int64
-		if err = rows.Scan(&nid); err != nil {
-			return nil, err
+		if err := rows.Scan(&nid); err != nil {
+			return []int64{}, err
 		}
-		result = append(result, nid)
+		nids = append(nids, nid)
 	}
-
-	return result, rows.Err()
+	if len(nids) == 0 {
+		return []int64{}, nil
+	}
+	return nids, rows.Err()
 }
 
+// SelectQueueEntryCount gets the number of entries in the table associated with the provided server name.
+// If there are no matching rows, a count of 0 is returned with err set to nil.
 func (s *relayQueueStatements) SelectQueueEntryCount(
 	ctx context.Context,
-	txn *sql.Tx,
 	serverName spec.ServerName,
 ) (int64, error) {
+	db := s.cm.Connection(ctx, true)
+	row := db.Raw(s.SelectCountSQL, serverName).Row()
 	var count int64
-	stmt := sqlutil.TxStmt(txn, s.selectQueueEntryCountStmt)
-	err := stmt.QueryRowContext(ctx, serverName).Scan(&count)
+	err := row.Scan(&count)
 	if errors.Is(err, sql.ErrNoRows) {
-		// It's acceptable for there to be no rows referencing a given
-		// JSON NID but it's not an error condition. Just return as if
-		// there's a zero count.
+		// It's acceptable for there to be no rows referencing a given server name.
 		return 0, nil
 	}
-	return count, err
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }

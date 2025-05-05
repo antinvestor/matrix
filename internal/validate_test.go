@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -230,9 +229,8 @@ func TestValidateApplicationServiceRequest(t *testing.T) {
 	}
 
 	// Set up a config
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	cfg.Global.ServerName = "localhost"
 	cfg.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService, fakeApplicationServiceOverlap}

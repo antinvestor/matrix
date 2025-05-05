@@ -1,4 +1,4 @@
-// Copyright 2023 The Matrix.org Foundation C.I.C.
+// Copyright 2023 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"time"
-
-	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -43,12 +38,14 @@ CREATE TABLE IF NOT EXISTS roomserver_reported_events
 
 const reportedEventsSchemaRevert = `DROP TABLE IF EXISTS roomserver_reported_events;`
 
+// Insert a new reported event.
 const insertReportedEventSQL = `
 	INSERT INTO roomserver_reported_events (room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts) 
 	VALUES ($1, $2, $3, $4, $5, $6, $7)
 	RETURNING id
 `
 
+// Select reported events in descending order of received timestamp.
 const selectReportedEventsDescSQL = `
 WITH countReports AS (
     SELECT count(*) as report_count
@@ -63,6 +60,7 @@ OFFSET $3
 LIMIT $4
 `
 
+// Select reported events in ascending order of received timestamp.
 const selectReportedEventsAscSQL = `
 WITH countReports AS (
     SELECT count(*) as report_count
@@ -77,141 +75,121 @@ OFFSET $3
 LIMIT $4
 `
 
+// Select a single reported event by ID.
 const selectReportedEventSQL = `
 SELECT id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
 FROM roomserver_reported_events
 WHERE id = $1
 `
 
+// Delete a reported event by ID.
 const deleteReportedEventSQL = `DELETE FROM roomserver_reported_events WHERE id = $1`
 
-type reportedEventsStatements struct {
-	insertReportedEventsStmt     *sql.Stmt
-	selectReportedEventsDescStmt *sql.Stmt
-	selectReportedEventsAscStmt  *sql.Stmt
-	selectReportedEventStmt      *sql.Stmt
-	deleteReportedEventStmt      *sql.Stmt
+// Refactored struct for GORM usage
+// All SQL strings are struct fields, set at initialization
+
+type reportedEventsTable struct {
+	cm                          *sqlutil.Connections
+	insertReportedEventSQL      string
+	selectReportedEventsDescSQL string
+	selectReportedEventsAscSQL  string
+	selectReportedEventSQL      string
+	deleteReportedEventSQL      string
 }
 
-func NewPostgresReportedEventsTable(ctx context.Context, db *sql.DB) (tables.ReportedEvents, error) {
-	s := &reportedEventsStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertReportedEventsStmt, insertReportedEventSQL},
-		{&s.selectReportedEventsDescStmt, selectReportedEventsDescSQL},
-		{&s.selectReportedEventsAscStmt, selectReportedEventsAscSQL},
-		{&s.selectReportedEventStmt, selectReportedEventSQL},
-		{&s.deleteReportedEventStmt, deleteReportedEventSQL},
-	}.Prepare(db)
+func NewPostgresReportedEventsTable(cm *sqlutil.Connections) tables.ReportedEvents {
+	return &reportedEventsTable{
+		cm:                          cm,
+		insertReportedEventSQL:      insertReportedEventSQL,
+		selectReportedEventsDescSQL: selectReportedEventsDescSQL,
+		selectReportedEventsAscSQL:  selectReportedEventsAscSQL,
+		selectReportedEventSQL:      selectReportedEventSQL,
+		deleteReportedEventSQL:      deleteReportedEventSQL,
+	}
 }
 
-func (r *reportedEventsStatements) InsertReportedEvent(
+// InsertReportedEvent inserts a new reported event and returns its ID.
+func (t *reportedEventsTable) InsertReportedEvent(
 	ctx context.Context,
-	txn *sql.Tx,
 	roomNID types.RoomNID,
 	eventNID types.EventNID,
 	reportingUserID types.EventStateKeyNID,
 	eventSenderID types.EventStateKeyNID,
 	reason string,
 	score int64,
+	receivedTS int64,
 ) (int64, error) {
-	stmt := sqlutil.TxStmt(txn, r.insertReportedEventsStmt)
-
-	var reportID int64
-	err := stmt.QueryRowContext(ctx,
-		roomNID,
-		eventNID,
-		reportingUserID,
-		eventSenderID,
-		reason,
-		score,
-		spec.AsTimestamp(time.Now()),
-	).Scan(&reportID)
-	return reportID, err
+	// Get a database connection for the given context.
+	db := t.cm.Connection(ctx, false)
+	var id int64
+	// Execute the insert query and scan the result into the id variable.
+	err := db.Raw(
+		t.insertReportedEventSQL,
+		roomNID, eventNID, reportingUserID, eventSenderID, reason, score, receivedTS,
+	).Row().Scan(&id)
+	return id, err
 }
 
-func (r *reportedEventsStatements) SelectReportedEvents(
+// SelectReportedEvents returns a slice of reported events and the total report count.
+func (t *reportedEventsTable) SelectReportedEvents(
 	ctx context.Context,
-	txn *sql.Tx,
 	from, limit uint64,
 	backwards bool,
 	reportingUserID types.EventStateKeyNID,
 	roomNID types.RoomNID,
 ) ([]api.QueryAdminEventReportsResponse, int64, error) {
-	var stmt *sql.Stmt
+	// Get a read-only database connection for the given context.
+	db := t.cm.Connection(ctx, true)
+	var sqlStr string
 	if backwards {
-		stmt = sqlutil.TxStmt(txn, r.selectReportedEventsDescStmt)
+		// If backwards is true, use the descending order SQL query.
+		sqlStr = t.selectReportedEventsDescSQL
 	} else {
-		stmt = sqlutil.TxStmt(txn, r.selectReportedEventsAscStmt)
+		// Otherwise, use the ascending order SQL query.
+		sqlStr = t.selectReportedEventsAscSQL
 	}
-
-	var qryRoomNID *types.RoomNID
-	if roomNID > 0 {
-		qryRoomNID = &roomNID
-	}
-	var qryReportingUser *types.EventStateKeyNID
-	if reportingUserID > 0 {
-		qryReportingUser = &reportingUserID
-	}
-
-	rows, err := stmt.QueryContext(ctx,
-		qryRoomNID,
-		qryReportingUser,
-		from,
-		limit,
-	)
+	// Execute the query and get the rows.
+	rows, err := db.Raw(sqlStr, roomNID, reportingUserID, from, limit).Rows()
 	if err != nil {
 		return nil, 0, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectReportedEvents: failed to close rows")
-
-	var result []api.QueryAdminEventReportsResponse
-	var row api.QueryAdminEventReportsResponse
-	var count int64
+	defer rows.Close()
+	// Initialize variables to store the report count and the slice of reports.
+	var reports []api.QueryAdminEventReportsResponse
+	var reportCount int64
+	// Iterate over the rows and scan each row into a report.
 	for rows.Next() {
-		if err = rows.Scan(
-			&count,
-			&row.ID,
-			&row.RoomNID,
-			&row.EventNID,
-			&row.ReportingUserNID,
-			&row.SenderNID,
-			&row.Reason,
-			&row.Score,
-			&row.ReceivedTS,
-		); err != nil {
+		var r api.QueryAdminEventReportsResponse
+		if err := rows.Scan(&reportCount, &r.ID, &r.RoomNID, &r.EventNID, &r.ReportingUserNID, &r.SenderNID, &r.Reason, &r.Score, &r.ReceivedTS); err != nil {
 			return nil, 0, err
 		}
-		result = append(result, row)
+		reports = append(reports, r)
 	}
-
-	return result, count, rows.Err()
+	// Return the slice of reports and the report count.
+	return reports, reportCount, rows.Err()
 }
 
-func (r *reportedEventsStatements) SelectReportedEvent(
+// SelectReportedEvent fetches a single reported event by its ID.
+func (t *reportedEventsTable) SelectReportedEvent(
 	ctx context.Context,
-	txn *sql.Tx,
 	reportID uint64,
 ) (api.QueryAdminEventReportResponse, error) {
-	stmt := sqlutil.TxStmt(txn, r.selectReportedEventStmt)
-
-	var row api.QueryAdminEventReportResponse
-	if err := stmt.QueryRowContext(ctx, reportID).Scan(
-		&row.ID,
-		&row.RoomNID,
-		&row.EventNID,
-		&row.ReportingUserNID,
-		&row.SenderNID,
-		&row.Reason,
-		&row.Score,
-		&row.ReceivedTS,
-	); err != nil {
-		return api.QueryAdminEventReportResponse{}, err
-	}
-	return row, nil
+	// Get a read-only database connection for the given context.
+	db := t.cm.Connection(ctx, true)
+	var r api.QueryAdminEventReportResponse
+	// Execute the query and scan the result into the report variable.
+	row := db.Raw(t.selectReportedEventSQL, reportID).Row()
+	err := row.Scan(&r.ID, &r.RoomNID, &r.EventNID, &r.ReportingUserNID, &r.SenderNID, &r.Reason, &r.Score, &r.ReceivedTS)
+	return r, err
 }
 
-func (r *reportedEventsStatements) DeleteReportedEvent(ctx context.Context, txn *sql.Tx, reportID uint64) error {
-	stmt := sqlutil.TxStmt(txn, r.deleteReportedEventStmt)
-	_, err := stmt.ExecContext(ctx, reportID)
-	return err
+// DeleteReportedEvent deletes a reported event by its ID.
+func (t *reportedEventsTable) DeleteReportedEvent(
+	ctx context.Context,
+	reportID uint64,
+) error {
+	// Get a database connection for the given context.
+	db := t.cm.Connection(ctx, false)
+	// Execute the delete query.
+	return db.Exec(t.deleteReportedEventSQL, reportID).Error
 }

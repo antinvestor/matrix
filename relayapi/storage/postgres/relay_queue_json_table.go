@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +16,8 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
 )
@@ -53,61 +50,53 @@ const selectQueueJSONSQL = "" +
 	"SELECT json_nid, json_body FROM relayapi_queue_json" +
 	" WHERE json_nid = ANY($1)"
 
+// Refactored relayQueueJSONStatements to use connection manager and GORM-style logic, removing *sql.Tx from all methods but preserving function names and signatures as per the updated table interface.
 type relayQueueJSONStatements struct {
-	db             *sql.DB
-	insertJSONStmt *sql.Stmt
-	deleteJSONStmt *sql.Stmt
-	selectJSONStmt *sql.Stmt
+	cm        *sqlutil.Connections
+	InsertSQL string
+	DeleteSQL string
+	SelectSQL string
 }
 
-func NewPostgresRelayQueueJSONTable(ctx context.Context, db *sql.DB) (tables.RelayQueueJSON, error) {
-	s := &relayQueueJSONStatements{
-		db: db,
+func NewPostgresRelayQueueJSONTable(cm *sqlutil.Connections) tables.RelayQueueJSON {
+	return &relayQueueJSONStatements{
+		cm:        cm,
+		InsertSQL: insertQueueJSONSQL,
+		DeleteSQL: deleteQueueJSONSQL,
+		SelectSQL: selectQueueJSONSQL,
 	}
-
-	return s, sqlutil.StatementList{
-		{&s.insertJSONStmt, insertQueueJSONSQL},
-		{&s.deleteJSONStmt, deleteQueueJSONSQL},
-		{&s.selectJSONStmt, selectQueueJSONSQL},
-	}.Prepare(db)
 }
 
-func (s *relayQueueJSONStatements) InsertQueueJSON(
-	ctx context.Context, txn *sql.Tx, json string,
-) (int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
+func (s *relayQueueJSONStatements) InsertQueueJSON(ctx context.Context, json string) (int64, error) {
+	db := s.cm.Connection(ctx, false)
 	var lastid int64
-	if err := stmt.QueryRowContext(ctx, json).Scan(&lastid); err != nil {
+	row := db.Raw(s.InsertSQL, json).Row()
+	if err := row.Scan(&lastid); err != nil {
 		return 0, err
 	}
 	return lastid, nil
 }
 
-func (s *relayQueueJSONStatements) DeleteQueueJSON(
-	ctx context.Context, txn *sql.Tx, nids []int64,
-) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteJSONStmt)
-	_, err := stmt.ExecContext(ctx, pq.Int64Array(nids))
-	return err
+func (s *relayQueueJSONStatements) DeleteQueueJSON(ctx context.Context, nids []int64) error {
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.DeleteSQL, pq.Int64Array(nids)).Error
 }
 
-func (s *relayQueueJSONStatements) SelectQueueJSON(
-	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
-) (map[int64][]byte, error) {
-	blobs := map[int64][]byte{}
-	stmt := sqlutil.TxStmt(txn, s.selectJSONStmt)
-	rows, err := stmt.QueryContext(ctx, pq.Int64Array(jsonNIDs))
+func (s *relayQueueJSONStatements) SelectQueueJSON(ctx context.Context, jsonNIDs []int64) (map[int64][]byte, error) {
+	db := s.cm.Connection(ctx, true)
+	rows, err := db.Raw(s.SelectSQL, pq.Int64Array(jsonNIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectJSON: rows.close() failed")
+	defer rows.Close()
+	blobs := map[int64][]byte{}
 	for rows.Next() {
 		var nid int64
-		var blob []byte
-		if err = rows.Scan(&nid, &blob); err != nil {
+		var body []byte
+		if err := rows.Scan(&nid, &body); err != nil {
 			return nil, err
 		}
-		blobs[nid] = blob
+		blobs[nid] = body
 	}
 	return blobs, rows.Err()
 }

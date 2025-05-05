@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"net/url"
@@ -38,7 +39,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	roomserver "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
@@ -158,7 +158,7 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) fclient.F
 // Test that the device keys get persisted and emitted if we have the previous IDs.
 func TestUpdateHavePrevID(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
@@ -207,7 +207,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 // and that the user's devices are marked as stale until it succeeds.
 func TestUpdateNoPrevID(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
@@ -293,7 +293,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 // update is still ongoing.
 func TestDebounce(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
@@ -373,20 +373,17 @@ func TestDebounce(t *testing.T) {
 	}
 }
 
-func mustCreateKeyserverDB(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.KeyDatabase, func()) {
+func mustCreateKeyserverDB(ctx context.Context, svc *frame.Service, t *testing.T) storage.KeyDatabase {
 	t.Helper()
 
-	connStr, clearDB, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewKeyDatabase(ctx, cm, &config.DatabaseOptions{ConnectionString: connStr})
+	cm := sqlutil.NewConnectionManager(svc)
+
+	db, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return db, clearDB
+	return db
 }
 
 type mockKeyserverRoomserverAPI struct {
@@ -407,10 +404,10 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 	rsAPI := &mockKeyserverRoomserverAPI{leftUsers: []string{bob.ID}}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		db, clearDB := mustCreateKeyserverDB(ctx, t, testOpts)
-		defer clearDB()
+		db := mustCreateKeyserverDB(ctx, svc, t)
 
 		// This should not get deleted
 		if err := db.MarkDeviceListStale(ctx, alice.ID, true); err != nil {
@@ -495,7 +492,7 @@ func Test_dedupeStateList(t *testing.T) {
 
 func TestDeviceListUpdaterIgnoreBlacklisted(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 
 	unreachableServer := spec.ServerName("notlocalhost")
 

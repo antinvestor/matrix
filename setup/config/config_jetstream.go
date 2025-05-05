@@ -16,7 +16,7 @@ type JetStream struct {
 	// internal NATS server will be used when running in monolith mode only.
 	Addresses []string `env:"QUEUE_URI" yaml:"addresses"`
 	// The prefix to use for stream names for this homeserver - really only
-	// useful if running more than one Dendrite on the same NATS deployment.
+	// useful if running more than one Matrix on the same NATS deployment.
 	TopicPrefix string `yaml:"topic_prefix"`
 
 	// A credentials file to be used for authentication, example:
@@ -52,7 +52,7 @@ func (c *JetStream) LoadEnv() error {
 
 func (c *JetStream) Defaults(opts DefaultOpts) {
 
-	c.TopicPrefix = "Matrix"
+	c.TopicPrefix = "Global"
 	c.Credentials = ""
 
 	connectionUris := opts.QueueConnectionStr.ToArray()

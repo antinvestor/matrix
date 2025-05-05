@@ -2,8 +2,8 @@ package tables_test
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/roomserver/storage"
@@ -17,43 +17,38 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func migrateDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*sql.DB, func()) {
+func migrateDatabase(ctx context.Context, svc *frame.Service, t *testing.T) *sqlutil.Connections {
 
-	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	_, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, nil)
+	cm := sqlutil.NewConnectionManager(svc)
+	_, err := storage.Open(ctx, cm, nil)
 	if err != nil {
 		t.Fatalf("failed to create sync DB: %s", err)
 	}
 
-	db, err := sqlutil.Open(&cfg.RoomServer.Database, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-
-	return db, closeDB
+	return cm
 }
 
-func mustCreateEventJSONTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.EventJSON, context.Context, func()) {
+func mustCreateEventJSONTable(ctx context.Context, svc *frame.Service, t *testing.T, dep test.DependancyOption) tables.EventJSON {
 	t.Helper()
 
-	db, closeDb := migrateDatabase(ctx, t, dep)
+	cm := migrateDatabase(ctx, svc, t)
 
-	tab, err := postgres.NewPostgresEventJSONTable(ctx, db)
+	return postgres.NewPostgresEventJSONTable(cm)
 
-	assert.NoError(t, err)
-
-	return tab, ctx, closeDb
 }
 
 func Test_EventJSONTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		tab, ctx, closeDb := mustCreateEventJSONTable(ctx, t, testOpts)
-		defer closeDb()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		tab := mustCreateEventJSONTable(ctx, svc, t, testOpts)
 
 		// create some dummy data
 		for i := 0; i < 10; i++ {
 			err := tab.InsertEventJSON(
-				ctx, nil, types.EventNID(i),
+				ctx, types.EventNID(i),
 				[]byte(fmt.Sprintf(`{"value":%d"}`, i)),
 			)
 			assert.NoError(t, err)
@@ -89,7 +84,7 @@ func Test_EventJSONTable(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
 				// select a subset of the data
-				values, err := tab.BulkSelectEventJSON(ctx, nil, tc.args)
+				values, err := tab.BulkSelectEventJSON(ctx, tc.args)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.wantCount, len(values))
 				for i, v := range values {

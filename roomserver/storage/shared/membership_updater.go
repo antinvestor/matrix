@@ -2,7 +2,6 @@ package shared
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -11,7 +10,6 @@ import (
 )
 
 type MembershipUpdater struct {
-	transaction
 	d             *Database
 	roomNID       types.RoomNID
 	targetUserNID types.EventStateKeyNID
@@ -19,54 +17,43 @@ type MembershipUpdater struct {
 }
 
 func NewMembershipUpdater(
-	ctx context.Context, d *Database, txn *sql.Tx, roomID, targetUserID string,
+	ctx context.Context, d *Database, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
 ) (*MembershipUpdater, error) {
 	var roomNID types.RoomNID
 	var targetUserNID types.EventStateKeyNID
 	var err error
-	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-		roomNID, err = d.assignRoomNID(ctx, txn, roomID, roomVersion)
-		if err != nil {
-			return err
-		}
-		targetUserNID, err = d.assignStateKeyNID(ctx, txn, targetUserID)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+
+	roomNID, err = d.assignRoomNID(ctx, roomID, roomVersion)
+	if err != nil {
+		return nil, err
+	}
+	targetUserNID, err = d.assignStateKeyNID(ctx, targetUserID)
 	if err != nil {
 		return nil, err
 	}
 
-	return d.membershipUpdaterTxn(ctx, txn, roomNID, targetUserNID, targetLocal)
+	return d.membershipUpdaterTxn(ctx, roomNID, targetUserNID, targetLocal)
 }
 
 func (d *Database) membershipUpdaterTxn(
 	ctx context.Context,
-	txn *sql.Tx,
 	roomNID types.RoomNID,
 	targetUserNID types.EventStateKeyNID,
 	targetLocal bool,
 ) (*MembershipUpdater, error) {
-	err := d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-		if err := d.MembershipTable.InsertMembership(ctx, txn, roomNID, targetUserNID, targetLocal); err != nil {
-			return fmt.Errorf("d.MembershipTable.InsertMembership: %w", err)
-		}
-		return nil
-	})
+	err := d.MembershipTable.InsertMembership(ctx, roomNID, targetUserNID, targetLocal)
 	if err != nil {
-		return nil, fmt.Errorf("u.d.Writer.Do: %w", err)
+		return nil, fmt.Errorf("d.MembershipTable.InsertMembership: %w", err)
 	}
 
-	membership, err := d.MembershipTable.SelectMembershipForUpdate(ctx, txn, roomNID, targetUserNID)
+	membership, err := d.MembershipTable.SelectMembershipForUpdate(ctx, roomNID, targetUserNID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &MembershipUpdater{
-		transaction{ctx, txn}, d, roomNID, targetUserNID, membership,
+		d, roomNID, targetUserNID, membership,
 	}, nil
 }
 
@@ -90,44 +77,44 @@ func (u *MembershipUpdater) IsKnock() bool {
 	return u.oldMembership == tables.MembershipStateKnock
 }
 
-func (u *MembershipUpdater) Delete() error {
-	if _, err := u.d.InvitesTable.UpdateInviteRetired(u.ctx, u.txn, u.roomNID, u.targetUserNID); err != nil {
+func (u *MembershipUpdater) Delete(ctx context.Context) error {
+	if _, err := u.d.InvitesTable.UpdateInviteRetired(ctx, u.roomNID, u.targetUserNID); err != nil {
 		return err
 	}
-	return u.d.MembershipTable.DeleteMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID)
+	return u.d.MembershipTable.DeleteMembership(ctx, u.roomNID, u.targetUserNID)
 }
 
-func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *types.Event) (bool, []string, error) {
+func (u *MembershipUpdater) Update(ctx context.Context, newMembership tables.MembershipState, event *types.Event) (bool, []string, error) {
 	var inserted bool    // Did the query result in a membership change?
 	var retired []string // Did we retire any updates in the process?
-	return inserted, retired, u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, string(event.SenderID()))
+
+	senderUserNID, err := u.d.assignStateKeyNID(ctx, string(event.SenderID()))
+	if err != nil {
+		return inserted, retired, fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
+	}
+	inserted, err = u.d.MembershipTable.UpdateMembership(ctx, u.roomNID, u.targetUserNID, senderUserNID, newMembership, event.EventNID, false)
+	if err != nil {
+		return inserted, retired, fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
+	}
+	if !inserted {
+		return inserted, retired, nil
+	}
+	switch {
+	case u.oldMembership != tables.MembershipStateInvite && newMembership == tables.MembershipStateInvite:
+		inserted, err = u.d.InvitesTable.InsertInviteEvent(
+			ctx, event.EventID(), u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
+		)
 		if err != nil {
-			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
+			return inserted, retired, fmt.Errorf("u.d.InvitesTable.InsertInviteEvent: %w", err)
 		}
-		inserted, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, newMembership, event.EventNID, false)
+	case u.oldMembership == tables.MembershipStateInvite && newMembership != tables.MembershipStateInvite:
+		retired, err = u.d.InvitesTable.UpdateInviteRetired(
+			ctx, u.roomNID, u.targetUserNID,
+		)
 		if err != nil {
-			return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
+			return inserted, retired, fmt.Errorf("u.d.InvitesTables.UpdateInviteRetired: %w", err)
 		}
-		if !inserted {
-			return nil
-		}
-		switch {
-		case u.oldMembership != tables.MembershipStateInvite && newMembership == tables.MembershipStateInvite:
-			inserted, err = u.d.InvitesTable.InsertInviteEvent(
-				u.ctx, u.txn, event.EventID(), u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
-			)
-			if err != nil {
-				return fmt.Errorf("u.d.InvitesTable.InsertInviteEvent: %w", err)
-			}
-		case u.oldMembership == tables.MembershipStateInvite && newMembership != tables.MembershipStateInvite:
-			retired, err = u.d.InvitesTable.UpdateInviteRetired(
-				u.ctx, u.txn, u.roomNID, u.targetUserNID,
-			)
-			if err != nil {
-				return fmt.Errorf("u.d.InvitesTables.UpdateInviteRetired: %w", err)
-			}
-		}
-		return nil
-	})
+	}
+
+	return inserted, retired, nil
 }

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -43,24 +42,28 @@ const upsertIgnoresSQL = "" +
 	"INSERT INTO syncapi_ignores (user_id, ignores_json) VALUES ($1, $2)" +
 	" ON CONFLICT (user_id) DO UPDATE set ignores_json = $2"
 
-type ignoresStatements struct {
-	selectIgnoresStmt *sql.Stmt
-	upsertIgnoresStmt *sql.Stmt
+// ignoresTable implements tables.Ignores using a connection manager and SQL constants.
+// This table stores ignore lists for users and provides methods for upserting and retrieving them.
+type ignoresTable struct {
+	cm               *sqlutil.Connections
+	selectIgnoresSQL string
+	upsertIgnoresSQL string
 }
 
-func NewPostgresIgnoresTable(ctx context.Context, db *sql.DB) (tables.Ignores, error) {
-	s := &ignoresStatements{}
-	return s, sqlutil.StatementList{
-		{&s.selectIgnoresStmt, selectIgnoresSQL},
-		{&s.upsertIgnoresStmt, upsertIgnoresSQL},
-	}.Prepare(db)
+// NewPostgresIgnoresTable creates a new Ignores table using a connection manager.
+func NewPostgresIgnoresTable(cm *sqlutil.Connections) tables.Ignores {
+	return &ignoresTable{
+		cm:               cm,
+		selectIgnoresSQL: selectIgnoresSQL,
+		upsertIgnoresSQL: upsertIgnoresSQL,
+	}
 }
 
-func (s *ignoresStatements) SelectIgnores(
-	ctx context.Context, txn *sql.Tx, userID string,
-) (*types.IgnoredUsers, error) {
+// SelectIgnores retrieves the ignore list for a user.
+func (t *ignoresTable) SelectIgnores(ctx context.Context, userID string) (*types.IgnoredUsers, error) {
+	db := t.cm.Connection(ctx, true)
 	var ignoresData []byte
-	err := sqlutil.TxStmt(txn, s.selectIgnoresStmt).QueryRowContext(ctx, userID).Scan(&ignoresData)
+	err := db.Raw(t.selectIgnoresSQL, userID).Row().Scan(&ignoresData)
 	if err != nil {
 		return nil, err
 	}
@@ -71,13 +74,12 @@ func (s *ignoresStatements) SelectIgnores(
 	return &ignores, nil
 }
 
-func (s *ignoresStatements) UpsertIgnores(
-	ctx context.Context, txn *sql.Tx, userID string, ignores *types.IgnoredUsers,
-) error {
+// UpsertIgnores inserts or updates the ignore list for a user.
+func (t *ignoresTable) UpsertIgnores(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
+	db := t.cm.Connection(ctx, false)
 	ignoresJSON, err := json.Marshal(ignores)
 	if err != nil {
 		return err
 	}
-	_, err = sqlutil.TxStmt(txn, s.upsertIgnoresStmt).ExecContext(ctx, userID, ignoresJSON)
-	return err
+	return db.Exec(t.upsertIgnoresSQL, userID, ignoresJSON).Error
 }

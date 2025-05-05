@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS syncapi_filter (
 	filter TEXT NOT NULL,
 	-- The ID
 	id SERIAL UNIQUE,
-	-- The localpart of the Matrix user ID associated to this filter
+	-- The localpart of the Global user ID associated to this filter
 	localpart TEXT NOT NULL,
 
 	PRIMARY KEY(id, localpart)
@@ -53,31 +53,36 @@ const selectFilterIDByContentSQL = "" +
 const insertFilterSQL = "" +
 	"INSERT INTO syncapi_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETURNING id"
 
-type filterStatements struct {
-	selectFilterStmt            *sql.Stmt
-	selectFilterIDByContentStmt *sql.Stmt
-	insertFilterStmt            *sql.Stmt
+// filterTable implements tables.Filter using a connection manager and SQL constants.
+// This table stores user filters and provides methods for inserting and retrieving filters by user and content.
+type filterTable struct {
+	cm                         *sqlutil.Connections
+	selectFilterSQL            string
+	selectFilterIDByContentSQL string
+	insertFilterSQL            string
 }
 
-func NewPostgresFilterTable(ctx context.Context, db *sql.DB) (tables.Filter, error) {
-	s := &filterStatements{}
-	return s, sqlutil.StatementList{
-		{&s.selectFilterStmt, selectFilterSQL},
-		{&s.selectFilterIDByContentStmt, selectFilterIDByContentSQL},
-		{&s.insertFilterStmt, insertFilterSQL},
-	}.Prepare(db)
+// NewPostgresFilterTable creates a new Filter table using a connection manager.
+func NewPostgresFilterTable(cm *sqlutil.Connections) tables.Filter {
+	return &filterTable{
+		cm:                         cm,
+		selectFilterSQL:            selectFilterSQL,
+		selectFilterIDByContentSQL: selectFilterIDByContentSQL,
+		insertFilterSQL:            insertFilterSQL,
+	}
 }
 
-func (s *filterStatements) SelectFilter(
-	ctx context.Context, txn *sql.Tx, target *synctypes.Filter, localpart string, filterID string,
+// SelectFilter retrieves a filter by localpart and filter ID, and unmarshals it into target.
+func (t *filterTable) SelectFilter(
+	ctx context.Context, target *synctypes.Filter, localpart string, filterID string,
 ) error {
 	// Retrieve filter from database (stored as canonical JSON)
+	db := t.cm.Connection(ctx, true)
 	var filterData []byte
-	err := sqlutil.TxStmt(txn, s.selectFilterStmt).QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
+	err := db.Raw(t.selectFilterSQL, localpart, filterID).Row().Scan(&filterData)
 	if err != nil {
 		return err
 	}
-
 	// Unmarshal JSON into Filter struct
 	if err = json.Unmarshal(filterData, &target); err != nil {
 		return err
@@ -85,11 +90,10 @@ func (s *filterStatements) SelectFilter(
 	return nil
 }
 
-func (s *filterStatements) InsertFilter(
-	ctx context.Context, txn *sql.Tx, filter *synctypes.Filter, localpart string,
+// InsertFilter inserts a filter for a user, ensuring deduplication by canonical JSON.
+func (t *filterTable) InsertFilter(
+	ctx context.Context, filter *synctypes.Filter, localpart string,
 ) (filterID string, err error) {
-	var existingFilterID string
-
 	// Serialise json
 	filterJSON, err := json.Marshal(filter)
 	if err != nil {
@@ -101,25 +105,20 @@ func (s *filterStatements) InsertFilter(
 	if err != nil {
 		return "", err
 	}
-
 	// Check if filter already exists in the database using its localpart and content
 	//
 	// This can result in a race condition when two clients try to insert the
 	// same filter and localpart at the same time, however this is not a
 	// problem as both calls will result in the same filterID
-	err = sqlutil.TxStmt(txn, s.selectFilterIDByContentStmt).QueryRowContext(
-		ctx, localpart, filterJSON,
-	).Scan(&existingFilterID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	db := t.cm.Connection(ctx, false)
+	err = db.Raw(t.selectFilterIDByContentSQL, localpart, string(filterJSON)).Row().Scan(&filterID)
+	if err == nil {
+		return filterID, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
-	// If it does, return the existing ID
-	if existingFilterID != "" {
-		return existingFilterID, err
-	}
-
-	// Otherwise insert the filter and return the new ID
-	err = sqlutil.TxStmt(txn, s.insertFilterStmt).QueryRowContext(ctx, filterJSON, localpart).
-		Scan(&filterID)
-	return
+	// Insert new filter
+	err = db.Raw(t.insertFilterSQL, string(filterJSON), localpart).Row().Scan(&filterID)
+	return filterID, err
 }

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -68,57 +68,59 @@ const selectRelationsInRangeDescSQL = "" +
 const selectMaxRelationIDSQL = "" +
 	"SELECT COALESCE(MAX(id), 0) FROM syncapi_relations"
 
-type relationsStatements struct {
-	insertRelationStmt             *sql.Stmt
-	selectRelationsInRangeAscStmt  *sql.Stmt
-	selectRelationsInRangeDescStmt *sql.Stmt
-	deleteRelationStmt             *sql.Stmt
-	selectMaxRelationIDStmt        *sql.Stmt
+// relationsTable implements tables.Relations using a connection manager and SQL constants.
+// This table stores event relations and provides methods for inserting, deleting, and querying them.
+type relationsTable struct {
+	cm                            *sqlutil.Connections
+	insertRelationSQL             string
+	selectRelationsInRangeAscSQL  string
+	selectRelationsInRangeDescSQL string
+	deleteRelationSQL             string
+	selectMaxRelationIDSQL        string
 }
 
-func NewPostgresRelationsTable(ctx context.Context, db *sql.DB) (tables.Relations, error) {
-	s := &relationsStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertRelationStmt, insertRelationSQL},
-		{&s.selectRelationsInRangeAscStmt, selectRelationsInRangeAscSQL},
-		{&s.selectRelationsInRangeDescStmt, selectRelationsInRangeDescSQL},
-		{&s.deleteRelationStmt, deleteRelationSQL},
-		{&s.selectMaxRelationIDStmt, selectMaxRelationIDSQL},
-	}.Prepare(db)
+// NewPostgresRelationsTable creates a new Relations table using a connection manager.
+func NewPostgresRelationsTable(cm *sqlutil.Connections) tables.Relations {
+	return &relationsTable{
+		cm:                            cm,
+		insertRelationSQL:             insertRelationSQL,
+		selectRelationsInRangeAscSQL:  selectRelationsInRangeAscSQL,
+		selectRelationsInRangeDescSQL: selectRelationsInRangeDescSQL,
+		deleteRelationSQL:             deleteRelationSQL,
+		selectMaxRelationIDSQL:        selectMaxRelationIDSQL,
+	}
 }
 
-func (s *relationsStatements) InsertRelation(
-	ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, childEventType, relType string,
-) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.insertRelationStmt).ExecContext(
-		ctx, roomID, eventID, childEventID, childEventType, relType,
-	)
-	return
+// InsertRelation inserts a relation between two events.
+func (t *relationsTable) InsertRelation(ctx context.Context, roomID, eventID, childEventID, childEventType, relType string) error {
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.insertRelationSQL, roomID, eventID, childEventID, childEventType, relType).Error
 }
 
-func (s *relationsStatements) DeleteRelation(
-	ctx context.Context, txn *sql.Tx, roomID, childEventID string,
-) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteRelationStmt)
-	_, err := stmt.ExecContext(
-		ctx, roomID, childEventID,
-	)
-	return err
+// DeleteRelation deletes a relation by room and child event ID.
+func (t *relationsTable) DeleteRelation(ctx context.Context, roomID, childEventID string) error {
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.deleteRelationSQL, roomID, childEventID).Error
 }
 
-// SelectRelationsInRange returns a map rel_type -> []child_event_id
-func (s *relationsStatements) SelectRelationsInRange(
-	ctx context.Context, txn *sql.Tx, roomID, eventID, relType, eventType string,
+// SelectRelationsInRange returns a map rel_type -> []child_event_id for a range.
+func (t *relationsTable) SelectRelationsInRange(
+	ctx context.Context, roomID, eventID, relType, eventType string,
 	r types.Range, limit int,
 ) (map[string][]types.RelationEntry, types.StreamPosition, error) {
-	var lastPos types.StreamPosition
-	var stmt *sql.Stmt
+	db := t.cm.Connection(ctx, true)
+	var (
+		lastPos types.StreamPosition
+		rows    *sql.Rows
+		err     error
+	)
 	if r.Backwards {
-		stmt = sqlutil.TxStmt(txn, s.selectRelationsInRangeDescStmt)
+		rows, err = db.Raw(t.selectRelationsInRangeDescSQL, roomID, eventID, relType, eventType, r.Low, r.High, limit).Rows()
+
 	} else {
-		stmt = sqlutil.TxStmt(txn, s.selectRelationsInRangeAscStmt)
+		rows, err = db.Raw(t.selectRelationsInRangeAscSQL, roomID, eventID, relType, eventType, r.Low, r.High, limit).Rows()
 	}
-	rows, err := stmt.QueryContext(ctx, roomID, eventID, relType, eventType, r.Low(), r.High(), limit)
+
 	if err != nil {
 		return nil, lastPos, err
 	}
@@ -147,10 +149,9 @@ func (s *relationsStatements) SelectRelationsInRange(
 	return result, lastPos, rows.Err()
 }
 
-func (s *relationsStatements) SelectMaxRelationID(
-	ctx context.Context, txn *sql.Tx,
-) (id int64, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMaxRelationIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&id)
+// SelectMaxRelationID returns the maximum stream position for relations.
+func (t *relationsTable) SelectMaxRelationID(ctx context.Context) (id int64, err error) {
+	db := t.cm.Connection(ctx, true)
+	err = db.Raw(t.selectMaxRelationIDSQL).Row().Scan(&id)
 	return
 }

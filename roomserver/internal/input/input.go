@@ -119,9 +119,9 @@ func (r *Inputer) startWorkerForRoom(ctx context.Context, roomID string) {
 	w.Lock()
 	defer w.Unlock()
 	if !loaded || w.subscription == nil {
-		streamName := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent)
-		consumer := r.Cfg.Matrix.JetStream.Prefixed("RoomInput" + jetstream.Tokenise(w.roomID))
-		subject := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEventSubj(w.roomID))
+		streamName := r.Cfg.Global.JetStream.Prefixed(jetstream.InputRoomEvent)
+		consumer := r.Cfg.Global.JetStream.Prefixed("RoomInput" + jetstream.Tokenise(w.roomID))
+		subject := r.Cfg.Global.JetStream.Prefixed(jetstream.InputRoomEventSubj(w.roomID))
 
 		logger := log.WithFields(log.Fields{
 			"stream_name": streamName,
@@ -188,7 +188,7 @@ func (r *Inputer) startWorkerForRoom(ctx context.Context, roomID string) {
 		if info == nil {
 			// Create the consumer with the correct config
 			if _, err = w.r.JetStream.AddConsumer(
-				r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent),
+				r.Cfg.Global.JetStream.Prefixed(jetstream.InputRoomEvent),
 				consumerConfig,
 			); err != nil {
 				logger.WithError(err).Errorf("Failed to create consumer for room %q", w.roomID)
@@ -245,7 +245,7 @@ func (r *Inputer) Start(ctx context.Context) error {
 	)
 
 	// Make sure that the room consumers have the right config.
-	stream := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent)
+	stream := r.Cfg.Global.JetStream.Prefixed(jetstream.InputRoomEvent)
 	for consumer := range r.JetStream.Consumers(stream) {
 		switch {
 		case consumer.Config.Durable == "":
@@ -358,7 +358,7 @@ func (w *worker) _next(ctx context.Context) {
 				"type":     inputRoomEvent.Event.Type(),
 			}).Warn("Roomserver failed to process event")
 		}
-		// Even though we failed to process this message (e.g. due to Dendrite restarting and receiving a context canceled),
+		// Even though we failed to process this message (e.g. due to Matrix restarting and receiving a context canceled),
 		// the message may already have been queued for redelivery or will be, so this makes sure that we still reprocess the msg
 		// after restarting. We only Ack if the context was not yet canceled.
 		if ctx.Err() == nil {
@@ -415,7 +415,7 @@ func (r *Inputer) queueInputRoomEvents(
 	// send it into the input queue.
 	for _, e := range request.InputRoomEvents {
 		roomID := e.Event.RoomID().String()
-		subj := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEventSubj(roomID))
+		subj := r.Cfg.Global.JetStream.Prefixed(jetstream.InputRoomEventSubj(roomID))
 		msg := &nats.Msg{
 			Subject: subj,
 			Header:  nats.Header{},

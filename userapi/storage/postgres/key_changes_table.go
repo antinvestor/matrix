@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,14 +16,12 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
 
-var keyChangesSchema = `
+// SQL: Create key changes table
+const keyChangesSchema = `
 -- Stores key change information about users. Used to determine when to send updated device lists to clients.
 CREATE SEQUENCE IF NOT EXISTS keyserver_key_changes_seq;
 CREATE TABLE IF NOT EXISTS keyserver_key_changes (
@@ -33,10 +31,10 @@ CREATE TABLE IF NOT EXISTS keyserver_key_changes (
 );
 `
 
-var keyChangesSchemaRevert = "DROP TABLE IF EXISTS keyserver_key_changes CASCADE;"
+// SQL: Drop key changes table
+const keyChangesSchemaRevert = "DROP TABLE IF EXISTS keyserver_key_changes CASCADE;"
 
-// Replace based on user ID. We don't care how many times the user's keys have changed, only that they
-// have changed, hence we can just keep bumping the change ID for this user.
+// SQL: Insert key change
 const upsertKeyChangeSQL = "" +
 	"INSERT INTO keyserver_key_changes (user_id)" +
 	" VALUES ($1)" +
@@ -44,43 +42,52 @@ const upsertKeyChangeSQL = "" +
 	" DO UPDATE SET change_id = nextval('keyserver_key_changes_seq')" +
 	" RETURNING change_id"
 
+// SQL: Select key changes
 const selectKeyChangesSQL = "" +
 	"SELECT user_id, change_id FROM keyserver_key_changes WHERE change_id > $1 AND change_id <= $2"
 
-type keyChangesStatements struct {
-	db                   *sql.DB
-	upsertKeyChangeStmt  *sql.Stmt
-	selectKeyChangesStmt *sql.Stmt
+// keyChangesTable implements tables.KeyChangesTable using GORM and a connection manager.
+type keyChangesTable struct {
+	cm *sqlutil.Connections
+
+	upsertKeyChangeSQL  string
+	selectKeyChangesSQL string
 }
 
-func NewPostgresKeyChangesTable(ctx context.Context, db *sql.DB) (tables.KeyChanges, error) {
-	s := &keyChangesStatements{db: db}
-
-	return s, sqlutil.StatementList{
-		{&s.upsertKeyChangeStmt, upsertKeyChangeSQL},
-		{&s.selectKeyChangesStmt, selectKeyChangesSQL},
-	}.Prepare(db)
+// NewPostgresKeyChangesTable returns a new KeyChangesTable using the provided connection manager.
+func NewPostgresKeyChangesTable(cm *sqlutil.Connections) tables.KeyChanges {
+	return &keyChangesTable{
+		cm:                  cm,
+		upsertKeyChangeSQL:  upsertKeyChangeSQL,
+		selectKeyChangesSQL: selectKeyChangesSQL,
+	}
 }
 
-func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, userID string) (changeID int64, err error) {
-	err = s.upsertKeyChangeStmt.QueryRowContext(ctx, userID).Scan(&changeID)
+// InsertKeyChange inserts a key change record.
+func (t *keyChangesTable) InsertKeyChange(ctx context.Context, userID string) (changeID int64, err error) {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.upsertKeyChangeSQL, userID)
+	err = result.Error
+	if err != nil {
+		return
+	}
+	err = result.Row().Scan(&changeID)
 	return
 }
 
-func (s *keyChangesStatements) SelectKeyChanges(
-	ctx context.Context, fromOffset, toOffset int64,
-) (userIDs []string, latestOffset int64, err error) {
-	latestOffset = fromOffset
-	rows, err := s.selectKeyChangesStmt.QueryContext(ctx, fromOffset, toOffset)
+// SelectKeyChanges retrieves key changes for a user after a specific offset.
+func (t *keyChangesTable) SelectKeyChanges(ctx context.Context, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectKeyChangesSQL, fromOffset, toOffset).Rows()
 	if err != nil {
-		return nil, 0, err
+		return
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectKeyChangesStmt: rows.close() failed")
+	defer rows.Close()
 	for rows.Next() {
 		var userID string
 		var offset int64
 		if err = rows.Scan(&userID, &offset); err != nil {
-			return nil, 0, err
+			return
 		}
 		if offset > latestOffset {
 			latestOffset = offset

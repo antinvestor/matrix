@@ -1,4 +1,4 @@
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,39 +67,41 @@ const deleteSendToDeviceMessagesSQL = `
 const selectMaxSendToDeviceIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_send_to_device"
 
-type sendToDeviceStatements struct {
-	insertSendToDeviceMessageStmt  *sql.Stmt
-	selectSendToDeviceMessagesStmt *sql.Stmt
-	deleteSendToDeviceMessagesStmt *sql.Stmt
-	selectMaxSendToDeviceIDStmt    *sql.Stmt
+// sendToDeviceTable implements tables.SendToDevice using a connection manager and SQL constants.
+type sendToDeviceTable struct {
+	cm *sqlutil.Connections
+	insertSendToDeviceMessageSQL string
+	selectSendToDeviceMessagesSQL string
+	deleteSendToDeviceMessagesSQL string
+	selectMaxSendToDeviceIDSQL string
 }
 
-func NewPostgresSendToDeviceTable(ctx context.Context, db *sql.DB) (tables.SendToDevice, error) {
-	s := &sendToDeviceStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertSendToDeviceMessageStmt, insertSendToDeviceMessageSQL},
-		{&s.selectSendToDeviceMessagesStmt, selectSendToDeviceMessagesSQL},
-		{&s.deleteSendToDeviceMessagesStmt, deleteSendToDeviceMessagesSQL},
-		{&s.selectMaxSendToDeviceIDStmt, selectMaxSendToDeviceIDSQL},
-	}.Prepare(db)
+// NewPostgresSendToDeviceTable creates a new SendToDevice table using a connection manager.
+func NewPostgresSendToDeviceTable(cm *sqlutil.Connections) tables.SendToDevice {
+	return &sendToDeviceTable{
+		cm: cm,
+		insertSendToDeviceMessageSQL: insertSendToDeviceMessageSQL,
+		selectSendToDeviceMessagesSQL: selectSendToDeviceMessagesSQL,
+		deleteSendToDeviceMessagesSQL: deleteSendToDeviceMessagesSQL,
+		selectMaxSendToDeviceIDSQL: selectMaxSendToDeviceIDSQL,
+	}
 }
 
-func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
-	ctx context.Context, txn *sql.Tx, userID, deviceID, content string,
-) (pos types.StreamPosition, err error) {
-	err = sqlutil.TxStmt(txn, s.insertSendToDeviceMessageStmt).QueryRowContext(ctx, userID, deviceID, content).Scan(&pos)
+// InsertSendToDeviceMessage inserts a send-to-device message for a user and device.
+func (t *sendToDeviceTable) InsertSendToDeviceMessage(ctx context.Context, userID, deviceID, content string) (pos types.StreamPosition, err error) {
+	db := t.cm.Connection(ctx, false)
+	err = db.Raw(t.insertSendToDeviceMessageSQL, userID, deviceID, content).Row().Scan(&pos)
 	return
 }
 
-func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string, from, to types.StreamPosition,
-) (lastPos types.StreamPosition, events []types.SendToDeviceEvent, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID, from, to)
+// SelectSendToDeviceMessages returns send-to-device messages for a user/device in a given range.
+func (t *sendToDeviceTable) SelectSendToDeviceMessages(ctx context.Context, userID, deviceID string, from, to types.StreamPosition) (lastPos types.StreamPosition, events []types.SendToDeviceEvent, err error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectSendToDeviceMessagesSQL, userID, deviceID, from, to).Rows()
 	if err != nil {
 		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectSendToDeviceMessages: rows.close() failed")
-
 	for rows.Next() {
 		var id types.StreamPosition
 		var userID, deviceID, content string
@@ -126,19 +128,17 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 	return lastPos, events, rows.Err()
 }
 
-func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string, pos types.StreamPosition,
-) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, userID, deviceID, pos)
-	return
+// DeleteSendToDeviceMessages deletes messages for a user/device up to a given position.
+func (t *sendToDeviceTable) DeleteSendToDeviceMessages(ctx context.Context, userID, deviceID string, pos types.StreamPosition) error {
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.deleteSendToDeviceMessagesSQL, userID, deviceID, pos).Error
 }
 
-func (s *sendToDeviceStatements) SelectMaxSendToDeviceMessageID(
-	ctx context.Context, txn *sql.Tx,
-) (id int64, err error) {
+// SelectMaxSendToDeviceMessageID returns the max stream position for send-to-device messages.
+func (t *sendToDeviceTable) SelectMaxSendToDeviceMessageID(ctx context.Context) (id int64, err error) {
+	db := t.cm.Connection(ctx, true)
 	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxSendToDeviceIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	err = db.Raw(t.selectMaxSendToDeviceIDSQL).Row().Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}

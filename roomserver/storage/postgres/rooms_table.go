@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -85,54 +85,52 @@ const bulkSelectRoomIDsSQL = "" +
 const bulkSelectRoomNIDsSQL = "" +
 	"SELECT room_nid FROM roomserver_rooms WHERE room_id = ANY($1)"
 
-type roomStatements struct {
-	insertRoomNIDStmt                  *sql.Stmt
-	selectRoomNIDStmt                  *sql.Stmt
-	selectRoomNIDForUpdateStmt         *sql.Stmt
-	selectLatestEventNIDsStmt          *sql.Stmt
-	selectLatestEventNIDsForUpdateStmt *sql.Stmt
-	updateLatestEventNIDsStmt          *sql.Stmt
-	selectRoomVersionsForRoomNIDsStmt  *sql.Stmt
-	selectRoomInfoStmt                 *sql.Stmt
-	bulkSelectRoomIDsStmt              *sql.Stmt
-	bulkSelectRoomNIDsStmt             *sql.Stmt
+type roomsTable struct {
+	cm                                *sqlutil.Connections
+	insertRoomNIDSQL                  string
+	selectRoomNIDSQL                  string
+	selectRoomNIDForUpdateSQL         string
+	selectLatestEventNIDsSQL          string
+	selectLatestEventNIDsForUpdateSQL string
+	updateLatestEventNIDsSQL          string
+	selectRoomVersionsForRoomNIDsSQL  string
+	selectRoomInfoSQL                 string
+	bulkSelectRoomIDsSQL              string
+	bulkSelectRoomNIDsSQL             string
 }
 
-func NewPostgresRoomsTable(ctx context.Context, db *sql.DB) (tables.Rooms, error) {
-	s := &roomStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertRoomNIDStmt, insertRoomNIDSQL},
-		{&s.selectRoomNIDStmt, selectRoomNIDSQL},
-		{&s.selectRoomNIDForUpdateStmt, selectRoomNIDForUpdateSQL},
-		{&s.selectLatestEventNIDsStmt, selectLatestEventNIDsSQL},
-		{&s.selectLatestEventNIDsForUpdateStmt, selectLatestEventNIDsForUpdateSQL},
-		{&s.updateLatestEventNIDsStmt, updateLatestEventNIDsSQL},
-		{&s.selectRoomVersionsForRoomNIDsStmt, selectRoomVersionsForRoomNIDsSQL},
-		{&s.selectRoomInfoStmt, selectRoomInfoSQL},
-		{&s.bulkSelectRoomIDsStmt, bulkSelectRoomIDsSQL},
-		{&s.bulkSelectRoomNIDsStmt, bulkSelectRoomNIDsSQL},
-	}.Prepare(db)
+func NewPostgresRoomsTable(cm *sqlutil.Connections) tables.Rooms {
+	return &roomsTable{
+		cm:                                cm,
+		insertRoomNIDSQL:                  insertRoomNIDSQL,
+		selectRoomNIDSQL:                  selectRoomNIDSQL,
+		selectRoomNIDForUpdateSQL:         selectRoomNIDForUpdateSQL,
+		selectLatestEventNIDsSQL:          selectLatestEventNIDsSQL,
+		selectLatestEventNIDsForUpdateSQL: selectLatestEventNIDsForUpdateSQL,
+		updateLatestEventNIDsSQL:          updateLatestEventNIDsSQL,
+		selectRoomVersionsForRoomNIDsSQL:  selectRoomVersionsForRoomNIDsSQL,
+		selectRoomInfoSQL:                 selectRoomInfoSQL,
+		bulkSelectRoomIDsSQL:              bulkSelectRoomIDsSQL,
+		bulkSelectRoomNIDsSQL:             bulkSelectRoomNIDsSQL,
+	}
 }
 
-func (s *roomStatements) InsertRoomNID(
-	ctx context.Context, txn *sql.Tx,
-	roomID string, roomVersion gomatrixserverlib.RoomVersion,
+func (t *roomsTable) InsertRoomNID(
+	ctx context.Context, roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	var roomNID int64
-	stmt := sqlutil.TxStmt(txn, s.insertRoomNIDStmt)
-	err := stmt.QueryRowContext(ctx, roomID, roomVersion).Scan(&roomNID)
+	db := t.cm.Connection(ctx, false)
+	err := db.Raw(t.insertRoomNIDSQL, roomID, roomVersion).Scan(&roomNID).Error
 	return types.RoomNID(roomNID), err
 }
 
-func (s *roomStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
+func (t *roomsTable) SelectRoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
 	var info types.RoomInfo
 	var latestNIDs pq.Int64Array
 	var stateSnapshotNID types.StateSnapshotNID
-	stmt := sqlutil.TxStmt(txn, s.selectRoomInfoStmt)
-	err := stmt.QueryRowContext(ctx, roomID).Scan(
-		&info.RoomVersion, &info.RoomNID, &stateSnapshotNID, &latestNIDs,
-	)
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectRoomInfoSQL, roomID).Row()
+	err := row.Scan(&info.RoomVersion, &info.RoomNID, &stateSnapshotNID, &latestNIDs)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -141,83 +139,75 @@ func (s *roomStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID
 	return &info, err
 }
 
-func (s *roomStatements) SelectRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) (types.RoomNID, error) {
+func (t *roomsTable) SelectRoomNID(ctx context.Context, roomID string) (types.RoomNID, error) {
 	var roomNID int64
-	stmt := sqlutil.TxStmt(txn, s.selectRoomNIDStmt)
-	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectRoomNIDSQL, roomID).Row()
+	err := row.Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 
-func (s *roomStatements) SelectRoomNIDForUpdate(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) (types.RoomNID, error) {
+func (t *roomsTable) SelectRoomNIDForUpdate(ctx context.Context, roomID string) (types.RoomNID, error) {
 	var roomNID int64
-	stmt := sqlutil.TxStmt(txn, s.selectRoomNIDForUpdateStmt)
-	err := stmt.QueryRowContext(ctx, roomID).Scan(&roomNID)
+	db := t.cm.Connection(ctx, false)
+	row := db.Raw(t.selectRoomNIDForUpdateSQL, roomID).Row()
+	err := row.Scan(&roomNID)
 	return types.RoomNID(roomNID), err
 }
 
-func (s *roomStatements) SelectLatestEventNIDs(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) ([]types.EventNID, types.StateSnapshotNID, error) {
+func (t *roomsTable) SelectLatestEventNIDs(ctx context.Context, roomNID types.RoomNID) ([]types.EventNID, types.StateSnapshotNID, error) {
 	var nids pq.Int64Array
 	var stateSnapshotNID int64
-	stmt := sqlutil.TxStmt(txn, s.selectLatestEventNIDsStmt)
-	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &stateSnapshotNID)
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectLatestEventNIDsSQL, int64(roomNID)).Row()
+	err := row.Scan(&nids, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, err
 	}
-	eventNIDs := make([]types.EventNID, len(nids))
-	for i := range nids {
-		eventNIDs[i] = types.EventNID(nids[i])
+	var eventNIDs []types.EventNID
+	for _, nid := range nids {
+		eventNIDs = append(eventNIDs, types.EventNID(nid))
 	}
 	return eventNIDs, types.StateSnapshotNID(stateSnapshotNID), nil
 }
 
-func (s *roomStatements) SelectLatestEventsNIDsForUpdate(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) ([]types.EventNID, types.EventNID, types.StateSnapshotNID, error) {
+func (t *roomsTable) SelectLatestEventsNIDsForUpdate(ctx context.Context, roomNID types.RoomNID) ([]types.EventNID, types.EventNID, types.StateSnapshotNID, error) {
 	var nids pq.Int64Array
 	var lastEventSentNID int64
 	var stateSnapshotNID int64
-	stmt := sqlutil.TxStmt(txn, s.selectLatestEventNIDsForUpdateStmt)
-	err := stmt.QueryRowContext(ctx, int64(roomNID)).Scan(&nids, &lastEventSentNID, &stateSnapshotNID)
+	db := t.cm.Connection(ctx, false)
+	row := db.Raw(t.selectLatestEventNIDsForUpdateSQL, int64(roomNID)).Row()
+	err := row.Scan(&nids, &lastEventSentNID, &stateSnapshotNID)
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	eventNIDs := make([]types.EventNID, len(nids))
-	for i := range nids {
-		eventNIDs[i] = types.EventNID(nids[i])
+	var eventNIDs []types.EventNID
+	for _, nid := range nids {
+		eventNIDs = append(eventNIDs, types.EventNID(nid))
 	}
 	return eventNIDs, types.EventNID(lastEventSentNID), types.StateSnapshotNID(stateSnapshotNID), nil
 }
 
-func (s *roomStatements) UpdateLatestEventNIDs(
+func (t *roomsTable) UpdateLatestEventNIDs(
 	ctx context.Context,
-	txn *sql.Tx,
 	roomNID types.RoomNID,
 	eventNIDs []types.EventNID,
 	lastEventSentNID types.EventNID,
 	stateSnapshotNID types.StateSnapshotNID,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.updateLatestEventNIDsStmt)
-	_, err := stmt.ExecContext(
-		ctx,
+	db := t.cm.Connection(ctx, false)
+	err := db.Exec(t.updateLatestEventNIDsSQL,
 		roomNID,
 		eventNIDsAsArray(eventNIDs),
 		int64(lastEventSentNID),
 		int64(stateSnapshotNID),
-	)
+	).Error
 	return err
 }
 
-func (s *roomStatements) SelectRoomVersionsForRoomNIDs(
-	ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID,
-) (map[types.RoomNID]gomatrixserverlib.RoomVersion, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomVersionsForRoomNIDsStmt)
-	rows, err := stmt.QueryContext(ctx, roomNIDsAsArray(roomNIDs))
+func (t *roomsTable) SelectRoomVersionsForRoomNIDs(ctx context.Context, roomNIDs []types.RoomNID) (map[types.RoomNID]gomatrixserverlib.RoomVersion, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectRoomVersionsForRoomNIDsSQL, roomNIDsAsArray(roomNIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -234,13 +224,9 @@ func (s *roomStatements) SelectRoomVersionsForRoomNIDs(
 	return result, rows.Err()
 }
 
-func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID) ([]string, error) {
-	var array pq.Int64Array
-	for _, nid := range roomNIDs {
-		array = append(array, int64(nid))
-	}
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectRoomIDsStmt)
-	rows, err := stmt.QueryContext(ctx, array)
+func (t *roomsTable) BulkSelectRoomIDs(ctx context.Context, roomNIDs []types.RoomNID) ([]string, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.bulkSelectRoomIDsSQL, roomNIDsAsArray(roomNIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -256,13 +242,9 @@ func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roo
 	return roomIDs, rows.Err()
 }
 
-func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, roomIDs []string) ([]types.RoomNID, error) {
-	var array pq.StringArray
-	for _, roomID := range roomIDs {
-		array = append(array, roomID)
-	}
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectRoomNIDsStmt)
-	rows, err := stmt.QueryContext(ctx, array)
+func (t *roomsTable) BulkSelectRoomNIDs(ctx context.Context, roomIDs []string) ([]types.RoomNID, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.bulkSelectRoomNIDsSQL, pq.StringArray(roomIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -114,7 +114,7 @@ func SendServerNotice(
 	}
 
 	// get rooms of the sender
-	senderUserID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName), true)
+	senderUserID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Global.ServerName), true)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -253,8 +253,8 @@ func SendServerNotice(
 			{PDU: e},
 		},
 		device.UserDomain(),
-		cfgClient.Matrix.ServerName,
-		cfgClient.Matrix.ServerName,
+		cfgClient.Global.ServerName,
+		cfgClient.Global.ServerName,
 		txnAndSessionID,
 		false,
 	); err != nil {
@@ -310,8 +310,8 @@ func getSenderDevice(
 	// create account if it doesn't exist
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
 		AccountType: userapi.AccountTypeUser,
-		Localpart:   cfg.Matrix.ServerNotices.LocalPart,
-		ServerName:  cfg.Matrix.ServerName,
+		Localpart:   cfg.Global.ServerNotices.LocalPart,
+		ServerName:  cfg.Global.ServerName,
 		OnConflict:  userapi.ConflictUpdate,
 	}, &accRes)
 	if err != nil {
@@ -320,9 +320,9 @@ func getSenderDevice(
 
 	// Set the avatarurl for the user
 	profile, avatarChanged, err := userAPI.SetAvatarURL(ctx,
-		cfg.Matrix.ServerNotices.LocalPart,
-		cfg.Matrix.ServerName,
-		cfg.Matrix.ServerNotices.AvatarURL,
+		cfg.Global.ServerNotices.LocalPart,
+		cfg.Global.ServerName,
+		cfg.Global.ServerNotices.AvatarURL,
 	)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
@@ -331,9 +331,9 @@ func getSenderDevice(
 
 	// Set the displayname for the user
 	_, displayNameChanged, err := userAPI.SetDisplayName(ctx,
-		cfg.Matrix.ServerNotices.LocalPart,
-		cfg.Matrix.ServerName,
-		cfg.Matrix.ServerNotices.DisplayName,
+		cfg.Global.ServerNotices.LocalPart,
+		cfg.Global.ServerName,
+		cfg.Global.ServerNotices.DisplayName,
 	)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
@@ -341,7 +341,7 @@ func getSenderDevice(
 	}
 
 	if displayNameChanged {
-		profile.DisplayName = cfg.Matrix.ServerNotices.DisplayName
+		profile.DisplayName = cfg.Global.ServerNotices.DisplayName
 	}
 
 	// Check if we got existing devices
@@ -367,8 +367,8 @@ func getSenderDevice(
 
 	// create an AccessToken
 	token, err := tokens.GenerateLoginToken(tokens.TokenOptions{
-		ServerPrivateKey: cfg.Matrix.PrivateKey.Seed(),
-		ServerName:       string(cfg.Matrix.ServerName),
+		ServerPrivateKey: cfg.Global.PrivateKey.Seed(),
+		ServerName:       string(cfg.Global.ServerName),
 		UserID:           accRes.Account.UserID,
 	})
 	if err != nil {
@@ -378,9 +378,9 @@ func getSenderDevice(
 	// create a new device, if we didn't find any
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
-		Localpart:          cfg.Matrix.ServerNotices.LocalPart,
-		ServerName:         cfg.Matrix.ServerName,
-		DeviceDisplayName:  &cfg.Matrix.ServerNotices.LocalPart,
+		Localpart:          cfg.Global.ServerNotices.LocalPart,
+		ServerName:         cfg.Global.ServerName,
+		DeviceDisplayName:  &cfg.Global.ServerNotices.LocalPart,
 		AccessToken:        token,
 		NoDeviceListUpdate: true,
 	}, &devRes)

@@ -25,7 +25,8 @@ func newRelationsTable(ctx context.Context, t *testing.T, dep test.DependancyOpt
 }
 
 func compareRelationsToExpected(t *testing.T, tab tables.Relations, r types.Range, expected []types.RelationEntry) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	relations, _, err := tab.SelectRelationsInRange(ctx, nil, roomID, "a", "", "", r, 50)
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +50,8 @@ const relType = "m.reaction"
 func TestRelationsTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		tab, _, closeDb := newRelationsTable(ctx, t, testOpts)
 		defer closeDb()

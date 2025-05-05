@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/storage/distributed"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
 )
@@ -35,18 +34,17 @@ import (
 func NewUserDatabase(
 	ctx context.Context,
 	profileCli *profilev1.ProfileClient,
-	conMan *sqlutil.Connections,
-	dbProperties *config.DatabaseOptions,
+	cm *sqlutil.Connections,
 	serverName spec.ServerName,
 	bcryptCost int,
 	openIDTokenLifetimeMS int64,
 	loginTokenLifetime time.Duration,
 	serverNoticesLocalpart string,
 ) (UserDatabase, error) {
-	if !dbProperties.ConnectionString.IsPostgres() {
-		return nil, fmt.Errorf("unexpected database type")
+	if !cm.DS().IsPostgres() {
+		return nil, fmt.Errorf("unexpected database type : %v", string(*cm.DS()))
 	}
-	pgUserDb, err := postgres.NewDatabase(ctx, conMan, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+	pgUserDb, err := postgres.NewDatabase(ctx, cm, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +63,10 @@ func NewUserDatabase(
 
 // NewKeyDatabase opens a new Postgres database (base on dataSourceName) scheme)
 // and sets postgres connection parameters.
-func NewKeyDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
+func NewKeyDatabase(ctx context.Context, cm *sqlutil.Connections) (KeyDatabase, error) {
 	switch {
-	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewKeyDatabase(ctx, conMan, dbProperties)
+	case cm.DS().IsPostgres():
+		return postgres.NewKeyDatabase(ctx, cm)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

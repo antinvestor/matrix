@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -78,86 +75,70 @@ const updateInviteRetiredSQL = "" +
 	" WHERE room_nid = $1 AND target_nid = $2 AND NOT retired" +
 	" RETURNING invite_event_id"
 
-type inviteStatements struct {
-	insertInviteEventStmt               *sql.Stmt
-	selectInviteActiveForUserInRoomStmt *sql.Stmt
-	updateInviteRetiredStmt             *sql.Stmt
+type inviteTable struct {
+	cm                     *sqlutil.Connections
+	insertInviteEventSQL   string
+	selectInviteActiveSQL  string
+	updateInviteRetiredSQL string
 }
 
-func NewPostgresInvitesTable(ctx context.Context, db *sql.DB) (tables.Invites, error) {
-	s := &inviteStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertInviteEventStmt, insertInviteEventSQL},
-		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},
-		{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},
-	}.Prepare(db)
-}
-
-func (s *inviteStatements) InsertInviteEvent(
-	ctx context.Context, txn *sql.Tx,
-	inviteEventID string, roomNID types.RoomNID,
-	targetUserNID, senderUserNID types.EventStateKeyNID,
-	inviteEventJSON []byte,
-) (bool, error) {
-	result, err := sqlutil.TxStmt(txn, s.insertInviteEventStmt).ExecContext(
-		ctx, inviteEventID, roomNID, targetUserNID, senderUserNID, inviteEventJSON,
-	)
-	if err != nil {
-		return false, err
+func NewPostgresInvitesTable(cm *sqlutil.Connections) tables.Invites {
+	return &inviteTable{
+		cm:                     cm,
+		insertInviteEventSQL:   insertInviteEventSQL,
+		selectInviteActiveSQL:  selectInviteActiveForUserInRoomSQL,
+		updateInviteRetiredSQL: updateInviteRetiredSQL,
 	}
-	count, err := result.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-	return count != 0, nil
 }
 
-func (s *inviteStatements) UpdateInviteRetired(
-	ctx context.Context, txn *sql.Tx,
-	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
-) ([]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.updateInviteRetiredStmt)
-	rows, err := stmt.QueryContext(ctx, roomNID, targetUserNID)
+func (t *inviteTable) InsertInviteEvent(ctx context.Context, inviteEventID string, roomNID types.RoomNID, targetUserNID, senderUserNID types.EventStateKeyNID, inviteEventJSON []byte) (bool, error) {
+	db := t.cm.Connection(ctx, false)
+	res := db.Exec(t.insertInviteEventSQL, inviteEventID, roomNID, targetUserNID, senderUserNID, string(inviteEventJSON))
+	if res.Error != nil {
+		return false, res.Error
+	}
+	rowsAffected := res.RowsAffected
+	return rowsAffected > 0, nil
+}
+
+func (t *inviteTable) UpdateInviteRetired(ctx context.Context, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) ([]string, error) {
+	db := t.cm.Connection(ctx, false)
+	rows, err := db.Raw(t.updateInviteRetiredSQL, roomNID, targetUserNID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "updateInviteRetired: rows.close() failed")
-
-	var eventIDs []string
-	var inviteEventID string
+	defer rows.Close()
+	var inviteEventIDs []string
 	for rows.Next() {
-		if err = rows.Scan(&inviteEventID); err != nil {
+		var inviteEventID string
+		if err := rows.Scan(&inviteEventID); err != nil {
 			return nil, err
 		}
-		eventIDs = append(eventIDs, inviteEventID)
+		inviteEventIDs = append(inviteEventIDs, inviteEventID)
 	}
-	return eventIDs, rows.Err()
+	return inviteEventIDs, nil
 }
 
-// SelectInviteActiveForUserInRoom returns a list of sender state key NIDs
-func (s *inviteStatements) SelectInviteActiveForUserInRoom(
-	ctx context.Context, txn *sql.Tx,
-	targetUserNID types.EventStateKeyNID, roomNID types.RoomNID,
-) ([]types.EventStateKeyNID, []string, []byte, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectInviteActiveForUserInRoomStmt)
-	rows, err := stmt.QueryContext(
-		ctx, targetUserNID, roomNID,
-	)
+func (t *inviteTable) SelectInviteActiveForUserInRoom(ctx context.Context, targetUserNID types.EventStateKeyNID, roomNID types.RoomNID) ([]types.EventStateKeyNID, []string, []byte, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectInviteActiveSQL, targetUserNID, roomNID).Rows()
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteActiveForUserInRoom: rows.close() failed")
-	var result []types.EventStateKeyNID
-	var eventIDs []string
-	var inviteEventID string
-	var senderUserNID int64
-	var eventJSON []byte
+	defer rows.Close()
+	var senderNIDs []types.EventStateKeyNID
+	var inviteEventIDs []string
+	var inviteEventJSON []byte
 	for rows.Next() {
-		if err := rows.Scan(&inviteEventID, &senderUserNID, &eventJSON); err != nil {
+		var inviteEventID string
+		var senderNID types.EventStateKeyNID
+		var eventJSON []byte
+		if err := rows.Scan(&inviteEventID, &senderNID, &eventJSON); err != nil {
 			return nil, nil, nil, err
 		}
-		result = append(result, types.EventStateKeyNID(senderUserNID))
-		eventIDs = append(eventIDs, inviteEventID)
+		senderNIDs = append(senderNIDs, senderNID)
+		inviteEventIDs = append(inviteEventIDs, inviteEventID)
+		inviteEventJSON = eventJSON
 	}
-	return result, eventIDs, eventJSON, rows.Err()
+	return senderNIDs, inviteEventIDs, inviteEventJSON, rows.Err()
 }

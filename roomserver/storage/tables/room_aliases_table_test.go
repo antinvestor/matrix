@@ -2,6 +2,7 @@ package tables_test
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
@@ -11,14 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRoomAliasesTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tab tables.RoomAliases, closeDb func()) {
+func mustCreateRoomAliasesTable(ctx context.Context, svc *frame.Service, t *testing.T) tables.RoomAliases {
 	t.Helper()
-	db, closeDb := migrateDatabase(ctx, t, dep)
-	tab, err := postgres.NewPostgresRoomAliasesTable(ctx, db)
+	cm := migrateDatabase(ctx, svc, t)
+	tab := postgres.NewPostgresRoomAliasesTable(cm)
 
-	assert.NoError(t, err)
-
-	return tab, closeDb
+	return tab
 }
 
 func TestRoomAliasesTable(t *testing.T) {
@@ -26,57 +25,58 @@ func TestRoomAliasesTable(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		tab, closeFn := mustCreateRoomAliasesTable(ctx, t, testOpts)
-		defer closeFn()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		tab := mustCreateRoomAliasesTable(ctx, svc, t)
+
 		alias, alias2, alias3 := "#alias:localhost", "#alias2:localhost", "#alias3:localhost"
 		// insert aliases
-		err := tab.InsertRoomAlias(ctx, nil, alias, room.ID, alice.ID)
+		err := tab.InsertRoomAlias(ctx, alias, room.ID, alice.ID)
 		assert.NoError(t, err)
 
-		err = tab.InsertRoomAlias(ctx, nil, alias2, room.ID, alice.ID)
+		err = tab.InsertRoomAlias(ctx, alias2, room.ID, alice.ID)
 		assert.NoError(t, err)
 
-		err = tab.InsertRoomAlias(ctx, nil, alias3, room2.ID, alice.ID)
+		err = tab.InsertRoomAlias(ctx, alias3, room2.ID, alice.ID)
 		assert.NoError(t, err)
 
 		// verify we can get the roomID for the alias
-		roomID, err := tab.SelectRoomIDFromAlias(ctx, nil, alias)
+		roomID, err := tab.SelectRoomIDFromAlias(ctx, alias)
 		assert.NoError(t, err)
 		assert.Equal(t, room.ID, roomID)
 
 		// .. and the creator
-		creator, err := tab.SelectCreatorIDFromAlias(ctx, nil, alias)
+		creator, err := tab.SelectCreatorIDFromAlias(ctx, alias)
 		assert.NoError(t, err)
 		assert.Equal(t, alice.ID, creator)
 
-		creator, err = tab.SelectCreatorIDFromAlias(ctx, nil, "#doesntexist:localhost")
+		creator, err = tab.SelectCreatorIDFromAlias(ctx, "#doesntexist:localhost")
 		assert.NoError(t, err)
 		assert.Equal(t, "", creator)
 
-		roomID, err = tab.SelectRoomIDFromAlias(ctx, nil, "#doesntexist:localhost")
+		roomID, err = tab.SelectRoomIDFromAlias(ctx, "#doesntexist:localhost")
 		assert.NoError(t, err)
 		assert.Equal(t, "", roomID)
 
 		// get all aliases for a room
-		aliases, err := tab.SelectAliasesFromRoomID(ctx, nil, room.ID)
+		aliases, err := tab.SelectAliasesFromRoomID(ctx, room.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, []string{alias, alias2}, aliases)
 
 		// delete an alias and verify it's deleted
-		err = tab.DeleteRoomAlias(ctx, nil, alias2)
+		err = tab.DeleteRoomAlias(ctx, alias2)
 		assert.NoError(t, err)
 
-		aliases, err = tab.SelectAliasesFromRoomID(ctx, nil, room.ID)
+		aliases, err = tab.SelectAliasesFromRoomID(ctx, room.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, []string{alias}, aliases)
 
 		// deleting the same alias should be a no-op
-		err = tab.DeleteRoomAlias(ctx, nil, alias2)
+		err = tab.DeleteRoomAlias(ctx, alias2)
 		assert.NoError(t, err)
 
 		// Delete non-existent alias should be a no-op
-		err = tab.DeleteRoomAlias(ctx, nil, "#doesntexist:localhost")
+		err = tab.DeleteRoomAlias(ctx, "#doesntexist:localhost")
 		assert.NoError(t, err)
 	})
 }

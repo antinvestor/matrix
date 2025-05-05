@@ -2,35 +2,29 @@ package internal_test
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"reflect"
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/internal"
 	"github.com/antinvestor/matrix/userapi/storage"
 )
 
-func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.KeyDatabase, func()) {
+func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T) storage.KeyDatabase {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewKeyDatabase(ctx, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	})
+	cm := sqlutil.NewConnectionManager(svc)
+
+	db, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
-	return db, closeDb
+	return db
 }
 
 func Test_QueryDeviceMessages(t *testing.T) {
@@ -68,19 +62,19 @@ func Test_QueryDeviceMessages(t *testing.T) {
 				Devices: []api.DeviceMessage{
 					{
 						Type: api.TypeDeviceKeyUpdate, StreamID: 5, DeviceKeys: &api.DeviceKeys{
-							DeviceID:    "myDevice",
-							DisplayName: "first device",
-							UserID:      alice.ID,
-							KeyJSON:     []byte("ghi"),
-						},
+						DeviceID:    "myDevice",
+						DisplayName: "first device",
+						UserID:      alice.ID,
+						KeyJSON:     []byte("ghi"),
+					},
 					},
 					{
 						Type: api.TypeDeviceKeyUpdate, StreamID: 6, DeviceKeys: &api.DeviceKeys{
-							DeviceID:    "mySecondDevice",
-							DisplayName: "second device",
-							UserID:      alice.ID,
-							KeyJSON:     []byte("jkl"),
-						}, // streamID 6
+						DeviceID:    "mySecondDevice",
+						DisplayName: "second device",
+						UserID:      alice.ID,
+						KeyJSON:     []byte("jkl"),
+					}, // streamID 6
 					},
 				},
 			},
@@ -90,60 +84,60 @@ func Test_QueryDeviceMessages(t *testing.T) {
 	deviceMessages := []api.DeviceMessage{
 		{ // not the user we're looking for
 			Type: api.TypeDeviceKeyUpdate, DeviceKeys: &api.DeviceKeys{
-				UserID: "@doesNotExist:localhost",
-			},
+			UserID: "@doesNotExist:localhost",
+		},
 			// streamID 1 for this user
 		},
 		{ // empty keyJSON will be ignored
 			Type: api.TypeDeviceKeyUpdate, DeviceKeys: &api.DeviceKeys{
-				DeviceID: "myDevice",
-				UserID:   alice.ID,
-			}, // streamID 1
+			DeviceID: "myDevice",
+			UserID:   alice.ID,
+		}, // streamID 1
 		},
 		{
 			Type: api.TypeDeviceKeyUpdate, DeviceKeys: &api.DeviceKeys{
-				DeviceID: "myDevice",
-				UserID:   alice.ID,
-				KeyJSON:  []byte("abc"),
-			}, // streamID 2
+			DeviceID: "myDevice",
+			UserID:   alice.ID,
+			KeyJSON:  []byte("abc"),
+		}, // streamID 2
 		},
 		{
 			Type: api.TypeDeviceKeyUpdate, DeviceKeys: &api.DeviceKeys{
-				DeviceID: "myDevice",
-				UserID:   alice.ID,
-				KeyJSON:  []byte("def"),
-			}, // streamID 3
+			DeviceID: "myDevice",
+			UserID:   alice.ID,
+			KeyJSON:  []byte("def"),
+		}, // streamID 3
 		},
 		{
 			Type: api.TypeDeviceKeyUpdate, DeviceKeys: &api.DeviceKeys{
-				DeviceID: "myDevice",
-				UserID:   alice.ID,
-				KeyJSON:  []byte(""),
-			}, // streamID 4
+			DeviceID: "myDevice",
+			UserID:   alice.ID,
+			KeyJSON:  []byte(""),
+		}, // streamID 4
 		},
 		{
 			Type: api.TypeDeviceKeyUpdate, DeviceKeys: &api.DeviceKeys{
-				DeviceID:    "myDevice",
-				DisplayName: "first device",
-				UserID:      alice.ID,
-				KeyJSON:     []byte("ghi"),
-			}, // streamID 5
+			DeviceID:    "myDevice",
+			DisplayName: "first device",
+			UserID:      alice.ID,
+			KeyJSON:     []byte("ghi"),
+		}, // streamID 5
 		},
 		{
 			Type: api.TypeDeviceKeyUpdate, DeviceKeys: &api.DeviceKeys{
-				DeviceID:    "mySecondDevice",
-				UserID:      alice.ID,
-				KeyJSON:     []byte("jkl"),
-				DisplayName: "second device",
-			}, // streamID 6
+			DeviceID:    "mySecondDevice",
+			UserID:      alice.ID,
+			KeyJSON:     []byte("jkl"),
+			DisplayName: "second device",
+		}, // streamID 6
 		},
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		db, closeDB := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateDatabase(ctx, svc, t)
 		if err := db.StoreLocalDeviceKeys(ctx, deviceMessages); err != nil {
 			t.Fatalf("failed to store local devicesKeys")
 		}

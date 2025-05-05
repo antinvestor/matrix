@@ -77,68 +77,55 @@ const selectStreamToTopologicalPositionDescSQL = "" +
 const purgeEventsTopologySQL = "" +
 	"DELETE FROM syncapi_output_room_events_topology WHERE room_id = $1"
 
-type outputRoomEventsTopologyStatements struct {
-	insertEventInTopologyStmt                 *sql.Stmt
-	selectEventIDsInRangeASCStmt              *sql.Stmt
-	selectEventIDsInRangeDESCStmt             *sql.Stmt
-	selectPositionInTopologyStmt              *sql.Stmt
-	selectStreamToTopologicalPositionAscStmt  *sql.Stmt
-	selectStreamToTopologicalPositionDescStmt *sql.Stmt
-	purgeEventsTopologyStmt                   *sql.Stmt
+// outputRoomEventsTopologyTable implements tables.Topology using a connection manager and SQL constants.
+type outputRoomEventsTopologyTable struct {
+	cm *sqlutil.Connections
+	insertEventInTopologySQL string
+	selectEventIDsInRangeASCSQL string
+	selectEventIDsInRangeDESCSQL string
+	selectPositionInTopologySQL string
+	selectStreamToTopologicalPositionAscSQL string
+	selectStreamToTopologicalPositionDescSQL string
+	purgeEventsTopologySQL string
 }
 
-func NewPostgresTopologyTable(ctx context.Context, db *sql.DB) (tables.Topology, error) {
-	s := &outputRoomEventsTopologyStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertEventInTopologyStmt, insertEventInTopologySQL},
-		{&s.selectEventIDsInRangeASCStmt, selectEventIDsInRangeASCSQL},
-		{&s.selectEventIDsInRangeDESCStmt, selectEventIDsInRangeDESCSQL},
-		{&s.selectPositionInTopologyStmt, selectPositionInTopologySQL},
-		{&s.selectStreamToTopologicalPositionAscStmt, selectStreamToTopologicalPositionAscSQL},
-		{&s.selectStreamToTopologicalPositionDescStmt, selectStreamToTopologicalPositionDescSQL},
-		{&s.purgeEventsTopologyStmt, purgeEventsTopologySQL},
-	}.Prepare(db)
+// NewPostgresTopologyTable creates a new Topology table using a connection manager.
+func NewPostgresTopologyTable(cm *sqlutil.Connections) tables.Topology {
+	return &outputRoomEventsTopologyTable{
+		cm: cm,
+		insertEventInTopologySQL: insertEventInTopologySQL,
+		selectEventIDsInRangeASCSQL: selectEventIDsInRangeASCSQL,
+		selectEventIDsInRangeDESCSQL: selectEventIDsInRangeDESCSQL,
+		selectPositionInTopologySQL: selectPositionInTopologySQL,
+		selectStreamToTopologicalPositionAscSQL: selectStreamToTopologicalPositionAscSQL,
+		selectStreamToTopologicalPositionDescSQL: selectStreamToTopologicalPositionDescSQL,
+		purgeEventsTopologySQL: purgeEventsTopologySQL,
+	}
 }
 
-// InsertEventInTopology inserts the given event in the room's topology, based
-// on the event's depth.
-func (s *outputRoomEventsTopologyStatements) InsertEventInTopology(
-	ctx context.Context, txn *sql.Tx, event *rstypes.HeaderedEvent, pos types.StreamPosition,
-) (topoPos types.StreamPosition, err error) {
-	err = sqlutil.TxStmt(txn, s.insertEventInTopologyStmt).QueryRowContext(
-		ctx, event.EventID(), event.Depth(), event.RoomID().String(), pos,
-	).Scan(&topoPos)
+// InsertEventInTopology inserts the given event in the room's topology, based on the event's depth.
+func (t *outputRoomEventsTopologyTable) InsertEventInTopology(ctx context.Context, event *rstypes.HeaderedEvent, pos types.StreamPosition) (topoPos types.StreamPosition, err error) {
+	db := t.cm.Connection(ctx, false)
+	err = db.Raw(t.insertEventInTopologySQL, event.EventID(), event.Depth(), event.RoomID().String(), pos).Row().Scan(&topoPos)
 	return
 }
 
-// SelectEventIDsInRange selects the IDs of events which positions are within a
-// given range in a given room's topological order. Returns the start/end topological tokens for
-// the returned eventIDs.
-// Returns an empty slice if no events match the given range.
-func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
-	ctx context.Context, txn *sql.Tx, roomID string, minDepth, maxDepth, maxStreamPos types.StreamPosition,
-	limit int, chronologicalOrder bool,
-) (eventIDs []string, start, end types.TopologyToken, err error) {
-	// Decide on the selection's order according to whether chronological order
-	// is requested or not.
-	var stmt *sql.Stmt
+// SelectEventIDsInRange selects the IDs of events which positions are within a given range in a given room's topological order.
+func (t *outputRoomEventsTopologyTable) SelectEventIDsInRange(ctx context.Context, roomID string, minDepth, maxDepth, maxStreamPos types.StreamPosition, limit int, chronologicalOrder bool) (eventIDs []string, start, end types.TopologyToken, err error) {
+	db := t.cm.Connection(ctx, true)
+	var rows *sql.Rows
 	if chronologicalOrder {
-		stmt = sqlutil.TxStmt(txn, s.selectEventIDsInRangeASCStmt)
+		rows, err = db.Raw(t.selectEventIDsInRangeASCSQL, roomID, minDepth, maxDepth, maxDepth, maxStreamPos, limit).Rows()
 	} else {
-		stmt = sqlutil.TxStmt(txn, s.selectEventIDsInRangeDESCStmt)
+		rows, err = db.Raw(t.selectEventIDsInRangeDESCSQL, roomID, minDepth, maxDepth, maxDepth, maxStreamPos, limit).Rows()
 	}
-
-	// Query the event IDs.
-	rows, err := stmt.QueryContext(ctx, roomID, minDepth, maxDepth, maxDepth, maxStreamPos, limit)
-	if errors.Is(err, sql.ErrNoRows) {
-		// If no event matched the request, return an empty slice.
-		return []string{}, start, end, nil
-	} else if err != nil {
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []string{}, start, end, nil
+		}
 		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectEventIDsInRange: rows.close() failed")
-
-	// Return the IDs.
 	var eventID string
 	var token types.TopologyToken
 	var tokens []types.TopologyToken
@@ -149,41 +136,33 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 		eventIDs = append(eventIDs, eventID)
 		tokens = append(tokens, token)
 	}
-
-	// The values are already ordered by SQL, so we can use them as is.
 	if len(tokens) > 0 {
 		start = tokens[0]
 		end = tokens[len(tokens)-1]
 	}
-
 	return eventIDs, start, end, rows.Err()
 }
 
-// SelectPositionInTopology returns the position of a given event in the
-// topology of the room it belongs to.
-func (s *outputRoomEventsTopologyStatements) SelectPositionInTopology(
-	ctx context.Context, txn *sql.Tx, eventID string,
-) (pos, spos types.StreamPosition, err error) {
-	err = sqlutil.TxStmt(txn, s.selectPositionInTopologyStmt).QueryRowContext(ctx, eventID).Scan(&pos, &spos)
+// SelectPositionInTopology returns the position of a given event in the topology of the room it belongs to.
+func (t *outputRoomEventsTopologyTable) SelectPositionInTopology(ctx context.Context, eventID string) (pos, spos types.StreamPosition, err error) {
+	db := t.cm.Connection(ctx, true)
+	err = db.Raw(t.selectPositionInTopologySQL, eventID).Row().Scan(&pos, &spos)
 	return
 }
 
-// SelectStreamToTopologicalPosition returns the closest position of a given event
-// in the topology of the room it belongs to from the given stream position.
-func (s *outputRoomEventsTopologyStatements) SelectStreamToTopologicalPosition(
-	ctx context.Context, txn *sql.Tx, roomID string, streamPos types.StreamPosition, backwardOrdering bool,
-) (topoPos types.StreamPosition, err error) {
+// SelectStreamToTopologicalPosition returns the closest position of a given event in the topology from the given stream position.
+func (t *outputRoomEventsTopologyTable) SelectStreamToTopologicalPosition(ctx context.Context, roomID string, streamPos types.StreamPosition, backwardOrdering bool) (topoPos types.StreamPosition, err error) {
+	db := t.cm.Connection(ctx, true)
 	if backwardOrdering {
-		err = sqlutil.TxStmt(txn, s.selectStreamToTopologicalPositionDescStmt).QueryRowContext(ctx, roomID, streamPos).Scan(&topoPos)
+		err = db.Raw(t.selectStreamToTopologicalPositionDescSQL, roomID, streamPos).Row().Scan(&topoPos)
 	} else {
-		err = sqlutil.TxStmt(txn, s.selectStreamToTopologicalPositionAscStmt).QueryRowContext(ctx, roomID, streamPos).Scan(&topoPos)
+		err = db.Raw(t.selectStreamToTopologicalPositionAscSQL, roomID, streamPos).Row().Scan(&topoPos)
 	}
 	return
 }
 
-func (s *outputRoomEventsTopologyStatements) PurgeEventsTopology(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeEventsTopologyStmt).ExecContext(ctx, roomID)
-	return err
+// PurgeEventsTopology deletes all topology events for a given room.
+func (t *outputRoomEventsTopologyTable) PurgeEventsTopology(ctx context.Context, roomID string) error {
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.purgeEventsTopologySQL, roomID).Error
 }

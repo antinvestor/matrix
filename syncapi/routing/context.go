@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/caching"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserver "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/internal"
@@ -62,8 +61,6 @@ func Context(
 			JSON: spec.InternalServerError{},
 		}
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	filter, err := parseRoomEventFilter(req)
 	if err != nil {
@@ -251,7 +248,6 @@ func Context(
 		response.End = end.String()
 		response.Start = start.String()
 	}
-	succeeded = true
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: response,

@@ -2,6 +2,7 @@ package tables_test
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
@@ -12,22 +13,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateStateBlockTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tab tables.StateBlock, close func()) {
+func mustCreateStateBlockTable(ctx context.Context, svc *frame.Service, t *testing.T) tables.StateBlock {
 	t.Helper()
 
-	db, closeDb := migrateDatabase(ctx, t, dep)
+	cm := migrateDatabase(ctx, svc, t)
 
-	tab, err := postgres.NewPostgresStateBlockTable(ctx, db)
-	assert.NoError(t, err)
-
-	return tab, closeDb
+	tab := postgres.NewPostgresStateBlockTable(cm)
+	return tab
 }
 
 func TestStateBlockTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		tab, closeFn := mustCreateStateBlockTable(ctx, t, testOpts)
-		defer closeFn()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		tab := mustCreateStateBlockTable(ctx, svc, t)
 
 		// generate some dummy data
 		var entries types.StateEntries
@@ -37,7 +36,7 @@ func TestStateBlockTable(t *testing.T) {
 			}
 			entries = append(entries, entry)
 		}
-		stateBlockNID, err := tab.BulkInsertStateData(ctx, nil, entries)
+		stateBlockNID, err := tab.BulkInsertStateData(ctx, entries)
 		assert.NoError(t, err)
 		assert.Equal(t, types.StateBlockNID(1), stateBlockNID)
 
@@ -49,21 +48,21 @@ func TestStateBlockTable(t *testing.T) {
 			}
 			entries2 = append(entries2, entry)
 		}
-		stateBlockNID, err = tab.BulkInsertStateData(ctx, nil, entries2)
+		stateBlockNID, err = tab.BulkInsertStateData(ctx, entries2)
 		assert.NoError(t, err)
 		assert.Equal(t, types.StateBlockNID(2), stateBlockNID)
 
-		eventNIDs, err := tab.BulkSelectStateBlockEntries(ctx, nil, types.StateBlockNIDs{1, 2})
+		eventNIDs, err := tab.BulkSelectStateBlockEntries(ctx, types.StateBlockNIDs{1, 2})
 		assert.NoError(t, err)
 		assert.Equal(t, len(entries), len(eventNIDs[0]))
 		assert.Equal(t, len(entries2), len(eventNIDs[1]))
 
 		// try to get a StateBlockNID which does not exist
-		_, err = tab.BulkSelectStateBlockEntries(ctx, nil, types.StateBlockNIDs{5})
+		_, err = tab.BulkSelectStateBlockEntries(ctx, types.StateBlockNIDs{5})
 		assert.Error(t, err)
 
 		// This should return an error, since we can only retrieve 1 StateBlock
-		_, err = tab.BulkSelectStateBlockEntries(ctx, nil, types.StateBlockNIDs{1, 5})
+		_, err = tab.BulkSelectStateBlockEntries(ctx, types.StateBlockNIDs{1, 5})
 		assert.Error(t, err)
 
 		for i := 0; i < 65555; i++ {
@@ -72,7 +71,7 @@ func TestStateBlockTable(t *testing.T) {
 			}
 			entries2 = append(entries2, entry)
 		}
-		stateBlockNID, err = tab.BulkInsertStateData(ctx, nil, entries2)
+		stateBlockNID, err = tab.BulkInsertStateData(ctx, entries2)
 		assert.NoError(t, err)
 		assert.Equal(t, types.StateBlockNID(3), stateBlockNID)
 	})
