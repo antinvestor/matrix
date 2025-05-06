@@ -12,7 +12,7 @@ import (
 
 func TestNotify(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 
 	wantResponse := NotifyResponse{
 		Rejected: []string{"testing"},

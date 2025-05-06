@@ -31,9 +31,8 @@ func TestLogin(t *testing.T) {
 	vhUser := &test.User{ID: "@vhuser:vh1"}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		natsInstance := jetstream.NATSInstance{}
@@ -42,7 +41,7 @@ func TestLogin(t *testing.T) {
 			SigningIdentity: fclient.SigningIdentity{ServerName: "vh1"},
 		})
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		routers := httputil.NewRouters()
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {

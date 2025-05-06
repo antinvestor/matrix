@@ -131,9 +131,8 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		// Create a dummy application service
 		as := &config.ApplicationService{
@@ -158,7 +157,8 @@ func TestAppserviceInternalAPI(t *testing.T) {
 
 		// Create required internal APIs
 		natsInstance := jetstream.NATSInstance{}
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
+
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -227,9 +227,8 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	srv.Start()
 	defer srv.Close()
 
-	ctx := testrig.NewContext(t)
-	cfg, tearDown := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer tearDown()
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	// Create a dummy application service
 	as := &config.ApplicationService{
@@ -253,7 +252,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	}
 	// Create required internal APIs
 	natsInstance := jetstream.NATSInstance{}
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -267,7 +266,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 }
 
 func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID string, wantExists bool) {
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 	userResp := &api.UserIDExistsResponse{}
 
 	if err := asAPI.UserIDExists(ctx, &api.UserIDExistsRequest{
@@ -281,7 +280,7 @@ func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID stri
 }
 
 func testAliasExists(t *testing.T, asAPI api.AppServiceInternalAPI, alias string, wantExists bool) {
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 	aliasResp := &api.RoomAliasExistsResponse{}
 
 	if err := asAPI.RoomAliasExists(ctx, &api.RoomAliasExistsRequest{
@@ -295,7 +294,7 @@ func testAliasExists(t *testing.T, asAPI api.AppServiceInternalAPI, alias string
 }
 
 func testLocations(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult []api.ASLocationResponse) {
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 	locationResp := &api.LocationResponse{}
 
 	if err := asAPI.Locations(ctx, &api.LocationRequest{
@@ -309,7 +308,7 @@ func testLocations(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, 
 }
 
 func testUser(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult []api.ASUserResponse) {
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 	userResp := &api.UserResponse{}
 
 	if err := asAPI.User(ctx, &api.UserRequest{
@@ -323,7 +322,7 @@ func testUser(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantR
 }
 
 func testProtocol(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult map[string]api.ASProtocolResponse) {
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 	protoResp := &api.ProtocolResponse{}
 
 	if err := asAPI.Protocols(ctx, &api.ProtocolRequest{
@@ -349,10 +348,9 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		cm := sqlutil.NewConnectionManager(svc)
 		natsInstance := &jetstream.NATSInstance{}
 
 		evChan := make(chan struct{})
@@ -425,7 +423,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 }
 
 // Note: If this test panics, it is because we timed out waiting for the
-// join event to come through to the appservice and we close the DB/shutdown Dendrite. This makes the
+// join event to come through to the appservice and we close the DB/shutdown Matrix. This makes the
 // syncAPI unhappy, as it is unable to write to the database.
 func TestOutputAppserviceEvent(t *testing.T) {
 	alice := test.NewUser(t)
@@ -433,11 +431,11 @@ func TestOutputAppserviceEvent(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		t.Cleanup(closeDB)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
+
 		natsInstance := &jetstream.NATSInstance{}
 
 		evChan := make(chan struct{})

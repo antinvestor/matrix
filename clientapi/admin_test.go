@@ -36,13 +36,14 @@ func TestAdminCreateToken(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
 		cfg.ClientAPI.RegistrationRequiresToken = true
-		defer closeRig()
+
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -190,15 +191,14 @@ func TestAdminListRegistrationTokens(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RegistrationRequiresToken = true
 
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -313,14 +313,13 @@ func TestAdminGetRegistrationToken(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg.ClientAPI.RegistrationRequiresToken = true
 
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -418,14 +417,13 @@ func TestAdminDeleteRegistrationToken(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RegistrationRequiresToken = true
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -516,14 +514,13 @@ func TestAdminUpdateRegistrationToken(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RegistrationRequiresToken = true
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -699,9 +696,8 @@ func TestAdminResetPassword(t *testing.T) {
 	vhUser := &test.User{ID: "@vhuser:vh1"}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		natsInstance := jetstream.NATSInstance{}
 		// add a vhost
 		cfg.Global.VirtualHosts = append(cfg.Global.VirtualHosts, &config.VirtualHost{
@@ -709,7 +705,7 @@ func TestAdminResetPassword(t *testing.T) {
 		})
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -796,21 +792,17 @@ func TestPurgeRoom(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		natsInstance := jetstream.NATSInstance{}
-		defer func() {
-			// give components the time to process purge requests
-			time.Sleep(time.Millisecond * 50)
-			closeRig()
-		}()
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
+
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 
 		// this starts the JetStream consumers
@@ -874,9 +866,8 @@ func TestAdminEvacuateRoom(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -885,7 +876,7 @@ func TestAdminEvacuateRoom(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 
 		// this starts the JetStream consumers
@@ -978,9 +969,8 @@ func TestAdminEvacuateUser(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -989,7 +979,7 @@ func TestAdminEvacuateUser(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 
 		// this starts the JetStream consumers
@@ -1076,9 +1066,8 @@ func TestAdminMarkAsStale(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -1087,7 +1076,7 @@ func TestAdminMarkAsStale(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -1156,12 +1145,11 @@ func TestAdminQueryEventReports(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -1393,12 +1381,11 @@ func TestEventReportsGetDelete(t *testing.T) {
 	eventIDToReport := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)

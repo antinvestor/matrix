@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,11 +48,11 @@ func NewSigningKeyUpdateConsumer(
 ) *SigningKeyUpdateConsumer {
 	return &SigningKeyUpdateConsumer{
 		jetstream:         js,
-		durable:           cfg.Matrix.JetStream.Prefixed("KeyServerSigningKeyConsumer"),
-		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		durable:           cfg.Global.JetStream.Prefixed("KeyServerSigningKeyConsumer"),
+		topic:             cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
 		userAPI:           userAPI,
 		cfg:               cfg,
-		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		isLocalServerName: cfg.Global.IsLocalServerName,
 	}
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ func TxStmtContext(context context.Context, transaction *sql.Tx, statement *sql.
 	return statement
 }
 
-// Hack of the century
+// QueryVariadic hack of the century
 func QueryVariadic(count int) string {
 	return QueryVariadicOffset(count, 0)
 }
@@ -168,21 +168,4 @@ func RunLimitedVariablesExec(ctx context.Context, query string, qp ExecProvider,
 		start = start + n
 	}
 	return nil
-}
-
-// StatementList is a list of SQL statements to prepare and a pointer to where to store the resulting prepared statement.
-type StatementList []struct {
-	Statement **sql.Stmt
-	SQL       string
-}
-
-// Prepare the SQL for each statement in the list and assign the result to the prepared statement.
-func (s StatementList) Prepare(db *sql.DB) (err error) {
-	for _, statement := range s {
-		if *statement.Statement, err = db.Prepare(statement.SQL); err != nil {
-			err = fmt.Errorf("error %q while preparing statement: %s", err, statement.SQL)
-			return
-		}
-	}
-	return
 }

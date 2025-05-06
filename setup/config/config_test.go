@@ -61,7 +61,7 @@ global:
   kafka:
     addresses:
     - localhost:2181
-    topic_prefix: Dendrite
+    topic_prefix: Matrix
     use_naffka: true
   database:
       connection_string: postgres://user:password@localhost/matrix?sslmode=disable

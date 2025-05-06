@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -80,8 +80,8 @@ func DirectoryRoom(
 	if res.RoomID == "" {
 		// If we don't know it locally, do a federation query.
 		// But don't send the query to ourselves.
-		if !cfg.Matrix.IsLocalServerName(domain) {
-			fedRes, fedErr := federation.LookupRoomAlias(req.Context(), cfg.Matrix.ServerName, domain, roomAlias)
+		if !cfg.Global.IsLocalServerName(domain) {
+			fedRes, fedErr := federation.LookupRoomAlias(req.Context(), cfg.Global.ServerName, domain, roomAlias)
 			if fedErr != nil {
 				// TODO: Return 502 if the remote server errored.
 				// TODO: Return 504 if the remote server timed out.
@@ -138,7 +138,7 @@ func SetLocalAlias(
 		}
 	}
 
-	if !cfg.Matrix.IsLocalServerName(domain) {
+	if !cfg.Global.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("Alias must be on local homeserver"),
@@ -159,7 +159,7 @@ func SetLocalAlias(
 	}
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		// Don't prevent AS from creating aliases in its own namespace
-		// Note that Dendrite uses SenderLocalpart as UserID for AS users
+		// Note that Matrix uses SenderLocalpart as UserID for AS users
 		if reqUserID != appservice.SenderLocalpart {
 			if aliasNamespaces, ok := appservice.NamespaceMap["aliases"]; ok {
 				for _, namespace := range aliasNamespaces {

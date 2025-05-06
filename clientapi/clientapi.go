@@ -38,7 +38,7 @@ import (
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	natsInstance *jetstream.NATSInstance,
 	federation fclient.FederationClient,
 	rsAPI roomserverAPI.ClientRoomserverAPI,

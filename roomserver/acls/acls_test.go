@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -137,7 +137,8 @@ func (d dummyACLDB) GetBulkStateContent(ctx context.Context, roomIDs []string, t
 
 func TestCachedRegex(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	db := dummyACLDB{}
 	wantBannedServer := spec.ServerName("hello.world")
 

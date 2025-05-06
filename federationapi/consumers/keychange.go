@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,11 +55,11 @@ func NewKeyChangeConsumer(
 ) *KeyChangeConsumer {
 	return &KeyChangeConsumer{
 		jetstream:         js,
-		durable:           cfg.Matrix.JetStream.Prefixed("FederationAPIKeyChangeConsumer"),
-		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
+		durable:           cfg.Global.JetStream.Prefixed("FederationAPIKeyChangeConsumer"),
+		topic:             cfg.Global.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
 		queues:            queues,
 		db:                store,
-		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		isLocalServerName: cfg.Global.IsLocalServerName,
 		rsAPI:             rsAPI,
 	}
 }

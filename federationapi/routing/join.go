@@ -65,7 +65,7 @@ func MakeJoin(
 	}
 
 	createJoinTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
-		identity, signErr := cfg.Matrix.SigningIdentityFor(request.Destination())
+		identity, signErr := cfg.Global.SigningIdentityFor(request.Destination())
 		if signErr != nil {
 			util.GetLogger(httpReq.Context()).WithError(signErr).Errorf("obtaining signing identity for %s failed", request.Destination())
 			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
@@ -123,7 +123,7 @@ func MakeJoin(
 		RoomVersion:       roomVersion,
 		RemoteVersions:    remoteVersions,
 		RequestOrigin:     request.Origin(),
-		LocalServerName:   cfg.Matrix.ServerName,
+		LocalServerName:   cfg.Global.ServerName,
 		LocalServerInRoom: res.RoomExists && res.IsInRoom,
 		RoomQuerier:       &roomQuerier,
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
@@ -215,9 +215,9 @@ func SendJoin(
 		JoinEvent:         request.Content(),
 		RoomVersion:       roomVersion,
 		RequestOrigin:     request.Origin(),
-		LocalServerName:   cfg.Matrix.ServerName,
-		KeyID:             cfg.Matrix.KeyID,
-		PrivateKey:        cfg.Matrix.PrivateKey,
+		LocalServerName:   cfg.Global.ServerName,
+		KeyID:             cfg.Global.KeyID,
+		PrivateKey:        cfg.Global.PrivateKey,
 		Verifier:          keys,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
@@ -307,7 +307,7 @@ func SendJoin(
 
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has joined
-	// the room, so set SendAsServer to cfg.Matrix.ServerName
+	// the room, so set SendAsServer to cfg.Global.ServerName
 	if !response.AlreadyJoined {
 		var rsResponse api.InputRoomEventsResponse
 		rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
@@ -315,7 +315,7 @@ func SendJoin(
 				{
 					Kind:          api.KindNew,
 					Event:         &types.HeaderedEvent{PDU: response.JoinEvent},
-					SendAsServer:  string(cfg.Matrix.ServerName),
+					SendAsServer:  string(cfg.Global.ServerName),
 					TransactionID: nil,
 				},
 			},
@@ -347,7 +347,7 @@ func SendJoin(
 		JSON: fclient.RespSendJoin{
 			StateEvents: types.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.StateEvents),
 			AuthEvents:  types.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
-			Origin:      cfg.Matrix.ServerName,
+			Origin:      cfg.Global.ServerName,
 			Event:       response.JoinEvent.JSON(),
 		},
 	}

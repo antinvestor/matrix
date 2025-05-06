@@ -6,7 +6,7 @@ import (
 )
 
 type FederationAPI struct {
-	Matrix *Global `yaml:"-"`
+	Global *Global `yaml:"-"`
 
 	// The database stores information used by the federation destination queues to
 	// send transactions to remote servers.
@@ -35,7 +35,7 @@ type FederationAPI struct {
 	// on remote federation endpoints. This is not recommended in production!
 	DisableTLSValidation bool `yaml:"disable_tls_validation"`
 
-	// DisableHTTPKeepalives prevents Dendrite from keeping HTTP connections
+	// DisableHTTPKeepalives prevents Matrix from keeping HTTP connections
 	// open for reuse for future requests. Connections will be closed quicker
 	// but we may spend more time on TLS handshakes instead.
 	DisableHTTPKeepalives bool `yaml:"disable_http_keepalives"`
@@ -73,7 +73,7 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 }
 
 func (c *FederationAPI) Verify(configErrs *ConfigErrors) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+	if c.Global.DatabaseOptions.ConnectionString == "" {
 		checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
 	}
 }

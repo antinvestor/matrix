@@ -50,19 +50,14 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		DynamicThumbnails: false,
 	}
 
-	ctx := testrig.NewContext(t)
-	// create testdata folder and remove when done
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	defer closeDb()
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewMediaAPIDatasource(ctx, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	})
+	cm := sqlutil.NewConnectionManager(svc)
+	if err != nil {
+		t.Fatalf("failed to open test database: %s", err)
+	}
+	db, err := storage.NewMediaAPIDatasource(ctx, cm)
 	if err != nil {
 		t.Errorf("error opening mediaapi database: %v", err)
 	}

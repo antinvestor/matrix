@@ -2,6 +2,8 @@ package tables_test
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 	"testing"
 	"time"
 
@@ -11,43 +13,23 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateServerKeyDB(ctx context.Context, t *testing.T, _ test.DependancyOption) (tables.FederationServerSigningKeys, func()) {
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	var tab tables.FederationServerSigningKeys
-	tab, err = postgres.NewPostgresServerSigningKeysTable(ctx, db)
-
-	if err != nil {
-		t.Fatalf("failed to create table: %s", err)
-	}
-	return tab, closeDb
+func mustCreateServerKeyDB(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T) tables.FederationServerSigningKeys {
+	cm := migrateDatabase(ctx, svc, cfg, t)
+	tab := postgres.NewPostgresServerSigningKeysTable(cm)
+	return tab
 }
 
 func TestServerKeysTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		ctx, cancel := context.WithCancel(ctx)
-		tab, closeKeyDb := mustCreateServerKeyDB(ctx, t, testOpts)
-		t.Cleanup(func() {
-			closeKeyDb()
-			cancel()
-		})
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		tab := mustCreateServerKeyDB(ctx, svc, cfg, t)
 
 		req := gomatrixserverlib.PublicKeyLookupRequest{
 			ServerName: "localhost",
@@ -61,13 +43,13 @@ func TestServerKeysTable(t *testing.T) {
 		}
 
 		// Insert the key
-		err := tab.UpsertServerKeys(ctx, nil, req, res)
+		err := tab.UpsertServerKeys(ctx, req, res)
 		assert.NoError(t, err)
 
 		selectKeys := map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp{
 			req: spec.AsTimestamp(time.Now()),
 		}
-		gotKeys, err := tab.BulkSelectServerKeys(ctx, nil, selectKeys)
+		gotKeys, err := tab.BulkSelectServerKeys(ctx, selectKeys)
 		assert.NoError(t, err)
 
 		// Now we should have a key for the req above
@@ -80,10 +62,10 @@ func TestServerKeysTable(t *testing.T) {
 		res.ValidUntilTS = 0
 
 		// Update the key
-		err = tab.UpsertServerKeys(ctx, nil, req, res)
+		err = tab.UpsertServerKeys(ctx, req, res)
 		assert.NoError(t, err)
 
-		gotKeys, err = tab.BulkSelectServerKeys(ctx, nil, selectKeys)
+		gotKeys, err = tab.BulkSelectServerKeys(ctx, selectKeys)
 		assert.NoError(t, err)
 
 		// The key should be expired
@@ -102,13 +84,13 @@ func TestServerKeysTable(t *testing.T) {
 			ValidUntilTS: expectedTimestamp2,
 		}
 
-		err = tab.UpsertServerKeys(ctx, nil, req2, res2)
+		err = tab.UpsertServerKeys(ctx, req2, res2)
 		assert.NoError(t, err)
 
 		// Select multiple keys
 		selectKeys[req2] = spec.AsTimestamp(time.Now())
 
-		gotKeys, err = tab.BulkSelectServerKeys(ctx, nil, selectKeys)
+		gotKeys, err = tab.BulkSelectServerKeys(ctx, selectKeys)
 		assert.NoError(t, err)
 
 		// We now should receive two keys, one of which is expired

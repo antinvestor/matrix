@@ -68,7 +68,7 @@ func main() {
 		}
 	}
 
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 
 	dbOpts := cfg.RoomServer.Database
 	if dbOpts.ConnectionString == "" {

@@ -1,37 +1,22 @@
 package tables_test
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 )
 
-func newRelationsTable(t *testing.T, _ test.DependancyOption) (tables.Relations, *sql.DB, func()) {
+func newRelationsTable(ctx context.Context, t *testing.T, dep test.DependancyOption) (tables.Relations, *sql.DB, func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
-
-	var tab tables.Relations
-	tab, err = postgres.NewPostgresRelationsTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+	tab, err := postgres.NewPostgresRelationsTable(ctx, db)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
@@ -40,7 +25,8 @@ func newRelationsTable(t *testing.T, _ test.DependancyOption) (tables.Relations,
 }
 
 func compareRelationsToExpected(t *testing.T, tab tables.Relations, r types.Range, expected []types.RelationEntry) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	relations, _, err := tab.SelectRelationsInRange(ctx, nil, roomID, "a", "", "", r, 50)
 	if err != nil {
 		t.Fatal(err)
@@ -64,9 +50,10 @@ const relType = "m.reaction"
 func TestRelationsTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		tab, _, closeDb := newRelationsTable(t, testOpts)
+		tab, _, closeDb := newRelationsTable(ctx, t, testOpts)
 		defer closeDb()
 
 		// Insert some relations

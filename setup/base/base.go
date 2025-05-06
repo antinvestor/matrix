@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ const HTTPServerTimeout = time.Minute * 5
 
 // CreateClient creates a new client (normally used for media fetch requests).
 // Should only be called once per component.
-func CreateClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) *fclient.Client {
+func CreateClient(cfg *config.Matrix, dnsCache *fclient.DNSCache) *fclient.Client {
 	if cfg.Global.DisableFederation {
 		return fclient.NewClient(
 			fclient.WithTransport(noOpHTTPTransport),
@@ -66,13 +66,13 @@ func CreateClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) *fclient.Cli
 		opts = append(opts, fclient.WithDNSCache(dnsCache))
 	}
 	client := fclient.NewClient(opts...)
-	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
+	client.SetUserAgent(fmt.Sprintf("Matrix/%s", internal.VersionString()))
 	return client
 }
 
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
-func CreateFederationClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) fclient.FederationClient {
+func CreateFederationClient(cfg *config.Matrix, dnsCache *fclient.DNSCache) fclient.FederationClient {
 	identities := cfg.Global.SigningIdentities()
 	if cfg.Global.DisableFederation {
 		return fclient.NewFederationClient(
@@ -83,7 +83,7 @@ func CreateFederationClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) fc
 		fclient.WithTimeout(time.Minute * 5),
 		fclient.WithSkipVerify(cfg.FederationAPI.DisableTLSValidation),
 		fclient.WithKeepAlives(!cfg.FederationAPI.DisableHTTPKeepalives),
-		fclient.WithUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString())),
+		fclient.WithUserAgent(fmt.Sprintf("Matrix/%s", internal.VersionString())),
 	}
 	if cfg.Global.DNSCache.Enabled {
 		opts = append(opts, fclient.WithDNSCache(dnsCache))
@@ -108,7 +108,7 @@ func ConfigureAdminEndpoints(ctx context.Context, routers httputil.Routers) {
 // and adds a prometheus handler under /_dendrite/metrics.
 func SetupHTTPOption(
 	ctx context.Context,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	routers httputil.Routers,
 
 ) (frame.Option, error) {
@@ -193,5 +193,5 @@ func WaitForShutdown(ctx context.Context) {
 	logrus.Warnf("Shutdown signal received")
 
 	// ShutdownDendrite and WaitForComponentsToFinish are not used in this function, so we don't need to call them
-	logrus.Warnf("Dendrite is exiting now")
+	logrus.Warnf("Matrix is exiting now")
 }

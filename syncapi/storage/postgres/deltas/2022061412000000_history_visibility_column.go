@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ func currentHistoryVisibilities(ctx context.Context, tx *sql.Tx) (map[string]gom
 	if err != nil {
 		return nil, fmt.Errorf("failed to query current room state: %w", err)
 	}
-	defer rows.Close() // nolint: errcheck
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows") // nolint: errcheck
 	var eventBytes []byte
 	var roomID string
 	var event types.HeaderedEvent

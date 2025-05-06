@@ -117,9 +117,12 @@ func (t *TestRoomServer) QueryUserIDForSender(ctx context.Context, roomID spec.R
 
 // Test that the current position is returned if a request is already behind.
 func TestImmediateNotification(t *testing.T) {
+
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	n := NewNotifier(&TestRoomServer{})
 	n.SetCurrentPosition(syncPositionBefore)
-	pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionVeryOld))
+	pos, err := waitForEvents(n, newTestSyncRequest(ctx, alice, aliceDev, syncPositionVeryOld))
 	if err != nil {
 		t.Fatalf("TestImmediateNotification error: %s", err)
 	}
@@ -129,7 +132,8 @@ func TestImmediateNotification(t *testing.T) {
 // Test that new events to a joined room unblocks the request.
 func TestNewEventAndJoinedToRoom(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	n := NewNotifier(&TestRoomServer{})
 	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
@@ -139,7 +143,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(ctx, bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestNewEventAndJoinedToRoom error: %s", err)
 		}
@@ -197,7 +201,8 @@ func TestCorrectStreamWakeup(t *testing.T) {
 // Test that an invite unblocks the request
 func TestNewInviteEventForUser(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	n := NewNotifier(&TestRoomServer{})
 	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
@@ -207,7 +212,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(ctx, bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestNewInviteEventForUser error: %s", err)
 		}
@@ -256,7 +261,8 @@ func TestEDUWakeup(t *testing.T) {
 // Test that all blocked requests get woken up on a new event.
 func TestMultipleRequestWakeup(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	n := NewNotifier(&TestRoomServer{})
 	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
@@ -266,7 +272,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(3)
 	poll := func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(ctx, bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestMultipleRequestWakeup error: %s", err)
 		}
@@ -293,7 +299,8 @@ func TestMultipleRequestWakeup(t *testing.T) {
 // Test that you stop getting woken up when you leave a room.
 func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	// listen as bob. Make bob leave room. Make alice send event to room.
 	// Make sure alice gets woken up only and not bob as well.
@@ -308,7 +315,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	// Make bob leave the room
 	leaveWG.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
+		pos, err := waitForEvents(n, newTestSyncRequest(ctx, bob, bobDev, syncPositionBefore))
 		if err != nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
 		}
@@ -325,7 +332,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	aliceStream := lockedFetchUserStream(n, alice, aliceDev)
 	aliceWG.Add(1)
 	go func() {
-		pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionAfter))
+		pos, err := waitForEvents(n, newTestSyncRequest(ctx, alice, aliceDev, syncPositionAfter))
 		if err != nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
 		}
@@ -335,7 +342,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 
 	go func() {
 		// this should timeout with an error (but the main goroutine won't wait for the timeout explicitly)
-		_, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionAfter))
+		_, err := waitForEvents(n, newTestSyncRequest(ctx, bob, bobDev, syncPositionAfter))
 		if err == nil {
 			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom expect error but got nil")
 		}
@@ -384,7 +391,7 @@ func lockedFetchUserStream(n *Notifier, userID, deviceID string) *UserDeviceStre
 	return n._fetchUserDeviceStream(userID, deviceID, true)
 }
 
-func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) types.SyncRequest {
+func newTestSyncRequest(ctx context.Context, userID, deviceID string, since types.StreamingToken) types.SyncRequest {
 	return types.SyncRequest{
 		Device: &userapi.Device{
 			UserID: userID,
@@ -393,7 +400,7 @@ func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) typ
 		Timeout:       1 * time.Minute,
 		Since:         since,
 		WantFullState: false,
-		Log:           util.GetLogger(context.TODO()),
-		Context:       context.TODO(),
+		Log:           util.GetLogger(ctx),
+		Context:       ctx,
 	}
 }

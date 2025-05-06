@@ -57,7 +57,7 @@ type Global struct {
 	// Requires `well_known_client_name` to also be configured.
 	WellKnownSlidingSyncProxy string `yaml:"well_known_sliding_sync_proxy"`
 
-	// Disables federation. Dendrite will not be able to make any outbound HTTP requests
+	// Disables federation. Matrix will not be able to make any outbound HTTP requests
 	// to other servers and the federation API will not be exposed.
 	DisableFederation bool `yaml:"disable_federation"`
 

@@ -100,14 +100,14 @@ func (r *Inputer) updateMembership(
 		targetLocal = r.isLocalTarget(ctx, add)
 	}
 
-	mu, err := updater.MembershipUpdater(targetUserNID, targetLocal)
+	mu, err := updater.MembershipUpdater(ctx, targetUserNID, targetLocal)
 	if err != nil {
 		return nil, err
 	}
 
 	// In an ideal world, we shouldn't ever have "add" be nil and "remove" be
 	// set, as this implies that we're deleting a state event without replacing
-	// it (a thing that ordinarily shouldn't happen in Matrix). However, state
+	// it (a thing that ordinarily shouldn't happen in Global). However, state
 	// resets are sadly a thing occasionally and we have to account for that.
 	// Beforehand there used to be a check here which stopped dead if we hit
 	// this scenario, but that meant that the membership table got out of sync
@@ -117,18 +117,18 @@ func (r *Inputer) updateMembership(
 	// the database. So instead we're going to remove the membership from the
 	// database altogether, so that it doesn't create future problems.
 	if add == nil && remove != nil {
-		return nil, mu.Delete()
+		return nil, mu.Delete(ctx)
 	}
 
 	switch newMembership {
 	case spec.Invite:
-		return helpers.UpdateToInviteMembership(mu, add, updates, updater.RoomVersion())
+		return helpers.UpdateToInviteMembership(ctx, mu, add, updates, updater.RoomVersion())
 	case spec.Join:
-		return updateToJoinMembership(mu, add, updates)
+		return updateToJoinMembership(ctx, mu, add, updates)
 	case spec.Leave, spec.Ban:
-		return updateToLeaveMembership(mu, add, newMembership, updates)
+		return updateToLeaveMembership(ctx, mu, add, newMembership, updates)
 	case spec.Knock:
-		return updateToKnockMembership(mu, add, updates)
+		return updateToKnockMembership(ctx, mu, add, updates)
 	default:
 		panic(fmt.Errorf(
 			"input: membership %q is not one of the allowed values", newMembership,
@@ -148,14 +148,14 @@ func (r *Inputer) isLocalTarget(ctx context.Context, event *types.Event) bool {
 	return isTargetLocalUser
 }
 
-func updateToJoinMembership(
+func updateToJoinMembership(ctx context.Context,
 	mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	// When we mark a user as being joined we will invalidate any invites that
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	_, retired, err := mu.Update(tables.MembershipStateJoin, add)
+	_, retired, err := mu.Update(ctx, tables.MembershipStateJoin, add)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +175,7 @@ func updateToJoinMembership(
 }
 
 func updateToLeaveMembership(
+	ctx context.Context,
 	mu *shared.MembershipUpdater, add *types.Event,
 	newMembership string, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
@@ -182,7 +183,7 @@ func updateToLeaveMembership(
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	_, retired, err := mu.Update(tables.MembershipStateLeaveOrBan, add)
+	_, retired, err := mu.Update(ctx, tables.MembershipStateLeaveOrBan, add)
 	if err != nil {
 		return nil, err
 	}
@@ -202,9 +203,9 @@ func updateToLeaveMembership(
 }
 
 func updateToKnockMembership(
-	mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
+	ctx context.Context, mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-	if _, _, err := mu.Update(tables.MembershipStateKnock, add); err != nil {
+	if _, _, err := mu.Update(ctx, tables.MembershipStateKnock, add); err != nil {
 		return nil, err
 	}
 	return updates, nil

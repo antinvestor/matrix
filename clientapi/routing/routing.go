@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ type WellKnownClientResponse struct {
 func Setup(
 	ctx context.Context,
 	routers httputil.Routers,
-	dendriteCfg *config.Dendrite,
+	dendriteCfg *config.Matrix,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	userAPI userapi.ClientUserAPI,
@@ -114,18 +114,18 @@ func Setup(
 	// 		 possibly other ways that can result in a stat reset.
 	sf := singleflight.Group{}
 
-	if cfg.Matrix.WellKnownClientName != "" {
-		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
-		if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
-			logrus.Infof("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownSlidingSyncProxy)
+	if cfg.Global.WellKnownClientName != "" {
+		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Global.WellKnownClientName)
+		if cfg.Global.WellKnownSlidingSyncProxy != "" {
+			logrus.Infof("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Global.WellKnownSlidingSyncProxy)
 		}
 		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
 			response := WellKnownClientResponse{
-				Homeserver: WellKnownClientHomeserver{cfg.Matrix.WellKnownClientName},
+				Homeserver: WellKnownClientHomeserver{cfg.Global.WellKnownClientName},
 			}
-			if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
+			if cfg.Global.WellKnownSlidingSyncProxy != "" {
 				response.SlidingSyncProxy = &WellKnownSlidingSyncProxy{
-					Url: cfg.Matrix.WellKnownSlidingSyncProxy,
+					Url: cfg.Global.WellKnownSlidingSyncProxy,
 				}
 			}
 
@@ -258,7 +258,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	// server notifications
-	if cfg.Matrix.ServerNotices.Enabled {
+	if cfg.Global.ServerNotices.Enabled {
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
 		serverNotificationSender, err := getSenderDevice(ctx, rsAPI, userAPI, cfg)
 		if err != nil {
@@ -278,7 +278,7 @@ func Setup(
 				}
 				txnID := vars["txnID"]
 				return SendServerNotice(
-					req, &cfg.Matrix.ServerNotices,
+					req, &cfg.Global.ServerNotices,
 					cfg, userAPI, rsAPI, asAPI,
 					device, serverNotificationSender,
 					&txnID, transactionsCache,
@@ -293,7 +293,7 @@ func Setup(
 					return *r
 				}
 				return SendServerNotice(
-					req, &cfg.Matrix.ServerNotices,
+					req, &cfg.Global.ServerNotices,
 					cfg, userAPI, rsAPI, asAPI,
 					device, serverNotificationSender,
 					nil, transactionsCache,
@@ -740,7 +740,7 @@ func Setup(
 
 	v3mux.Handle("/login/sso/callback",
 		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
-			return SSOCallback(req, userAPI, ssoAuth, &cfg.LoginSSO, cfg.Matrix.ServerName)
+			return SSOCallback(req, userAPI, ssoAuth, &cfg.LoginSSO, cfg.Global.ServerName)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -1139,7 +1139,7 @@ func Setup(
 				postContent.SearchString,
 				postContent.Limit,
 				federation,
-				cfg.Matrix.ServerName,
+				cfg.Global.ServerName,
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
@@ -1536,7 +1536,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetPresence(req, device, natsClient, cfg.Matrix.JetStream.Prefixed(jetstream.RequestPresence), vars["userId"])
+			return GetPresence(req, device, natsClient, cfg.Global.JetStream.Prefixed(jetstream.RequestPresence), vars["userId"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

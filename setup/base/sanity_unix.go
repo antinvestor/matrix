@@ -9,13 +9,13 @@ import (
 )
 
 func PlatformSanityChecks() {
-	// Matrix needs a relatively high number of file descriptors in order
+	// Global needs a relatively high number of file descriptors in order
 	// to function properly, particularly when federating with lots of servers.
 	// If we run out of file descriptors, we might run into problems accessing
 	// PostgreSQL amongst other things. Complain at startup if we think the
 	// number of file descriptors is too low.
 	warn := func(rLimit *syscall.Rlimit) {
-		logrus.Warnf("IMPORTANT: Process file descriptor limit is currently %d, it is recommended to raise the limit for Matrix to at least 65535 to avoid issues", rLimit.Cur)
+		logrus.Warnf("IMPORTANT: Process file descriptor limit is currently %d, it is recommended to raise the limit for Global to at least 65535 to avoid issues", rLimit.Cur)
 	}
 	var rLimit syscall.Rlimit
 	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err == nil && rLimit.Cur < 65535 {

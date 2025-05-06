@@ -30,7 +30,7 @@ func TestShouldReturnCorrectAmountOfResulstIfFewerVariablesThanLimit(t *testing.
 		iKeyIDs[i] = d
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 	var result = make([]int, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -67,7 +67,7 @@ func TestShouldReturnCorrectAmountOfResulstIfEqualVariablesAsLimit(t *testing.T)
 		iKeyIDs[i] = d
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 	var result = make([]int, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -108,7 +108,7 @@ func TestShouldReturnCorrectAmountOfResultsIfMoreVariablesThanLimit(t *testing.T
 		iKeyIDs[i] = d
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 	var result = make([]int, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -148,7 +148,7 @@ func TestShouldReturnErrorIfRowsScanReturnsError(t *testing.T) {
 		iKeyIDs[i] = d
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 	var result = make([]uint, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -168,7 +168,7 @@ func TestShouldReturnErrorIfRowsScanReturnsError(t *testing.T) {
 
 func TestRunLimitedVariablesExec(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, _ := testrig.NewService(t)
 
 	db, mock, err := sqlmock.New()
 	assertNoError(t, err, "Failed to make DB")

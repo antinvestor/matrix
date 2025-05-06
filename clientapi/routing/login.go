@@ -65,7 +65,7 @@ func Login(
 			return *authErr
 		}
 		// make a device/access token
-		authResponse := completeAuth(req.Context(), cfg.Matrix, userAPI, login, req.RemoteAddr, req.UserAgent())
+		authResponse := completeAuth(req.Context(), cfg.Global, userAPI, login, req.RemoteAddr, req.UserAgent())
 		cleanup(req.Context(), &authResponse)
 		return authResponse
 	}

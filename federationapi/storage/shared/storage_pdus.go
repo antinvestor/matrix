@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package shared
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,19 +33,16 @@ func (d *Database) AssociatePDUWithDestinations(
 	destinations map[spec.ServerName]struct{},
 	dbReceipt *receipt.Receipt,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		var err error
-		for destination := range destinations {
-			err = d.FederationQueuePDUs.InsertQueuePDU(
-				ctx,                // context
-				txn,                // SQL transaction
-				"",                 // transaction ID
-				destination,        // destination server name
-				dbReceipt.GetNID(), // NID from the federationapi_queue_json table
-			)
-		}
-		return err
-	})
+	var err error
+	for destination := range destinations {
+		err = d.FederationQueuePDUs.InsertQueuePDU(
+			ctx,                // context
+			"",                 // transaction ID
+			destination,        // destination server name
+			dbReceipt.GetNID(), // NID from the federationapi_queue_json table
+		)
+	}
+	return err
 }
 
 // GetNextTransactionPDUs retrieves events from the database for
@@ -65,40 +61,37 @@ func (d *Database) GetPendingPDUs(
 	// to know in SQLite mode that nothing else is trying to modify
 	// the database.
 	events = make(map[*receipt.Receipt]*types.HeaderedEvent)
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nids, err := d.FederationQueuePDUs.SelectQueuePDUs(ctx, txn, serverName, limit)
-		if err != nil {
-			return fmt.Errorf("SelectQueuePDUs: %w", err)
-		}
+	nids, err := d.FederationQueuePDUs.SelectQueuePDUs(ctx, serverName, limit)
+	if err != nil {
+		return nil, fmt.Errorf("SelectQueuePDUs: %w", err)
+	}
 
-		retrieve := make([]int64, 0, len(nids))
-		for _, nid := range nids {
-			if event, ok := d.Cache.GetFederationQueuedPDU(ctx, nid); ok {
-				newReceipt := receipt.NewReceipt(nid)
-				events[&newReceipt] = event
-			} else {
-				retrieve = append(retrieve, nid)
-			}
-		}
-
-		blobs, err := d.FederationQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
-		if err != nil {
-			return fmt.Errorf("SelectQueueJSON: %w", err)
-		}
-
-		for nid, blob := range blobs {
-			var event types.HeaderedEvent
-			if err := json.Unmarshal(blob, &event); err != nil {
-				return fmt.Errorf("json.Unmarshal: %w", err)
-			}
+	retrieve := make([]int64, 0, len(nids))
+	for _, nid := range nids {
+		if event, ok := d.Cache.GetFederationQueuedPDU(ctx, nid); ok {
 			newReceipt := receipt.NewReceipt(nid)
-			events[&newReceipt] = &event
-			_ = d.Cache.StoreFederationQueuedPDU(ctx, nid, &event)
+			events[&newReceipt] = event
+		} else {
+			retrieve = append(retrieve, nid)
 		}
+	}
 
-		return nil
-	})
-	return
+	blobs, err := d.FederationQueueJSON.SelectQueueJSON(ctx, retrieve)
+	if err != nil {
+		return nil, fmt.Errorf("SelectQueueJSON: %w", err)
+	}
+
+	for nid, blob := range blobs {
+		var event types.HeaderedEvent
+		if err := json.Unmarshal(blob, &event); err != nil {
+			return nil, fmt.Errorf("json.Unmarshal: %w", err)
+		}
+		newReceipt := receipt.NewReceipt(nid)
+		events[&newReceipt] = &event
+		_ = d.Cache.StoreFederationQueuedPDU(ctx, nid, &event)
+	}
+
+	return events, nil
 }
 
 // CleanTransactionPDUs cleans up all associated events for a
@@ -118,31 +111,29 @@ func (d *Database) CleanPDUs(
 		nids[i] = receipts[i].GetNID()
 	}
 
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationQueuePDUs.DeleteQueuePDUs(ctx, txn, serverName, nids); err != nil {
-			return err
-		}
+	if err := d.FederationQueuePDUs.DeleteQueuePDUs(ctx, serverName, nids); err != nil {
+		return err
+	}
 
-		var deleteNIDs []int64
-		for _, nid := range nids {
-			count, err := d.FederationQueuePDUs.SelectQueuePDUReferenceJSONCount(ctx, txn, nid)
-			if err != nil {
-				return fmt.Errorf("SelectQueuePDUReferenceJSONCount: %w", err)
-			}
-			if count == 0 {
-				deleteNIDs = append(deleteNIDs, nid)
-				_ = d.Cache.EvictFederationQueuedPDU(ctx, nid)
-			}
+	var deleteNIDs []int64
+	for _, nid := range nids {
+		count, err := d.FederationQueuePDUs.SelectQueuePDUReferenceJSONCount(ctx, nid)
+		if err != nil {
+			return fmt.Errorf("SelectQueuePDUReferenceJSONCount: %w", err)
 		}
-
-		if len(deleteNIDs) > 0 {
-			if err := d.FederationQueueJSON.DeleteQueueJSON(ctx, txn, deleteNIDs); err != nil {
-				return fmt.Errorf("DeleteQueueJSON: %w", err)
-			}
+		if count == 0 {
+			deleteNIDs = append(deleteNIDs, nid)
+			_ = d.Cache.EvictFederationQueuedPDU(ctx, nid)
 		}
+	}
 
-		return nil
-	})
+	if len(deleteNIDs) > 0 {
+		if err := d.FederationQueueJSON.DeleteQueueJSON(ctx, deleteNIDs); err != nil {
+			return fmt.Errorf("DeleteQueueJSON: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // GetPendingServerNames returns the server names that have PDUs
@@ -150,5 +141,5 @@ func (d *Database) CleanPDUs(
 func (d *Database) GetPendingPDUServerNames(
 	ctx context.Context,
 ) ([]spec.ServerName, error) {
-	return d.FederationQueuePDUs.SelectQueuePDUServerNames(ctx, nil)
+	return d.FederationQueuePDUs.SelectQueuePDUServerNames(ctx)
 }

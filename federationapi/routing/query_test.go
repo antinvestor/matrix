@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -49,17 +49,16 @@ func (f *fakeFedClient) LookupRoomAlias(ctx context.Context, origin, s spec.Serv
 
 func TestHandleQueryDirectory(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		cm := sqlutil.NewConnectionManager(svc)
 		routers := httputil.NewRouters()
-		defer closeRig()
 
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
 		natsInstance := jetstream.NATSInstance{}
 		routers.Federation = fedMux
-		cfg.FederationAPI.Matrix.ServerName = testOrigin
-		cfg.FederationAPI.Matrix.Metrics.Enabled = false
+		cfg.FederationAPI.Global.ServerName = testOrigin
+		cfg.FederationAPI.Global.Metrics.Enabled = false
 		fedClient := fakeFedClient{}
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()

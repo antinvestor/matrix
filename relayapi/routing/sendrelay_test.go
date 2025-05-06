@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -182,7 +182,8 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 
 func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),

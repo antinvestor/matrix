@@ -51,8 +51,8 @@ func NewOutputTypingEventConsumer(
 ) *OutputTypingEventConsumer {
 	return &OutputTypingEventConsumer{
 		jetstream: js,
-		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		durable:   cfg.Matrix.JetStream.Durable("SyncAPITypingConsumer"),
+		topic:     cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		durable:   cfg.Global.JetStream.Durable("SyncAPITypingConsumer"),
 		eduCache:  eduCache,
 		notifier:  notifier,
 		stream:    stream,

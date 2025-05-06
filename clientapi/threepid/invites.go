@@ -94,16 +94,16 @@ func (e ErrNotTrusted) Unwrap() error {
 
 // CheckAndProcessInvite analyses the body of an incoming membership request.
 // If the fields relative to a third-party-invite are all supplied, lookups the
-// matching Matrix ID from the given identity server. If no Matrix ID is
+// matching Global ID from the given identity server. If no Global ID is
 // associated to the given 3PID, asks the identity server to store the invite
 // and emit a "m.room.third_party_invite" event.
 // Returns a representation of the HTTP response to send to the user.
 // Returns a representation of a non-200 HTTP response if something went wrong
 // in the process, or if some 3PID fields aren't supplied but others are.
-// If none of the 3PID-specific fields are supplied, or if a Matrix ID is
+// If none of the 3PID-specific fields are supplied, or if a Global ID is
 // supplied by the identity server, returns nil to indicate that the request
 // must be processed as a non-3PID membership request. In the latter case,
-// fills the Matrix ID in the request body so a normal invite membership event
+// fills the Global ID in the request body so a normal invite membership event
 // can be emitted.
 func CheckAndProcessInvite(
 	ctx context.Context,
@@ -129,7 +129,7 @@ func CheckAndProcessInvite(
 	}
 
 	if lookupRes.MXID == "" {
-		// No Matrix ID could be found for this 3PID, meaning that a
+		// No Global ID could be found for this 3PID, meaning that a
 		// "m.room.third_party_invite" have to be emitted from the data in
 		// storeInviteRes.
 		err = emit3PIDInviteEvent(
@@ -140,7 +140,7 @@ func CheckAndProcessInvite(
 		return
 	}
 
-	// A Matrix ID have been found: set it in the body request and let the process
+	// A Global ID have been found: set it in the body request and let the process
 	// continue to create a "m.room.member" event with an "invite" membership
 	body.UserID = lookupRes.MXID
 
@@ -149,10 +149,10 @@ func CheckAndProcessInvite(
 
 // queryIDServer handles all the requests to the identity server, starting by
 // looking up the given 3PID on the given identity server.
-// If the lookup returned a Matrix ID, checks if the current time is within the
+// If the lookup returned a Global ID, checks if the current time is within the
 // time frame in which the 3PID-MXID association is known to be valid, and checks
 // the response's signatures. If one of the checks fails, returns an error.
-// If the lookup didn't return a Matrix ID, asks the identity server to store
+// If the lookup didn't return a Global ID, asks the identity server to store
 // the invite and to respond with a token.
 // Returns a representation of the response for both cases.
 // Returns an error if a check or a request failed.
@@ -172,13 +172,13 @@ func queryIDServer(
 	}
 
 	if lookupRes.MXID == "" {
-		// No Matrix ID matches with the given 3PID, ask the server to store the
+		// No Global ID matches with the given 3PID, ask the server to store the
 		// invite and return a token
 		storeInviteRes, err = queryIDServerStoreInvite(ctx, userAPI, cfg, device, body, roomID)
 		return
 	}
 
-	// A Matrix ID matches with the given 3PID
+	// A Global ID matches with the given 3PID
 	// Get timestamp in milliseconds to compare it with the timestamps provided
 	// by the identity server
 	now := time.Now().UnixNano() / 1000000
@@ -237,7 +237,7 @@ func queryIDServerStoreInvite(
 	}
 
 	var profile *authtypes.Profile
-	if cfg.Matrix.IsLocalServerName(serverName) {
+	if cfg.Global.IsLocalServerName(serverName) {
 		profile, err = userAPI.QueryProfile(ctx, device.UserID)
 		if err != nil {
 			return nil, err
@@ -388,7 +388,7 @@ func emit3PIDInviteEvent(
 		return err
 	}
 
-	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	identity, err := cfg.Global.SigningIdentityFor(device.UserDomain())
 	if err != nil {
 		return err
 	}
@@ -406,8 +406,8 @@ func emit3PIDInviteEvent(
 			event,
 		},
 		device.UserDomain(),
-		cfg.Matrix.ServerName,
-		cfg.Matrix.ServerName,
+		cfg.Global.ServerName,
+		cfg.Global.ServerName,
 		nil,
 		false,
 	)

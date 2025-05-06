@@ -209,7 +209,8 @@ func leaveResponseWithRooms(syncResponse *types.Response, userID string, roomIDs
 // tests that joining a room which results in sharing a new user includes that user in `changed`
 func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	newShareUser := "@bill:localhost"
 	newlyJoinedRoom := "!TestKeyChangeCatchupOnJoinShareNewUser:bar"
@@ -235,7 +236,8 @@ func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 // tests that leaving a room which results in sharing no rooms with a user includes that user in `left`
 func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	removeUser := "@bill:localhost"
 	newlyLeftRoom := "!TestKeyChangeCatchupOnLeaveShareLeftUser:bar"
 	syncResponse := types.NewResponse()
@@ -260,7 +262,8 @@ func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 // tests that joining a room which doesn't result in sharing a new user results in no changes.
 func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	existingUser := "@bob:localhost"
 	newlyJoinedRoom := "!TestKeyChangeCatchupOnJoinShareNoNewUsers:bar"
@@ -285,7 +288,8 @@ func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 // tests that leaving a room which doesn't result in sharing no rooms with a user results in no changes.
 func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	existingUser := "@bob:localhost"
 	newlyLeftRoom := "!TestKeyChangeCatchupOnLeaveShareNoUsers:bar"
@@ -310,7 +314,8 @@ func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 // tests that not joining any rooms (but having messages in the response) do not result in changes.
 func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	existingUser := "@bob1:localhost"
 	roomID := "!TestKeyChangeCatchupNoNewJoinsButMessages:bar"
@@ -376,7 +381,8 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 // tests that joining/leaving multiple rooms can result in both `changed` and `left` and they are not duplicated.
 func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	newShareUser := "@berta:localhost"
 	newShareUser2 := "@bobby:localhost"
@@ -419,7 +425,8 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 // Ergo, we put them in `left` as it is simpler.
 func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	newShareUser := "@berta:localhost"
 	newShareUser2 := "@bobby:localhost"

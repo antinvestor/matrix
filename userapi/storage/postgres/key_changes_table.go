@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,17 +16,13 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-	"fmt"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
 
-var keyChangesSchema = `
+// SQL: Create key changes table
+const keyChangesSchema = `
 -- Stores key change information about users. Used to determine when to send updated device lists to clients.
 CREATE SEQUENCE IF NOT EXISTS keyserver_key_changes_seq;
 CREATE TABLE IF NOT EXISTS keyserver_key_changes (
@@ -36,8 +32,10 @@ CREATE TABLE IF NOT EXISTS keyserver_key_changes (
 );
 `
 
-// Replace based on user ID. We don't care how many times the user's keys have changed, only that they
-// have changed, hence we can just keep bumping the change ID for this user.
+// SQL: Drop key changes table
+const keyChangesSchemaRevert = "DROP TABLE IF EXISTS keyserver_key_changes CASCADE;"
+
+// SQL: Insert key change
 const upsertKeyChangeSQL = "" +
 	"INSERT INTO keyserver_key_changes (user_id)" +
 	" VALUES ($1)" +
@@ -45,78 +43,52 @@ const upsertKeyChangeSQL = "" +
 	" DO UPDATE SET change_id = nextval('keyserver_key_changes_seq')" +
 	" RETURNING change_id"
 
+// SQL: Select key changes
 const selectKeyChangesSQL = "" +
 	"SELECT user_id, change_id FROM keyserver_key_changes WHERE change_id > $1 AND change_id <= $2"
 
-type keyChangesStatements struct {
-	db                   *sql.DB
-	upsertKeyChangeStmt  *sql.Stmt
-	selectKeyChangesStmt *sql.Stmt
+// keyChangesTable implements tables.KeyChangesTable using GORM and a connection manager.
+type keyChangesTable struct {
+	cm *sqlutil.Connections
+
+	upsertKeyChangeSQL  string
+	selectKeyChangesSQL string
 }
 
-func NewPostgresKeyChangesTable(ctx context.Context, db *sql.DB) (tables.KeyChanges, error) {
-	s := &keyChangesStatements{
-		db: db,
+// NewPostgresKeyChangesTable returns a new KeyChangesTable using the provided connection manager.
+func NewPostgresKeyChangesTable(cm *sqlutil.Connections) tables.KeyChanges {
+	return &keyChangesTable{
+		cm:                  cm,
+		upsertKeyChangeSQL:  upsertKeyChangeSQL,
+		selectKeyChangesSQL: selectKeyChangesSQL,
 	}
-	_, err := db.Exec(keyChangesSchema)
+}
+
+// InsertKeyChange inserts a key change record.
+func (t *keyChangesTable) InsertKeyChange(ctx context.Context, userID string) (changeID int64, err error) {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.upsertKeyChangeSQL, userID)
+	err = result.Error
 	if err != nil {
-		return s, err
+		return
 	}
-
-	if err = executeMigration(ctx, db); err != nil {
-		return nil, err
-	}
-	return s, sqlutil.StatementList{
-		{&s.upsertKeyChangeStmt, upsertKeyChangeSQL},
-		{&s.selectKeyChangesStmt, selectKeyChangesSQL},
-	}.Prepare(db)
-}
-
-func executeMigration(ctx context.Context, db *sql.DB) error {
-	// TODO: Remove when we are sure we are not having goose artefacts in the db
-	// This forces an error, which indicates the migration is already applied, since the
-	// column partition was removed from the table
-	migrationName := "keyserver: refactor key changes"
-
-	var cName string
-	err := db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'keyserver_key_changes' AND column_name = 'partition'").Scan(&cName)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
-			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
-				return fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
-			}
-			return nil
-		}
-		return err
-	}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: migrationName,
-		Up:      deltas.UpRefactorKeyChanges,
-	})
-
-	return m.Up(ctx)
-}
-
-func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, userID string) (changeID int64, err error) {
-	err = s.upsertKeyChangeStmt.QueryRowContext(ctx, userID).Scan(&changeID)
+	err = result.Row().Scan(&changeID)
 	return
 }
 
-func (s *keyChangesStatements) SelectKeyChanges(
-	ctx context.Context, fromOffset, toOffset int64,
-) (userIDs []string, latestOffset int64, err error) {
-	latestOffset = fromOffset
-	rows, err := s.selectKeyChangesStmt.QueryContext(ctx, fromOffset, toOffset)
+// SelectKeyChanges retrieves key changes for a user after a specific offset.
+func (t *keyChangesTable) SelectKeyChanges(ctx context.Context, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectKeyChangesSQL, fromOffset, toOffset).Rows()
 	if err != nil {
-		return nil, 0, err
+		return
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectKeyChangesStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	for rows.Next() {
 		var userID string
 		var offset int64
 		if err = rows.Scan(&userID, &offset); err != nil {
-			return nil, 0, err
+			return
 		}
 		if offset > latestOffset {
 			latestOffset = offset

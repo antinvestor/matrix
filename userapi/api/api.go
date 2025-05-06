@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -426,7 +426,7 @@ type QueryOpenIDTokenRequest struct {
 
 // QueryOpenIDTokenResponse is the response for QueryOpenIDToken
 type QueryOpenIDTokenResponse struct {
-	Sub         string // The Matrix User ID that generated the token
+	Sub         string // The Global User ID that generated the token
 	ExpiresAtMS int64
 }
 
@@ -463,7 +463,7 @@ func (d *Device) UserDomain() spec.ServerName {
 	return domain
 }
 
-// Account represents a Matrix account on this home server.
+// Account represents a Global account on this home server.
 type Account struct {
 	UserID       string
 	Localpart    string
@@ -488,7 +488,7 @@ type OpenIDTokenAttributes struct {
 
 // UserInfo is for returning information about the user an OpenID token was issued for
 type UserInfo struct {
-	Sub string // The Matrix user's ID who generated the token
+	Sub string // The Global user's ID who generated the token
 }
 
 // ErrorForbidden is an error indicating that the supplied access token is forbidden

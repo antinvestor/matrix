@@ -8,7 +8,7 @@ import (
 )
 
 type RoomServer struct {
-	Matrix *Global `yaml:"-"`
+	Global *Global `yaml:"-"`
 
 	DefaultRoomVersion gomatrixserverlib.RoomVersion `yaml:"default_room_version,omitempty"`
 

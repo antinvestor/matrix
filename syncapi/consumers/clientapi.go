@@ -57,14 +57,14 @@ func NewOutputClientDataConsumer(
 ) *OutputClientDataConsumer {
 	return &OutputClientDataConsumer{
 		jetstream:    js,
-		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
-		topicReIndex: cfg.Matrix.JetStream.Prefixed(jetstream.InputFulltextReindex),
-		durable:      cfg.Matrix.JetStream.Durable("SyncAPIAccountDataConsumer"),
+		topic:        cfg.Global.JetStream.Prefixed(jetstream.OutputClientData),
+		topicReIndex: cfg.Global.JetStream.Prefixed(jetstream.InputFulltextReindex),
+		durable:      cfg.Global.JetStream.Durable("SyncAPIAccountDataConsumer"),
 		nats:         nats,
 		db:           store,
 		notifier:     notifier,
 		stream:       stream,
-		serverName:   cfg.Matrix.ServerName,
+		serverName:   cfg.Global.ServerName,
 		cfg:          cfg,
 	}
 }

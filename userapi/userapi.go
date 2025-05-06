@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,14 +38,17 @@ import (
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 )
 
+const defaultWaitTime = time.Minute
+
 // NewInternalAPI returns a concrete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 //
 // Creating a new instance of the user API requires a roomserver API with a federation API set
 // using its `SetFederationAPI` method, other you may get nil-dereference errors.
+// cm should use :  &dendriteCfg.UserAPI.AccountDatabase,
 func NewInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Dendrite,
+	dendriteCfg *config.Matrix,
 	cm *sqlutil.Connections,
 	natsInstance *jetstream.NATSInstance,
 	rsAPI rsapi.UserRoomserverAPI,
@@ -61,22 +64,31 @@ func NewInternalAPI(
 
 	pgClient := pushgateway.NewHTTPClient(dendriteCfg.UserAPI.PushGatewayDisableTLSValidation)
 
+	userApiCM, err := cm.FromOptions(ctx, &dendriteCfg.UserAPI.AccountDatabase)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to configured userapi db")
+	}
+
 	db, err := storage.NewUserDatabase(
 		ctx,
 		profileCli,
-		cm,
-		&dendriteCfg.UserAPI.AccountDatabase,
+		userApiCM,
 		dendriteCfg.Global.ServerName,
 		dendriteCfg.UserAPI.BCryptCost,
 		dendriteCfg.UserAPI.OpenIDTokenLifetimeMS,
 		api.DefaultLoginTokenLifetime,
-		dendriteCfg.UserAPI.Matrix.ServerNotices.LocalPart,
+		dendriteCfg.UserAPI.Global.ServerNotices.LocalPart,
 	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
-	keyDB, err := storage.NewKeyDatabase(ctx, cm, &dendriteCfg.KeyServer.Database)
+	keyServerCM, err := cm.FromOptions(ctx, &dendriteCfg.KeyServer.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to configured keyserver db")
+	}
+
+	keyDB, err := storage.NewKeyDatabase(ctx, keyServerCM)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key db")
 	}
@@ -109,51 +121,56 @@ func NewInternalAPI(
 		FedClient:            fedClient,
 	}
 
-	updater := internal.NewDeviceListUpdater(ctx, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn)
+	updater := internal.NewDeviceListUpdater(ctx, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn, defaultWaitTime)
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
-	if err := updater.CleanUp(ctx); err != nil {
+	if err = updater.CleanUp(ctx); err != nil {
 		logrus.WithError(err).Error("failed to cleanup stale device lists")
 	}
 
-	go func() {
-		if err := updater.Start(ctx); err != nil {
-			logrus.WithError(err).Panicf("failed to start device list updater")
+	go func(ctx context.Context) {
+		err0 := updater.Start(ctx)
+		if err0 != nil {
+			logrus.WithError(err0).Panicf("failed to start device list updater")
 		}
-	}()
+	}(ctx)
 
 	dlConsumer := consumers.NewDeviceListUpdateConsumer(
 		ctx, &dendriteCfg.UserAPI, js, updater,
 	)
-	if err := dlConsumer.Start(ctx); err != nil {
+	if err = dlConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start device list consumer")
 	}
 
 	sigConsumer := consumers.NewSigningKeyUpdateConsumer(
 		ctx, &dendriteCfg.UserAPI, js, userAPI,
 	)
-	if err := sigConsumer.Start(ctx); err != nil {
+	err = sigConsumer.Start(ctx)
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start signing key consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
 		ctx, &dendriteCfg.UserAPI, js, db, syncProducer, pgClient,
 	)
-	if err := receiptConsumer.Start(ctx); err != nil {
+	err = receiptConsumer.Start(ctx)
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start user API receipt consumer")
 	}
 
 	eventConsumer := consumers.NewOutputRoomEventConsumer(
 		ctx, &dendriteCfg.UserAPI, js, db, pgClient, rsAPI, syncProducer,
 	)
-	if err := eventConsumer.Start(ctx); err != nil {
+	err = eventConsumer.Start(ctx)
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
 	}
 
 	var cleanOldNotifs func()
 	cleanOldNotifs = func() {
 		logrus.Infof("Cleaning old notifications")
-		if err := db.DeleteOldNotifications(ctx); err != nil {
+		err = db.DeleteOldNotifications(ctx)
+		if err != nil {
 			logrus.WithError(err).Error("Failed to clean old notifications")
 		}
 		time.AfterFunc(time.Hour, cleanOldNotifs)

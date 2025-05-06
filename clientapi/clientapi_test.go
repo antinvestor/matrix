@@ -117,9 +117,8 @@ func TestGetPutDevices(t *testing.T) {
 			},
 		}
 
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -128,7 +127,7 @@ func TestGetPutDevices(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -171,13 +170,12 @@ func TestDeleteDevice(t *testing.T) {
 	localpart, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -280,13 +278,12 @@ func TestDeleteDevices(t *testing.T) {
 	localpart, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		natsInstance := jetstream.NATSInstance{}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -452,15 +449,14 @@ func TestSetDisplayname(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		natsInstance := &jetstream.NATSInstance{}
 
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
@@ -568,15 +564,14 @@ func TestSetAvatarURL(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		natsInstance := &jetstream.NATSInstance{}
 
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
@@ -648,13 +643,12 @@ func TestTyping(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -734,15 +728,14 @@ func TestMembership(t *testing.T) {
 	bob := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -977,15 +970,14 @@ func TestCapabilities(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 
 		// Needed to create accounts
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -1029,16 +1021,15 @@ func TestCapabilities(t *testing.T) {
 
 func TestTurnserver(t *testing.T) {
 	alice := test.NewUser(t)
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	cfg.ClientAPI.RateLimiting.Enabled = false
 
 	natsInstance := jetstream.NATSInstance{}
 
 	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 
 	// Needed to create accounts
 	caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -1132,16 +1123,15 @@ func Test3PID(t *testing.T) {
 	alice := test.NewUser(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		cfg.FederationAPI.DisableTLSValidation = true // needed to be able to connect to our identityServer below
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 
 		// Needed to create accounts
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -1317,9 +1307,8 @@ func TestPushRules(t *testing.T) {
 	ruleID3 := "myrule3"
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -1329,7 +1318,7 @@ func TestPushRules(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -1708,9 +1697,8 @@ func TestKeys(t *testing.T) {
 	alice := test.NewUser(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -1720,7 +1708,7 @@ func TestKeys(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -2186,9 +2174,8 @@ func TestKeyBackup(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -2198,7 +2185,7 @@ func TestKeyBackup(t *testing.T) {
 		natsInstance := jetstream.NATSInstance{}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -2224,7 +2211,6 @@ func TestKeyBackup(t *testing.T) {
 }
 
 func TestGetMembership(t *testing.T) {
-	t.Parallel()
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 
@@ -2239,7 +2225,7 @@ func TestGetMembership(t *testing.T) {
 	}{
 
 		{
-			name: "/joined_members - Bob never joined",
+			name: "joined_members - Bob never joined",
 			user: bob,
 			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
 				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
@@ -2249,7 +2235,7 @@ func TestGetMembership(t *testing.T) {
 			wantOK: false,
 		},
 		{
-			name: "/joined_members - Alice joined",
+			name: "joined_members - Alice joined",
 			user: alice,
 			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
 				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
@@ -2260,7 +2246,7 @@ func TestGetMembership(t *testing.T) {
 			wantMemberCount: 1,
 		},
 		{
-			name: "/joined_members - Alice leaves, shouldn't be able to see members ",
+			name: "joined_members - Alice leaves, shouldn't be able to see members ",
 			user: alice,
 			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
 				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
@@ -2275,7 +2261,7 @@ func TestGetMembership(t *testing.T) {
 			wantOK: false,
 		},
 		{
-			name: "/joined_members - Bob joins, Alice sees two members",
+			name: "joined_members - Bob joins, Alice sees two members",
 			user: alice,
 			request: func(t *testing.T, room *test.Room, accessToken string) *http.Request {
 				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
@@ -2294,11 +2280,10 @@ func TestGetMembership(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -2362,11 +2347,10 @@ func TestCreateRoomInvite(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -2436,12 +2420,11 @@ func TestReportEvent(t *testing.T) {
 	eventToReport := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)

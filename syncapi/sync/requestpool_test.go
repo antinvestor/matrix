@@ -119,9 +119,9 @@ func TestRequestPool_updatePresence(t *testing.T) {
 		producer: publisher,
 		consumer: consumer,
 		cfg: &config.SyncAPI{
-			Matrix: &config.Global{
+			Global: &config.Global{
 				JetStream: config.JetStream{
-					TopicPrefix: "Dendrite",
+					TopicPrefix: "Matrix",
 				},
 				Presence: config.PresenceOptions{
 					EnableInbound:  true,
@@ -132,7 +132,8 @@ func TestRequestPool_updatePresence(t *testing.T) {
 	}
 	db := dummyDB{}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	go rp.cleanPresence(ctx, db, time.Millisecond*50)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

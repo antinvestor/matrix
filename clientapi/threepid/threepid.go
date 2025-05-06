@@ -145,7 +145,7 @@ func CheckAssociation(
 }
 
 // PublishAssociation publishes a validated association between a third-party
-// identifier and a Matrix ID.
+// identifier and a Global ID.
 // Returns an error if there was a problem sending the request or decoding the
 // response, or if the identity server responded with a non-OK status.
 func PublishAssociation(ctx context.Context, creds Credentials, userID string, cfg *config.ClientAPI, client *fclient.Client) error {
@@ -183,7 +183,7 @@ func PublishAssociation(ctx context.Context, creds Credentials, userID string, c
 // identity servers in the configuration file.
 // Returns an error if the server isn't trusted.
 func isTrusted(idServer string, cfg *config.ClientAPI) error {
-	for _, server := range cfg.Matrix.TrustedIDServers {
+	for _, server := range cfg.Global.TrustedIDServers {
 		if idServer == server {
 			return nil
 		}

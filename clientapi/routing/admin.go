@@ -342,7 +342,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 	}
 	var localpart string
 	userID := vars["userID"]
-	localpart, serverName, err := cfg.Matrix.SplitLocalID('@', userID)
+	localpart, serverName, err := cfg.Global.SplitLocalID('@', userID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -410,7 +410,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 }
 
 func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, natsClient *nats.Conn) util.JSONResponse {
-	_, err := natsClient.RequestMsg(nats.NewMsg(cfg.Matrix.JetStream.Prefixed(jetstream.InputFulltextReindex)), time.Second*10)
+	_, err := natsClient.RequestMsg(nats.NewMsg(cfg.Global.JetStream.Prefixed(jetstream.InputFulltextReindex)), time.Second*10)
 	if err != nil {
 		logrus.WithError(err).Error("failed to publish nats message")
 		return util.JSONResponse{
@@ -435,7 +435,7 @@ func AdminMarkAsStale(req *http.Request, cfg *config.ClientAPI, keyAPI userapi.C
 	if err != nil {
 		return util.MessageResponse(http.StatusBadRequest, err.Error())
 	}
-	if cfg.Matrix.IsLocalServerName(domain) {
+	if cfg.Global.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam("Can not mark local device list as stale"),

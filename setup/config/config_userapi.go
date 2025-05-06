@@ -5,7 +5,7 @@ import (
 )
 
 type UserAPI struct {
-	Matrix *Global `yaml:"-"`
+	Global *Global `yaml:"-"`
 
 	// The cost when hashing passwords.
 	BCryptCost int `yaml:"bcrypt_cost"`

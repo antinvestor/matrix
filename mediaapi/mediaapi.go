@@ -33,13 +33,19 @@ func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
 	cm *sqlutil.Connections,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	userAPI userapi.MediaUserAPI,
 	client *fclient.Client,
 	fedClient fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 ) {
-	mediaDB, err := storage.NewMediaAPIDatasource(ctx, cm, &cfg.MediaAPI.Database)
+
+	mediaCM, err := cm.FromOptions(ctx, &cfg.MediaAPI.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to obtain connection manager for media db")
+	}
+
+	mediaDB, err := storage.NewMediaAPIDatasource(ctx, mediaCM)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to media db")
 	}

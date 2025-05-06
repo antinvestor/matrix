@@ -37,10 +37,10 @@ func Consumer(
 	}()
 
 	name := durable + "Pull"
-	sub, err := js.PullSubscribe(subj, name, opts...)
-	if err != nil {
-		sentry.CaptureException(err)
-		return fmt.Errorf("nats.SubscribeSync: %w", err)
+	sub, err0 := js.PullSubscribe(subj, name, opts...)
+	if err0 != nil {
+		sentry.CaptureException(err0)
+		return fmt.Errorf("nats.SubscribeSync: %w", err0)
 	}
 	go func() {
 		for {

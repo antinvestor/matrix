@@ -56,7 +56,7 @@ func RoomAliasToID(
 
 	var resp fclient.RespDirectory
 
-	if domain == cfg.Matrix.ServerName {
+	if domain == cfg.Global.ServerName {
 		queryReq := &roomserverAPI.GetRoomIDForAliasRequest{
 			Alias:              roomAlias,
 			IncludeAppservices: true,
@@ -93,7 +93,7 @@ func RoomAliasToID(
 			}
 		}
 	} else {
-		resp, err = federation.LookupRoomAlias(httpReq.Context(), domain, cfg.Matrix.ServerName, roomAlias)
+		resp, err = federation.LookupRoomAlias(httpReq.Context(), domain, cfg.Global.ServerName, roomAlias)
 		if err != nil {
 			var x gomatrix.HTTPError
 			switch {

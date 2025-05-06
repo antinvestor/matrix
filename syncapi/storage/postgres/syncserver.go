@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,108 +17,125 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
+	"github.com/pitabwire/frame"
 
 	// Import the postgres database driver.
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/syncapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/syncapi/storage/shared"
 	_ "github.com/lib/pq"
 )
+
+// Migrations - All syncapi migrations for the postgres module
+var Migrations = []frame.MigrationPatch{
+	{
+		Name:        "syncapi_001_create_account_data_table",
+		Patch:       accountDataSchema,
+		RevertPatch: accountDataSchemaRevert,
+	},
+	{
+		Name:        "syncapi_002_create_backwards_extremities_table",
+		Patch:       backwardExtremitiesSchema,
+		RevertPatch: backwardExtremitiesSchemaRevert,
+	},
+	{
+		Name:        "syncapi_003_create_current_room_state_table",
+		Patch:       currentRoomStateSchema,
+		RevertPatch: currentRoomStateSchemaRevert,
+	},
+	{
+		Name:        "syncapi_004_create_filter_table",
+		Patch:       filterSchema,
+		RevertPatch: filterSchemaRevert,
+	},
+	{
+		Name:        "syncapi_005_create_ignores_table",
+		Patch:       ignoresSchema,
+		RevertPatch: ignoresSchemaRevert,
+	},
+	{
+		Name:        "syncapi_006_create_invites_table",
+		Patch:       inviteEventsSchema,
+		RevertPatch: invitesSchemaRevert,
+	},
+	{
+		Name:        "syncapi_007_create_memberships_table",
+		Patch:       membershipsSchema,
+		RevertPatch: membershipsSchemaRevert,
+	},
+	{
+		Name:        "syncapi_008_create_notification_data_table",
+		Patch:       notificationDataSchema,
+		RevertPatch: notificationDataSchemaRevert,
+	},
+	{
+		Name:        "syncapi_009_create_output_room_events_table",
+		Patch:       outputRoomEventsSchema,
+		RevertPatch: outputRoomEventsSchemaRevert,
+	},
+	{
+		Name:        "syncapi_010_create_output_room_events_topology_table",
+		Patch:       outputRoomEventsTopologySchema,
+		RevertPatch: outputRoomEventsTopologySchemaRevert,
+	},
+	{
+		Name:        "syncapi_011_create_peeks_table",
+		Patch:       peeksSchema,
+		RevertPatch: peeksSchemaRevert,
+	},
+	{
+		Name:        "syncapi_012_create_presence_table",
+		Patch:       presenceSchema,
+		RevertPatch: presenceSchemaRevert,
+	},
+	{
+		Name:        "syncapi_013_create_receipt_table",
+		Patch:       receiptsSchema,
+		RevertPatch: receiptSchemaRevert,
+	},
+	{
+		Name:        "syncapi_014_create_relations_table",
+		Patch:       relationsSchema,
+		RevertPatch: relationsSchemaRevert,
+	},
+	{
+		Name:        "syncapi_015_create_send_to_device_table",
+		Patch:       sendToDeviceSchema,
+		RevertPatch: sendToDeviceSchemaRevert,
+	},
+}
 
 // SyncServerDatasource represents a sync server datasource which manages
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	shared.Database
-	db     *sql.DB
-	writer sqlutil.Writer
 }
 
 // NewDatabase creates a new sync server database
-func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
-	var err error
-	if d.db, d.writer, err = cm.Connection(ctx, dbProperties); err != nil {
-		return nil, err
-	}
-	accountData, err := NewPostgresAccountDataTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	events, err := NewPostgresEventsTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	currState, err := NewPostgresCurrentRoomStateTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	invites, err := NewPostgresInvitesTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	peeks, err := NewPostgresPeeksTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	topology, err := NewPostgresTopologyTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	backwardExtremities, err := NewPostgresBackwardsExtremitiesTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	sendToDevice, err := NewPostgresSendToDeviceTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	filter, err := NewPostgresFilterTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	receipts, err := NewPostgresReceiptsTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	memberships, err := NewPostgresMembershipsTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	notificationData, err := NewPostgresNotificationDataTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	ignores, err := NewPostgresIgnoresTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	presence, err := NewPostgresPresenceTable(ctx, d.db)
-	if err != nil {
-		return nil, err
-	}
-	relations, err := NewPostgresRelationsTable(ctx, d.db)
+
+	err := cm.MigrateStrings(ctx, Migrations...)
 	if err != nil {
 		return nil, err
 	}
 
-	// apply migrations which need multiple tables
-	m := sqlutil.NewMigrator(d.db)
-	m.AddMigrations(
-		sqlutil.Migration{
-			Version: "syncapi: set history visibility for existing events",
-			Up:      deltas.UpSetHistoryVisibility, // Requires current_room_state and output_room_events to be created.
-		},
-	)
-	err = m.Up(ctx)
-	if err != nil {
-		return nil, err
-	}
+	accountData := NewPostgresAccountDataTable(cm)
+	events := NewPostgresEventsTable(cm)
+	currState := NewPostgresCurrentRoomStateTable(cm)
+	invites := NewPostgresInvitesTable(cm)
+	peeks := NewPostgresPeeksTable(cm)
+	topology := NewPostgresTopologyTable(cm)
+	backwardExtremities := NewPostgresBackwardsExtremitiesTable(cm)
+	sendToDevice := NewPostgresSendToDeviceTable(cm)
+	filter := NewPostgresFilterTable(cm)
+	receipts := NewPostgresReceiptsTable(cm)
+	memberships := NewPostgresMembershipsTable(cm)
+	notificationData := NewPostgresNotificationDataTable(cm)
+	ignores := NewPostgresIgnoresTable(cm)
+	presence := NewPostgresPresenceTable(cm)
+	relations := NewPostgresRelationsTable(cm)
 
 	d.Database = shared.Database{
-		DB:                  d.db,
-		Writer:              d.writer,
 		Invites:             invites,
 		Peeks:               peeks,
 		AccountData:         accountData,

@@ -23,7 +23,7 @@ import (
 // TODO: temporary package which has helper functions used by both internal/perform packages.
 // Move these to a more sensible place.
 
-func UpdateToInviteMembership(
+func UpdateToInviteMembership(ctx context.Context,
 	mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
 	roomVersion gomatrixserverlib.RoomVersion,
 ) ([]api.OutputEvent, error) {
@@ -31,7 +31,7 @@ func UpdateToInviteMembership(
 	// reprocessing this event, or because the we received this invite from a
 	// remote server via the federation invite API. In those cases we don't need
 	// to send the event.
-	needsSending, retired, err := mu.Update(tables.MembershipStateInvite, add)
+	needsSending, retired, err := mu.Update(ctx, tables.MembershipStateInvite, add)
 	if err != nil {
 		return nil, err
 	}

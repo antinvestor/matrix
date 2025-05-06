@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package shared
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -24,15 +23,12 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
 	"github.com/antinvestor/matrix/internal/caching"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 )
 
 type Database struct {
-	DB                *sql.DB
 	IsLocalServerName func(spec.ServerName) bool
 	Cache             caching.FederationCache
-	Writer            sqlutil.Writer
 	RelayQueue        tables.RelayQueue
 	RelayQueueJSON    tables.RelayQueueJSON
 }
@@ -41,17 +37,12 @@ func (d *Database) StoreTransaction(
 	ctx context.Context,
 	transaction gomatrixserverlib.Transaction,
 ) (*receipt.Receipt, error) {
-	var err error
 	jsonTransaction, err := json.Marshal(transaction)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal: %w", err)
 	}
 
-	var nid int64
-	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nid, err = d.RelayQueueJSON.InsertQueueJSON(ctx, txn, string(jsonTransaction))
-		return err
-	})
+	nid, err := d.RelayQueueJSON.InsertQueueJSON(ctx, string(jsonTransaction))
 	if err != nil {
 		return nil, fmt.Errorf("d.insertQueueJSON: %w", err)
 	}
@@ -66,25 +57,20 @@ func (d *Database) AssociateTransactionWithDestinations(
 	transactionID gomatrixserverlib.TransactionID,
 	dbReceipt *receipt.Receipt,
 ) error {
-	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		var lastErr error
-		for destination := range destinations {
-			destination := destination
-			err := d.RelayQueue.InsertQueueEntry(
-				ctx,
-				txn,
-				transactionID,
-				destination.Domain(),
-				dbReceipt.GetNID(),
-			)
-			if err != nil {
-				lastErr = fmt.Errorf("d.insertQueueEntry: %w", err)
-			}
+	var lastErr error
+	for destination := range destinations {
+		destination := destination
+		err := d.RelayQueue.InsertQueueEntry(
+			ctx,
+			transactionID,
+			destination.Domain(),
+			dbReceipt.GetNID(),
+		)
+		if err != nil {
+			lastErr = fmt.Errorf("d.insertQueueEntry: %w", err)
 		}
-		return lastErr
-	})
-
-	return err
+	}
+	return lastErr
 }
 
 func (d *Database) CleanTransactions(
@@ -97,29 +83,25 @@ func (d *Database) CleanTransactions(
 		nids[i] = dbReceipt.GetNID()
 	}
 
-	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		deleteEntryErr := d.RelayQueue.DeleteQueueEntries(ctx, txn, userID.Domain(), nids)
-		// TODO : If there are still queue entries for any of these nids for other destinations
-		// then we shouldn't delete the json entries.
-		// But this can't happen with the current api design.
-		// There will only ever be one server entry for each nid since each call to send_relay
-		// only accepts a single server name and inside there we create a new json entry.
-		// So for multiple destinations we would call send_relay multiple times and have multiple
-		// json entries of the same transaction.
-		//
-		// TLDR; this works as expected right now but can easily be optimised in the future.
-		deleteJSONErr := d.RelayQueueJSON.DeleteQueueJSON(ctx, txn, nids)
+	// TODO : If there are still queue entries for any of these nids for other destinations
+	// then we shouldn't delete the json entries.
+	// But this can't happen with the current api design.
+	// There will only ever be one server entry for each nid since each call to send_relay
+	// only accepts a single server name and inside there we create a new json entry.
+	// So for multiple destinations we would call send_relay multiple times and have multiple
+	// json entries of the same transaction.
+	//
+	// TLDR; this works as expected right now but can easily be optimised in the future.
+	deleteEntryErr := d.RelayQueue.DeleteQueueEntries(ctx, userID.Domain(), nids)
+	deleteJSONErr := d.RelayQueueJSON.DeleteQueueJSON(ctx, nids)
 
-		if deleteEntryErr != nil {
-			return fmt.Errorf("d.deleteQueueEntries: %w", deleteEntryErr)
-		}
-		if deleteJSONErr != nil {
-			return fmt.Errorf("d.deleteQueueJSON: %w", deleteJSONErr)
-		}
-		return nil
-	})
-
-	return err
+	if deleteEntryErr != nil {
+		return fmt.Errorf("d.deleteQueueEntries: %w", deleteEntryErr)
+	}
+	if deleteJSONErr != nil {
+		return fmt.Errorf("d.deleteQueueJSON: %w", deleteJSONErr)
+	}
+	return nil
 }
 
 func (d *Database) GetTransaction(
@@ -127,7 +109,7 @@ func (d *Database) GetTransaction(
 	userID spec.UserID,
 ) (*gomatrixserverlib.Transaction, *receipt.Receipt, error) {
 	entriesRequested := 1
-	nids, err := d.RelayQueue.SelectQueueEntries(ctx, nil, userID.Domain(), entriesRequested)
+	nids, err := d.RelayQueue.SelectQueueEntries(ctx, userID.Domain(), entriesRequested)
 	if err != nil {
 		return nil, nil, fmt.Errorf("d.SelectQueueEntries: %w", err)
 	}
@@ -136,11 +118,7 @@ func (d *Database) GetTransaction(
 	}
 	firstNID := nids[0]
 
-	txns := map[int64][]byte{}
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		txns, err = d.RelayQueueJSON.SelectQueueJSON(ctx, txn, nids)
-		return err
-	})
+	txns, err := d.RelayQueueJSON.SelectQueueJSON(ctx, nids)
 	if err != nil {
 		return nil, nil, fmt.Errorf("d.SelectQueueJSON: %w", err)
 	}
@@ -163,7 +141,7 @@ func (d *Database) GetTransactionCount(
 	ctx context.Context,
 	userID spec.UserID,
 ) (int64, error) {
-	count, err := d.RelayQueue.SelectQueueEntryCount(ctx, nil, userID.Domain())
+	count, err := d.RelayQueue.SelectQueueEntryCount(ctx, userID.Domain())
 	if err != nil {
 		return 0, fmt.Errorf("d.SelectQueueEntryCount: %w", err)
 	}

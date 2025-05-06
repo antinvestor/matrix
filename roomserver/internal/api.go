@@ -45,7 +45,7 @@ type RoomserverInternalAPI struct {
 	*perform.Admin
 	*perform.Creator
 	DB                     storage.Database
-	Cfg                    *config.Dendrite
+	Cfg                    *config.Matrix
 	Cache                  caching.RoomServerCaches
 	ServerName             spec.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
@@ -63,7 +63,7 @@ type RoomserverInternalAPI struct {
 }
 
 func NewRoomserverAPI(
-	ctx context.Context, dendriteCfg *config.Dendrite, roomserverDB storage.Database,
+	ctx context.Context, dendriteCfg *config.Matrix, roomserverDB storage.Database,
 	js nats.JetStreamContext, nc *nats.Conn, caches caching.RoomServerCaches, enableMetrics bool,
 ) *RoomserverInternalAPI {
 	var perspectiveServerNames []spec.ServerName

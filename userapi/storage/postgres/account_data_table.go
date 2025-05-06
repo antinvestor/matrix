@@ -19,9 +19,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/antinvestor/matrix/internal"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
@@ -29,7 +29,7 @@ import (
 const accountDataSchema = `
 -- Stores data about accounts data.
 CREATE TABLE IF NOT EXISTS userapi_account_datas (
-    -- The Matrix user ID localpart for this account
+    -- The Global user ID localpart for this account
     localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
     -- The room ID for this data (empty string if not specific to a room)
@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS userapi_account_datas (
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_account_datas_idx ON userapi_account_datas(localpart, server_name, room_id, type);
 `
 
+const accountDataSchemaRevert = "DROP TABLE IF EXISTS userapi_account_datas CASCADE; DROP INDEX IF EXISTS userapi_account_datas_idx;"
+
 const insertAccountDataSQL = `
 	INSERT INTO userapi_account_datas(localpart, server_name, room_id, type, content) VALUES($1, $2, $3, $4, $5)
 	ON CONFLICT (localpart, server_name, room_id, type) DO UPDATE SET content = EXCLUDED.content
@@ -54,93 +56,73 @@ const selectAccountDataSQL = "" +
 const selectAccountDataByTypeSQL = "" +
 	"SELECT content FROM userapi_account_datas WHERE localpart = $1 AND server_name = $2 AND room_id = $3 AND type = $4"
 
-type accountDataStatements struct {
-	insertAccountDataStmt       *sql.Stmt
-	selectAccountDataStmt       *sql.Stmt
-	selectAccountDataByTypeStmt *sql.Stmt
+// accountDataTable implements tables.AccountDataTable using GORM and a connection manager.
+type accountDataTable struct {
+	cm *sqlutil.Connections
+
+	insertAccountDataSQL       string
+	selectAccountDataSQL       string
+	selectAccountDataByTypeSQL string
 }
 
-func NewPostgresAccountDataTable(ctx context.Context, db *sql.DB) (tables.AccountDataTable, error) {
-	s := &accountDataStatements{}
-	_, err := db.Exec(accountDataSchema)
-	if err != nil {
-		return nil, err
+// NewPostgresAccountDataTable returns a new AccountDataTable using the provided connection manager.
+func NewPostgresAccountDataTable(cm *sqlutil.Connections) tables.AccountDataTable {
+	return &accountDataTable{
+		cm:                         cm,
+		insertAccountDataSQL:       insertAccountDataSQL,
+		selectAccountDataSQL:       selectAccountDataSQL,
+		selectAccountDataByTypeSQL: selectAccountDataByTypeSQL,
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertAccountDataStmt, insertAccountDataSQL},
-		{&s.selectAccountDataStmt, selectAccountDataSQL},
-		{&s.selectAccountDataByTypeStmt, selectAccountDataByTypeSQL},
-	}.Prepare(db)
 }
 
-func (s *accountDataStatements) InsertAccountData(
-	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName spec.ServerName,
-	roomID, dataType string, content json.RawMessage,
-) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.insertAccountDataStmt)
-	// Empty/nil json.RawMessage is not interpreted as "nil", so use *json.RawMessage
-	// when passing the data to trigger "NOT NULL" constraint
-	var data *json.RawMessage
-	if len(content) > 0 {
-		data = &content
-	}
-	_, err = stmt.ExecContext(ctx, localpart, serverName, roomID, dataType, data)
-	return
+// InsertAccountData inserts or updates account data for a user and room/type.
+func (t *accountDataTable) InsertAccountData(ctx context.Context, localpart string, serverName spec.ServerName, roomID, dataType string, content json.RawMessage) error {
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.insertAccountDataSQL, localpart, serverName, roomID, dataType, content)
+	return result.Error
 }
 
-func (s *accountDataStatements) SelectAccountData(
-	ctx context.Context,
-	localpart string, serverName spec.ServerName,
-) (
-	/* global */ map[string]json.RawMessage,
-	/* rooms */ map[string]map[string]json.RawMessage,
-	error,
-) {
-	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart, serverName)
+// SelectAccountData retrieves all account data for a user, returning global and per-room data maps.
+func (t *accountDataTable) SelectAccountData(ctx context.Context, localpart string, serverName spec.ServerName) (map[string]json.RawMessage, map[string]map[string]json.RawMessage, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectAccountDataSQL, localpart, serverName).Rows()
 	if err != nil {
 		return nil, nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectAccountData: rows.close() failed")
-
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	global := map[string]json.RawMessage{}
 	rooms := map[string]map[string]json.RawMessage{}
-
 	for rows.Next() {
-		var roomID string
-		var dataType string
+		var roomID, dataType string
 		var content []byte
-
-		if err = rows.Scan(&roomID, &dataType, &content); err != nil {
+		if err := rows.Scan(&roomID, &dataType, &content); err != nil {
 			return nil, nil, err
 		}
-
 		if roomID != "" {
 			if _, ok := rooms[roomID]; !ok {
 				rooms[roomID] = map[string]json.RawMessage{}
 			}
-			rooms[roomID][dataType] = content
+			rooms[roomID][dataType] = json.RawMessage(content)
 		} else {
-			global[dataType] = content
+			global[dataType] = json.RawMessage(content)
 		}
 	}
-
 	return global, rooms, rows.Err()
 }
 
-func (s *accountDataStatements) SelectAccountDataByType(
-	ctx context.Context,
-	localpart string, serverName spec.ServerName,
-	roomID, dataType string,
-) (data json.RawMessage, err error) {
-	var bytes []byte
-	stmt := s.selectAccountDataByTypeStmt
-	if err = stmt.QueryRowContext(ctx, localpart, serverName, roomID, dataType).Scan(&bytes); err != nil {
+// SelectAccountDataByType retrieves account data for a user, room, and type.
+func (t *accountDataTable) SelectAccountDataByType(ctx context.Context, localpart string, serverName spec.ServerName, roomID, dataType string) (json.RawMessage, error) {
+	db := t.cm.Connection(ctx, true)
+	var content sql.NullString
+	row := db.Raw(t.selectAccountDataByTypeSQL, localpart, serverName, roomID, dataType).Row()
+	if err := row.Scan(&content); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return
+		return nil, err
 	}
-	data = bytes
-	return
+	if content.Valid {
+		return json.RawMessage(content.String), nil
+	}
+	return nil, nil
 }

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,10 +18,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-
 	"github.com/antinvestor/matrix/internal"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/roomserver/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 )
 
@@ -40,6 +39,8 @@ CREATE TABLE IF NOT EXISTS roomserver_published (
 );
 `
 
+const publishedSchemaRevert = `DROP TABLE IF EXISTS roomserver_published;`
+
 const upsertPublishedSQL = "" +
 	"INSERT INTO roomserver_published (room_id, appservice_id, network_id, published) VALUES ($1, $2, $3, $4) " +
 	"ON CONFLICT (room_id, appservice_id, network_id) DO UPDATE SET published=$4"
@@ -53,87 +54,59 @@ const selectNetworkPublishedSQL = "" +
 const selectPublishedSQL = "" +
 	"SELECT published FROM roomserver_published WHERE room_id = $1"
 
-type publishedStatements struct {
-	upsertPublishedStmt        *sql.Stmt
-	selectAllPublishedStmt     *sql.Stmt
-	selectPublishedStmt        *sql.Stmt
-	selectNetworkPublishedStmt *sql.Stmt
+type publishedTable struct {
+	cm                        *sqlutil.Connections
+	upsertPublishedSQL        string
+	selectAllPublishedSQL     string
+	selectNetworkPublishedSQL string
+	selectPublishedSQL        string
 }
 
-func CreatePublishedTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(publishedSchema)
-	if err != nil {
-		return err
+func NewPostgresPublishedTable(cm *sqlutil.Connections) tables.Published {
+	return &publishedTable{
+		cm:                        cm,
+		upsertPublishedSQL:        upsertPublishedSQL,
+		selectAllPublishedSQL:     selectAllPublishedSQL,
+		selectNetworkPublishedSQL: selectNetworkPublishedSQL,
+		selectPublishedSQL:        selectPublishedSQL,
 	}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations([]sqlutil.Migration{
-		{
-			Version: "roomserver: published appservice",
-			Up:      deltas.UpPulishedAppservice,
-		},
-		{
-			Version: "roomserver: published appservice pkey",
-			Up:      deltas.UpPulishedAppservicePrimaryKey,
-		},
-	}...)
-	return m.Up(ctx)
 }
 
-func PreparePublishedTable(ctx context.Context, db *sql.DB) (tables.Published, error) {
-	s := &publishedStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.upsertPublishedStmt, upsertPublishedSQL},
-		{&s.selectAllPublishedStmt, selectAllPublishedSQL},
-		{&s.selectPublishedStmt, selectPublishedSQL},
-		{&s.selectNetworkPublishedStmt, selectNetworkPublishedSQL},
-	}.Prepare(db)
+func (t *publishedTable) UpsertRoomPublished(ctx context.Context, roomID, appserviceID, networkID string, published bool) error {
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.upsertPublishedSQL, roomID, appserviceID, networkID, published).Error
 }
 
-func (s *publishedStatements) UpsertRoomPublished(
-	ctx context.Context, txn *sql.Tx, roomID, appserviceID, networkID string, published bool,
-) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.upsertPublishedStmt)
-	_, err = stmt.ExecContext(ctx, roomID, appserviceID, networkID, published)
-	return
-}
-
-func (s *publishedStatements) SelectPublishedFromRoomID(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) (published bool, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectPublishedStmt)
-	err = stmt.QueryRowContext(ctx, roomID).Scan(&published)
+func (t *publishedTable) SelectPublishedFromRoomID(ctx context.Context, roomID string) (bool, error) {
+	db := t.cm.Connection(ctx, true)
+	var published bool
+	row := db.Raw(t.selectPublishedSQL, roomID).Row()
+	err := row.Scan(&published)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
-	return
+	return published, err
 }
 
-func (s *publishedStatements) SelectAllPublishedRooms(
-	ctx context.Context, txn *sql.Tx, networkID string, published, includeAllNetworks bool,
-) ([]string, error) {
+func (t *publishedTable) SelectAllPublishedRooms(ctx context.Context, networkID string, published, includeAllNetworks bool) ([]string, error) {
+	db := t.cm.Connection(ctx, true)
 	var rows *sql.Rows
 	var err error
 	if networkID != "" {
-		stmt := sqlutil.TxStmt(txn, s.selectNetworkPublishedStmt)
-		rows, err = stmt.QueryContext(ctx, published, networkID)
+		rows, err = db.Raw(t.selectNetworkPublishedSQL, published, networkID).Rows()
 	} else {
-		stmt := sqlutil.TxStmt(txn, s.selectAllPublishedStmt)
-		rows, err = stmt.QueryContext(ctx, published, includeAllNetworks)
-
+		rows, err = db.Raw(t.selectAllPublishedSQL, published, includeAllNetworks).Rows()
 	}
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectAllPublishedStmt: rows.close() failed")
-
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var roomIDs []string
-	var roomID string
 	for rows.Next() {
+		var roomID string
 		if err = rows.Scan(&roomID); err != nil {
 			return nil, err
 		}
-
 		roomIDs = append(roomIDs, roomID)
 	}
 	return roomIDs, rows.Err()

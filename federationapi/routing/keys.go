@@ -149,20 +149,20 @@ func localKeys(cfg *config.FederationAPI, serverName spec.ServerName) (*gomatrix
 	var keys gomatrixserverlib.ServerKeys
 	var identity *fclient.SigningIdentity
 	var err error
-	if virtualHost := cfg.Matrix.VirtualHostForHTTPHost(serverName); virtualHost == nil {
-		if identity, err = cfg.Matrix.SigningIdentityFor(cfg.Matrix.ServerName); err != nil {
+	if virtualHost := cfg.Global.VirtualHostForHTTPHost(serverName); virtualHost == nil {
+		if identity, err = cfg.Global.SigningIdentityFor(cfg.Global.ServerName); err != nil {
 			return nil, err
 		}
-		publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
-		keys.ServerName = cfg.Matrix.ServerName
-		keys.ValidUntilTS = spec.AsTimestamp(time.Now().Add(cfg.Matrix.KeyValidityPeriod))
+		publicKey := cfg.Global.PrivateKey.Public().(ed25519.PublicKey)
+		keys.ServerName = cfg.Global.ServerName
+		keys.ValidUntilTS = spec.AsTimestamp(time.Now().Add(cfg.Global.KeyValidityPeriod))
 		keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
-			cfg.Matrix.KeyID: {
+			cfg.Global.KeyID: {
 				Key: spec.Base64Bytes(publicKey),
 			},
 		}
 		keys.OldVerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.OldVerifyKey{}
-		for _, oldVerifyKey := range cfg.Matrix.OldVerifyKeys {
+		for _, oldVerifyKey := range cfg.Global.OldVerifyKeys {
 			keys.OldVerifyKeys[oldVerifyKey.KeyID] = gomatrixserverlib.OldVerifyKey{
 				VerifyKey: gomatrixserverlib.VerifyKey{
 					Key: oldVerifyKey.PublicKey,
@@ -171,7 +171,7 @@ func localKeys(cfg *config.FederationAPI, serverName spec.ServerName) (*gomatrix
 			}
 		}
 	} else {
-		if identity, err = cfg.Matrix.SigningIdentityFor(virtualHost.ServerName); err != nil {
+		if identity, err = cfg.Global.SigningIdentityFor(virtualHost.ServerName); err != nil {
 			return nil, err
 		}
 		publicKey := virtualHost.PrivateKey.Public().(ed25519.PublicKey)
@@ -207,7 +207,7 @@ func NotaryKeys(
 	req *gomatrixserverlib.PublicKeyNotaryLookupRequest,
 ) util.JSONResponse {
 	serverName := spec.ServerName(httpReq.Host) // TODO: this is not ideal
-	if !cfg.Matrix.IsLocalServerName(serverName) {
+	if !cfg.Global.IsLocalServerName(serverName) {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("Server name not known"),
@@ -227,7 +227,7 @@ func NotaryKeys(
 
 	for serverName, kidToCriteria := range req.ServerKeys {
 		var keyList []gomatrixserverlib.ServerKeys
-		if serverName == cfg.Matrix.ServerName {
+		if serverName == cfg.Global.ServerName {
 			if k, err := localKeys(cfg, serverName); err == nil {
 				keyList = append(keyList, *k)
 			} else {
@@ -259,7 +259,7 @@ func NotaryKeys(
 			}
 
 			js, err := gomatrixserverlib.SignJSON(
-				string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, j,
+				string(cfg.Global.ServerName), cfg.Global.KeyID, cfg.Global.PrivateKey, j,
 			)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to sign %q response", serverName)

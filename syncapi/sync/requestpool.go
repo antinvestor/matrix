@@ -1,6 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/internal"
@@ -106,7 +105,7 @@ func (rp *RequestPool) cleanLastSeen() {
 }
 
 func (rp *RequestPool) cleanPresence(ctx context.Context, db storage.Presence, cleanupTime time.Duration) {
-	if !rp.cfg.Matrix.Presence.EnableOutbound {
+	if !rp.cfg.Global.Presence.EnableOutbound {
 		return
 	}
 	for {
@@ -142,7 +141,7 @@ func (rp *RequestPool) updatePresence(ctx context.Context, db storage.Presence, 
 }
 
 func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Presence, presence string, userID string, checkAgain bool) {
-	if !rp.cfg.Matrix.Presence.EnableOutbound {
+	if !rp.cfg.Global.Presence.EnableOutbound {
 		return
 	}
 
@@ -292,7 +291,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	// Extract values from request
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
-		if err == types.ErrMalformedSyncToken {
+		if errors.Is(err, types.ErrMalformedSyncToken) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.InvalidParam(err.Error()),
@@ -315,7 +314,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	// Clean up old send-to-device messages from before this stream position.
 	// This is needed to avoid sending the same message multiple times
-	if err = rp.db.CleanSendToDeviceUpdates(syncReq.Context, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
+	if err = rp.db.CleanSendToDeviceUpdates(ctx, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
 		syncReq.Log.WithError(err).Error("p.DB.CleanSendToDeviceUpdates failed")
 	}
 
@@ -341,7 +340,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				// Only try to get OTKs if the context isn't already done.
 				if syncReq.Context.Err() == nil {
 					err = internal.DeviceOTKCounts(syncReq.Context, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
-					if err != nil && err != context.Canceled {
+					if err != nil && !errors.Is(err, context.Canceled) {
 						syncReq.Log.WithError(err).Warn("failed to get OTK counts")
 					}
 				}
@@ -352,7 +351,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			}
 
 			select {
-			case <-syncReq.Context.Done(): // Caller gave up
+			case <-ctx.Done(): // Caller gave up
 				return giveup()
 
 			case <-timer.C: // Timeout reached
@@ -367,16 +366,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		}
 
 		withTransaction := func(from types.StreamPosition, f func(snapshot storage.DatabaseTransaction) types.StreamPosition) types.StreamPosition {
-			var succeeded bool
 			snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
 			if err != nil {
 				logrus.WithError(err).Error("Failed to acquire database snapshot for sync request")
 				return from
 			}
-			defer func() {
-				succeeded = err == nil
-				sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
-			}()
+
 			return f(snapshot)
 		}
 
@@ -545,7 +540,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				),
 			}
 			// it's possible for there to be no updates for this user even though since < current pos,
-			// e.g busy servers with a quiet user. In this scenario, we don't want to return a no-op
+			// e.g. busy servers with a quiet user. In this scenario, we don't want to return a no-op
 			// response immediately, so let's try this again but pretend they bumped their since token.
 			// If the incremental sync was processed very quickly then we expect the next loop to block
 			// with a notifier, but if things are slow it's entirely possible that currentPos is no
@@ -613,8 +608,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 			JSON: spec.InternalServerError{},
 		}
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+
 	rp.streams.PDUStreamProvider.IncrementalSync(req.Context(), snapshot, syncReq, fromToken.PDUPosition, toToken.PDUPosition)
 	_, _, err = internal.DeviceListCatchup(
 		req.Context(), snapshot, rp.userAPI, rp.rsAPI, syncReq.Device.UserID,
@@ -627,7 +621,6 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 			JSON: spec.InternalServerError{},
 		}
 	}
-	succeeded = true
 	return util.JSONResponse{
 		Code: 200,
 		JSON: struct {

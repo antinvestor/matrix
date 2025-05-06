@@ -130,7 +130,7 @@ func setupNATS(ctx context.Context, cfg *config.JetStream, nc *natsclient.Conn) 
 				})
 
 				// The stream was supposed to be on disk. Let's try starting
-				// Dendrite with the stream in-memory instead. That'll mean that
+				// Matrix with the stream in-memory instead. That'll mean that
 				// we can't recover anything that was queued on the disk but we
 				// will still be able to start and run hopefully in the meantime.
 				sentry.CaptureException(fmt.Errorf("unable to add stream %q: %w", namespaced.Name, err))

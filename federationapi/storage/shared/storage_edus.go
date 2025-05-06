@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package shared
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -60,20 +59,17 @@ func (d *Database) AssociateEDUWithDestinations(
 	if eduType == spec.MDirectToDevice || eduType == spec.MDeviceListUpdate {
 		expiresAt = 0
 	}
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		var err error
-		for destination := range destinations {
-			err = d.FederationQueueEDUs.InsertQueueEDU(
-				ctx,                // context
-				txn,                // SQL transaction
-				eduType,            // EDU type for coalescing
-				destination,        // destination server name
-				dbReceipt.GetNID(), // NID from the federationapi_queue_json table
-				expiresAt,          // The timestamp this EDU will expire
-			)
-		}
-		return err
-	})
+	var err error
+	for destination := range destinations {
+		err = d.FederationQueueEDUs.InsertQueueEDU(
+			ctx,                // context
+			eduType,            // EDU type for coalescing
+			destination,        // destination server name
+			dbReceipt.GetNID(), // NID from the federationapi_queue_json table
+			expiresAt,          // The timestamp this EDU will expire
+		)
+	}
+	return err
 }
 
 // GetNextTransactionEDUs retrieves events from the database for
@@ -87,40 +83,37 @@ func (d *Database) GetPendingEDUs(
 	err error,
 ) {
 	edus = make(map[*receipt.Receipt]*gomatrixserverlib.EDU)
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nids, err := d.FederationQueueEDUs.SelectQueueEDUs(ctx, txn, serverName, limit)
-		if err != nil {
-			return fmt.Errorf("SelectQueueEDUs: %w", err)
-		}
+	nids, err := d.FederationQueueEDUs.SelectQueueEDUs(ctx, serverName, limit)
+	if err != nil {
+		return nil, fmt.Errorf("SelectQueueEDUs: %w", err)
+	}
 
-		retrieve := make([]int64, 0, len(nids))
-		for _, nid := range nids {
-			if edu, ok := d.Cache.GetFederationQueuedEDU(ctx, nid); ok {
-				newReceipt := receipt.NewReceipt(nid)
-				edus[&newReceipt] = edu
-			} else {
-				retrieve = append(retrieve, nid)
-			}
-		}
-
-		blobs, err := d.FederationQueueJSON.SelectQueueJSON(ctx, txn, retrieve)
-		if err != nil {
-			return fmt.Errorf("SelectQueueJSON: %w", err)
-		}
-
-		for nid, blob := range blobs {
-			var event gomatrixserverlib.EDU
-			if err := json.Unmarshal(blob, &event); err != nil {
-				return fmt.Errorf("json.Unmarshal: %w", err)
-			}
+	retrieve := make([]int64, 0, len(nids))
+	for _, nid := range nids {
+		if edu, ok := d.Cache.GetFederationQueuedEDU(ctx, nid); ok {
 			newReceipt := receipt.NewReceipt(nid)
-			edus[&newReceipt] = &event
-			_ = d.Cache.StoreFederationQueuedEDU(ctx, nid, &event)
+			edus[&newReceipt] = edu
+		} else {
+			retrieve = append(retrieve, nid)
 		}
+	}
 
-		return nil
-	})
-	return
+	blobs, err := d.FederationQueueJSON.SelectQueueJSON(ctx, retrieve)
+	if err != nil {
+		return nil, fmt.Errorf("SelectQueueJSON: %w", err)
+	}
+
+	for nid, blob := range blobs {
+		var edu gomatrixserverlib.EDU
+		if err := json.Unmarshal(blob, &edu); err != nil {
+			return nil, fmt.Errorf("json.Unmarshal: %w", err)
+		}
+		newReceipt := receipt.NewReceipt(nid)
+		edus[&newReceipt] = &edu
+		_ = d.Cache.StoreFederationQueuedEDU(ctx, nid, &edu)
+	}
+
+	return edus, nil
 }
 
 // CleanEDUs cleans up all specified EDUs. This is done when a
@@ -139,62 +132,56 @@ func (d *Database) CleanEDUs(
 		nids[i] = receipts[i].GetNID()
 	}
 
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationQueueEDUs.DeleteQueueEDUs(ctx, txn, serverName, nids); err != nil {
-			return err
+	var deleteNIDs []int64
+	for _, nid := range nids {
+		count, err := d.FederationQueueEDUs.SelectQueueEDUReferenceJSONCount(ctx, nid)
+		if err != nil {
+			return fmt.Errorf("SelectQueueEDUReferenceJSONCount: %w", err)
 		}
-
-		var deleteNIDs []int64
-		for _, nid := range nids {
-			count, err := d.FederationQueueEDUs.SelectQueueEDUReferenceJSONCount(ctx, txn, nid)
-			if err != nil {
-				return fmt.Errorf("SelectQueueEDUReferenceJSONCount: %w", err)
-			}
-			if count == 0 {
-				deleteNIDs = append(deleteNIDs, nid)
-				_ = d.Cache.EvictFederationQueuedEDU(ctx, nid)
-			}
+		if count == 0 {
+			deleteNIDs = append(deleteNIDs, nid)
+			_ = d.Cache.EvictFederationQueuedEDU(ctx, nid)
 		}
+	}
 
-		if len(deleteNIDs) > 0 {
-			if err := d.FederationQueueJSON.DeleteQueueJSON(ctx, txn, deleteNIDs); err != nil {
-				return fmt.Errorf("DeleteQueueJSON: %w", err)
-			}
+	if len(deleteNIDs) > 0 {
+		if err := d.FederationQueueJSON.DeleteQueueJSON(ctx, deleteNIDs); err != nil {
+			return fmt.Errorf("DeleteQueueJSON: %w", err)
 		}
+	}
 
-		return nil
-	})
+	if err := d.FederationQueueEDUs.DeleteQueueEDUs(ctx, serverName, nids); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// GetPendingServerNames returns the server names that have EDUs
+// GetPendingEDUServerNames returns the server names that have EDUs
 // waiting to be sent.
 func (d *Database) GetPendingEDUServerNames(
 	ctx context.Context,
 ) ([]spec.ServerName, error) {
-	return d.FederationQueueEDUs.SelectQueueEDUServerNames(ctx, nil)
+	return d.FederationQueueEDUs.SelectQueueEDUServerNames(ctx)
 }
 
 // DeleteExpiredEDUs deletes expired EDUs and evicts them from the cache.
 func (d *Database) DeleteExpiredEDUs(ctx context.Context) error {
 	var jsonNIDs []int64
-	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) (err error) {
-		expiredBefore := spec.AsTimestamp(time.Now())
-		jsonNIDs, err = d.FederationQueueEDUs.SelectExpiredEDUs(ctx, txn, expiredBefore)
-		if err != nil {
-			return err
-		}
-		if len(jsonNIDs) == 0 {
-			return nil
-		}
-
-		if err = d.FederationQueueJSON.DeleteQueueJSON(ctx, txn, jsonNIDs); err != nil {
-			return err
-		}
-
-		return d.FederationQueueEDUs.DeleteExpiredEDUs(ctx, txn, expiredBefore)
-	})
-
+	expiredBefore := spec.AsTimestamp(time.Now())
+	jsonNIDs, err := d.FederationQueueEDUs.SelectExpiredEDUs(ctx, expiredBefore)
 	if err != nil {
+		return err
+	}
+	if len(jsonNIDs) == 0 {
+		return nil
+	}
+
+	if err = d.FederationQueueJSON.DeleteQueueJSON(ctx, jsonNIDs); err != nil {
+		return err
+	}
+
+	if err = d.FederationQueueEDUs.DeleteExpiredEDUs(ctx, expiredBefore); err != nil {
 		return err
 	}
 

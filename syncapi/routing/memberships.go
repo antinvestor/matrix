@@ -75,7 +75,6 @@ func GetMemberships(
 			JSON: spec.InternalServerError{},
 		}
 	}
-	defer db.Rollback() // nolint: errcheck
 
 	atToken, err := types.NewTopologyTokenFromString(at)
 	if err != nil {

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/postgres"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,21 +41,13 @@ type RelayQueueDatabase struct {
 func mustCreateQueueTable(
 	ctx context.Context,
 	t *testing.T,
-	_ test.DependancyOption,
+	dep test.DependancyOption,
 ) (database RelayQueueDatabase, close func()) {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	var tab tables.RelayQueue
-	tab, err = postgres.NewPostgresRelayQueueTable(ctx, db)
+	db, closeDb := migrateDatabase(ctx, t, dep)
+
+	tab, err := postgres.NewPostgresRelayQueueTable(ctx, db)
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
@@ -71,7 +62,8 @@ func mustCreateQueueTable(
 
 func TestShoudInsertQueueTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -87,7 +79,8 @@ func TestShoudInsertQueueTransaction(t *testing.T) {
 
 func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -112,7 +105,8 @@ func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 
 func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -153,7 +147,8 @@ func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 
 func TestShouldDeleteQueueTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -184,7 +179,8 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 
 func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
