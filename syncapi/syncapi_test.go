@@ -135,7 +135,8 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 	defer closeRig()
 
@@ -240,7 +241,8 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 		},
 	}, test.WithStateKey(""))
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 	defer closeRig()
 
@@ -391,7 +393,8 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 	defer closeRig()
 
@@ -490,7 +493,8 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 	defer closeRig()
 
@@ -613,7 +617,8 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 			userType = "real user"
 		}
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -889,7 +894,8 @@ func TestGetMembership(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -968,7 +974,8 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 	defer closeRig()
 
@@ -1194,7 +1201,8 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 	defer closeRig()
 
@@ -1339,7 +1347,8 @@ func TestUpdateRelations(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		t.Cleanup(closeRig)
 
@@ -1378,7 +1387,8 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	routers := httputil.NewRouters()
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer closeRig()
 

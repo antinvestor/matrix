@@ -137,7 +137,8 @@ func (d dummyACLDB) GetBulkStateContent(ctx context.Context, roomIDs []string, t
 
 func TestCachedRegex(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	db := dummyACLDB{}
 	wantBannedServer := spec.ServerName("hello.world")
 

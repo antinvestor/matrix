@@ -129,7 +129,8 @@ func TestImmediateNotification(t *testing.T) {
 // Test that new events to a joined room unblocks the request.
 func TestNewEventAndJoinedToRoom(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	n := NewNotifier(&TestRoomServer{})
 	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
@@ -197,7 +198,8 @@ func TestCorrectStreamWakeup(t *testing.T) {
 // Test that an invite unblocks the request
 func TestNewInviteEventForUser(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	n := NewNotifier(&TestRoomServer{})
 	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
@@ -256,7 +258,8 @@ func TestEDUWakeup(t *testing.T) {
 // Test that all blocked requests get woken up on a new event.
 func TestMultipleRequestWakeup(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	n := NewNotifier(&TestRoomServer{})
 	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
@@ -293,7 +296,8 @@ func TestMultipleRequestWakeup(t *testing.T) {
 // Test that you stop getting woken up when you leave a room.
 func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	// listen as bob. Make bob leave room. Make alice send event to room.
 	// Make sure alice gets woken up only and not bob as well.

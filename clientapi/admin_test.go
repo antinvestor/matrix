@@ -36,7 +36,8 @@ func TestAdminCreateToken(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		cfg.ClientAPI.RegistrationRequiresToken = true
 		defer closeRig()
@@ -190,7 +191,8 @@ func TestAdminListRegistrationTokens(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -313,7 +315,8 @@ func TestAdminGetRegistrationToken(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 		cfg.ClientAPI.RegistrationRequiresToken = true
@@ -418,7 +421,8 @@ func TestAdminDeleteRegistrationToken(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -516,7 +520,8 @@ func TestAdminUpdateRegistrationToken(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -699,7 +704,8 @@ func TestAdminResetPassword(t *testing.T) {
 	vhUser := &test.User{ID: "@vhuser:vh1"}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 		natsInstance := jetstream.NATSInstance{}
@@ -796,7 +802,8 @@ func TestPurgeRoom(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -874,7 +881,8 @@ func TestAdminEvacuateRoom(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -978,7 +986,8 @@ func TestAdminEvacuateUser(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -1076,7 +1085,8 @@ func TestAdminMarkAsStale(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -1156,7 +1166,8 @@ func TestAdminQueryEventReports(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -1393,7 +1404,8 @@ func TestEventReportsGetDelete(t *testing.T) {
 	eventIDToReport := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 

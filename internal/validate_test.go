@@ -230,7 +230,8 @@ func TestValidateApplicationServiceRequest(t *testing.T) {
 	}
 
 	// Set up a config
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer closeRig()
 

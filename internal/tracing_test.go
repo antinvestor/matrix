@@ -9,7 +9,8 @@ import (
 )
 
 func TestTracing(t *testing.T) {
-	inctx := testrig.NewContext(t)
+	inctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	task, ctx := StartTask(inctx, "testing")
 	assert.NotNil(t, ctx)

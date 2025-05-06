@@ -3,6 +3,7 @@ package sqlutil
 import (
 	"database/sql"
 	"errors"
+	"github.com/antinvestor/matrix/test"
 	"reflect"
 	"testing"
 
@@ -30,7 +31,8 @@ func TestShouldReturnCorrectAmountOfResulstIfFewerVariablesThanLimit(t *testing.
 		iKeyIDs[i] = d
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	var result = make([]int, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -67,7 +69,8 @@ func TestShouldReturnCorrectAmountOfResulstIfEqualVariablesAsLimit(t *testing.T)
 		iKeyIDs[i] = d
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	var result = make([]int, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -108,7 +111,8 @@ func TestShouldReturnCorrectAmountOfResultsIfMoreVariablesThanLimit(t *testing.T
 		iKeyIDs[i] = d
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	var result = make([]int, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -148,7 +152,9 @@ func TestShouldReturnErrorIfRowsScanReturnsError(t *testing.T) {
 		iKeyIDs[i] = d
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
+
 	var result = make([]uint, 0)
 	err = RunLimitedVariablesQuery(ctx, q, db, iKeyIDs, limit, func(rows *sql.Rows) error {
 		for rows.Next() {
@@ -168,7 +174,8 @@ func TestShouldReturnErrorIfRowsScanReturnsError(t *testing.T) {
 
 func TestRunLimitedVariablesExec(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	db, mock, err := sqlmock.New()
 	assertNoError(t, err, "Failed to make DB")

@@ -41,7 +41,8 @@ import (
 func mustCreateFederationDatabase(t *testing.T, realDatabase bool) (storage.Database, context.Context, func()) {
 	if realDatabase {
 		// Real Database/s
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 
 		dbOptions := cfg.Global.DatabaseOptions

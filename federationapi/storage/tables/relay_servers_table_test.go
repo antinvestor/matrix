@@ -73,7 +73,8 @@ func Equal(a, b []spec.ServerName) bool {
 
 func TestShouldInsertRelayServers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
 		defer closeDb()
 		expectedRelayServers := []spec.ServerName{server2, server3}
@@ -96,7 +97,8 @@ func TestShouldInsertRelayServers(t *testing.T) {
 
 func TestShouldInsertRelayServersWithDuplicates(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
 		defer closeDb()
 		insertRelayServers := []spec.ServerName{server2, server2, server2, server3, server2}
@@ -126,7 +128,8 @@ func TestShouldInsertRelayServersWithDuplicates(t *testing.T) {
 
 func TestShouldGetRelayServersUnknownDestination(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -144,7 +147,8 @@ func TestShouldGetRelayServersUnknownDestination(t *testing.T) {
 
 func TestShouldDeleteCorrectRelayServers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
 		defer closeDb()
 		relayServers1 := []spec.ServerName{server2, server3}
@@ -188,7 +192,8 @@ func TestShouldDeleteCorrectRelayServers(t *testing.T) {
 
 func TestShouldDeleteAllRelayServers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
 		defer closeDb()
 		expectedRelayServers := []spec.ServerName{server2, server3}

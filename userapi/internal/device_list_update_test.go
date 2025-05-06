@@ -158,7 +158,8 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) fclient.F
 // Test that the device keys get persisted and emitted if we have the previous IDs.
 func TestUpdateHavePrevID(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
@@ -207,7 +208,8 @@ func TestUpdateHavePrevID(t *testing.T) {
 // and that the user's devices are marked as stale until it succeeds.
 func TestUpdateNoPrevID(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
@@ -295,7 +297,8 @@ func TestDebounce(t *testing.T) {
 
 	t.Skipf("panic on closed channel on GHA")
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
@@ -407,7 +410,8 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 	rsAPI := &mockKeyserverRoomserverAPI{leftUsers: []string{bob.ID}}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		db, clearDB := mustCreateKeyserverDB(ctx, t, testOpts)
 		defer clearDB()
@@ -495,7 +499,8 @@ func Test_dedupeStateList(t *testing.T) {
 
 func TestDeviceListUpdaterIgnoreBlacklisted(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	unreachableServer := spec.ServerName("notlocalhost")
 

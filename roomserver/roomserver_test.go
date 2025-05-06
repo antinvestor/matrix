@@ -52,7 +52,8 @@ func (f *FakeQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.Room
 
 func TestUsers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -91,7 +92,8 @@ func testSharedUsers(t *testing.T, rsAPI api.RoomserverInternalAPI) {
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	// Create the room
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
@@ -129,7 +131,8 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	// Create the users in the userapi, so the RSAPI can query the account type later
 	for _, u := range []*test.User{alice, bob} {
@@ -195,7 +198,8 @@ func Test_QueryLeftUsers(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -252,7 +256,8 @@ func TestPurgeRoom(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		natsInstance := jetstream.NATSInstance{}
 		defer closeRig()
@@ -550,7 +555,8 @@ func TestRedaction(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
@@ -745,7 +751,8 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		natsInstance := jetstream.NATSInstance{}
 		defer closeRig()
@@ -795,7 +802,8 @@ func TestUpgrade(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 	charlie := test.NewUser(t)
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	spaceChild := test.NewRoom(t, alice)
 	validateTuples := []gomatrixserverlib.StateKeyTuple{
@@ -1129,7 +1137,8 @@ func TestStateReset(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		// Prepare APIs
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -1238,7 +1247,8 @@ func TestNewServerACLs(t *testing.T) {
 	roomWithoutACL := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeDB()
 
@@ -1276,7 +1286,8 @@ func TestRoomConsumerRecreation(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer closeRig()
 
@@ -1335,7 +1346,8 @@ func TestRoomsWithACLs(t *testing.T) {
 	}, test.WithStateKey(""))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeDB()
 

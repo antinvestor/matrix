@@ -42,7 +42,8 @@ func mustCreateInviteTable(t *testing.T, ctx context.Context, _ test.DependancyO
 func TestInviteTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		tab, closeFn := mustCreateInviteTable(t, ctx, testOpts)
 		defer closeFn()
 		eventID1 := util.RandomString(16)

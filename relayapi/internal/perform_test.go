@@ -63,7 +63,8 @@ func (f *testFedClient) P2PGetTransactionFromRelay(
 }
 
 func TestPerformRelayServerSync(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -84,7 +85,8 @@ func TestPerformRelayServerSync(t *testing.T) {
 }
 
 func TestPerformRelayServerSyncFedError(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -105,7 +107,8 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 }
 
 func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),

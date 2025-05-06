@@ -31,7 +31,8 @@ func TestLogin(t *testing.T) {
 	vhUser := &test.User{ID: "@vhuser:vh1"}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 

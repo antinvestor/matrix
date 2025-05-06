@@ -41,7 +41,8 @@ func mustCreateEventTypesTable(ctx context.Context, t *testing.T, _ test.Dependa
 func Test_EventTypesTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		tab, closeDb := mustCreateEventTypesTable(ctx, t, testOpts)
 		defer closeDb()
 		var eventTypeNID, gotEventTypeNID types.EventTypeNID

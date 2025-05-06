@@ -17,7 +17,8 @@ import (
 )
 
 func mustCreateOutboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.FederationOutboundPeeks, func()) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -39,7 +40,8 @@ func mustCreateOutboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables
 }
 
 func TestOutboundPeeksTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)

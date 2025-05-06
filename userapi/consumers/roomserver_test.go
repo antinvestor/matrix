@@ -62,7 +62,8 @@ func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, _ spec
 func Test_evaluatePushRules(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
 		defer closeDb()
 		consumer := OutputRoomEventConsumer{db: db, rsAPI: &FakeUserRoomserverAPI{}}
@@ -155,7 +156,8 @@ func TestLocalRoomMembers(t *testing.T) {
 	room.CreateAndInsert(t, charlie, spec.MRoomMember, map[string]string{"membership": spec.Join}, test.WithStateKey(charlie.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -265,7 +267,8 @@ func TestMessageStats(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
 		defer closeDb()
 
@@ -308,7 +311,8 @@ func TestMessageStats(t *testing.T) {
 func BenchmarkLocalRoomMembers(b *testing.B) {
 	t := &testing.T{}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer closeRig()
 	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)

@@ -29,7 +29,8 @@ func TestNewAuthenticator(t *testing.T) {
 }
 
 func TestAuthenticator(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	var idp fakeIdentityProvider
 

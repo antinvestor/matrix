@@ -17,7 +17,8 @@ import (
 )
 
 func mustCreateInboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.FederationInboundPeeks, func()) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
@@ -40,7 +41,8 @@ func mustCreateInboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.
 }
 
 func TestInboundPeeksTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)

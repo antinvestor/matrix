@@ -24,7 +24,8 @@ import (
 func mustCreateRoomServerDatabase(t *testing.T, _ test.DependancyOption) (context.Context, *shared.Database, func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	connStr, clearDB, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)

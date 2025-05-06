@@ -75,7 +75,8 @@ func TestMembershipsTable(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		table, _, closeDb := newMembershipsTable(ctx, t, testOpts)
 		defer closeDb()
 

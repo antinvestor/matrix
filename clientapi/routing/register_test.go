@@ -200,7 +200,8 @@ func TestValidationOfApplicationServices(t *testing.T) {
 		},
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer closeRig()
 
@@ -417,7 +418,8 @@ func Test_register(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -593,7 +595,8 @@ func Test_register(t *testing.T) {
 
 func TestRegisterUserWithDisplayName(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 		cfg.Global.ServerName = "server"
@@ -636,7 +639,8 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 		natsInstance := jetstream.NATSInstance{}

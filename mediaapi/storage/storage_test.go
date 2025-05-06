@@ -31,7 +31,8 @@ func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOpti
 }
 func TestMediaRepository(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
 		defer closeDb()
 		t.Run("can insert media & query media", func(t *testing.T) {
@@ -69,7 +70,8 @@ func TestMediaRepository(t *testing.T) {
 
 func TestThumbnailsStorage(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
 		defer closeDb()
 		t.Run("can insert thumbnails & query media", func(t *testing.T) {

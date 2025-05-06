@@ -71,7 +71,8 @@ func mustCreateQueueTable(
 
 func TestShoudInsertQueueTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -87,7 +88,8 @@ func TestShoudInsertQueueTransaction(t *testing.T) {
 
 func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -112,7 +114,8 @@ func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 
 func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -153,7 +156,8 @@ func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 
 func TestShouldDeleteQueueTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -184,7 +188,8 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 
 func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueTable(ctx, t, testOpts)
 		defer closeDb()
 

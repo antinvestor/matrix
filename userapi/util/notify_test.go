@@ -38,7 +38,8 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	// Create a test room, just used to provide events
 	room := test.NewRoom(t, alice)

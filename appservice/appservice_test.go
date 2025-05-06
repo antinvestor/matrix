@@ -131,7 +131,8 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -227,7 +228,8 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	srv.Start()
 	defer srv.Close()
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, tearDown := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer tearDown()
 
@@ -267,7 +269,8 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 }
 
 func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID string, wantExists bool) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	userResp := &api.UserIDExistsResponse{}
 
 	if err := asAPI.UserIDExists(ctx, &api.UserIDExistsRequest{
@@ -281,7 +284,8 @@ func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID stri
 }
 
 func testAliasExists(t *testing.T, asAPI api.AppServiceInternalAPI, alias string, wantExists bool) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	aliasResp := &api.RoomAliasExistsResponse{}
 
 	if err := asAPI.RoomAliasExists(ctx, &api.RoomAliasExistsRequest{
@@ -295,7 +299,8 @@ func testAliasExists(t *testing.T, asAPI api.AppServiceInternalAPI, alias string
 }
 
 func testLocations(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult []api.ASLocationResponse) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	locationResp := &api.LocationResponse{}
 
 	if err := asAPI.Locations(ctx, &api.LocationRequest{
@@ -309,7 +314,8 @@ func testLocations(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, 
 }
 
 func testUser(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult []api.ASUserResponse) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	userResp := &api.UserResponse{}
 
 	if err := asAPI.User(ctx, &api.UserRequest{
@@ -323,7 +329,8 @@ func testUser(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantR
 }
 
 func testProtocol(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult map[string]api.ASProtocolResponse) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	protoResp := &api.ProtocolResponse{}
 
 	if err := asAPI.Protocols(ctx, &api.ProtocolRequest{
@@ -349,7 +356,8 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 	}, test.WithStateKey(bob.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeDB()
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
@@ -433,7 +441,8 @@ func TestOutputAppserviceEvent(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
 		t.Cleanup(closeDB)
 

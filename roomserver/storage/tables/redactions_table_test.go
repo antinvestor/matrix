@@ -17,7 +17,8 @@ import (
 func mustCreateRedactionsTable(t *testing.T, _ test.DependancyOption) (tab tables.Redactions, closeDb func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -37,7 +38,8 @@ func mustCreateRedactionsTable(t *testing.T, _ test.DependancyOption) (tab table
 }
 
 func TestRedactionsTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		tab, closeFn := mustCreateRedactionsTable(t, testOpts)

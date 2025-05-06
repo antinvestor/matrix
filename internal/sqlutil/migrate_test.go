@@ -83,7 +83,8 @@ func Test_migrations_Up(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 		if err != nil {
 			t.Fatalf("failed to open database: %s", err)
@@ -116,7 +117,8 @@ func Test_migrations_Up(t *testing.T) {
 
 func Test_insertMigration(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 		if err != nil {
 			t.Fatalf("failed to open database: %s", err)

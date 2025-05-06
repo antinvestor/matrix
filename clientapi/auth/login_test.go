@@ -34,7 +34,8 @@ import (
 )
 
 func TestLoginFromJSONReader(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	tsts := []struct {
 		Name  string
@@ -154,7 +155,8 @@ func TestLoginFromJSONReader(t *testing.T) {
 }
 
 func TestBadLoginFromJSONReader(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	tsts := []struct {
 		Name  string

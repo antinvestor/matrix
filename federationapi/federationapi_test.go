@@ -183,7 +183,8 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 }
 
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOption) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -323,7 +324,8 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 		},
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 
 	defer closeRig()
@@ -460,7 +462,8 @@ func TestNotaryServer(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)

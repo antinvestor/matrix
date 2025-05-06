@@ -29,7 +29,8 @@ func newSyncDB(ctx context.Context, t *testing.T, testOpts test.DependancyOption
 func TestFilterTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		tab, closeDB := newSyncDB(ctx, t, testOpts)
 		defer closeDB()
 
@@ -72,7 +73,8 @@ func TestIgnores(t *testing.T) {
 	bob := test.NewUser(t)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		syncDB, closeDB := newSyncDB(ctx, t, testOpts)
 		defer closeDB()
 

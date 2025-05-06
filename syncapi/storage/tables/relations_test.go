@@ -17,7 +17,8 @@ import (
 func newRelationsTable(t *testing.T, _ test.DependancyOption) (tables.Relations, *sql.DB, func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -40,7 +41,8 @@ func newRelationsTable(t *testing.T, _ test.DependancyOption) (tables.Relations,
 }
 
 func compareRelationsToExpected(t *testing.T, tab tables.Relations, r types.Range, expected []types.RelationEntry) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	relations, _, err := tab.SelectRelationsInRange(ctx, nil, roomID, "a", "", "", r, 50)
 	if err != nil {
 		t.Fatal(err)
@@ -64,7 +66,8 @@ const relType = "m.reaction"
 func TestRelationsTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		tab, _, closeDb := newRelationsTable(t, testOpts)
 		defer closeDb()

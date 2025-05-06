@@ -50,7 +50,8 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		DynamicThumbnails: false,
 	}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	// create testdata folder and remove when done
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {

@@ -84,7 +84,8 @@ func mustCreateQueueJSONTable(
 
 func TestShoudInsertTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -103,7 +104,8 @@ func TestShoudInsertTransaction(t *testing.T) {
 
 func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
 		defer closeDb()
 
@@ -141,7 +143,8 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 
 func TestShouldDeleteTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
 		defer closeDb()
 

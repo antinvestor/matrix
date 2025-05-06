@@ -32,7 +32,8 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 	charlie := test.NewUser(t, test.WithAccountType(uapi.AccountTypeGuest))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 

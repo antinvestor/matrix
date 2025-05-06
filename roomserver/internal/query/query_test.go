@@ -97,7 +97,8 @@ func (db *getEventDB) EventsFromIDs(_ context.Context, _ *types.RoomInfo, eventI
 }
 
 func TestGetAuthChainSingle(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	db := createEventDB()
 
 	err := db.addFakeEvents(map[string][]string{
@@ -131,7 +132,8 @@ func TestGetAuthChainSingle(t *testing.T) {
 
 func TestGetAuthChainMultiple(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	db := createEventDB()
 
 	err := db.addFakeEvents(map[string][]string{
@@ -197,7 +199,8 @@ func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOpti
 func TestCurrentEventIsNil(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
 		defer closeDb()
 		querier := Queryer{

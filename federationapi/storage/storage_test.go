@@ -59,7 +59,8 @@ func TestExpireEDUs(t *testing.T) {
 	destinations := map[spec.ServerName]struct{}{"localhost": {}}
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		db, closeDb := mustCreateFederationDatabase(ctx, t, testOpts)
 		defer closeDb()
@@ -111,7 +112,8 @@ func TestOutboundPeeking(t *testing.T) {
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
 		defer closeDB()
 		peekID := util.RandomString(8)
@@ -191,7 +193,8 @@ func TestInboundPeeking(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
@@ -275,7 +278,8 @@ func TestServersAssumedOffline(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
 		defer closeDB()
 
@@ -334,7 +338,8 @@ func TestRelayServersStored(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
 		defer closeDB()
 

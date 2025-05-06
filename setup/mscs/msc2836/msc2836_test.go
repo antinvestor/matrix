@@ -561,7 +561,8 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	t.Cleanup(closeRig)
 

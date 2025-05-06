@@ -162,7 +162,8 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 func TestServersRequestOwnKeys(t *testing.T) {
 	// Each server will request its own keys. There's no reason
 	// for this to fail as each server should know its own keys.
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	for name, s := range servers {
 		req := gomatrixserverlib.PublicKeyLookupRequest{
@@ -189,7 +190,8 @@ func TestRenewalBehaviour(t *testing.T) {
 	// Server A will request Server C's key but their validity period
 	// is an hour in the past. We'll retrieve the key as, even though it's
 	// past its validity, it will be able to verify past events.
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	req := gomatrixserverlib.PublicKeyLookupRequest{
 		ServerName: serverC.name,

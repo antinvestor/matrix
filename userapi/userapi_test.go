@@ -72,7 +72,8 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, testOpts test.Dependanc
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 	sName := serverName
 	if opts.serverName != "" {
@@ -146,7 +147,8 @@ func TestQueryProfile(t *testing.T) {
 		}
 		for _, tc := range testCases {
 
-			ctx := testrig.NewContext(t)
+			ctx, svc, cfg := testrig.Init(t, testOpts)
+			defer svc.Stop(ctx)
 
 			profile, gotErr := testAPI.QueryProfile(ctx, tc.userID)
 			if tc.wantErr == nil && gotErr != nil || tc.wantErr != nil && gotErr == nil {

@@ -82,7 +82,8 @@ func TestIsServerAllowed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			ctx := testrig.NewContext(t)
+			ctx, svc, cfg := testrig.Init(t, testOpts)
+			defer svc.Stop(ctx)
 
 			if tt.roomFunc == nil {
 				t.Fatalf("missing roomFunc")

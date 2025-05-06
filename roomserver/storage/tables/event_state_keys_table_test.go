@@ -18,7 +18,8 @@ import (
 func mustCreateEventStateKeysTable(t *testing.T, _ test.DependancyOption) (tables.EventStateKeys, func()) {
 	t.Helper()
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
@@ -43,7 +44,8 @@ func Test_EventStateKeysTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		tab, closeDb := mustCreateEventStateKeysTable(t, testOpts)
 		defer closeDb()
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		var stateKeyNID, gotEventStateKey types.EventStateKeyNID
 		var err error
 		// create some dummy data

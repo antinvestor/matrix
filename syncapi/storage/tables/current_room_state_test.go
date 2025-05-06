@@ -20,7 +20,8 @@ import (
 
 func newCurrentRoomStateTable(t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, *sql.DB, func()) {
 	t.Helper()
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
@@ -43,7 +44,8 @@ func newCurrentRoomStateTable(t *testing.T, _ test.DependancyOption) (tables.Cur
 }
 
 func TestCurrentRoomStateTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {

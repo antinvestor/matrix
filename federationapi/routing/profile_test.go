@@ -51,7 +51,8 @@ func (u *fakeUserAPI) QueryProfile(ctx context.Context, userID string) (*authtyp
 
 func TestHandleQueryProfile(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		t.Cleanup(closeRig)
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)

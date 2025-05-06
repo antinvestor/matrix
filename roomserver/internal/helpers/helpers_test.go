@@ -19,7 +19,8 @@ import (
 )
 
 func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (context.Context, storage.Database, func()) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)

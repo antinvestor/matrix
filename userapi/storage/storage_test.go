@@ -54,7 +54,8 @@ func mustCreateUserDatabase(ctx context.Context, t *testing.T, _ test.Dependancy
 // Tests storing and getting account data
 func Test_AccountData(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
 		defer closeDb()
 		alice := test.NewUser(t)
@@ -86,7 +87,8 @@ func Test_AccountData(t *testing.T) {
 // Tests the creation of accounts
 func Test_Accounts(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
 		defer closeDb()
 		alice := test.NewUser(t)
@@ -167,7 +169,8 @@ func Test_Devices(t *testing.T) {
 	accessToken := util.RandomString(16)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
 		defer closeDb()
 
@@ -248,7 +251,8 @@ func Test_KeyBackup(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
 		defer closeDb()
 
@@ -326,7 +330,8 @@ func Test_KeyBackup(t *testing.T) {
 func Test_LoginToken(t *testing.T) {
 	alice := test.NewUser(t)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
 		defer closeDb()
 
@@ -359,7 +364,8 @@ func Test_OpenID(t *testing.T) {
 	token := util.RandomString(24)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
 		defer closeDb()
 
@@ -381,7 +387,8 @@ func Test_Profile(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
 		defer closeDb()
 
@@ -431,7 +438,8 @@ func Test_Pusher(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
 		defer closeDb()
 
@@ -483,7 +491,8 @@ func Test_ThreePID(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
 		defer closeDb()
 		threePID := util.RandomString(8)
@@ -523,7 +532,8 @@ func Test_Notification(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
 		defer closeDb()
 		// generate some dummy notifications
@@ -609,7 +619,8 @@ func MustNotError(t *testing.T, err error) {
 
 func TestKeyChanges(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, clean := mustCreateKeyDatabase(ctx, t, testOpts)
 		defer clean()
 		_, err := db.StoreKeyChange(ctx, "@alice:localhost")
@@ -633,7 +644,8 @@ func TestKeyChanges(t *testing.T) {
 
 func TestKeyChangesNoDupes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, clean := mustCreateKeyDatabase(ctx, t, testOpts)
 		defer clean()
 		deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
@@ -660,7 +672,8 @@ func TestKeyChangesNoDupes(t *testing.T) {
 
 func TestKeyChangesUpperLimit(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, clean := mustCreateKeyDatabase(ctx, t, testOpts)
 		defer clean()
 		deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
@@ -690,7 +703,8 @@ var deviceArray = []string{"AAA", "another_device"}
 func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 	var err error
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, clean := mustCreateKeyDatabase(ctx, t, testOpts)
 		defer clean()
 		alice := "@alice:TestDeviceKeysStreamIDGeneration"
@@ -777,7 +791,8 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 
 func TestOneTimeKeys(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		db, clean := mustCreateKeyDatabase(ctx, t, testOpts)
 		defer clean()
 		userID := "@alice:localhost"

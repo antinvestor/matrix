@@ -35,7 +35,8 @@ func TestLandingPage_Tcp(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer closeRig()
 

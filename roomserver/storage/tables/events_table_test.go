@@ -43,7 +43,8 @@ func Test_EventsTable(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		tab, closeDb := mustCreateEventsTable(ctx, t, testOpts)
 		defer closeDb()
 		// create some dummy data
@@ -154,7 +155,8 @@ func TestRoomsWithACL(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		eventStateKeys, closeEventStateKeys := mustCreateEventTypesTable(ctx, t, testOpts)
 		defer closeEventStateKeys()

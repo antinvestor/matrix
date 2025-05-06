@@ -39,7 +39,8 @@ import (
 
 func TestCreateNewRelayInternalAPI(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -59,7 +60,8 @@ func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 
 		var cfg config.Dendrite
 		cfg.Defaults(config.DefaultOpts{})
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 		assert.Panics(t, func() {
@@ -70,7 +72,8 @@ func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 
 func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 		defer closeRig()
 		routers := httputil.NewRouters()
@@ -117,7 +120,8 @@ func createSendRelayTxnHTTPRequest(serverName spec.ServerName, txnID string, use
 
 func TestCreateRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 
@@ -175,7 +179,8 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 
 func TestDisableRelayPublicRoutes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
 		defer closeRig()
 

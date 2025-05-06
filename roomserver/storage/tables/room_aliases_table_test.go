@@ -39,7 +39,8 @@ func TestRoomAliasesTable(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 		tab, closeFn := mustCreateRoomAliasesTable(ctx, t, testOpts)
 		defer closeFn()
 		alias, alias2, alias3 := "#alias:localhost", "#alias2:localhost", "#alias3:localhost"

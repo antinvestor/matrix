@@ -95,7 +95,7 @@ func TxStmtContext(context context.Context, transaction *sql.Tx, statement *sql.
 	return statement
 }
 
-// Hack of the century
+// QueryVariadic hack of the century
 func QueryVariadic(count int) string {
 	return QueryVariadicOffset(count, 0)
 }
