@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/internal"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -229,30 +230,27 @@ func (t *devicesTable) SelectDeviceByToken(ctx context.Context, accessToken stri
 // SelectDeviceByID retrieves a device from the database with the given user localpart and deviceID.
 func (t *devicesTable) SelectDeviceByID(ctx context.Context, localpart string, serverName spec.ServerName, deviceID string) (*api.Device, error) {
 	db := t.cm.Connection(ctx, true)
+	var dev api.Device
 	row := db.Raw(t.selectDeviceByIDSQL, localpart, serverName, deviceID).Row()
+
 	var displayName sql.NullString
 	var lastSeenTS sql.NullInt64
-	var ip, userAgent sql.NullString
-	if err := row.Scan(&displayName, &lastSeenTS, &ip); err != nil {
-		return nil, err
+	var ip sql.NullString
+	err := row.Scan(&displayName, &lastSeenTS, &ip)
+	if err == nil {
+		dev.ID = deviceID
+		dev.UserID = userutil.MakeUserID(localpart, serverName)
+		if displayName.Valid {
+			dev.DisplayName = displayName.String
+		}
+		if lastSeenTS.Valid {
+			dev.LastSeenTS = lastSeenTS.Int64
+		}
+		if ip.Valid {
+			dev.LastSeenIP = ip.String
+		}
 	}
-	dev := &api.Device{
-		ID:     deviceID,
-		UserID: userutil.MakeUserID(localpart, serverName),
-	}
-	if displayName.Valid {
-		dev.DisplayName = displayName.String
-	}
-	if lastSeenTS.Valid {
-		dev.LastSeenTS = lastSeenTS.Int64
-	}
-	if ip.Valid {
-		dev.LastSeenIP = ip.String
-	}
-	if userAgent.Valid {
-		dev.UserAgent = userAgent.String
-	}
-	return dev, nil
+	return &dev, err
 }
 
 // SelectDevicesByLocalpart retrieves all devices for a user except a specific device.
@@ -262,12 +260,13 @@ func (t *devicesTable) SelectDevicesByLocalpart(ctx context.Context, localpart s
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var devices []api.Device
 	for rows.Next() {
 		var deviceID, displayName, ip, userAgent sql.NullString
 		var lastSeenTS, sessionID sql.NullInt64
-		if err := rows.Scan(&deviceID, &displayName, &lastSeenTS, &ip, &userAgent, &sessionID); err != nil {
+		err = rows.Scan(&deviceID, &displayName, &lastSeenTS, &ip, &userAgent, &sessionID)
+		if err != nil {
 			return nil, err
 		}
 		dev := api.Device{}
@@ -302,7 +301,7 @@ func (t *devicesTable) SelectDevicesByID(ctx context.Context, deviceIDs []string
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var devices []api.Device
 	for rows.Next() {
 		var deviceID, localpart, serverName, displayName sql.NullString

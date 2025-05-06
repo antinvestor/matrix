@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -158,7 +159,7 @@ func (t *stateSnapshotTable) BulkSelectStateBlockNIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var results []types.StateBlockNIDList
 	for rows.Next() {
 		var snapshotNID int64
@@ -186,7 +187,7 @@ func (t *stateSnapshotTable) BulkSelectStateForHistoryVisibility(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var results []types.EventNID
 	for rows.Next() {
 		var eventNID types.EventNID
@@ -206,7 +207,7 @@ func (t *stateSnapshotTable) BulkSelectMembershipForHistoryVisibility(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	result := make(map[string]*types.HeaderedEvent, len(eventIDs))
 	knownEvents := make(map[string]*types.HeaderedEvent, len(eventIDs))
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomInfo.RoomVersion)

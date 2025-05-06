@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -88,7 +89,7 @@ func (s *relayQueueJSONStatements) SelectQueueJSON(ctx context.Context, jsonNIDs
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	blobs := map[int64][]byte{}
 	for rows.Next() {
 		var nid int64

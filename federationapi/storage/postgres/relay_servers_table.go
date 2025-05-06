@@ -18,6 +18,7 @@ import (
 	"context"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
 )
@@ -52,11 +53,11 @@ const deleteAllRelayServersSQL = "" +
 
 // relayServersTable provides methods for relay servers operations using GORM.
 type relayServersTable struct {
-	cm                 *sqlutil.Connections
-	InsertSQL          string
-	SelectSQL          string
-	DeleteSQL          string
-	DeleteAllSQL       string
+	cm           *sqlutil.Connections
+	InsertSQL    string
+	SelectSQL    string
+	DeleteSQL    string
+	DeleteAllSQL string
 }
 
 // NewPostgresRelayServersTable initializes a relayServersTable with SQL constants and a connection manager
@@ -88,7 +89,7 @@ func (t *relayServersTable) SelectRelayServers(ctx context.Context, serverName s
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var result []spec.ServerName
 	for rows.Next() {
 		var relayServer string

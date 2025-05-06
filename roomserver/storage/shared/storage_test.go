@@ -102,10 +102,10 @@ func TestUserRoomKeys(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
-	userID, err := spec.NewUserID(alice.ID, true)
-	assert.NoError(t, err)
-	roomID, err := spec.NewRoomID(room.ID)
-	assert.NoError(t, err)
+	userID, err0 := spec.NewUserID(alice.ID, true)
+	assert.NoError(t, err0)
+	roomID, err0 := spec.NewRoomID(room.ID)
+	assert.NoError(t, err0)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
@@ -114,7 +114,7 @@ func TestUserRoomKeys(t *testing.T) {
 		db := mustCreateRoomServerDatabase(ctx, svc, cfg, t)
 
 		// create a room NID so we can query the room
-		_, err = db.RoomsTable.InsertRoomNID(ctx, roomID.String(), gomatrixserverlib.RoomVersionV10)
+		_, err := db.RoomsTable.InsertRoomNID(ctx, roomID.String(), gomatrixserverlib.RoomVersionV10)
 		assert.NoError(t, err)
 		doesNotExist, err := spec.NewRoomID("!doesnotexist:localhost")
 		assert.NoError(t, err)

@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/antinvestor/matrix/internal"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -99,7 +100,7 @@ func (t *publishedTable) SelectAllPublishedRooms(ctx context.Context, networkID 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var roomIDs []string
 	for rows.Next() {
 		var roomID string

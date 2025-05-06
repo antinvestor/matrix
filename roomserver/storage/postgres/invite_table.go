@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -107,7 +108,7 @@ func (t *inviteTable) UpdateInviteRetired(ctx context.Context, roomNID types.Roo
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var inviteEventIDs []string
 	for rows.Next() {
 		var inviteEventID string
@@ -125,7 +126,7 @@ func (t *inviteTable) SelectInviteActiveForUserInRoom(ctx context.Context, targe
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var senderNIDs []types.EventStateKeyNID
 	var inviteEventIDs []string
 	var inviteEventJSON []byte

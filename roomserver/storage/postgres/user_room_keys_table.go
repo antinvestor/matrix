@@ -88,48 +88,85 @@ func NewPostgresUserRoomKeysTable(cm *sqlutil.Connections) tables.UserRoomKeys {
 
 func (t *userRoomKeysTable) InsertUserRoomPrivatePublicKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
 	db := t.cm.Connection(ctx, false)
-	var retKey []byte
-	err = db.Raw(t.insertUserRoomPrivateKeySQL, userNID, roomNID, key, key.Public()).Scan(&retKey).Error
+
+	rows, err := db.Raw(t.insertUserRoomPrivateKeySQL, userNID, roomNID, []byte(key), key.Public()).Rows()
+	defer internal.CloseAndLogIfError(ctx, rows, "could not close rows well")
+
 	if err != nil {
 		return nil, err
 	}
-	return ed25519.PrivateKey(retKey), nil
+
+	var retKey []byte
+
+	if rows.Next() {
+		err = rows.Scan(&retKey)
+		if err != nil {
+			return nil, err
+		}
+		return ed25519.PrivateKey(retKey), nil
+	}
+	return nil, sql.ErrNoRows
+
 }
 
 func (t *userRoomKeysTable) InsertUserRoomPublicKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PublicKey) (result ed25519.PublicKey, err error) {
 	db := t.cm.Connection(ctx, false)
-	var retKey []byte
-	err = db.Raw(t.insertUserRoomPublicKeySQL, userNID, roomNID, key).Scan(&retKey).Error
+	rows, err := db.Raw(t.insertUserRoomPublicKeySQL, userNID, roomNID, key).Rows()
+	defer internal.CloseAndLogIfError(ctx, rows, "could not close rows well")
+
 	if err != nil {
 		return nil, err
 	}
-	return ed25519.PublicKey(retKey), nil
+	var publicKeyResult []byte
+
+	if rows.Next() {
+		err = rows.Scan(&publicKeyResult)
+		if err != nil {
+			return nil, err
+		}
+		return ed25519.PublicKey(publicKeyResult), nil
+	}
+	return nil, nil
 }
 
 func (t *userRoomKeysTable) SelectUserRoomPrivateKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID) (ed25519.PrivateKey, error) {
 	db := t.cm.Connection(ctx, true)
-	var result []byte
-	err := db.Raw(t.selectUserRoomKeySQL, userNID, roomNID).Scan(&result).Error
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
+	rows, err := db.Raw(t.selectUserRoomKeySQL, userNID, roomNID).Rows()
+	defer internal.CloseAndLogIfError(ctx, rows, "could not close rows well")
+
 	if err != nil {
 		return nil, err
 	}
-	return ed25519.PrivateKey(result), nil
+	var privateKeyResult []byte
+
+	if rows.Next() {
+		err = rows.Scan(&privateKeyResult)
+		if err != nil {
+			return nil, err
+		}
+		return ed25519.PrivateKey(privateKeyResult), nil
+	}
+	return nil, nil
 }
 
 func (t *userRoomKeysTable) SelectUserRoomPublicKey(ctx context.Context, userNID types.EventStateKeyNID, roomNID types.RoomNID) (ed25519.PublicKey, error) {
 	db := t.cm.Connection(ctx, true)
-	var result []byte
-	err := db.Raw(t.selectUserRoomPublicKeySQL, userNID, roomNID).Scan(&result).Error
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
+	rows, err := db.Raw(t.selectUserRoomPublicKeySQL, userNID, roomNID).Rows()
+	defer internal.CloseAndLogIfError(ctx, rows, "could not close rows well")
+
 	if err != nil {
 		return nil, err
 	}
-	return ed25519.PublicKey(result), nil
+	var publicKeyResult []byte
+
+	if rows.Next() {
+		err = rows.Scan(&publicKeyResult)
+		if err != nil {
+			return nil, err
+		}
+		return ed25519.PublicKey(publicKeyResult), nil
+	}
+	return nil, nil
 }
 
 func (t *userRoomKeysTable) BulkSelectUserNIDs(ctx context.Context, senderKeys map[types.RoomNID][]ed25519.PublicKey) (map[string]types.UserRoomKeyPair, error) {

@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/lib/pq"
 
 	"github.com/antinvestor/matrix/internal/eventutil"
@@ -89,7 +90,7 @@ func (t *notificationDataTable) SelectUserUnreadCountsForRooms(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 
 	roomCounts := map[string]*eventutil.NotificationData{}
 	var roomID string

@@ -17,7 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/shared"
 	"github.com/antinvestor/matrix/internal/caching"
@@ -92,8 +91,6 @@ var Migrations = []frame.MigrationPatch{
 // Database stores information needed by the federation sender
 type Database struct {
 	shared.Database
-	db     *sql.DB
-	writer sqlutil.Writer
 }
 
 // NewDatabase opens a new database
@@ -119,10 +116,8 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.Fed
 	serverSigningKeys := NewPostgresServerSigningKeysTable(cm)
 
 	d.Database = shared.Database{
-		DB:                       d.db,
 		IsLocalServerName:        isLocalServerName,
 		Cache:                    cache,
-		Writer:                   d.writer,
 		FederationJoinedHosts:    joinedHosts,
 		FederationQueuePDUs:      queuePDUs,
 		FederationQueueEDUs:      queueEDUs,

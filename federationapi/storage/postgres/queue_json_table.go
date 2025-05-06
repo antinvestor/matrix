@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
 )
@@ -93,7 +94,7 @@ func (t *queueJSONTable) SelectQueueJSON(ctx context.Context, jsonNIDs []int64) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	for rows.Next() {
 		var nid int64
 		var jsonBody []byte

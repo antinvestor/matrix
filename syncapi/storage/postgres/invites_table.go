@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/antinvestor/matrix/internal"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
@@ -139,7 +140,7 @@ func (t *inviteEventsTable) SelectInviteEventsInRange(
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var (
 		id                types.StreamPosition
 		roomID            string

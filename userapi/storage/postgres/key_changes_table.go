@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
@@ -82,7 +83,7 @@ func (t *keyChangesTable) SelectKeyChanges(ctx context.Context, fromOffset, toOf
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	for rows.Next() {
 		var userID string
 		var offset int64

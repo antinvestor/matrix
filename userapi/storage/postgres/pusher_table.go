@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -104,7 +105,7 @@ func (t *pushersTable) SelectPushers(ctx context.Context, localpart string, serv
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var pushers []api.Pusher
 	for rows.Next() {
 		var pusher api.Pusher

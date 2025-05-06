@@ -16,18 +16,15 @@ package test
 
 import (
 	"context"
-	"crypto/sha256"
-	"database/sql"
+	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"net/url"
 	"os"
 	"testing"
 
 	"github.com/antinvestor/matrix/setup/config"
-
-	"github.com/lib/pq"
 )
 
 type DependancyOption struct {
@@ -51,74 +48,70 @@ func (opt *DependancyOption) Queue() string {
 }
 
 // ensureDatabaseExists checks if a specific database exists and creates it if it does not.
-func ensureDatabaseExists(_ context.Context, postgresUri *url.URL, newDbName string) (*url.URL, error) {
-
-	var connectionString = postgresUri.String()
-	db, err := sql.Open("postgres", connectionString)
+func ensureDatabaseExists(ctx context.Context, postgresUri *url.URL, newDbName string) (*url.URL, error) {
+	connectionString := postgresUri.String()
+	config, err := pgxpool.ParseConfig(connectionString)
 	if err != nil {
 		return postgresUri, err
 	}
-	defer func(db *sql.DB) {
-		_ = db.Close()
-	}(db)
-
-	if err = db.Ping(); err != nil {
+	config.MaxConns = 20 // Increase pool size for concurrency
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
 		return postgresUri, err
 	}
-	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s;`, newDbName))
-	if err != nil {
-		var pqErr *pq.Error
-		ok := errors.As(err, &pqErr)
-		if !ok {
+
+	defer pool.Close()
+
+	if err = pool.Ping(ctx); err != nil {
+		return postgresUri, err
+	}
+
+	// Check if database exists before trying to create it
+	var exists bool
+	checkQuery := `SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1);`
+	if err := pool.QueryRow(ctx, checkQuery, newDbName).Scan(&exists); err != nil {
+		return postgresUri, err
+	}
+	if !exists {
+		_, err = pool.Exec(ctx, fmt.Sprintf(`CREATE DATABASE %s;`, newDbName))
+		if err != nil {
 			return postgresUri, err
-		}
-		// we ignore duplicate database error as we expect this
-		if pqErr.Code != "42P04" {
-			return postgresUri, pqErr
 		}
 	}
 
 	dbUserName := postgresUri.User.Username()
-
-	_, err = db.Exec(fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE %s TO %s;`, newDbName, dbUserName))
+	_, err = pool.Exec(ctx, fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE %s TO %s;`, newDbName, dbUserName))
 	if err != nil {
 		return postgresUri, err
 	}
 
 	postgresUri.Path = newDbName
-
 	return postgresUri, nil
 }
 
-func clearDatabase(_ context.Context, connectionStr string) error {
+func clearDatabase(ctx context.Context, connectionString string) error {
 
-	db, err := sql.Open("postgres", connectionStr)
+	pool, err := pgxpool.New(ctx, connectionString)
 	if err != nil {
 		return err
 	}
+	defer pool.Close()
 
-	defer func(db *sql.DB) {
-		_ = db.Close()
-	}(db)
-
-	_, err = db.Exec(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`)
+	_, err = pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+// generateNewDBName generates a random DB name for each test run for full isolation.
 func generateNewDBName() (string, error) {
-	// we cannot use 'matrix_test' here else 2x concurrently running packages will try to use the same db.
-	// instead, hash the current working directory, snaffle the first 16 bytes and append that to matrix_test
-	// and use that as the unique db name. We do this because packages are per-directory hence by hashing the
-	// working (test) directory we ensure we get a consistent hash and don't hash against concurrent packages.
-	wd, err := os.Getwd()
+	b := make([]byte, 8)
+	_, err := rand.Read(b)
 	if err != nil {
 		return "", err
 	}
-	hash := sha256.Sum256([]byte(wd))
-	databaseName := fmt.Sprintf("matrix_tests_%s", hex.EncodeToString(hash[:16]))
+	databaseName := fmt.Sprintf("matrix_test_%s", hex.EncodeToString(b))
 	return databaseName, nil
 }
 
@@ -126,14 +119,11 @@ func generateNewDBName() (string, error) {
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config.DataSource, close func(ctx context.Context), err error) {
-
-	var connectionUri *url.URL
+func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config.DataSource, close func(context.Context), err error) {
 	postgresUriStr := os.Getenv("TESTING_DATABASE_URI")
 	if postgresUriStr == "" {
 		postgresUriStr = "postgres://matrix:s3cr3t@127.0.0.1:5432/matrix?sslmode=disable"
 	}
-
 	parsedPostgresUri, err := url.Parse(postgresUriStr)
 	if err != nil {
 		return "", func(ctx context.Context) {}, err
@@ -144,7 +134,7 @@ func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config
 		return "", func(ctx context.Context) {}, err
 	}
 
-	connectionUri, err = ensureDatabaseExists(ctx, parsedPostgresUri, newDatabaseName)
+	connectionUri, err := ensureDatabaseExists(ctx, parsedPostgresUri, newDatabaseName)
 	if err != nil {
 		return "", func(ctx context.Context) {}, err
 	}

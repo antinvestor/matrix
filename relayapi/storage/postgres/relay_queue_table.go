@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/antinvestor/matrix/internal"
 
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 
@@ -120,7 +121,7 @@ func (s *relayQueueStatements) SelectQueueEntries(
 	if err != nil {
 		return []int64{}, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var nids []int64
 	for rows.Next() {
 		var nid int64

@@ -21,6 +21,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
 )
@@ -125,7 +126,7 @@ func (t *notaryServerKeysMetadataTable) SelectKeys(ctx context.Context, serverNa
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var results []gomatrixserverlib.ServerKeys
 	for rows.Next() {
 		var rawJSON string

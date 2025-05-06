@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
+	"github.com/antinvestor/matrix/internal"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -112,7 +113,7 @@ func (t *queuePDUsTable) SelectQueuePDUs(ctx context.Context, serverName spec.Se
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var result []int64
 	for rows.Next() {
 		var nid int64
@@ -130,7 +131,7 @@ func (t *queuePDUsTable) SelectQueuePDUServerNames(ctx context.Context) ([]spec.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var result []spec.ServerName
 	for rows.Next() {
 		var name spec.ServerName

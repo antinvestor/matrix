@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/antinvestor/matrix/internal"
 	"time"
 
 	"github.com/lib/pq"
@@ -173,7 +174,7 @@ func (t *deviceKeysTable) SelectBatchDeviceKeys(ctx context.Context, userID stri
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	deviceIDMap := make(map[string]bool)
 	for _, d := range deviceIDs {
 		deviceIDMap[d] = true

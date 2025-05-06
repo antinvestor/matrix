@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -226,7 +227,7 @@ func (t *membershipTable) SelectMembershipsFromRoom(ctx context.Context, roomNID
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var eventNIDs []types.EventNID
 	for rows.Next() {
 		var eventNID types.EventNID
@@ -250,7 +251,7 @@ func (t *membershipTable) SelectMembershipsFromRoomAndMembership(ctx context.Con
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var eventNIDs []types.EventNID
 	for rows.Next() {
 		var eventNID types.EventNID
@@ -277,7 +278,7 @@ func (t *membershipTable) SelectRoomsWithMembership(ctx context.Context, userID 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var roomNIDs []types.RoomNID
 	for rows.Next() {
 		var roomNID types.RoomNID
@@ -295,7 +296,7 @@ func (t *membershipTable) SelectKnownUsers(ctx context.Context, userID types.Eve
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var users []string
 	for rows.Next() {
 		var user string
@@ -349,7 +350,7 @@ func (t *membershipTable) SelectJoinedUsers(ctx context.Context, targetUserNIDs 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var result []types.EventStateKeyNID
 	for rows.Next() {
 		var targetNID int64
@@ -375,7 +376,7 @@ func (t *membershipTable) SelectJoinedUsersSetForRooms(ctx context.Context, room
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	result := make(map[types.EventStateKeyNID]int)
 	for rows.Next() {
 		var targetNID int64
@@ -398,7 +399,7 @@ func (t *membershipTable) SelectJoinedUsersSetForRoomsSQL(ctx context.Context, r
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	result := make(map[types.EventStateKeyNID]int)
 	for rows.Next() {
 		var targetNID int64

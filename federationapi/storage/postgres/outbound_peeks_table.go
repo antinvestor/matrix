@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
+	"github.com/antinvestor/matrix/internal"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -119,7 +120,7 @@ func (t *outboundPeeksTable) SelectOutboundPeeks(ctx context.Context, roomID str
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var peeks []types.OutboundPeek
 	for rows.Next() {
 		var peek types.OutboundPeek

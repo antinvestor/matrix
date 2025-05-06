@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"github.com/antinvestor/matrix/internal"
 	"time"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -141,7 +142,7 @@ func (t *peeksTable) SelectPeeksInRange(
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	for rows.Next() {
 		var p types.Peek
 		var changed bool
@@ -165,7 +166,7 @@ func (t *peeksTable) SelectPeekingDevices(
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	for rows.Next() {
 		var pd types.PeekingDevice
 		var roomID string

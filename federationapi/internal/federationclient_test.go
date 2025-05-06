@@ -52,7 +52,7 @@ func (t *testFedClient) ClaimKeys(ctx context.Context, origin, s spec.ServerName
 }
 
 func TestFederationClientQueryKeys(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 
@@ -85,7 +85,7 @@ func TestFederationClientQueryKeys(t *testing.T) {
 
 func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 	err := testDB.AddServerToBlacklist(ctx, "server")
@@ -119,7 +119,7 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 }
 
 func TestFederationClientQueryKeysFailure(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 
@@ -152,7 +152,7 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 
 func TestFederationClientClaimKeys(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 
@@ -184,7 +184,7 @@ func TestFederationClientClaimKeys(t *testing.T) {
 }
 
 func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 	err := testDB.AddServerToBlacklist(ctx, "server")

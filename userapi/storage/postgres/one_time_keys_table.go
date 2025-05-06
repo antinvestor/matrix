@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/antinvestor/matrix/internal"
 	"time"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -108,7 +109,7 @@ func (t *oneTimeKeysTable) InsertOneTimeKeys(ctx context.Context, keys api.OneTi
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	for rows.Next() {
 		var algorithm string
 		var count int
@@ -127,7 +128,7 @@ func (t *oneTimeKeysTable) SelectOneTimeKeys(ctx context.Context, userID, device
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	result := make(map[string]json.RawMessage)
 	var (
 		algorithmWithID string
@@ -176,7 +177,7 @@ func (t *oneTimeKeysTable) CountOneTimeKeys(ctx context.Context, userID, deviceI
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	counts := &api.OneTimeKeysCount{
 		DeviceID: deviceID,
 		UserID:   userID,

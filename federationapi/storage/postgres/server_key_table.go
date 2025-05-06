@@ -20,6 +20,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
 )
@@ -64,9 +65,9 @@ const upsertServerSigningKeysSQL = "" +
 
 // serverSigningKeysTable provides methods for server signing keys operations using GORM.
 type serverSigningKeysTable struct {
-	cm                   *sqlutil.Connections
-	BulkSelectKeysSQL    string
-	UpsertKeysSQL        string
+	cm                *sqlutil.Connections
+	BulkSelectKeysSQL string
+	UpsertKeysSQL     string
 }
 
 // NewPostgresServerSigningKeysTable initializes a serverSigningKeysTable with SQL constants and a connection manager
@@ -89,7 +90,7 @@ func (t *serverSigningKeysTable) BulkSelectServerKeys(ctx context.Context, reque
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 	var serverName string
 	var keyID string

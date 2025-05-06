@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/antinvestor/matrix/internal"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
@@ -153,7 +154,7 @@ func (t *profilesTable) SelectProfilesBySearch(ctx context.Context, localpart, s
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var profiles []authtypes.Profile
 	for rows.Next() {
 		var profile authtypes.Profile

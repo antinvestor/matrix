@@ -18,6 +18,7 @@ import (
 	"context"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 )
@@ -93,7 +94,7 @@ func (t *threepidTable) SelectThreePIDsForLocalpart(ctx context.Context, localpa
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var threepids []authtypes.ThreePID
 	for rows.Next() {
 		var pid authtypes.ThreePID

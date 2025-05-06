@@ -20,6 +20,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/federationapi/types"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
 )
@@ -128,7 +129,7 @@ func (t *joinedHostsTable) SelectJoinedHosts(ctx context.Context, roomID string)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var result []types.JoinedHost
 	for rows.Next() {
 		var eventID, serverName string
@@ -151,7 +152,7 @@ func (t *joinedHostsTable) SelectAllJoinedHosts(ctx context.Context) ([]spec.Ser
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var result []spec.ServerName
 	for rows.Next() {
 		var serverName string
@@ -177,7 +178,7 @@ func (t *joinedHostsTable) SelectJoinedHostsForRooms(ctx context.Context, roomID
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var result []spec.ServerName
 	for rows.Next() {
 		var serverName string

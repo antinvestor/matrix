@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -70,7 +71,7 @@ func (t *crossSigningKeysTable) SelectCrossSigningKeysForUser(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	r := types.CrossSigningKeyMap{}
 	for rows.Next() {
 		var keyTypeInt int16

@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -153,7 +154,7 @@ func (t *reportedEventsTable) SelectReportedEvents(
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	// Initialize variables to store the report count and the slice of reports.
 	var reports []api.QueryAdminEventReportsResponse
 	var reportCount int64

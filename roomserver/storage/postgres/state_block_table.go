@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"github.com/antinvestor/matrix/internal"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -101,7 +102,7 @@ func (t *stateBlockTable) BulkSelectStateBlockEntries(ctx context.Context, state
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	results := make([][]types.EventNID, len(stateBlockNIDs))
 	i := 0
 	for rows.Next() {

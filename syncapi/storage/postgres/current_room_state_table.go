@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
@@ -168,7 +169,7 @@ func (t *currentRoomStateTable) SelectJoinedUsers(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	result := make(map[string][]string)
 	var roomID, userID string
 	for rows.Next() {
@@ -190,7 +191,7 @@ func (t *currentRoomStateTable) SelectJoinedUsersInRoom(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	result := make(map[string][]string)
 	var userID, roomID string
 	for rows.Next() {
@@ -213,7 +214,7 @@ func (t *currentRoomStateTable) SelectRoomIDsWithMembership(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var result []string
 	for rows.Next() {
 		var roomID string
@@ -235,7 +236,7 @@ func (t *currentRoomStateTable) SelectRoomIDsWithAnyMembership(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	result := map[string]string{}
 	for rows.Next() {
 		var roomID, membership string
@@ -277,7 +278,7 @@ func (t *currentRoomStateTable) SelectCurrentState(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	return rowsToEvents(rows)
 }
 
@@ -341,7 +342,7 @@ func (t *currentRoomStateTable) SelectEventsWithEventIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	return currentRoomStateRowsToStreamEvents(rows)
 }
 
@@ -374,7 +375,7 @@ func (t *currentRoomStateTable) SelectSharedUsers(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var result []string
 	for rows.Next() {
 		var user string
@@ -397,7 +398,7 @@ func (t *currentRoomStateTable) SelectRoomHeroes(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var heroes []string
 	for rows.Next() {
 		var userID string

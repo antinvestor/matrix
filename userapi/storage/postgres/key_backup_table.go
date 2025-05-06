@@ -124,7 +124,7 @@ func (t *keyBackupTable) SelectKeys(ctx context.Context, userID, version string)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	return unpackKeys(ctx, rows)
 }
 
@@ -134,7 +134,7 @@ func (t *keyBackupTable) SelectKeysByRoomID(ctx context.Context, userID, version
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	return unpackKeys(ctx, rows)
 }
 
@@ -144,7 +144,7 @@ func (t *keyBackupTable) SelectKeysByRoomIDAndSessionID(ctx context.Context, use
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	return unpackKeys(ctx, rows)
 }
 

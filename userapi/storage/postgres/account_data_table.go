@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/antinvestor/matrix/internal"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -88,7 +89,7 @@ func (t *accountDataTable) SelectAccountData(ctx context.Context, localpart stri
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	global := map[string]json.RawMessage{}
 	rooms := map[string]map[string]json.RawMessage{}
 	for rows.Next() {

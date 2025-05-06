@@ -98,9 +98,9 @@ func NewPostgresAccountsTable(cm *sqlutil.Connections) tables.AccountsTable {
 func (t *accountsTable) InsertAccount(ctx context.Context, localpart string, serverName spec.ServerName, hash, appserviceID string, accountType api.AccountType) (*api.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1e6
 	db := t.cm.Connection(ctx, false)
-	result := db.Exec(t.insertAccountSQL, localpart, serverName, createdTimeMS, hash, appserviceID, int32(accountType))
-	if result.Error != nil {
-		return nil, result.Error
+	err := db.Exec(t.insertAccountSQL, localpart, serverName, createdTimeMS, hash, appserviceID, int32(accountType)).Error
+	if err != nil {
+		return nil, err
 	}
 	acc := &api.Account{
 		Localpart:    localpart,

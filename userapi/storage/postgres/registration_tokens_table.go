@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/antinvestor/matrix/internal"
 	"time"
 
 	"github.com/antinvestor/matrix/clientapi/api"
@@ -135,7 +136,7 @@ func (t *registrationTokensTable) ListRegistrationTokens(ctx context.Context, re
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var tokens []api.RegistrationToken
 	for rows.Next() {
 		var tkn api.RegistrationToken

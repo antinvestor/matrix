@@ -1705,7 +1705,7 @@ func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.Use
 	}
 
 	key, sErr = d.UserRoomKeyTable.SelectUserRoomPrivateKey(ctx, stateKeyNID, roomInfo.RoomNID)
-	if !errors.Is(sErr, sql.ErrNoRows) {
+	if sErr != nil {
 		return nil, sErr
 	}
 	return key, nil
@@ -1731,7 +1731,7 @@ func (d *Database) SelectUserRoomPublicKey(ctx context.Context, userID spec.User
 	}
 
 	key, sErr = d.UserRoomKeyTable.SelectUserRoomPublicKey(ctx, stateKeyNID, roomInfo.RoomNID)
-	if !errors.Is(sErr, sql.ErrNoRows) {
+	if sErr != nil {
 		return nil, sErr
 	}
 	return key, nil

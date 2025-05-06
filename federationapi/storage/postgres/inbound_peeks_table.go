@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
+	"github.com/antinvestor/matrix/internal"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -117,7 +118,7 @@ func (t *inboundPeeksTable) SelectInboundPeeks(ctx context.Context, roomID strin
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var peeks []types.InboundPeek
 	for rows.Next() {
 		var peek types.InboundPeek

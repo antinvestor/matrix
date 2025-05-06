@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/antinvestor/matrix/internal"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -147,11 +148,11 @@ func (t *msc2836EdgeTable) ChildrenForParent(ctx context.Context, eventID, relTy
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows") // nolint: errcheck
 	var children []shared.EventInfo
 	for rows.Next() {
 		var evInfo shared.EventInfo
-		if err := rows.Scan(&evInfo.EventID, &evInfo.OriginServerTS, &evInfo.RoomID); err != nil {
+		if err = rows.Scan(&evInfo.EventID, &evInfo.OriginServerTS, &evInfo.RoomID); err != nil {
 			return nil, err
 		}
 		children = append(children, evInfo)

@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -129,7 +130,7 @@ func (s *thumbnailStatements) SelectThumbnails(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var results []*types.ThumbnailMetadata
 	for rows.Next() {
 		var meta types.ThumbnailMetadata

@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/internal"
 	"sort"
 	"strings"
 
@@ -291,7 +292,7 @@ func (t *outputRoomEventsTable) SelectStateInRange(
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	// Process state change events for all rooms between the two positions.
 	eventIDToEvent := make(map[string]types.StreamEvent)
 	stateNeeded := make(map[string]map[string]bool)
@@ -427,7 +428,7 @@ func (t *outputRoomEventsTable) SelectRecentEvents(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	result := make(map[string]types.RecentEvents)
 	for rows.Next() {
 		var (
@@ -516,7 +517,7 @@ func (t *outputRoomEventsTable) SelectEvents(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	streamEvents, err := rowsToStreamEvents(rows)
 	if err != nil {
 		return nil, err
@@ -580,7 +581,7 @@ func (t *outputRoomEventsTable) SelectContextBeforeEvent(
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	for rows.Next() {
 		var (
 			eventBytes        []byte
@@ -617,7 +618,7 @@ func (t *outputRoomEventsTable) SelectContextAfterEvent(
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	for rows.Next() {
 		var (
 			rowID             int
@@ -653,7 +654,7 @@ func (t *outputRoomEventsTable) ReIndex(ctx context.Context, limit, afterID int6
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	var (
 		eventID string
 		id      int64
@@ -746,7 +747,7 @@ func (t *outputRoomEventsTable) SearchEvents(
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	resultHits, err := rowsToSearchResult(rows)
 	if err != nil {
 		return nil, err

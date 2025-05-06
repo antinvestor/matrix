@@ -161,8 +161,8 @@ const (
 	AllNotifications NotificationFilter = (1 << 31) - 1
 )
 
+// OneTimeKeys defines the interface for one-time keys DB operations, without transactions.
 type OneTimeKeys interface {
-	// OneTimeKeys defines the interface for one-time keys DB operations, without transactions.
 	SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error)
 	CountOneTimeKeys(ctx context.Context, userID, deviceID string) (*api.OneTimeKeysCount, error)
 	InsertOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error)
@@ -170,8 +170,8 @@ type OneTimeKeys interface {
 	DeleteOneTimeKeys(ctx context.Context, userID, deviceID string) error
 }
 
+// DeviceKeys defines the interface for device keys DB operations, without transactions.
 type DeviceKeys interface {
-	// DeviceKeys defines the interface for device keys DB operations, without transactions.
 	SelectDeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error
 	InsertDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error
 	SelectMaxStreamIDForUser(ctx context.Context, userID string) (streamID int64, err error)
@@ -188,21 +188,21 @@ type KeyChanges interface {
 	SelectKeyChanges(ctx context.Context, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error)
 }
 
+// StaleDeviceLists defines the interface for stale device list DB operations, without transactions.
 type StaleDeviceLists interface {
-	// StaleDeviceLists defines the interface for stale device list DB operations, without transactions.
 	InsertStaleDeviceList(ctx context.Context, userID string, isStale bool) error
 	SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []spec.ServerName) ([]string, error)
 	DeleteStaleDeviceLists(ctx context.Context, userIDs []string) error
 }
 
+// CrossSigningKeys defines the interface for cross-signing keys DB operations, without transactions.
 type CrossSigningKeys interface {
-	// CrossSigningKeys defines the interface for cross-signing keys DB operations, without transactions.
 	SelectCrossSigningKeysForUser(ctx context.Context, userID string) (r types.CrossSigningKeyMap, err error)
 	UpsertCrossSigningKeysForUser(ctx context.Context, userID string, keyType fclient.CrossSigningKeyPurpose, keyData spec.Base64Bytes) error
 }
 
+// CrossSigningSigs defines the interface for cross-signing signatures DB operations, without transactions.
 type CrossSigningSigs interface {
-	// CrossSigningSigs defines the interface for cross-signing signatures DB operations, without transactions.
 	SelectCrossSigningSigsForTarget(ctx context.Context, originUserID, targetUserID string, targetKeyID gomatrixserverlib.KeyID) (r types.CrossSigningSigMap, err error)
 	UpsertCrossSigningSigsForTarget(ctx context.Context, originUserID string, originKeyID gomatrixserverlib.KeyID, targetUserID string, targetKeyID gomatrixserverlib.KeyID, signature spec.Base64Bytes) error
 	DeleteCrossSigningSigsForTarget(ctx context.Context, targetUserID string, targetKeyID gomatrixserverlib.KeyID) error

@@ -18,6 +18,7 @@ import (
 	"context"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
@@ -73,7 +74,7 @@ func (t *crossSigningSigsTable) SelectCrossSigningSigsForTarget(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 	r := types.CrossSigningSigMap{}
 	for rows.Next() {
 		var userID string

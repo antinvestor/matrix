@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"os"
@@ -78,6 +79,7 @@ func TestMain(m *testing.M) {
 
 			cfg := &config.Matrix{}
 			cfg.Defaults(defaultOpts)
+
 			cfg.Global.ServerName = s.name
 
 			// Generate a new key.
@@ -92,6 +94,16 @@ func TestMain(m *testing.M) {
 			cfg.FederationAPI.KeyPerspectives = nil
 
 			s.config = &cfg.FederationAPI
+
+			for _, conn := range defaultOpts.DatabaseConnectionStr.ToArray() {
+				cfg.Global.DatabasePrimaryURL = append(cfg.Global.DatabasePrimaryURL, string(conn))
+			}
+
+			scfg := cfg.Global
+
+			svcOpts := []frame.Option{frame.Config(&scfg), frame.Datastore(ctx)}
+
+			svc.Init(svcOpts...)
 
 			s.cache, err = caching.NewCache(&config.CacheOptions{
 				ConnectionString: cfg.Global.Cache.ConnectionString,
@@ -116,7 +128,10 @@ func TestMain(m *testing.M) {
 
 			// Finally, build the server key APIs.
 
-			cm := sqlutil.NewConnectionManager(svc)
+			cm, err0 := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &config.DatabaseOptions{ConnectionString: defaultOpts.DatabaseConnectionStr})
+			if err0 != nil {
+				panic("could not create connection manager from connection: " + defaultOpts.DatabaseConnectionStr)
+			}
 			s.api = NewInternalAPI(ctx, cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)
 		}
 

@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/lib/pq"
@@ -121,7 +122,14 @@ func (t *receiptTable) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []st
 // SelectMaxReceiptID returns the maximum stream position for receipts.
 func (t *receiptTable) SelectMaxReceiptID(ctx context.Context) (id int64, err error) {
 	db := t.cm.Connection(ctx, true)
-	err = db.Raw(t.selectMaxReceiptIDSQL).Row().Scan(&id)
+
+	var scanId sql.NullInt64
+
+	err = db.Raw(t.selectMaxReceiptIDSQL).Row().Scan(&scanId)
+
+	if scanId.Valid {
+		id = scanId.Int64
+	}
 	return
 }
 
