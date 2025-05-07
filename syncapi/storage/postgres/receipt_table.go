@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/lib/pq"
@@ -46,7 +45,7 @@ CREATE TABLE IF NOT EXISTS syncapi_receipts (
 CREATE INDEX IF NOT EXISTS syncapi_receipts_room_id ON syncapi_receipts(room_id);
 `
 
-const upsertReceipt = "" +
+const upsertReceiptSQL = "" +
 	"INSERT INTO syncapi_receipts" +
 	" (room_id, receipt_type, user_id, event_id, receipt_ts)" +
 	" VALUES ($1, $2, $3, $4, $5)" +
@@ -54,72 +53,82 @@ const upsertReceipt = "" +
 	" DO UPDATE SET id = nextval('syncapi_receipt_id'), event_id = $4, receipt_ts = $5" +
 	" RETURNING id"
 
-const selectRoomReceipts = "" +
+const selectRoomReceiptsSQL = "" +
 	"SELECT id, room_id, receipt_type, user_id, event_id, receipt_ts" +
 	" FROM syncapi_receipts" +
 	" WHERE room_id = ANY($1) AND id > $2"
 
 const selectMaxReceiptIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_receipts"
+	"SELECT COALESCE(MAX(id), 0) FROM syncapi_receipts"
 
 const purgeReceiptsSQL = "" +
 	"DELETE FROM syncapi_receipts WHERE room_id = $1"
 
-type receiptStatements struct {
-	db                 *sql.DB
-	upsertReceipt      *sql.Stmt
-	selectRoomReceipts *sql.Stmt
-	selectMaxReceiptID *sql.Stmt
-	purgeReceiptsStmt  *sql.Stmt
+type receiptTable struct {
+	cm                     *sqlutil.Connections
+	upsertReceiptSQL       string
+	selectRoomReceiptsSQL  string
+	selectMaxReceiptIDSQL  string
+	purgeReceiptsSQL       string
 }
 
-func NewPostgresReceiptsTable(ctx context.Context, db *sql.DB) (tables.Receipts, error) {
-	_, err := db.Exec(receiptsSchema)
-	if err != nil {
+func NewPostgresReceiptsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Receipts, error) {
+	// Create the table first
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(receiptsSchema).Error; err != nil {
 		return nil, err
 	}
-	m := sqlutil.NewMigrator(db)
+	
+	// Run migrations
+	m := sqlutil.NewMigrator(db.DB())
 	m.AddMigrations(sqlutil.Migration{
 		Version: "syncapi: fix sequences",
 		Up:      deltas.UpFixSequences,
 	})
-	err = m.Up(ctx)
+	err := m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}
-	r := &receiptStatements{
-		db: db,
+	
+	// Initialize the table with SQL statements
+	r := &receiptTable{
+		cm:                    cm,
+		upsertReceiptSQL:      upsertReceiptSQL,
+		selectRoomReceiptsSQL: selectRoomReceiptsSQL,
+		selectMaxReceiptIDSQL: selectMaxReceiptIDSQL,
+		purgeReceiptsSQL:      purgeReceiptsSQL,
 	}
-	return r, sqlutil.StatementList{
-		{&r.upsertReceipt, upsertReceipt},
-		{&r.selectRoomReceipts, selectRoomReceipts},
-		{&r.selectMaxReceiptID, selectMaxReceiptIDSQL},
-		{&r.purgeReceiptsStmt, purgeReceiptsSQL},
-	}.Prepare(db)
+	return r, nil
 }
 
-func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, r.upsertReceipt)
-	err = stmt.QueryRowContext(ctx, roomId, receiptType, userId, eventId, timestamp).Scan(&pos)
+func (r *receiptTable) UpsertReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error) {
+	// Get database connection
+	db := r.cm.Connection(ctx, false)
+	
+	row := db.Raw(r.upsertReceiptSQL, roomId, receiptType, userId, eventId, timestamp).Row()
+	err = row.Scan(&pos)
 	return
 }
 
-func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, txn *sql.Tx, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
+func (r *receiptTable) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
+	// Get database connection
+	db := r.cm.Connection(ctx, true)
+	
 	var lastPos types.StreamPosition
-	rows, err := sqlutil.TxStmt(txn, r.selectRoomReceipts).QueryContext(ctx, pq.Array(roomIDs), streamPos)
+	rows, err := db.Raw(r.selectRoomReceiptsSQL, pq.Array(roomIDs), streamPos).Rows()
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to query room receipts: %w", err)
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomReceiptsAfter: rows.close() failed")
 	var res []types.OutputReceiptEvent
 	for rows.Next() {
-		r := types.OutputReceiptEvent{}
+		receipt := types.OutputReceiptEvent{}
 		var id types.StreamPosition
-		err = rows.Scan(&id, &r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.Timestamp)
+		err = rows.Scan(&id, &receipt.RoomID, &receipt.Type, &receipt.UserID, &receipt.EventID, &receipt.Timestamp)
 		if err != nil {
 			return 0, res, fmt.Errorf("unable to scan row to api.Receipts: %w", err)
 		}
-		res = append(res, r)
+		res = append(res, receipt)
 		if id > lastPos {
 			lastPos = id
 		}
@@ -127,21 +136,17 @@ func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, txn *sq
 	return lastPos, res, rows.Err()
 }
 
-func (s *receiptStatements) SelectMaxReceiptID(
-	ctx context.Context, txn *sql.Tx,
-) (id int64, err error) {
-	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxReceiptID)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
-	if nullableID.Valid {
-		id = nullableID.Int64
-	}
+func (s *receiptTable) SelectMaxReceiptID(ctx context.Context) (id int64, err error) {
+	// Get database connection
+	db := s.cm.Connection(ctx, true)
+	
+	err = db.Raw(s.selectMaxReceiptIDSQL).Scan(&id).Error
 	return
 }
 
-func (s *receiptStatements) PurgeReceipts(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeReceiptsStmt).ExecContext(ctx, roomID)
-	return err
+func (s *receiptTable) PurgeReceipts(ctx context.Context, roomID string) error {
+	// Get database connection
+	db := s.cm.Connection(ctx, false)
+	
+	return db.Exec(s.purgeReceiptsSQL, roomID).Error
 }

@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -28,134 +29,219 @@ import (
 
 const eventStateKeysSchema = `
 -- Numeric versions of the event "state_key"s. State keys tend to be reused so
--- assigning each string a numeric ID should reduce the amount of data that
--- needs to be stored and fetched from the database.
--- It also means that many operations can work with int64 arrays rather than
--- string arrays which may help reduce GC pressure.
--- Well known state keys are pre-assigned numeric IDs:
---   1 -> "" (the empty string)
--- Other state keys are automatically assigned numeric IDs starting from 2**16.
--- This leaves room to add more pre-assigned numeric IDs and clearly separates
--- the automatically assigned IDs from the pre-assigned IDs.
-CREATE SEQUENCE IF NOT EXISTS roomserver_event_state_key_nid_seq START 65536;
+-- assigning each a numeric ID should reduce the amount of data that needs to be
+-- stored and fetched from the database.
+-- These are numeric versions of the strings in roomserver_event_state_keys_table.
+-- We can't use a normal foreign key relationship because we want to reuse state
+-- keys across many different rooms and event types.
+CREATE SEQUENCE IF NOT EXISTS roomserver_event_state_key_nid_seq;
 CREATE TABLE IF NOT EXISTS roomserver_event_state_keys (
     -- Local numeric ID for the state key.
     event_state_key_nid BIGINT PRIMARY KEY DEFAULT nextval('roomserver_event_state_key_nid_seq'),
+    -- The string state key. These tend to be reused so we cluster on this column.
     event_state_key TEXT NOT NULL CONSTRAINT roomserver_event_state_key_unique UNIQUE
 );
-INSERT INTO roomserver_event_state_keys (event_state_key_nid, event_state_key) VALUES
-    (1, '') ON CONFLICT DO NOTHING;
 `
 
-// Same as insertEventTypeNIDSQL
-const insertEventStateKeyNIDSQL = "" +
-	"INSERT INTO roomserver_event_state_keys (event_state_key) VALUES ($1)" +
-	" ON CONFLICT ON CONSTRAINT roomserver_event_state_key_unique" +
-	" DO NOTHING RETURNING (event_state_key_nid)"
+// SQL query constants for event state keys operations
+const (
+	// insertEventStateKeySQL inserts a new state key into the table
+	insertEventStateKeySQL = "" +
+		"INSERT INTO roomserver_event_state_keys (event_state_key)" +
+		" VALUES ($1)" +
+		" ON CONFLICT ON CONSTRAINT roomserver_event_state_key_unique" +
+		" DO NOTHING" +
+		" RETURNING event_state_key_nid"
 
-const selectEventStateKeyNIDSQL = "" +
-	"SELECT event_state_key_nid FROM roomserver_event_state_keys" +
-	" WHERE event_state_key = $1"
+	// selectEventStateKeySQL selects an event state key NID from the event_state_key string
+	selectEventStateKeySQL = "" +
+		"SELECT event_state_key_nid FROM roomserver_event_state_keys" +
+		" WHERE event_state_key = $1"
 
-// Bulk lookup from string state key to numeric ID for that state key.
-// Takes an array of strings as the query parameter.
-const bulkSelectEventStateKeyNIDSQL = "" +
-	"SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys" +
-	" WHERE event_state_key = ANY($1)"
+	// bulkSelectEventStateKeySQL selects event state key NIDs from an array of event_state_keys
+	bulkSelectEventStateKeySQL = "" +
+		"SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys" +
+		" WHERE event_state_key = ANY($1)"
 
-// Bulk lookup from numeric ID to string state key for that state key.
-// Takes an array of strings as the query parameter.
-const bulkSelectEventStateKeySQL = "" +
-	"SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys" +
-	" WHERE event_state_key_nid = ANY($1)"
+	// bulkSelectEventStateKeyNIDSQL selects event state keys from an array of event_state_key_nids
+	bulkSelectEventStateKeyNIDSQL = "" +
+		"SELECT event_state_key_nid, event_state_key FROM roomserver_event_state_keys" +
+		" WHERE event_state_key_nid = ANY($1)"
+)
 
-type eventStateKeyStatements struct {
-	insertEventStateKeyNIDStmt     *sql.Stmt
-	selectEventStateKeyNIDStmt     *sql.Stmt
-	bulkSelectEventStateKeyNIDStmt *sql.Stmt
-	bulkSelectEventStateKeyStmt    *sql.Stmt
+type eventStateKeysStatements struct {
+	cm *sqlutil.Connections
+	
+	// SQL statements stored as struct fields
+	insertEventStateKeyStmt      string
+	selectEventStateKeyStmt      string
+	bulkSelectEventStateKeyStmt  string
+	bulkSelectEventStateKeyNIDStmt string
 }
 
-func CreateEventStateKeysTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(eventStateKeysSchema)
-	return err
+// NewPostgresEventStateKeysTable creates a new PostgreSQL event state keys table and prepares all statements
+func NewPostgresEventStateKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.EventStateKeys, error) {
+	// Create the table first
+	if err := cm.Writer.ExecSQL(ctx, eventStateKeysSchema); err != nil {
+		return nil, err
+	}
+	
+	// Initialize and return the statements
+	s := &eventStateKeysStatements{
+		cm: cm,
+		
+		// Initialize SQL statement fields with the constants
+		insertEventStateKeyStmt:      insertEventStateKeySQL,
+		selectEventStateKeyStmt:      selectEventStateKeySQL,
+		bulkSelectEventStateKeyStmt:  bulkSelectEventStateKeySQL,
+		bulkSelectEventStateKeyNIDStmt: bulkSelectEventStateKeyNIDSQL,
+	}
+	
+	return s, nil
 }
 
-func PrepareEventStateKeysTable(ctx context.Context, db *sql.DB) (tables.EventStateKeys, error) {
-	s := &eventStateKeyStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
-		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},
-		{&s.bulkSelectEventStateKeyNIDStmt, bulkSelectEventStateKeyNIDSQL},
-		{&s.bulkSelectEventStateKeyStmt, bulkSelectEventStateKeySQL},
-	}.Prepare(db)
-}
-
-func (s *eventStateKeyStatements) InsertEventStateKeyNID(
-	ctx context.Context, txn *sql.Tx, eventStateKey string,
+// InsertEventStateKey implements tables.EventStateKeys
+func (s *eventStateKeysStatements) InsertEventStateKey(
+	ctx context.Context, txn *sql.Tx, key string,
 ) (types.EventStateKeyNID, error) {
+	// Get database connection
+	var db *sql.Conn
+	var err error
+	
+	if txn != nil {
+		// Use existing transaction.
+		var eventStateKeyNID int64
+		err = txn.QueryRowContext(ctx, s.insertEventStateKeyStmt, key).Scan(&eventStateKeyNID)
+		if err == sql.ErrNoRows {
+			// We didn't insert a new event state key so we need to look up what
+			// the existing NID is.
+			err = txn.QueryRowContext(ctx, s.selectEventStateKeyStmt, key).Scan(&eventStateKeyNID)
+		}
+		return types.EventStateKeyNID(eventStateKeyNID), err
+	}
+	
+	// Acquire a new connection, since we're not using a transaction.
+	if db, err = s.cm.Writer.GetSQLConn(ctx); err != nil {
+		return 0, err
+	}
+	defer internal.CloseAndLogIfError(ctx, db, "InsertEventStateKey: failed to close connection")
+	
+	// Execute the insertion
 	var eventStateKeyNID int64
-	stmt := sqlutil.TxStmt(txn, s.insertEventStateKeyNIDStmt)
-	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
+	err = db.QueryRowContext(ctx, s.insertEventStateKeyStmt, key).Scan(&eventStateKeyNID)
+	if err == sql.ErrNoRows {
+		// We didn't insert a new event state key so we need to look up what
+		// the existing NID is.
+		err = db.QueryRowContext(ctx, s.selectEventStateKeyStmt, key).Scan(&eventStateKeyNID)
+	}
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) SelectEventStateKeyNID(
-	ctx context.Context, txn *sql.Tx, eventStateKey string,
+// SelectEventStateKeyNID implements tables.EventStateKeys
+func (s *eventStateKeysStatements) SelectEventStateKeyNID(
+	ctx context.Context, txn *sql.Tx, key string,
 ) (types.EventStateKeyNID, error) {
+	// Get database connection
 	var eventStateKeyNID int64
-	stmt := sqlutil.TxStmt(txn, s.selectEventStateKeyNIDStmt)
-	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
+	var err error
+	
+	if txn != nil {
+		// Use existing transaction.
+		err = txn.QueryRowContext(ctx, s.selectEventStateKeyStmt, key).Scan(&eventStateKeyNID)
+		return types.EventStateKeyNID(eventStateKeyNID), err
+	}
+	
+	// Use a new connection since we're not in a transaction.
+	db := s.cm.Connection(ctx, true)
+	err = db.Raw(s.selectEventStateKeyStmt, key).Row().Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
-	ctx context.Context, txn *sql.Tx, eventStateKeys []string,
+// BulkSelectEventStateKeyNID implements tables.EventStateKeys
+func (s *eventStateKeysStatements) BulkSelectEventStateKeyNID(
+	ctx context.Context, txn *sql.Tx, keys []string,
 ) (map[string]types.EventStateKeyNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventStateKeyNIDStmt)
-	rows, err := stmt.QueryContext(
-		ctx, pq.StringArray(eventStateKeys),
-	)
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	
+	// Get database connection
+	var err error
+	var rows *sql.Rows
+	
+	if txn != nil {
+		// Use existing transaction.
+		rows, err = txn.QueryContext(ctx, s.bulkSelectEventStateKeyStmt, pq.StringArray(keys))
+	} else {
+		// Use a new connection since we're not in a transaction.
+		db := s.cm.Connection(ctx, true)
+		rows, err = db.Raw(s.bulkSelectEventStateKeyStmt, pq.StringArray(keys)).Rows()
+	}
+	
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKeyNID: rows.close() failed")
-
-	result := make(map[string]types.EventStateKeyNID, len(eventStateKeys))
-	var stateKey string
-	var stateKeyNID int64
+	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectEventStateKeyNID: rows.close() failed")
+	
+	// Create result map
+	result := make(map[string]types.EventStateKeyNID, len(keys))
+	var eventStateKey string
+	var eventStateKeyNID int64
+	
+	// Process rows
 	for rows.Next() {
-		if err := rows.Scan(&stateKey, &stateKeyNID); err != nil {
+		if err = rows.Scan(&eventStateKey, &eventStateKeyNID); err != nil {
 			return nil, err
 		}
-		result[stateKey] = types.EventStateKeyNID(stateKeyNID)
+		result[eventStateKey] = types.EventStateKeyNID(eventStateKeyNID)
 	}
+	
 	return result, rows.Err()
 }
 
-func (s *eventStateKeyStatements) BulkSelectEventStateKey(
-	ctx context.Context, txn *sql.Tx, eventStateKeyNIDs []types.EventStateKeyNID,
+// BulkSelectEventStateKey implements tables.EventStateKeys
+func (s *eventStateKeysStatements) BulkSelectEventStateKey(
+	ctx context.Context, txn *sql.Tx, nids []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
-	nIDs := make(pq.Int64Array, len(eventStateKeyNIDs))
-	for i := range eventStateKeyNIDs {
-		nIDs[i] = int64(eventStateKeyNIDs[i])
+	if len(nids) == 0 {
+		return nil, nil
 	}
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventStateKeyStmt)
-	rows, err := stmt.QueryContext(ctx, nIDs)
+	
+	// Convert nids to int64 array
+	stateKeyNIDs := make([]int64, len(nids))
+	for i := range nids {
+		stateKeyNIDs[i] = int64(nids[i])
+	}
+	
+	// Get database connection
+	var err error
+	var rows *sql.Rows
+	
+	if txn != nil {
+		// Use existing transaction.
+		rows, err = txn.QueryContext(ctx, s.bulkSelectEventStateKeyNIDStmt, pq.Int64Array(stateKeyNIDs))
+	} else {
+		// Use a new connection since we're not in a transaction.
+		db := s.cm.Connection(ctx, true)
+		rows, err = db.Raw(s.bulkSelectEventStateKeyNIDStmt, pq.Int64Array(stateKeyNIDs)).Rows()
+	}
+	
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventStateKey: rows.close() failed")
-
-	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
-	var stateKey string
-	var stateKeyNID int64
+	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectEventStateKey: rows.close() failed")
+	
+	// Create result map and process rows
+	result := make(map[types.EventStateKeyNID]string, len(nids))
+	var eventStateKeyNID int64
+	var eventStateKey string
+	
 	for rows.Next() {
-		if err := rows.Scan(&stateKey, &stateKeyNID); err != nil {
+		if err = rows.Scan(&eventStateKeyNID, &eventStateKey); err != nil {
 			return nil, err
 		}
-		result[types.EventStateKeyNID(stateKeyNID)] = stateKey
+		result[types.EventStateKeyNID(eventStateKeyNID)] = eventStateKey
 	}
+	
 	return result, rows.Err()
 }

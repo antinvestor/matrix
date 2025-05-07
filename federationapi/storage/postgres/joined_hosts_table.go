@@ -17,9 +17,9 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -46,159 +46,112 @@ CREATE INDEX IF NOT EXISTS federatonsender_joined_hosts_room_id_idx
     ON federationsender_joined_hosts (room_id)
 `
 
-const insertJoinedHostsSQL = "" +
-	"INSERT INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
-	" VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
+// SQL query constants
+const (
+	insertJoinedHostsSQL = "" +
+		"INSERT INTO federationsender_joined_hosts (room_id, event_id, server_name)" +
+		" VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
 
-const deleteJoinedHostsSQL = "" +
-	"DELETE FROM federationsender_joined_hosts WHERE event_id = ANY($1)"
+	deleteJoinedHostsSQL = "" +
+		"DELETE FROM federationsender_joined_hosts WHERE event_id = ANY($1)"
 
-const deleteJoinedHostsForRoomSQL = "" +
-	"DELETE FROM federationsender_joined_hosts WHERE room_id = $1"
+	deleteJoinedHostsForRoomSQL = "" +
+		"DELETE FROM federationsender_joined_hosts WHERE room_id = $1"
 
-const selectJoinedHostsSQL = "" +
-	"SELECT event_id, server_name FROM federationsender_joined_hosts" +
-	" WHERE room_id = $1"
+	selectJoinedHostsSQL = "" +
+		"SELECT event_id, server_name FROM federationsender_joined_hosts" +
+		" WHERE room_id = $1"
 
-const selectAllJoinedHostsSQL = "" +
-	"SELECT DISTINCT server_name FROM federationsender_joined_hosts"
+	selectAllJoinedHostsSQL = "" +
+		"SELECT DISTINCT server_name FROM federationsender_joined_hosts"
 
-const selectJoinedHostsForRoomsSQL = "" +
-	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id = ANY($1)"
+	selectJoinedHostsForRoomsSQL = "" +
+		"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id = ANY($1)"
 
-const selectJoinedHostsForRoomsExcludingBlacklistedSQL = "" +
-	"SELECT DISTINCT server_name FROM federationsender_joined_hosts j WHERE room_id = ANY($1) AND NOT EXISTS (" +
-	"  SELECT server_name FROM federationsender_blacklist WHERE j.server_name = server_name" +
-	");"
+	selectJoinedHostsForRoomsExcludingBlacklistedSQL = "" +
+		"SELECT DISTINCT server_name FROM federationsender_joined_hosts j WHERE room_id = ANY($1) AND NOT EXISTS (" +
+		"  SELECT server_name FROM federationsender_blacklist WHERE j.server_name = server_name" +
+		");"
+)
 
-type joinedHostsStatements struct {
-	db                                                *sql.DB
-	insertJoinedHostsStmt                             *sql.Stmt
-	deleteJoinedHostsStmt                             *sql.Stmt
-	deleteJoinedHostsForRoomStmt                      *sql.Stmt
-	selectJoinedHostsStmt                             *sql.Stmt
-	selectAllJoinedHostsStmt                          *sql.Stmt
-	selectJoinedHostsForRoomsStmt                     *sql.Stmt
-	selectJoinedHostsForRoomsExcludingBlacklistedStmt *sql.Stmt
+type joinedHostsTable struct {
+	cm *sqlutil.Connections
+
+	insertJoinedHostsStmt                             string
+	deleteJoinedHostsStmt                             string
+	deleteJoinedHostsForRoomStmt                      string
+	selectJoinedHostsStmt                             string
+	selectAllJoinedHostsStmt                          string
+	selectJoinedHostsForRoomsStmt                     string
+	selectJoinedHostsForRoomsExcludingBlacklistedStmt string
 }
 
-func NewPostgresJoinedHostsTable(ctx context.Context, db *sql.DB) (s *joinedHostsStatements, err error) {
-	s = &joinedHostsStatements{
-		db: db,
+func NewPostgresJoinedHostsTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationJoinedHosts, error) {
+	// Initialize schema
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(joinedHostsSchema).Error; err != nil {
+		return nil, err
 	}
-	_, err = s.db.Exec(joinedHostsSchema)
-	if err != nil {
-		return
+
+	s := &joinedHostsTable{
+		cm:                            cm,
+		insertJoinedHostsStmt:         insertJoinedHostsSQL,
+		deleteJoinedHostsStmt:         deleteJoinedHostsSQL,
+		deleteJoinedHostsForRoomStmt:  deleteJoinedHostsForRoomSQL,
+		selectJoinedHostsStmt:         selectJoinedHostsSQL,
+		selectAllJoinedHostsStmt:      selectAllJoinedHostsSQL,
+		selectJoinedHostsForRoomsStmt: selectJoinedHostsForRoomsSQL,
+		selectJoinedHostsForRoomsExcludingBlacklistedStmt: selectJoinedHostsForRoomsExcludingBlacklistedSQL,
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertJoinedHostsStmt, insertJoinedHostsSQL},
-		{&s.deleteJoinedHostsStmt, deleteJoinedHostsSQL},
-		{&s.deleteJoinedHostsForRoomStmt, deleteJoinedHostsForRoomSQL},
-		{&s.selectJoinedHostsStmt, selectJoinedHostsSQL},
-		{&s.selectAllJoinedHostsStmt, selectAllJoinedHostsSQL},
-		{&s.selectJoinedHostsForRoomsStmt, selectJoinedHostsForRoomsSQL},
-		{&s.selectJoinedHostsForRoomsExcludingBlacklistedStmt, selectJoinedHostsForRoomsExcludingBlacklistedSQL},
-	}.Prepare(db)
+
+	return s, nil
 }
 
-func (s *joinedHostsStatements) InsertJoinedHosts(
+func (s *joinedHostsTable) InsertJoinedHosts(
 	ctx context.Context,
-	txn *sql.Tx,
 	roomID, eventID string,
 	serverName spec.ServerName,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertJoinedHostsStmt)
-	_, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
-	return err
+	// Get writable database connection
+	db := s.cm.Connection(ctx, false)
+
+	return db.Exec(s.insertJoinedHostsStmt, roomID, eventID, serverName).Error
 }
 
-func (s *joinedHostsStatements) DeleteJoinedHosts(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+func (s *joinedHostsTable) DeleteJoinedHosts(
+	ctx context.Context, eventIDs []string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsStmt)
-	_, err := stmt.ExecContext(ctx, pq.StringArray(eventIDs))
-	return err
+	// Get writable database connection
+	db := s.cm.Connection(ctx, false)
+
+	return db.Exec(s.deleteJoinedHostsStmt, pq.StringArray(eventIDs)).Error
 }
 
-func (s *joinedHostsStatements) DeleteJoinedHostsForRoom(
-	ctx context.Context, txn *sql.Tx, roomID string,
+func (s *joinedHostsTable) DeleteJoinedHostsForRoom(
+	ctx context.Context, roomID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsForRoomStmt)
-	_, err := stmt.ExecContext(ctx, roomID)
-	return err
+	// Get writable database connection
+	db := s.cm.Connection(ctx, false)
+
+	return db.Exec(s.deleteJoinedHostsForRoomStmt, roomID).Error
 }
 
-func (s *joinedHostsStatements) SelectJoinedHostsWithTx(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) ([]types.JoinedHost, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectJoinedHostsStmt)
-	return joinedHostsFromStmt(ctx, stmt, roomID)
-}
-
-func (s *joinedHostsStatements) SelectJoinedHosts(
+func (s *joinedHostsTable) SelectJoinedHostsWithTx(
 	ctx context.Context, roomID string,
 ) ([]types.JoinedHost, error) {
-	return joinedHostsFromStmt(ctx, s.selectJoinedHostsStmt, roomID)
-}
+	// Get readable database connection
+	db := s.cm.Connection(ctx, true)
 
-func (s *joinedHostsStatements) SelectAllJoinedHosts(
-	ctx context.Context,
-) ([]spec.ServerName, error) {
-	rows, err := s.selectAllJoinedHostsStmt.QueryContext(ctx)
+	rows, err := db.Raw(s.selectJoinedHostsStmt, roomID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectAllJoinedHosts: rows.close() failed")
-
-	var result []spec.ServerName
-	for rows.Next() {
-		var serverName string
-		if err = rows.Scan(&serverName); err != nil {
-			return nil, err
-		}
-		result = append(result, spec.ServerName(serverName))
-	}
-
-	return result, rows.Err()
-}
-
-func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
-	ctx context.Context, roomIDs []string, excludingBlacklisted bool,
-) ([]spec.ServerName, error) {
-	stmt := s.selectJoinedHostsForRoomsStmt
-	if excludingBlacklisted {
-		stmt = s.selectJoinedHostsForRoomsExcludingBlacklistedStmt
-	}
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(roomIDs))
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedHostsForRoomsStmt: rows.close() failed")
-
-	var result []spec.ServerName
-	for rows.Next() {
-		var serverName string
-		if err = rows.Scan(&serverName); err != nil {
-			return nil, err
-		}
-		result = append(result, spec.ServerName(serverName))
-	}
-
-	return result, rows.Err()
-}
-
-func joinedHostsFromStmt(
-	ctx context.Context, stmt *sql.Stmt, roomID string,
-) ([]types.JoinedHost, error) {
-	rows, err := stmt.QueryContext(ctx, roomID)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "joinedHostsFromStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectJoinedHostsWithTx: rows.close() failed")
 
 	var result []types.JoinedHost
 	for rows.Next() {
-		var eventID, serverName string
+		var eventID string
+		var serverName string
 		if err = rows.Scan(&eventID, &serverName); err != nil {
 			return nil, err
 		}
@@ -206,6 +159,89 @@ func joinedHostsFromStmt(
 			MemberEventID: eventID,
 			ServerName:    spec.ServerName(serverName),
 		})
+	}
+
+	return result, rows.Err()
+}
+
+func (s *joinedHostsTable) SelectJoinedHosts(
+	ctx context.Context, roomID string,
+) ([]types.JoinedHost, error) {
+	// Get readable database connection
+	db := s.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(s.selectJoinedHostsStmt, roomID).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectJoinedHosts: rows.close() failed")
+
+	var result []types.JoinedHost
+	for rows.Next() {
+		var eventID string
+		var serverName string
+		if err = rows.Scan(&eventID, &serverName); err != nil {
+			return nil, err
+		}
+		result = append(result, types.JoinedHost{
+			MemberEventID: eventID,
+			ServerName:    spec.ServerName(serverName),
+		})
+	}
+
+	return result, rows.Err()
+}
+
+func (s *joinedHostsTable) SelectAllJoinedHosts(
+	ctx context.Context,
+) ([]spec.ServerName, error) {
+	// Get readable database connection
+	db := s.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(s.selectAllJoinedHostsStmt).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectAllJoinedHosts: rows.close() failed")
+
+	var result []spec.ServerName
+	for rows.Next() {
+		var serverName string
+		if err = rows.Scan(&serverName); err != nil {
+			return nil, err
+		}
+		result = append(result, spec.ServerName(serverName))
+	}
+
+	return result, rows.Err()
+}
+
+func (s *joinedHostsTable) SelectJoinedHostsForRooms(
+	ctx context.Context, roomIDs []string, excludingBlacklisted bool,
+) ([]spec.ServerName, error) {
+	// Get readable database connection
+	db := s.cm.Connection(ctx, true)
+
+	var sqlQuery string
+	if excludingBlacklisted {
+		sqlQuery = s.selectJoinedHostsForRoomsExcludingBlacklistedStmt
+	} else {
+		sqlQuery = s.selectJoinedHostsForRoomsStmt
+	}
+
+	rows, err := db.Raw(sqlQuery, pq.StringArray(roomIDs)).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectJoinedHostsForRooms: rows.close() failed")
+
+	var result []spec.ServerName
+	for rows.Next() {
+		var serverName string
+		if err = rows.Scan(&serverName); err != nil {
+			return nil, err
+		}
+		result = append(result, spec.ServerName(serverName))
 	}
 
 	return result, rows.Err()

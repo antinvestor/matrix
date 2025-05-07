@@ -21,14 +21,13 @@ import (
 	"errors"
 	"time"
 
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/lib/pq"
 )
 
-var oneTimeKeysSchema = `
+const oneTimeKeysSchema = `
 -- Stores one-time public keys for users
 CREATE TABLE IF NOT EXISTS keyserver_one_time_keys (
     user_id TEXT NOT NULL,
@@ -44,63 +43,72 @@ CREATE TABLE IF NOT EXISTS keyserver_one_time_keys (
 CREATE INDEX IF NOT EXISTS keyserver_one_time_keys_idx ON keyserver_one_time_keys (user_id, device_id);
 `
 
-const upsertKeysSQL = "" +
-	"INSERT INTO keyserver_one_time_keys (user_id, device_id, key_id, algorithm, ts_added_secs, key_json)" +
-	" VALUES ($1, $2, $3, $4, $5, $6)" +
-	" ON CONFLICT ON CONSTRAINT keyserver_one_time_keys_unique" +
-	" DO UPDATE SET key_json = $6"
+// SQL query constants for one-time keys operations
+const (
+	// upsertKeysSQL inserts or updates a one-time key
+	upsertKeysSQL = "INSERT INTO keyserver_one_time_keys (user_id, device_id, key_id, algorithm, ts_added_secs, key_json)" +
+		" VALUES ($1, $2, $3, $4, $5, $6)" +
+		" ON CONFLICT ON CONSTRAINT keyserver_one_time_keys_unique" +
+		" DO UPDATE SET key_json = $6"
 
-const selectOneTimeKeysSQL = "" +
-	"SELECT concat(algorithm, ':', key_id) as algorithmwithid, key_json FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2 AND concat(algorithm, ':', key_id) = ANY($3);"
+	// selectOneTimeKeysSQL retrieves one-time keys by user, device, and algorithm+keyID combinations
+	selectOneTimeKeysSQL = "SELECT concat(algorithm, ':', key_id) as algorithmwithid, key_json FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2 AND concat(algorithm, ':', key_id) = ANY($3);"
 
-const selectKeysCountSQL = "" +
-	"SELECT algorithm, COUNT(key_id) FROM " +
-	" (SELECT algorithm, key_id FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 LIMIT 100)" +
-	" x GROUP BY algorithm"
+	// selectKeysCountSQL counts how many keys exist for a user/device by algorithm
+	selectKeysCountSQL = "SELECT algorithm, COUNT(key_id) FROM " +
+		" (SELECT algorithm, key_id FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 LIMIT 100)" +
+		" x GROUP BY algorithm"
 
-const deleteOneTimeKeySQL = "" +
-	"DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 AND key_id = $4"
+	// deleteOneTimeKeySQL removes a single key by user, device, algorithm, and keyID
+	deleteOneTimeKeySQL = "DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 AND key_id = $4"
 
-const selectKeyByAlgorithmSQL = "" +
-	"SELECT key_id, key_json FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 LIMIT 1"
+	// selectKeyByAlgorithmSQL retrieves a single key for a user/device by algorithm
+	selectKeyByAlgorithmSQL = "SELECT key_id, key_json FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 LIMIT 1"
 
-const deleteOneTimeKeysSQL = "" +
-	"DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2"
+	// deleteOneTimeKeysSQL removes all one-time keys for a user/device
+	deleteOneTimeKeysSQL = "DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2"
+)
 
-type oneTimeKeysStatements struct {
-	db                       *sql.DB
-	upsertKeysStmt           *sql.Stmt
-	selectKeysStmt           *sql.Stmt
-	selectKeysCountStmt      *sql.Stmt
-	selectKeyByAlgorithmStmt *sql.Stmt
-	deleteOneTimeKeyStmt     *sql.Stmt
-	deleteOneTimeKeysStmt    *sql.Stmt
+type oneTimeKeysTable struct {
+	cm *sqlutil.Connections
+
+	upsertKeysStmt           string
+	selectOneTimeKeysStmt    string
+	selectKeysCountStmt      string
+	selectKeyByAlgorithmStmt string
+	deleteOneTimeKeyStmt     string
+	deleteOneTimeKeysStmt    string
 }
 
-func NewPostgresOneTimeKeysTable(ctx context.Context, db *sql.DB) (tables.OneTimeKeys, error) {
-	s := &oneTimeKeysStatements{
-		db: db,
+func NewPostgresOneTimeKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.OneTimeKeys, error) {
+	// Initialize schema
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(oneTimeKeysSchema).Error; err != nil {
+		return nil, err
 	}
-	_, err := db.Exec(oneTimeKeysSchema)
+
+	// Initialize table with SQL statements
+	t := &oneTimeKeysTable{
+		cm:                       cm,
+		upsertKeysStmt:           upsertKeysSQL,
+		selectOneTimeKeysStmt:    selectOneTimeKeysSQL,
+		selectKeysCountStmt:      selectKeysCountSQL,
+		selectKeyByAlgorithmStmt: selectKeyByAlgorithmSQL,
+		deleteOneTimeKeyStmt:     deleteOneTimeKeySQL,
+		deleteOneTimeKeysStmt:    deleteOneTimeKeysSQL,
+	}
+
+	return t, nil
+}
+
+func (t *oneTimeKeysTable) SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
+	db := t.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(t.selectOneTimeKeysStmt, userID, deviceID, pq.Array(keyIDsWithAlgorithms)).Rows()
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.upsertKeysStmt, upsertKeysSQL},
-		{&s.selectKeysStmt, selectOneTimeKeysSQL},
-		{&s.selectKeysCountStmt, selectKeysCountSQL},
-		{&s.selectKeyByAlgorithmStmt, selectKeyByAlgorithmSQL},
-		{&s.deleteOneTimeKeyStmt, deleteOneTimeKeySQL},
-		{&s.deleteOneTimeKeysStmt, deleteOneTimeKeysSQL},
-	}.Prepare(db)
-}
-
-func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, deviceID string, keyIDsWithAlgorithms []string) (map[string]json.RawMessage, error) {
-	rows, err := s.selectKeysStmt.QueryContext(ctx, userID, deviceID, pq.Array(keyIDsWithAlgorithms))
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectKeysStmt: rows.close() failed")
+	defer rows.Close()
 
 	result := make(map[string]json.RawMessage)
 	var (
@@ -116,17 +124,21 @@ func (s *oneTimeKeysStatements) SelectOneTimeKeys(ctx context.Context, userID, d
 	return result, rows.Err()
 }
 
-func (s *oneTimeKeysStatements) CountOneTimeKeys(ctx context.Context, userID, deviceID string) (*api.OneTimeKeysCount, error) {
+func (t *oneTimeKeysTable) CountOneTimeKeys(ctx context.Context, userID, deviceID string) (*api.OneTimeKeysCount, error) {
+	db := t.cm.Connection(ctx, true)
+
 	counts := &api.OneTimeKeysCount{
 		DeviceID: deviceID,
 		UserID:   userID,
 		KeyCount: make(map[string]int),
 	}
-	rows, err := s.selectKeysCountStmt.QueryContext(ctx, userID, deviceID)
+
+	rows, err := db.Raw(t.selectKeysCountStmt, userID, deviceID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectKeysCountStmt: rows.close() failed")
+	defer rows.Close()
+
 	for rows.Next() {
 		var algorithm string
 		var count int
@@ -138,27 +150,31 @@ func (s *oneTimeKeysStatements) CountOneTimeKeys(ctx context.Context, userID, de
 	return counts, rows.Err()
 }
 
-func (s *oneTimeKeysStatements) InsertOneTimeKeys(ctx context.Context, txn *sql.Tx, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error) {
+func (t *oneTimeKeysTable) InsertOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (*api.OneTimeKeysCount, error) {
+	db := t.cm.Connection(ctx, false)
+
 	now := time.Now().Unix()
 	counts := &api.OneTimeKeysCount{
 		DeviceID: keys.DeviceID,
 		UserID:   keys.UserID,
 		KeyCount: make(map[string]int),
 	}
+
 	for keyIDWithAlgo, keyJSON := range keys.KeyJSON {
 		algo, keyID := keys.Split(keyIDWithAlgo)
-		_, err := sqlutil.TxStmt(txn, s.upsertKeysStmt).ExecContext(
-			ctx, keys.UserID, keys.DeviceID, keyID, algo, now, string(keyJSON),
-		)
-		if err != nil {
+		if err := db.Exec(
+			t.upsertKeysStmt, keys.UserID, keys.DeviceID, keyID, algo, now, string(keyJSON),
+		).Error; err != nil {
 			return nil, err
 		}
 	}
-	rows, err := sqlutil.TxStmt(txn, s.selectKeysCountStmt).QueryContext(ctx, keys.UserID, keys.DeviceID)
+
+	rows, err := db.Raw(t.selectKeysCountStmt, keys.UserID, keys.DeviceID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectKeysCountStmt: rows.close() failed")
+	defer rows.Close()
+
 	for rows.Next() {
 		var algorithm string
 		var count int
@@ -171,25 +187,33 @@ func (s *oneTimeKeysStatements) InsertOneTimeKeys(ctx context.Context, txn *sql.
 	return counts, rows.Err()
 }
 
-func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
-	ctx context.Context, txn *sql.Tx, userID, deviceID, algorithm string,
+func (t *oneTimeKeysTable) SelectAndDeleteOneTimeKey(
+	ctx context.Context, userID, deviceID, algorithm string,
 ) (map[string]json.RawMessage, error) {
+	db := t.cm.Connection(ctx, false)
+
 	var keyID string
 	var keyJSON string
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectKeyByAlgorithmStmt).QueryRowContext(ctx, userID, deviceID, algorithm).Scan(&keyID, &keyJSON)
+
+	row := db.Raw(t.selectKeyByAlgorithmStmt, userID, deviceID, algorithm).Row()
+	err := row.Scan(&keyID, &keyJSON)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	_, err = sqlutil.TxStmtContext(ctx, txn, s.deleteOneTimeKeyStmt).ExecContext(ctx, userID, deviceID, algorithm, keyID)
+
+	if err = db.Exec(t.deleteOneTimeKeyStmt, userID, deviceID, algorithm, keyID).Error; err != nil {
+		return nil, err
+	}
+
 	return map[string]json.RawMessage{
 		algorithm + ":" + keyID: json.RawMessage(keyJSON),
-	}, err
+	}, nil
 }
 
-func (s *oneTimeKeysStatements) DeleteOneTimeKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error {
-	_, err := sqlutil.TxStmt(txn, s.deleteOneTimeKeysStmt).ExecContext(ctx, userID, deviceID)
-	return err
+func (t *oneTimeKeysTable) DeleteOneTimeKeys(ctx context.Context, userID, deviceID string) error {
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.deleteOneTimeKeysStmt, userID, deviceID).Error
 }

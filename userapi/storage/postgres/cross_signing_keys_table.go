@@ -16,12 +16,10 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
@@ -36,43 +34,52 @@ CREATE TABLE IF NOT EXISTS keyserver_cross_signing_keys (
 );
 `
 
-const selectCrossSigningKeysForUserSQL = "" +
-	"SELECT key_type, key_data FROM keyserver_cross_signing_keys" +
-	" WHERE user_id = $1"
+// SQL query constants for cross-signing keys operations
+const (
+	// selectCrossSigningKeysForUserSQL retrieves all cross-signing keys for a user
+	selectCrossSigningKeysForUserSQL = "SELECT key_type, key_data FROM keyserver_cross_signing_keys" +
+		" WHERE user_id = $1"
 
-const upsertCrossSigningKeysForUserSQL = "" +
-	"INSERT INTO keyserver_cross_signing_keys (user_id, key_type, key_data)" +
-	" VALUES($1, $2, $3)" +
-	" ON CONFLICT (user_id, key_type) DO UPDATE SET key_data = $3"
+	// upsertCrossSigningKeysForUserSQL inserts or updates a cross-signing key for a user
+	upsertCrossSigningKeysForUserSQL = "INSERT INTO keyserver_cross_signing_keys (user_id, key_type, key_data)" +
+		" VALUES($1, $2, $3)" +
+		" ON CONFLICT (user_id, key_type) DO UPDATE SET key_data = $3"
+)
 
-type crossSigningKeysStatements struct {
-	db                                *sql.DB
-	selectCrossSigningKeysForUserStmt *sql.Stmt
-	upsertCrossSigningKeysForUserStmt *sql.Stmt
+type crossSigningKeysTable struct {
+	cm                                *sqlutil.Connections
+	selectCrossSigningKeysForUserStmt string
+	upsertCrossSigningKeysForUserStmt string
 }
 
-func NewPostgresCrossSigningKeysTable(ctx context.Context, db *sql.DB) (tables.CrossSigningKeys, error) {
-	s := &crossSigningKeysStatements{
-		db: db,
-	}
-	_, err := db.Exec(crossSigningKeysSchema)
-	if err != nil {
+func NewPostgresCrossSigningKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.CrossSigningKeys, error) {
+	// Initialize schema
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(crossSigningKeysSchema).Error; err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.selectCrossSigningKeysForUserStmt, selectCrossSigningKeysForUserSQL},
-		{&s.upsertCrossSigningKeysForUserStmt, upsertCrossSigningKeysForUserSQL},
-	}.Prepare(db)
+
+	// Initialize table with SQL statements
+	t := &crossSigningKeysTable{
+		cm:                                cm,
+		selectCrossSigningKeysForUserStmt: selectCrossSigningKeysForUserSQL,
+		upsertCrossSigningKeysForUserStmt: upsertCrossSigningKeysForUserSQL,
+	}
+
+	return t, nil
 }
 
-func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
-	ctx context.Context, txn *sql.Tx, userID string,
+func (t *crossSigningKeysTable) SelectCrossSigningKeysForUser(
+	ctx context.Context, userID string,
 ) (r types.CrossSigningKeyMap, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningKeysForUserStmt).QueryContext(ctx, userID)
+	db := t.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(t.selectCrossSigningKeysForUserStmt, userID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningKeysForUserStmt: rows.close() failed")
+	defer rows.Close()
+
 	r = types.CrossSigningKeyMap{}
 	for rows.Next() {
 		var keyTypeInt int16
@@ -90,15 +97,19 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 	return
 }
 
-func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
-	ctx context.Context, txn *sql.Tx, userID string, keyType fclient.CrossSigningKeyPurpose, keyData spec.Base64Bytes,
+func (t *crossSigningKeysTable) UpsertCrossSigningKeysForUser(
+	ctx context.Context, userID string, keyType fclient.CrossSigningKeyPurpose, keyData spec.Base64Bytes,
 ) error {
+	db := t.cm.Connection(ctx, false)
+
 	keyTypeInt, ok := types.KeyTypePurposeToInt[keyType]
 	if !ok {
 		return fmt.Errorf("unknown key purpose %q", keyType)
 	}
-	if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningKeysForUserStmt).ExecContext(ctx, userID, keyTypeInt, keyData); err != nil {
-		return fmt.Errorf("s.upsertCrossSigningKeysForUserStmt: %w", err)
+
+	if err := db.Exec(t.upsertCrossSigningKeysForUserStmt, userID, keyTypeInt, keyData).Error; err != nil {
+		return fmt.Errorf("failed to upsert cross signing keys: %w", err)
 	}
+
 	return nil
 }

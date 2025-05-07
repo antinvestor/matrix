@@ -51,60 +51,85 @@ CREATE TABLE IF NOT EXISTS roomserver_state_block (
 );
 `
 
-// Insert a new state block. If we conflict on the hash column then
-// we must perform an update so that the RETURNING statement returns the
-// ID of the row that we conflicted with, so that we can then refer to
-// the original block.
-const insertStateDataSQL = "" +
-	"INSERT INTO roomserver_state_block (state_block_hash, event_nids)" +
-	" VALUES ($1, $2)" +
-	" ON CONFLICT (state_block_hash) DO UPDATE SET event_nids=$2" +
-	" RETURNING state_block_nid"
+// SQL query constants for state block operations
+const (
+	// insertStateDataSQL inserts or updates a state block
+	insertStateDataSQL = "" +
+		"INSERT INTO roomserver_state_block (state_block_hash, event_nids)" +
+		" VALUES ($1, $2)" +
+		" ON CONFLICT (state_block_hash) DO UPDATE SET event_nids=$2" +
+		" RETURNING state_block_nid"
 
-const bulkSelectStateBlockEntriesSQL = "" +
-	"SELECT state_block_nid, event_nids" +
-	" FROM roomserver_state_block WHERE state_block_nid = ANY($1) ORDER BY state_block_nid ASC"
+	// bulkSelectStateBlockEntriesSQL selects state block entries for a list of state block NIDs
+	bulkSelectStateBlockEntriesSQL = "" +
+		"SELECT state_block_nid, event_nids" +
+		" FROM roomserver_state_block WHERE state_block_nid = ANY($1) ORDER BY state_block_nid ASC"
+)
 
-type stateBlockStatements struct {
-	insertStateDataStmt             *sql.Stmt
-	bulkSelectStateBlockEntriesStmt *sql.Stmt
+// stateBlockTable implements tables.StateBlock using PostgreSQL
+type stateBlockTable struct {
+	cm *sqlutil.Connections
 }
 
-func CreateStateBlockTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(stateDataSchema)
-	return err
+// NewPostgresStateBlockTable creates a new PostgreSQL state block table and prepares all statements
+func NewPostgresStateBlockTable(ctx context.Context, cm *sqlutil.Connections) (tables.StateBlock, error) {
+	// Create the table first
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(stateDataSchema).Error; err != nil {
+		return nil, err
+	}
+	
+	// Initialize the table
+	s := &stateBlockTable{
+		cm: cm,
+	}
+	
+	return s, nil
 }
 
-func PrepareStateBlockTable(ctx context.Context, db *sql.DB) (tables.StateBlock, error) {
-	s := &stateBlockStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertStateDataStmt, insertStateDataSQL},
-		{&s.bulkSelectStateBlockEntriesStmt, bulkSelectStateBlockEntriesSQL},
-	}.Prepare(db)
-}
-
-func (s *stateBlockStatements) BulkInsertStateData(
+func (s *stateBlockTable) BulkInsertStateData(
 	ctx context.Context, txn *sql.Tx,
 	entries types.StateEntries,
 ) (id types.StateBlockNID, err error) {
+	// Sort and deduplicate the entries
 	entries = entries[:util.SortAndUnique(entries)]
 	nids := make(types.EventNIDs, entries.Len())
 	for i := range entries {
 		nids[i] = entries[i].EventNID
 	}
-	stmt := sqlutil.TxStmt(txn, s.insertStateDataStmt)
-	err = stmt.QueryRowContext(
-		ctx, nids.Hash(), eventNIDsAsArray(nids),
-	).Scan(&id)
+	
+	// Get database connection
+	db := s.cm.Connection(ctx, false)
+	if txn != nil {
+		db = db.WithContext(ctx)
+	}
+	
+	// Execute query
+	err = db.Raw(
+		insertStateDataSQL,
+		nids.Hash(),
+		eventNIDsAsArray(nids),
+	).Scan(&id).Error
+	
 	return
 }
 
-func (s *stateBlockStatements) BulkSelectStateBlockEntries(
-	ctx context.Context, txn *sql.Tx, stateBlockNIDs types.StateBlockNIDs,
+func (s *stateBlockTable) BulkSelectStateBlockEntries(
+	ctx context.Context, txn *sql.Tx,
+	stateBlockNIDs types.StateBlockNIDs,
 ) ([][]types.EventNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateBlockEntriesStmt)
-	rows, err := stmt.QueryContext(ctx, stateBlockNIDsAsArray(stateBlockNIDs))
+	// Get database connection
+	db := s.cm.Connection(ctx, true)
+	if txn != nil {
+		db = db.WithContext(ctx)
+	}
+	
+	// Execute query
+	rows, err := db.Raw(
+		bulkSelectStateBlockEntriesSQL,
+		stateBlockNIDsAsArray(stateBlockNIDs),
+	).Rows()
+	
 	if err != nil {
 		return nil, err
 	}

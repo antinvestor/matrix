@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/antinvestor/matrix/internal"
@@ -68,65 +67,79 @@ const selectMaxPeekIDSQL = "" +
 const purgePeeksSQL = "" +
 	"DELETE FROM syncapi_peeks WHERE room_id = $1"
 
-type peekStatements struct {
-	db                       *sql.DB
-	insertPeekStmt           *sql.Stmt
-	deletePeekStmt           *sql.Stmt
-	deletePeeksStmt          *sql.Stmt
-	selectPeeksInRangeStmt   *sql.Stmt
-	selectPeekingDevicesStmt *sql.Stmt
-	selectMaxPeekIDStmt      *sql.Stmt
-	purgePeeksStmt           *sql.Stmt
+type peeksTable struct {
+	cm                       *sqlutil.Connections
+	insertPeekSQL            string
+	deletePeekSQL            string
+	deletePeeksSQL           string
+	selectPeeksInRangeSQL    string
+	selectPeekingDevicesSQL  string
+	selectMaxPeekIDSQL       string
+	purgePeeksSQL            string
 }
 
-func NewPostgresPeeksTable(ctx context.Context, db *sql.DB) (tables.Peeks, error) {
-	_, err := db.Exec(peeksSchema)
-	if err != nil {
+func NewPostgresPeeksTable(ctx context.Context, cm *sqlutil.Connections) (tables.Peeks, error) {
+	// Create the table first
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(peeksSchema).Error; err != nil {
 		return nil, err
 	}
-	s := &peekStatements{
-		db: db,
+	
+	// Initialize the table with SQL statements
+	s := &peeksTable{
+		cm:                      cm,
+		insertPeekSQL:           insertPeekSQL,
+		deletePeekSQL:           deletePeekSQL,
+		deletePeeksSQL:          deletePeeksSQL,
+		selectPeeksInRangeSQL:   selectPeeksInRangeSQL,
+		selectPeekingDevicesSQL: selectPeekingDevicesSQL,
+		selectMaxPeekIDSQL:      selectMaxPeekIDSQL,
+		purgePeeksSQL:           purgePeeksSQL,
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertPeekStmt, insertPeekSQL},
-		{&s.deletePeekStmt, deletePeekSQL},
-		{&s.deletePeeksStmt, deletePeeksSQL},
-		{&s.selectPeeksInRangeStmt, selectPeeksInRangeSQL},
-		{&s.selectPeekingDevicesStmt, selectPeekingDevicesSQL},
-		{&s.selectMaxPeekIDStmt, selectMaxPeekIDSQL},
-		{&s.purgePeeksStmt, purgePeeksSQL},
-	}.Prepare(db)
+	return s, nil
 }
 
-func (s *peekStatements) InsertPeek(
-	ctx context.Context, txn *sql.Tx, roomID, userID, deviceID string,
+func (s *peeksTable) InsertPeek(
+	ctx context.Context, roomID, userID, deviceID string,
 ) (streamPos types.StreamPosition, err error) {
+	// Get database connection
+	db := s.cm.Connection(ctx, false)
+	
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	stmt := sqlutil.TxStmt(txn, s.insertPeekStmt)
-	err = stmt.QueryRowContext(ctx, roomID, userID, deviceID, nowMilli).Scan(&streamPos)
+	row := db.Raw(s.insertPeekSQL, roomID, userID, deviceID, nowMilli).Row()
+	err = row.Scan(&streamPos)
 	return
 }
 
-func (s *peekStatements) DeletePeek(
-	ctx context.Context, txn *sql.Tx, roomID, userID, deviceID string,
+func (s *peeksTable) DeletePeek(
+	ctx context.Context, roomID, userID, deviceID string,
 ) (streamPos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, s.deletePeekStmt)
-	err = stmt.QueryRowContext(ctx, roomID, userID, deviceID).Scan(&streamPos)
+	// Get database connection
+	db := s.cm.Connection(ctx, false)
+	
+	row := db.Raw(s.deletePeekSQL, roomID, userID, deviceID).Row()
+	err = row.Scan(&streamPos)
 	return
 }
 
-func (s *peekStatements) DeletePeeks(
-	ctx context.Context, txn *sql.Tx, roomID, userID string,
+func (s *peeksTable) DeletePeeks(
+	ctx context.Context, roomID, userID string,
 ) (streamPos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, s.deletePeeksStmt)
-	err = stmt.QueryRowContext(ctx, roomID, userID).Scan(&streamPos)
+	// Get database connection
+	db := s.cm.Connection(ctx, false)
+	
+	row := db.Raw(s.deletePeeksSQL, roomID, userID).Row()
+	err = row.Scan(&streamPos)
 	return
 }
 
-func (s *peekStatements) SelectPeeksInRange(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string, r types.Range,
+func (s *peeksTable) SelectPeeksInRange(
+	ctx context.Context, userID, deviceID string, r types.Range,
 ) (peeks []types.Peek, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectPeeksInRangeStmt).QueryContext(ctx, userID, deviceID, r.Low(), r.High())
+	// Get database connection
+	db := s.cm.Connection(ctx, true)
+	
+	rows, err := db.Raw(s.selectPeeksInRangeSQL, userID, deviceID, r.Low(), r.High()).Rows()
 	if err != nil {
 		return
 	}
@@ -145,10 +158,13 @@ func (s *peekStatements) SelectPeeksInRange(
 	return peeks, rows.Err()
 }
 
-func (s *peekStatements) SelectPeekingDevices(
-	ctx context.Context, txn *sql.Tx,
+func (s *peeksTable) SelectPeekingDevices(
+	ctx context.Context,
 ) (peekingDevices map[string][]types.PeekingDevice, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectPeekingDevicesStmt).QueryContext(ctx)
+	// Get database connection
+	db := s.cm.Connection(ctx, true)
+	
+	rows, err := db.Raw(s.selectPeekingDevicesSQL).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -167,21 +183,21 @@ func (s *peekStatements) SelectPeekingDevices(
 	return result, rows.Err()
 }
 
-func (s *peekStatements) SelectMaxPeekID(
-	ctx context.Context, txn *sql.Tx,
+func (s *peeksTable) SelectMaxPeekID(
+	ctx context.Context,
 ) (id int64, err error) {
-	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxPeekIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
-	if nullableID.Valid {
-		id = nullableID.Int64
-	}
+	// Get database connection
+	db := s.cm.Connection(ctx, true)
+	
+	err = db.Raw(s.selectMaxPeekIDSQL).Scan(&id).Error
 	return
 }
 
-func (s *peekStatements) PurgePeeks(
-	ctx context.Context, txn *sql.Tx, roomID string,
+func (s *peeksTable) PurgePeeks(
+	ctx context.Context, roomID string,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.purgePeeksStmt).ExecContext(ctx, roomID)
-	return err
+	// Get database connection
+	db := s.cm.Connection(ctx, false)
+	
+	return db.Exec(s.purgePeeksSQL, roomID).Error
 }

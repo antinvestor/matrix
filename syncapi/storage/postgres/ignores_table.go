@@ -16,12 +16,12 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"gorm.io/gorm"
 )
 
 const ignoresSchema = `
@@ -41,29 +41,37 @@ const upsertIgnoresSQL = "" +
 	"INSERT INTO syncapi_ignores (user_id, ignores_json) VALUES ($1, $2)" +
 	" ON CONFLICT (user_id) DO UPDATE set ignores_json = $2"
 
-type ignoresStatements struct {
-	selectIgnoresStmt *sql.Stmt
-	upsertIgnoresStmt *sql.Stmt
+type ignoresTable struct {
+	cm                *sqlutil.Connections
+	selectIgnoresSQL  string
+	upsertIgnoresSQL  string
 }
 
-func NewPostgresIgnoresTable(ctx context.Context, db *sql.DB) (tables.Ignores, error) {
-	_, err := db.Exec(ignoresSchema)
-	if err != nil {
+func NewPostgresIgnoresTable(ctx context.Context, cm *sqlutil.Connections) (tables.Ignores, error) {
+	// Create the table first
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(ignoresSchema).Error; err != nil {
 		return nil, err
 	}
-	s := &ignoresStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.selectIgnoresStmt, selectIgnoresSQL},
-		{&s.upsertIgnoresStmt, upsertIgnoresSQL},
-	}.Prepare(db)
+	
+	// Initialize the table with SQL statements
+	s := &ignoresTable{
+		cm:               cm,
+		selectIgnoresSQL: selectIgnoresSQL,
+		upsertIgnoresSQL: upsertIgnoresSQL,
+	}
+	
+	return s, nil
 }
 
-func (s *ignoresStatements) SelectIgnores(
-	ctx context.Context, txn *sql.Tx, userID string,
+func (s *ignoresTable) SelectIgnores(
+	ctx context.Context, userID string,
 ) (*types.IgnoredUsers, error) {
+	// Get database connection
+	db := s.cm.Connection(ctx, true)
+	
 	var ignoresData []byte
-	err := sqlutil.TxStmt(txn, s.selectIgnoresStmt).QueryRowContext(ctx, userID).Scan(&ignoresData)
+	err := db.Raw(s.selectIgnoresSQL, userID).Scan(&ignoresData).Error
 	if err != nil {
 		return nil, err
 	}
@@ -74,13 +82,15 @@ func (s *ignoresStatements) SelectIgnores(
 	return &ignores, nil
 }
 
-func (s *ignoresStatements) UpsertIgnores(
-	ctx context.Context, txn *sql.Tx, userID string, ignores *types.IgnoredUsers,
+func (s *ignoresTable) UpsertIgnores(
+	ctx context.Context, userID string, ignores *types.IgnoredUsers,
 ) error {
+	// Get database connection
+	db := s.cm.Connection(ctx, false)
+	
 	ignoresJSON, err := json.Marshal(ignores)
 	if err != nil {
 		return err
 	}
-	_, err = sqlutil.TxStmt(txn, s.upsertIgnoresStmt).ExecContext(ctx, userID, ignoresJSON)
-	return err
+	return db.Exec(s.upsertIgnoresSQL, userID, ignoresJSON).Error
 }

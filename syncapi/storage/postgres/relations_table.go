@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -66,65 +65,75 @@ const selectRelationsInRangeDescSQL = "" +
 const selectMaxRelationIDSQL = "" +
 	"SELECT COALESCE(MAX(id), 0) FROM syncapi_relations"
 
-type relationsStatements struct {
-	insertRelationStmt             *sql.Stmt
-	selectRelationsInRangeAscStmt  *sql.Stmt
-	selectRelationsInRangeDescStmt *sql.Stmt
-	deleteRelationStmt             *sql.Stmt
-	selectMaxRelationIDStmt        *sql.Stmt
+type relationsTable struct {
+	cm                            *sqlutil.Connections
+	insertRelationSQL             string
+	selectRelationsInRangeAscSQL  string
+	selectRelationsInRangeDescSQL string
+	deleteRelationSQL             string
+	selectMaxRelationIDSQL        string
 }
 
-func NewPostgresRelationsTable(ctx context.Context, db *sql.DB) (tables.Relations, error) {
-	s := &relationsStatements{}
-	_, err := db.Exec(relationsSchema)
-	if err != nil {
+func NewPostgresRelationsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Relations, error) {
+	// Create the table first
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(relationsSchema).Error; err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertRelationStmt, insertRelationSQL},
-		{&s.selectRelationsInRangeAscStmt, selectRelationsInRangeAscSQL},
-		{&s.selectRelationsInRangeDescStmt, selectRelationsInRangeDescSQL},
-		{&s.deleteRelationStmt, deleteRelationSQL},
-		{&s.selectMaxRelationIDStmt, selectMaxRelationIDSQL},
-	}.Prepare(db)
+	
+	// Initialize the table with SQL statements
+	s := &relationsTable{
+		cm:                            cm,
+		insertRelationSQL:             insertRelationSQL,
+		selectRelationsInRangeAscSQL:  selectRelationsInRangeAscSQL,
+		selectRelationsInRangeDescSQL: selectRelationsInRangeDescSQL,
+		deleteRelationSQL:             deleteRelationSQL,
+		selectMaxRelationIDSQL:        selectMaxRelationIDSQL,
+	}
+	return s, nil
 }
 
-func (s *relationsStatements) InsertRelation(
-	ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, childEventType, relType string,
+func (s *relationsTable) InsertRelation(
+	ctx context.Context, roomID, eventID, childEventID, childEventType, relType string,
 ) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.insertRelationStmt).ExecContext(
-		ctx, roomID, eventID, childEventID, childEventType, relType,
-	)
+	// Get database connection
+	db := s.cm.Connection(ctx, false)
+	
+	err = db.Exec(s.insertRelationSQL, roomID, eventID, childEventID, childEventType, relType).Error
 	return
 }
 
-func (s *relationsStatements) DeleteRelation(
-	ctx context.Context, txn *sql.Tx, roomID, childEventID string,
+func (s *relationsTable) DeleteRelation(
+	ctx context.Context, roomID, childEventID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteRelationStmt)
-	_, err := stmt.ExecContext(
-		ctx, roomID, childEventID,
-	)
-	return err
+	// Get database connection
+	db := s.cm.Connection(ctx, false)
+	
+	return db.Exec(s.deleteRelationSQL, roomID, childEventID).Error
 }
 
 // SelectRelationsInRange returns a map rel_type -> []child_event_id
-func (s *relationsStatements) SelectRelationsInRange(
-	ctx context.Context, txn *sql.Tx, roomID, eventID, relType, eventType string,
+func (s *relationsTable) SelectRelationsInRange(
+	ctx context.Context, roomID, eventID, relType, eventType string,
 	r types.Range, limit int,
 ) (map[string][]types.RelationEntry, types.StreamPosition, error) {
+	// Get database connection
+	db := s.cm.Connection(ctx, true)
+	
 	var lastPos types.StreamPosition
-	var stmt *sql.Stmt
+	var query string
 	if r.Backwards {
-		stmt = sqlutil.TxStmt(txn, s.selectRelationsInRangeDescStmt)
+		query = s.selectRelationsInRangeDescSQL
 	} else {
-		stmt = sqlutil.TxStmt(txn, s.selectRelationsInRangeAscStmt)
+		query = s.selectRelationsInRangeAscSQL
 	}
-	rows, err := stmt.QueryContext(ctx, roomID, eventID, relType, eventType, r.Low(), r.High(), limit)
+	
+	rows, err := db.Raw(query, roomID, eventID, relType, eventType, r.Low(), r.High(), limit).Rows()
 	if err != nil {
 		return nil, lastPos, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRelationsInRange: rows.close() failed")
+	
 	result := map[string][]types.RelationEntry{}
 	var (
 		id           types.StreamPosition
@@ -149,10 +158,12 @@ func (s *relationsStatements) SelectRelationsInRange(
 	return result, lastPos, rows.Err()
 }
 
-func (s *relationsStatements) SelectMaxRelationID(
-	ctx context.Context, txn *sql.Tx,
+func (s *relationsTable) SelectMaxRelationID(
+	ctx context.Context,
 ) (id int64, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMaxRelationIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&id)
+	// Get database connection
+	db := s.cm.Connection(ctx, true)
+	
+	err = db.Raw(s.selectMaxRelationIDSQL).Scan(&id).Error
 	return
 }

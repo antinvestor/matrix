@@ -16,10 +16,11 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"gorm.io/gorm"
 )
 
 const blacklistSchema = `
@@ -30,79 +31,80 @@ CREATE TABLE IF NOT EXISTS federationsender_blacklist (
 );
 `
 
-const insertBlacklistSQL = "" +
-	"INSERT INTO federationsender_blacklist (server_name) VALUES ($1)" +
-	" ON CONFLICT DO NOTHING"
-
-const selectBlacklistSQL = "" +
-	"SELECT server_name FROM federationsender_blacklist WHERE server_name = $1"
-
-const deleteBlacklistSQL = "" +
-	"DELETE FROM federationsender_blacklist WHERE server_name = $1"
-
-const deleteAllBlacklistSQL = "" +
-	"TRUNCATE federationsender_blacklist"
-
-type blacklistStatements struct {
-	db                     *sql.DB
-	insertBlacklistStmt    *sql.Stmt
-	selectBlacklistStmt    *sql.Stmt
-	deleteBlacklistStmt    *sql.Stmt
-	deleteAllBlacklistStmt *sql.Stmt
+// blacklistTable contains the postgres-specific implementation of the blacklist table
+type blacklistTable struct {
+	cm *sqlutil.Connections
+	
+	// SQL queries stored as fields for better maintainability
+	// insertBlacklistSQL adds a server name to the blacklist
+	insertBlacklistSQL string
+	
+	// selectBlacklistSQL checks if a server name is blacklisted
+	selectBlacklistSQL string
+	
+	// deleteBlacklistSQL removes a server name from the blacklist
+	deleteBlacklistSQL string
+	
+	// deleteAllBlacklistSQL removes all server names from the blacklist
+	deleteAllBlacklistSQL string
 }
 
-func NewPostgresBlacklistTable(ctx context.Context, db *sql.DB) (s *blacklistStatements, err error) {
-	s = &blacklistStatements{
-		db: db,
+// NewPostgresBlacklistTable creates a new postgres blacklist table and prepares all statements
+func NewPostgresBlacklistTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationBlacklist, error) {
+	// Initialize schema using GORM
+	gormDB := cm.Connection(ctx, false)
+	if err := gormDB.Exec(blacklistSchema).Error; err != nil {
+		return nil, err
 	}
-	_, err = db.Exec(blacklistSchema)
-	if err != nil {
-		return
+	
+	s := &blacklistTable{
+		cm: cm,
+		insertBlacklistSQL: "INSERT INTO federationsender_blacklist (server_name) VALUES ($1) ON CONFLICT DO NOTHING",
+		selectBlacklistSQL: "SELECT server_name FROM federationsender_blacklist WHERE server_name = $1",
+		deleteBlacklistSQL: "DELETE FROM federationsender_blacklist WHERE server_name = $1",
+		deleteAllBlacklistSQL: "TRUNCATE federationsender_blacklist",
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.insertBlacklistStmt, insertBlacklistSQL},
-		{&s.selectBlacklistStmt, selectBlacklistSQL},
-		{&s.deleteBlacklistStmt, deleteBlacklistSQL},
-		{&s.deleteAllBlacklistStmt, deleteAllBlacklistSQL},
-	}.Prepare(db)
+	return s, nil
 }
 
-func (s *blacklistStatements) InsertBlacklist(
-	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
+// InsertBlacklist adds a server name to the blacklist
+func (s *blacklistTable) InsertBlacklist(
+	ctx context.Context, serverName spec.ServerName,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertBlacklistStmt)
-	_, err := stmt.ExecContext(ctx, serverName)
-	return err
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.insertBlacklistSQL, serverName).Error
 }
 
-func (s *blacklistStatements) SelectBlacklist(
-	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
+// SelectBlacklist checks if a server name is on the blacklist
+func (s *blacklistTable) SelectBlacklist(
+	ctx context.Context, serverName spec.ServerName,
 ) (bool, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectBlacklistStmt)
-	res, err := stmt.QueryContext(ctx, serverName)
+	db := s.cm.Connection(ctx, true)
+	rows, err := db.Raw(s.selectBlacklistSQL, serverName).Rows()
 	if err != nil {
 		return false, err
 	}
-	defer res.Close() // nolint:errcheck
+	defer rows.Close() // nolint:errcheck
+	
 	// The query will return the server name if the server is blacklisted, and
 	// will return no rows if not. By calling Next, we find out if a row was
 	// returned or not - we don't care about the value itself.
-	return res.Next(), nil
+	return rows.Next(), nil
 }
 
-func (s *blacklistStatements) DeleteBlacklist(
-	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
+// DeleteBlacklist removes a server name from the blacklist
+func (s *blacklistTable) DeleteBlacklist(
+	ctx context.Context, serverName spec.ServerName,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteBlacklistStmt)
-	_, err := stmt.ExecContext(ctx, serverName)
-	return err
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.deleteBlacklistSQL, serverName).Error
 }
 
-func (s *blacklistStatements) DeleteAllBlacklist(
-	ctx context.Context, txn *sql.Tx,
+// DeleteAllBlacklist removes all server names from the blacklist
+func (s *blacklistTable) DeleteAllBlacklist(
+	ctx context.Context,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteAllBlacklistStmt)
-	_, err := stmt.ExecContext(ctx)
-	return err
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.deleteAllBlacklistSQL).Error
 }

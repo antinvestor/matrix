@@ -16,8 +16,7 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -37,87 +36,131 @@ CREATE TABLE IF NOT EXISTS roomserver_redactions (
 CREATE INDEX IF NOT EXISTS roomserver_redactions_redacts_event_id ON roomserver_redactions(redacts_event_id);
 `
 
-const insertRedactionSQL = "" +
-	"INSERT INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
-	" VALUES ($1, $2, $3)" +
-	" ON CONFLICT DO NOTHING"
+// SQL query constants for redactions table
+const (
+	// insertRedactionSQL inserts a new redaction event into the redactions table
+	insertRedactionSQL = "" +
+		"INSERT INTO roomserver_redactions (redaction_event_id, redacts_event_id, validated)" +
+		" VALUES ($1, $2, $3)" +
+		" ON CONFLICT DO NOTHING"
 
-const selectRedactionInfoByRedactionEventIDSQL = "" +
-	"SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
-	" WHERE redaction_event_id = $1"
+	// selectRedactionInfoByRedactionEventIDSQL gets redaction info by the redaction event ID
+	selectRedactionInfoByRedactionEventIDSQL = "" +
+		"SELECT redaction_event_id, redacts_event_id, validated" +
+		" FROM roomserver_redactions" +
+		" WHERE redaction_event_id = $1"
 
-const selectRedactionInfoByEventBeingRedactedSQL = "" +
-	"SELECT redaction_event_id, redacts_event_id, validated FROM roomserver_redactions" +
-	" WHERE redacts_event_id = $1"
+	// selectRedactionInfoByEventBeingRedactedSQL gets redaction info by the event being redacted
+	selectRedactionInfoByEventBeingRedactedSQL = "" +
+		"SELECT redaction_event_id, redacts_event_id, validated" +
+		" FROM roomserver_redactions" +
+		" WHERE redacts_event_id = $1"
 
-const markRedactionValidatedSQL = "" +
-	" UPDATE roomserver_redactions SET validated = $2 WHERE redaction_event_id = $1"
+	// markRedactionValidatedSQL updates the validated status of a redaction
+	markRedactionValidatedSQL = "" +
+		"UPDATE roomserver_redactions" +
+		" SET validated = $2" +
+		" WHERE redaction_event_id = $1"
+)
 
-type redactionStatements struct {
-	insertRedactionStmt                         *sql.Stmt
-	selectRedactionInfoByRedactionEventIDStmt   *sql.Stmt
-	selectRedactionInfoByEventBeingRedactedStmt *sql.Stmt
-	markRedactionValidatedStmt                  *sql.Stmt
+type redactionsStatements struct {
+	cm *sqlutil.Connections
+	
+	// SQL statements stored as struct fields
+	insertRedactionStmt                        string
+	selectRedactionInfoByRedactionEventIDStmt  string
+	selectRedactionInfoByEventBeingRedactedStmt string
+	markRedactionValidatedStmt                 string
 }
 
-func CreateRedactionsTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(redactionsSchema)
-	return err
-}
-
-func PrepareRedactionsTable(ctx context.Context, db *sql.DB) (tables.Redactions, error) {
-	s := &redactionStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertRedactionStmt, insertRedactionSQL},
-		{&s.selectRedactionInfoByRedactionEventIDStmt, selectRedactionInfoByRedactionEventIDSQL},
-		{&s.selectRedactionInfoByEventBeingRedactedStmt, selectRedactionInfoByEventBeingRedactedSQL},
-		{&s.markRedactionValidatedStmt, markRedactionValidatedSQL},
-	}.Prepare(db)
-}
-
-func (s *redactionStatements) InsertRedaction(
-	ctx context.Context, txn *sql.Tx, info tables.RedactionInfo,
-) error {
-	stmt := sqlutil.TxStmt(txn, s.insertRedactionStmt)
-	_, err := stmt.ExecContext(ctx, info.RedactionEventID, info.RedactsEventID, info.Validated)
-	return err
-}
-
-func (s *redactionStatements) SelectRedactionInfoByRedactionEventID(
-	ctx context.Context, txn *sql.Tx, redactionEventID string,
-) (info *tables.RedactionInfo, err error) {
-	info = &tables.RedactionInfo{}
-	stmt := sqlutil.TxStmt(txn, s.selectRedactionInfoByRedactionEventIDStmt)
-	err = stmt.QueryRowContext(ctx, redactionEventID).Scan(
-		&info.RedactionEventID, &info.RedactsEventID, &info.Validated,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		info = nil
-		err = nil
+// NewPostgresRedactionsTable creates a new PostgreSQL redactions table and initializes it
+func NewPostgresRedactionsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Redactions, error) {
+	// Create the table first
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(redactionsSchema).Error; err != nil {
+		return nil, err
 	}
+
+	// Initialize the table
+	s := &redactionsStatements{
+		cm: cm,
+		
+		// Initialize SQL statement fields with the constants
+		insertRedactionStmt:                        insertRedactionSQL,
+		selectRedactionInfoByRedactionEventIDStmt:  selectRedactionInfoByRedactionEventIDSQL,
+		selectRedactionInfoByEventBeingRedactedStmt: selectRedactionInfoByEventBeingRedactedSQL,
+		markRedactionValidatedStmt:                 markRedactionValidatedSQL,
+	}
+
+	return s, nil
+}
+
+// InsertRedaction adds a new redaction event to the table
+func (s *redactionsStatements) InsertRedaction(
+	ctx context.Context, info tables.RedactionInfo,
+) error {
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(
+		s.insertRedactionStmt,
+		info.RedactionEventID,
+		info.RedactsEventID,
+		info.Validated,
+	).Error
+}
+
+// SelectRedactionInfoByRedactionEventID gets redaction info by the redaction event ID
+func (s *redactionsStatements) SelectRedactionInfoByRedactionEventID(
+	ctx context.Context, redactionEventID string,
+) (info *tables.RedactionInfo, err error) {
+	db := s.cm.Connection(ctx, true)
+	info = &tables.RedactionInfo{}
+
+	raw := db.Raw(
+		s.selectRedactionInfoByRedactionEventIDStmt,
+		redactionEventID,
+	).Row()
+	err = raw.Scan(
+		&info.RedactionEventID,
+		&info.RedactsEventID,
+		&info.Validated,
+	)
+
+	if frame.DBErrorIsRecordNotFound(err) {
+		return nil, nil
+	}
+
 	return
 }
 
-func (s *redactionStatements) SelectRedactionInfoByEventBeingRedacted(
-	ctx context.Context, txn *sql.Tx, eventID string,
+// SelectRedactionInfoByEventBeingRedacted gets redaction info by the event being redacted
+func (s *redactionsStatements) SelectRedactionInfoByEventBeingRedacted(
+	ctx context.Context, eventID string,
 ) (info *tables.RedactionInfo, err error) {
+	db := s.cm.Connection(ctx, true)
 	info = &tables.RedactionInfo{}
-	stmt := sqlutil.TxStmt(txn, s.selectRedactionInfoByEventBeingRedactedStmt)
-	err = stmt.QueryRowContext(ctx, eventID).Scan(
-		&info.RedactionEventID, &info.RedactsEventID, &info.Validated,
+
+	row := db.Raw(
+		s.selectRedactionInfoByEventBeingRedactedStmt,
+		eventID,
+	).Row()
+
+	err = row.Scan(
+		&info.RedactionEventID,
+		&info.RedactsEventID,
+		&info.Validated,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
-		info = nil
-		err = nil
+
+	if frame.DBErrorIsRecordNotFound(err) {
+		return nil, nil
 	}
+
 	return
 }
 
-func (s *redactionStatements) MarkRedactionValidated(
-	ctx context.Context, txn *sql.Tx, redactionEventID string, validated bool,
+// MarkRedactionValidated updates the validated status of a redaction
+func (s *redactionsStatements) MarkRedactionValidated(
+	ctx context.Context, redactionEventID string, validated bool,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.markRedactionValidatedStmt)
-	_, err := stmt.ExecContext(ctx, redactionEventID, validated)
-	return err
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.markRedactionValidatedStmt, redactionEventID, validated).Error
 }

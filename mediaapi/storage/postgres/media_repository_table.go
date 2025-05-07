@@ -17,13 +17,13 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/tables"
 	"github.com/antinvestor/matrix/mediaapi/types"
+	"gorm.io/gorm"
 )
 
 const mediaSchema = `
@@ -52,45 +52,73 @@ CREATE TABLE IF NOT EXISTS mediaapi_media_repository (
 CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);
 `
 
-const insertMediaSQL = `
-INSERT INTO mediaapi_media_repository (media_id, media_origin, content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-`
+// SQL query constants for media repository operations
+const (
+	// insertMediaSQL inserts new media metadata into the repository
+	insertMediaSQL = `
+    INSERT INTO mediaapi_media_repository (media_id, media_origin, content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `
 
-const selectMediaSQL = `
-SELECT content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id FROM mediaapi_media_repository WHERE media_id = $1 AND media_origin = $2
-`
+	// selectMediaSQL retrieves media metadata by ID and origin
+	selectMediaSQL = `
+    SELECT content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id FROM mediaapi_media_repository WHERE media_id = $1 AND media_origin = $2
+    `
 
-const selectMediaByHashSQL = `
-SELECT content_type, file_size_bytes, creation_ts, upload_name, media_id, user_id FROM mediaapi_media_repository WHERE base64hash = $1 AND media_origin = $2
-`
+	// selectMediaByHashSQL retrieves media metadata by hash and origin
+	selectMediaByHashSQL = `
+    SELECT content_type, file_size_bytes, creation_ts, upload_name, media_id, user_id FROM mediaapi_media_repository WHERE base64hash = $1 AND media_origin = $2
+    `
+)
 
+// mediaStatements holds the SQL statements for media repository operations
 type mediaStatements struct {
-	insertMediaStmt       *sql.Stmt
-	selectMediaStmt       *sql.Stmt
-	selectMediaByHashStmt *sql.Stmt
+	insertMediaStmt       string
+	selectMediaStmt       string
+	selectMediaByHashStmt string
 }
 
-func NewPostgresMediaRepositoryTable(ctx context.Context, db *sql.DB) (tables.MediaRepository, error) {
-	s := &mediaStatements{}
-	_, err := db.Exec(mediaSchema)
-	if err != nil {
+// mediaRepository contains the postgres-specific implementation
+type mediaRepository struct {
+	cm         *sqlutil.Connections
+	statements mediaStatements
+}
+
+// NewPostgresMediaRepositoryTable creates a new postgres media repository table
+func NewPostgresMediaRepositoryTable(ctx context.Context, cm *sqlutil.Connections) (tables.MediaRepository, error) {
+	// Initialize schema using GORM
+	gormDB := cm.Connection(ctx, false)
+	if err := gormDB.Exec(mediaSchema).Error; err != nil {
 		return nil, err
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.insertMediaStmt, insertMediaSQL},
-		{&s.selectMediaStmt, selectMediaSQL},
-		{&s.selectMediaByHashStmt, selectMediaByHashSQL},
-	}.Prepare(db)
+	// Initialize repository with SQL statements
+	r := &mediaRepository{
+		cm: cm,
+		statements: mediaStatements{
+			insertMediaStmt:       insertMediaSQL,
+			selectMediaStmt:       selectMediaSQL,
+			selectMediaByHashStmt: selectMediaByHashSQL,
+		},
+	}
+
+	return r, nil
 }
 
-func (s *mediaStatements) InsertMedia(
-	ctx context.Context, txn *sql.Tx, mediaMetadata *types.MediaMetadata,
+// InsertMedia inserts media metadata into the repository
+func (s *mediaRepository) InsertMedia(
+	ctx context.Context, txn *gorm.DB, mediaMetadata *types.MediaMetadata,
 ) error {
 	mediaMetadata.CreationTimestamp = spec.AsTimestamp(time.Now())
-	_, err := sqlutil.TxStmtContext(ctx, txn, s.insertMediaStmt).ExecContext(
-		ctx,
+	
+	// Use provided transaction or create a new one
+	db := txn
+	if db == nil {
+		db = s.cm.Connection(ctx, false)
+	}
+
+	return db.Exec(
+		s.statements.insertMediaStmt,
 		mediaMetadata.MediaID,
 		mediaMetadata.Origin,
 		mediaMetadata.ContentType,
@@ -99,20 +127,31 @@ func (s *mediaStatements) InsertMedia(
 		mediaMetadata.UploadName,
 		mediaMetadata.Base64Hash,
 		mediaMetadata.UserID,
-	)
-	return err
+	).Error
 }
 
-func (s *mediaStatements) SelectMedia(
-	ctx context.Context, txn *sql.Tx, mediaID types.MediaID, mediaOrigin spec.ServerName,
+// SelectMedia retrieves media metadata by ID and origin
+func (s *mediaRepository) SelectMedia(
+	ctx context.Context, txn *gorm.DB, mediaID types.MediaID, mediaOrigin spec.ServerName,
 ) (*types.MediaMetadata, error) {
 	mediaMetadata := types.MediaMetadata{
 		MediaID: mediaID,
 		Origin:  mediaOrigin,
 	}
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectMediaStmt).QueryRowContext(
-		ctx, mediaMetadata.MediaID, mediaMetadata.Origin,
-	).Scan(
+	
+	// Use provided transaction or create a new one
+	db := txn
+	if db == nil {
+		db = s.cm.Connection(ctx, true)
+	}
+
+	row := db.Raw(
+		s.statements.selectMediaStmt, 
+		mediaMetadata.MediaID, 
+		mediaMetadata.Origin,
+	).Row()
+
+	err := row.Scan(
 		&mediaMetadata.ContentType,
 		&mediaMetadata.FileSizeBytes,
 		&mediaMetadata.CreationTimestamp,
@@ -123,16 +162,28 @@ func (s *mediaStatements) SelectMedia(
 	return &mediaMetadata, err
 }
 
-func (s *mediaStatements) SelectMediaByHash(
-	ctx context.Context, txn *sql.Tx, mediaHash types.Base64Hash, mediaOrigin spec.ServerName,
+// SelectMediaByHash retrieves media metadata by hash and origin
+func (s *mediaRepository) SelectMediaByHash(
+	ctx context.Context, txn *gorm.DB, mediaHash types.Base64Hash, mediaOrigin spec.ServerName,
 ) (*types.MediaMetadata, error) {
 	mediaMetadata := types.MediaMetadata{
 		Base64Hash: mediaHash,
 		Origin:     mediaOrigin,
 	}
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectMediaByHashStmt).QueryRowContext(
-		ctx, mediaMetadata.Base64Hash, mediaMetadata.Origin,
-	).Scan(
+	
+	// Use provided transaction or create a new one
+	db := txn
+	if db == nil {
+		db = s.cm.Connection(ctx, true)
+	}
+
+	row := db.Raw(
+		s.statements.selectMediaByHashStmt,
+		mediaMetadata.Base64Hash, 
+		mediaMetadata.Origin,
+	).Row()
+
+	err := row.Scan(
 		&mediaMetadata.ContentType,
 		&mediaMetadata.FileSizeBytes,
 		&mediaMetadata.CreationTimestamp,

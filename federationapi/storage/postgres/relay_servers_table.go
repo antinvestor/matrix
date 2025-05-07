@@ -16,9 +16,9 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
@@ -37,66 +37,84 @@ CREATE INDEX IF NOT EXISTS federationsender_relay_servers_server_name_idx
 	ON federationsender_relay_servers (server_name);
 `
 
-const insertRelayServersSQL = "" +
-	"INSERT INTO federationsender_relay_servers (server_name, relay_server_name) VALUES ($1, $2)" +
-	" ON CONFLICT DO NOTHING"
+// SQL query string constants
+const (
+	// insertRelayServersSQL inserts a relay server for a destination with conflict handling
+	insertRelayServersSQL = "" +
+		"INSERT INTO federationsender_relay_servers (server_name, relay_server_name) VALUES ($1, $2)" +
+		" ON CONFLICT DO NOTHING"
 
-const selectRelayServersSQL = "" +
-	"SELECT relay_server_name FROM federationsender_relay_servers WHERE server_name = $1"
+	// selectRelayServersSQL retrieves all relay servers for a given destination
+	selectRelayServersSQL = "" +
+		"SELECT relay_server_name FROM federationsender_relay_servers WHERE server_name = $1"
 
-const deleteRelayServersSQL = "" +
-	"DELETE FROM federationsender_relay_servers WHERE server_name = $1 AND relay_server_name = ANY($2)"
+	// deleteRelayServersSQL removes specific relay servers for a destination
+	deleteRelayServersSQL = "" +
+		"DELETE FROM federationsender_relay_servers WHERE server_name = $1 AND relay_server_name = ANY($2)"
 
-const deleteAllRelayServersSQL = "" +
-	"DELETE FROM federationsender_relay_servers WHERE server_name = $1"
+	// deleteAllRelayServersSQL removes all relay servers for a given destination
+	deleteAllRelayServersSQL = "" +
+		"DELETE FROM federationsender_relay_servers WHERE server_name = $1"
+)
 
-type relayServersStatements struct {
-	db                        *sql.DB
-	insertRelayServersStmt    *sql.Stmt
-	selectRelayServersStmt    *sql.Stmt
-	deleteRelayServersStmt    *sql.Stmt
-	deleteAllRelayServersStmt *sql.Stmt
+// relayServersTable contains the postgres-specific implementation
+type relayServersTable struct {
+	cm *sqlutil.Connections
+
+	insertRelayServersStmt    string
+	selectRelayServersStmt    string
+	deleteRelayServersStmt    string
+	deleteAllRelayServersStmt string
 }
 
-func NewPostgresRelayServersTable(ctx context.Context, db *sql.DB) (s *relayServersStatements, err error) {
-	s = &relayServersStatements{
-		db: db,
-	}
-	_, err = db.Exec(relayServersSchema)
-	if err != nil {
-		return
+// NewPostgresRelayServersTable creates a new postgres relay servers table
+func NewPostgresRelayServersTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationRelayServers, error) {
+	// Initialize schema using GORM
+	gormDB := cm.Connection(ctx, false)
+	if err := gormDB.Exec(relayServersSchema).Error; err != nil {
+		return nil, err
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.insertRelayServersStmt, insertRelayServersSQL},
-		{&s.selectRelayServersStmt, selectRelayServersSQL},
-		{&s.deleteRelayServersStmt, deleteRelayServersSQL},
-		{&s.deleteAllRelayServersStmt, deleteAllRelayServersSQL},
-	}.Prepare(db)
+	s := &relayServersTable{
+		cm:                        cm,
+		insertRelayServersStmt:    insertRelayServersSQL,
+		selectRelayServersStmt:    selectRelayServersSQL,
+		deleteRelayServersStmt:    deleteRelayServersSQL,
+		deleteAllRelayServersStmt: deleteAllRelayServersSQL,
+	}
+
+	return s, nil
 }
 
-func (s *relayServersStatements) InsertRelayServers(
+// InsertRelayServers adds relay servers for a destination
+func (s *relayServersTable) InsertRelayServers(
 	ctx context.Context,
-	txn *sql.Tx,
 	serverName spec.ServerName,
 	relayServers []spec.ServerName,
 ) error {
+	// Get writable database connection
+	db := s.cm.Connection(ctx, false)
+
 	for _, relayServer := range relayServers {
-		stmt := sqlutil.TxStmt(txn, s.insertRelayServersStmt)
-		if _, err := stmt.ExecContext(ctx, serverName, relayServer); err != nil {
+		if err := db.Exec(
+			s.insertRelayServersStmt,
+			serverName, relayServer,
+		).Error; err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *relayServersStatements) SelectRelayServers(
+// SelectRelayServers retrieves all relay servers for a destination
+func (s *relayServersTable) SelectRelayServers(
 	ctx context.Context,
-	txn *sql.Tx,
 	serverName spec.ServerName,
 ) ([]spec.ServerName, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRelayServersStmt)
-	rows, err := stmt.QueryContext(ctx, serverName)
+	// Get read-only database connection
+	db := s.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(s.selectRelayServersStmt, serverName).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -113,25 +131,34 @@ func (s *relayServersStatements) SelectRelayServers(
 	return result, rows.Err()
 }
 
-func (s *relayServersStatements) DeleteRelayServers(
+// DeleteRelayServers removes specific relay servers for a destination
+func (s *relayServersTable) DeleteRelayServers(
 	ctx context.Context,
-	txn *sql.Tx,
 	serverName spec.ServerName,
 	relayServers []spec.ServerName,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteRelayServersStmt)
-	_, err := stmt.ExecContext(ctx, serverName, pq.Array(relayServers))
-	return err
+	// Get writable database connection
+	db := s.cm.Connection(ctx, false)
+
+	// Convert []spec.ServerName to []string for pq.Array
+	relayServerStrings := make([]string, len(relayServers))
+	for i, server := range relayServers {
+		relayServerStrings[i] = string(server)
+	}
+
+	return db.Exec(
+		s.deleteRelayServersStmt,
+		serverName, pq.Array(relayServerStrings),
+	).Error
 }
 
-func (s *relayServersStatements) DeleteAllRelayServers(
+// DeleteAllRelayServers removes all relay servers for a destination
+func (s *relayServersTable) DeleteAllRelayServers(
 	ctx context.Context,
-	txn *sql.Tx,
 	serverName spec.ServerName,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteAllRelayServersStmt)
-	if _, err := stmt.ExecContext(ctx, serverName); err != nil {
-		return err
-	}
-	return nil
+	// Get writable database connection
+	db := s.cm.Connection(ctx, false)
+
+	return db.Exec(s.deleteAllRelayServersStmt, serverName).Error
 }

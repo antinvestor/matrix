@@ -26,18 +26,24 @@ import (
 
 // NewDatabase opens a postgres database.
 func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
+	// Get the database connections
 	db, writer, err := conMan.Connection(ctx, dbProperties)
 	if err != nil {
 		return nil, err
 	}
-	mediaRepo, err := NewPostgresMediaRepositoryTable(ctx, db)
+	
+	// Create media repository table
+	mediaRepo, err := NewPostgresMediaRepositoryTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	thumbnails, err := NewPostgresThumbnailsTable(ctx, db)
+	
+	// Create thumbnails table
+	thumbnails, err := NewPostgresThumbnailsTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
+	
 	return &shared.Database{
 		MediaRepository: mediaRepo,
 		Thumbnails:      thumbnails,

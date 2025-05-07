@@ -42,54 +42,67 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
 		return nil, err
 	}
-	blacklist, err := NewPostgresBlacklistTable(ctx, d.db)
+	
+	blacklist, err := NewPostgresBlacklistTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	joinedHosts, err := NewPostgresJoinedHostsTable(ctx, d.db)
+	
+	joinedHosts, err := NewPostgresJoinedHostsTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	queuePDUs, err := NewPostgresQueuePDUsTable(ctx, d.db)
+	
+	queuePDUs, err := NewPostgresQueuePDUsTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	queueEDUs, err := NewPostgresQueueEDUsTable(ctx, d.db)
+	
+	queueEDUs, err := NewPostgresQueueEDUsTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	queueJSON, err := NewPostgresQueueJSONTable(ctx, d.db)
+	
+	queueJSON, err := NewPostgresQueueJSONTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	assumedOffline, err := NewPostgresAssumedOfflineTable(ctx, d.db)
+	
+	assumedOffline, err := NewPostgresAssumedOfflineTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	relayServers, err := NewPostgresRelayServersTable(ctx, d.db)
+	
+	relayServers, err := NewPostgresRelayServersTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	inboundPeeks, err := NewPostgresInboundPeeksTable(ctx, d.db)
+	
+	inboundPeeks, err := NewPostgresInboundPeeksTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	outboundPeeks, err := NewPostgresOutboundPeeksTable(ctx, d.db)
+	
+	outboundPeeks, err := NewPostgresOutboundPeeksTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, d.db)
+	
+	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, conMan)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotaryServerKeysTable: %s", err)
 	}
-	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, d.db)
+	
+	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, conMan)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotaryServerKeysMetadataTable: %s", err)
 	}
-	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, d.db)
+	
+	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
+	
 	m := sqlutil.NewMigrator(d.db)
 	m.AddMigrations(sqlutil.Migration{
 		Version: "federationsender: drop federationsender_rooms",
@@ -99,9 +112,11 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	if err != nil {
 		return nil, err
 	}
+	
 	if err = queueEDUs.Prepare(); err != nil {
 		return nil, err
 	}
+	
 	d.Database = shared.Database{
 		DB:                       d.db,
 		IsLocalServerName:        isLocalServerName,

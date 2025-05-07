@@ -16,12 +16,12 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"gorm.io/gorm"
 )
 
 const notaryServerKeysJSONSchema = `
@@ -34,32 +34,44 @@ CREATE TABLE IF NOT EXISTS federationsender_notary_server_keys_json (
 );
 `
 
-const insertServerKeysJSONSQL = "" +
-	"INSERT INTO federationsender_notary_server_keys_json (response_json, server_name, valid_until) VALUES ($1, $2, $3)" +
-	" RETURNING notary_id"
-
-type notaryServerKeysStatements struct {
-	db                       *sql.DB
-	insertServerKeysJSONStmt *sql.Stmt
+// notaryServerKeysJSONTable contains the postgres-specific implementation
+type notaryServerKeysJSONTable struct {
+	cm *sqlutil.Connections
+	
+	// insertServerKeysJSONSQL inserts a server key response JSON and returns the created notary ID
+	insertServerKeysJSONSQL string
 }
 
-func NewPostgresNotaryServerKeysTable(ctx context.Context, db *sql.DB) (s *notaryServerKeysStatements, err error) {
-	s = &notaryServerKeysStatements{
-		db: db,
-	}
-	_, err = db.Exec(notaryServerKeysJSONSchema)
-	if err != nil {
-		return
+// NewPostgresNotaryServerKeysTable creates a new postgres notary server keys table
+func NewPostgresNotaryServerKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationNotaryServerKeysJSON, error) {
+	// Initialize schema using GORM
+	gormDB := cm.Connection(ctx, false)
+	if err := gormDB.Exec(notaryServerKeysJSONSchema).Error; err != nil {
+		return nil, err
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.insertServerKeysJSONStmt, insertServerKeysJSONSQL},
-	}.Prepare(db)
+	s := &notaryServerKeysJSONTable{
+		cm: cm,
+		insertServerKeysJSONSQL: "INSERT INTO federationsender_notary_server_keys_json (response_json, server_name, valid_until) VALUES ($1, $2, $3) RETURNING notary_id",
+	}
+
+	return s, nil
 }
 
-func (s *notaryServerKeysStatements) InsertJSONResponse(
-	ctx context.Context, txn *sql.Tx, keyQueryResponseJSON gomatrixserverlib.ServerKeys, serverName spec.ServerName, validUntil spec.Timestamp,
+// InsertJSONResponse stores a server key response and returns the notary ID
+func (s *notaryServerKeysJSONTable) InsertJSONResponse(
+	ctx context.Context, keyQueryResponseJSON gomatrixserverlib.ServerKeys, serverName spec.ServerName, validUntil spec.Timestamp,
 ) (tables.NotaryID, error) {
+	db := s.cm.Connection(ctx, false)
+	
 	var notaryID tables.NotaryID
-	return notaryID, txn.Stmt(s.insertServerKeysJSONStmt).QueryRowContext(ctx, string(keyQueryResponseJSON.Raw), serverName, validUntil).Scan(&notaryID)
+	row := db.Raw(
+		s.insertServerKeysJSONSQL, 
+		string(keyQueryResponseJSON.Raw), 
+		serverName, 
+		validUntil,
+	).Row()
+	
+	err := row.Scan(&notaryID)
+	return notaryID, err
 }

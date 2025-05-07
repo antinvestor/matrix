@@ -50,63 +50,83 @@ CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account_data_type(id, type);
 `
 
-const insertAccountDataSQL = "" +
-	"INSERT INTO syncapi_account_data_type (user_id, room_id, type) VALUES ($1, $2, $3)" +
-	" ON CONFLICT ON CONSTRAINT syncapi_account_data_unique" +
-	" DO UPDATE SET id = nextval('syncapi_stream_id')" +
-	" RETURNING id"
+// SQL query constants for the account data table
+const (
+	// insertAccountDataSQL inserts account data and returns the generated stream ID
+	insertAccountDataSQL = `
+		INSERT INTO syncapi_account_data_type (user_id, room_id, type) 
+		VALUES ($1, $2, $3)
+		ON CONFLICT ON CONSTRAINT syncapi_account_data_unique
+		DO UPDATE SET id = nextval('syncapi_stream_id')
+		RETURNING id
+	`
 
-const selectAccountDataInRangeSQL = "" +
-	"SELECT id, room_id, type FROM syncapi_account_data_type" +
-	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
-	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
-	" ORDER BY id ASC LIMIT $6"
+	// selectAccountDataInRangeSQL retrieves account data within the specified range
+	selectAccountDataInRangeSQL = `
+		SELECT id, room_id, type FROM syncapi_account_data_type
+		WHERE user_id = $1 AND id > $2 AND id <= $3
+		AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )
+		AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )
+		ORDER BY id ASC LIMIT $6
+	`
 
-const selectMaxAccountDataIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_account_data_type"
+	// selectMaxAccountDataIDSQL gets the maximum account data ID
+	selectMaxAccountDataIDSQL = `
+		SELECT MAX(id) FROM syncapi_account_data_type
+	`
+)
 
-type accountDataStatements struct {
-	insertAccountDataStmt        *sql.Stmt
-	selectAccountDataInRangeStmt *sql.Stmt
-	selectMaxAccountDataIDStmt   *sql.Stmt
+type accountDataTable struct {
+	cm *sqlutil.Connections
+	
+	insertAccountDataSQL        string
+	selectAccountDataInRangeSQL string
+	selectMaxAccountDataIDSQL   string
 }
 
-func NewPostgresAccountDataTable(ctx context.Context, db *sql.DB) (tables.AccountData, error) {
-	s := &accountDataStatements{}
-	_, err := db.Exec(accountDataSchema)
-	if err != nil {
+func NewPostgresAccountDataTable(ctx context.Context, cm *sqlutil.Connections) (tables.AccountData, error) {
+	// Create the table first
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(accountDataSchema).Error; err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertAccountDataStmt, insertAccountDataSQL},
-		{&s.selectAccountDataInRangeStmt, selectAccountDataInRangeSQL},
-		{&s.selectMaxAccountDataIDStmt, selectMaxAccountDataIDSQL},
-	}.Prepare(db)
+	
+	s := &accountDataTable{
+		cm:                         cm,
+		insertAccountDataSQL:        insertAccountDataSQL,
+		selectAccountDataInRangeSQL: selectAccountDataInRangeSQL,
+		selectMaxAccountDataIDSQL:   selectMaxAccountDataIDSQL,
+	}
+	
+	return s, nil
 }
 
-func (s *accountDataStatements) InsertAccountData(
-	ctx context.Context, txn *sql.Tx,
+func (s *accountDataTable) InsertAccountData(
+	ctx context.Context,
 	userID, roomID, dataType string,
 ) (pos types.StreamPosition, err error) {
-	err = s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType).Scan(&pos)
+	db := s.cm.Connection(ctx, false)
+	err = db.Raw(s.insertAccountDataSQL, userID, roomID, dataType).Row().Scan(&pos)
 	return
 }
 
-func (s *accountDataStatements) SelectAccountDataInRange(
-	ctx context.Context, txn *sql.Tx,
+func (s *accountDataTable) SelectAccountDataInRange(
+	ctx context.Context,
 	userID string,
 	r types.Range,
 	accountDataEventFilter *synctypes.EventFilter,
 ) (data map[string][]string, pos types.StreamPosition, err error) {
 	data = make(map[string][]string)
-
-	rows, err := sqlutil.TxStmt(txn, s.selectAccountDataInRangeStmt).QueryContext(
-		ctx, userID, r.Low(), r.High(),
+	db := s.cm.Connection(ctx, true)
+	
+	rows, err := db.Raw(
+		s.selectAccountDataInRangeSQL,
+		userID, r.Low(), r.High(),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.NotTypes)),
 		accountDataEventFilter.Limit,
-	)
+	).Rows()
+	
 	if err != nil {
 		return
 	}
@@ -136,12 +156,12 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	return data, pos, rows.Err()
 }
 
-func (s *accountDataStatements) SelectMaxAccountDataID(
-	ctx context.Context, txn *sql.Tx,
+func (s *accountDataTable) SelectMaxAccountDataID(
+	ctx context.Context,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxAccountDataIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	db := s.cm.Connection(ctx, true)
+	err = db.Raw(s.selectMaxAccountDataIDSQL).Row().Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}

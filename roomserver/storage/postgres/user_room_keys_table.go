@@ -38,97 +38,154 @@ CREATE TABLE IF NOT EXISTS roomserver_user_room_keys (
 );
 `
 
-const insertUserRoomPrivateKeySQL = `
-	INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_key, pseudo_id_pub_key) VALUES ($1, $2, $3, $4)
-	ON CONFLICT ON CONSTRAINT roomserver_user_room_keys_pk DO UPDATE SET pseudo_id_key = roomserver_user_room_keys.pseudo_id_key
-	RETURNING (pseudo_id_key)
-`
+// SQL query constants for user room keys operations
+const (
+	// insertUserRoomPrivateKeySQL inserts a user's private key for a room
+	insertUserRoomPrivateKeySQL = `
+		INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_key, pseudo_id_pub_key) VALUES ($1, $2, $3, $4)
+		ON CONFLICT ON CONSTRAINT roomserver_user_room_keys_pk DO UPDATE SET pseudo_id_key = roomserver_user_room_keys.pseudo_id_key
+		RETURNING (pseudo_id_key)
+	`
 
-const insertUserRoomPublicKeySQL = `
-	INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_pub_key) VALUES ($1, $2, $3)
-	ON CONFLICT ON CONSTRAINT roomserver_user_room_keys_pk DO UPDATE SET pseudo_id_pub_key = $3
-	RETURNING (pseudo_id_pub_key)
-`
+	// insertUserRoomPublicKeySQL inserts a user's public key for a room
+	insertUserRoomPublicKeySQL = `
+		INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_pub_key) VALUES ($1, $2, $3)
+		ON CONFLICT ON CONSTRAINT roomserver_user_room_keys_pk DO UPDATE SET pseudo_id_pub_key = $3
+		RETURNING (pseudo_id_pub_key)
+	`
 
-const selectUserRoomKeySQL = `SELECT pseudo_id_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
+	// selectUserRoomKeySQL selects a user's private key for a room
+	selectUserRoomKeySQL = `SELECT pseudo_id_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
 
-const selectUserRoomPublicKeySQL = `SELECT pseudo_id_pub_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
+	// selectUserRoomPublicKeySQL selects a user's public key for a room
+	selectUserRoomPublicKeySQL = `SELECT pseudo_id_pub_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
 
-const selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE room_nid = ANY($1) AND pseudo_id_pub_key = ANY($2)`
+	// selectUserNIDsSQL looks up user NIDs by room NIDs and public keys
+	selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE room_nid = ANY($1) AND pseudo_id_pub_key = ANY($2)`
 
-const selectAllUserRoomPublicKeyForUserSQL = `SELECT room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE user_nid = $1`
+	// selectAllUserRoomPublicKeyForUserSQL gets all public keys for a user
+	selectAllUserRoomPublicKeyForUserSQL = `SELECT room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE user_nid = $1`
+)
 
-type userRoomKeysStatements struct {
-	insertUserRoomPrivateKeyStmt       *sql.Stmt
-	insertUserRoomPublicKeyStmt        *sql.Stmt
-	selectUserRoomKeyStmt              *sql.Stmt
-	selectUserRoomPublicKeyStmt        *sql.Stmt
-	selectUserNIDsStmt                 *sql.Stmt
-	selectAllUserRoomPublicKeysForUser *sql.Stmt
+type postgresUserRoomKeysTable struct {
+	cm *sqlutil.Connections
+	
+	// SQL statements stored as struct fields
+	insertUserRoomPrivateKeyStmt       string
+	insertUserRoomPublicKeyStmt        string
+	selectUserRoomKeyStmt              string
+	selectUserRoomPublicKeyStmt        string
+	selectUserNIDsStmt                 string
+	selectAllUserRoomPublicKeyForUserStmt string
 }
 
-func CreateUserRoomKeysTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(userRoomKeysSchema)
-	return err
+func NewPostgresUserRoomKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.UserRoomKeys, error) {
+	// Create the table first
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(userRoomKeysSchema).Error; err != nil {
+		return nil, err
+	}
+	
+	s := &postgresUserRoomKeysTable{
+		cm: cm,
+		
+		// Initialize SQL statement fields with the constants
+		insertUserRoomPrivateKeyStmt:       insertUserRoomPrivateKeySQL,
+		insertUserRoomPublicKeyStmt:        insertUserRoomPublicKeySQL,
+		selectUserRoomKeyStmt:              selectUserRoomKeySQL,
+		selectUserRoomPublicKeyStmt:        selectUserRoomPublicKeySQL,
+		selectUserNIDsStmt:                 selectUserNIDsSQL,
+		selectAllUserRoomPublicKeyForUserStmt: selectAllUserRoomPublicKeyForUserSQL,
+	}
+	
+	return s, nil
 }
 
-func PrepareUserRoomKeysTable(ctx context.Context, db *sql.DB) (tables.UserRoomKeys, error) {
-	s := &userRoomKeysStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertUserRoomPrivateKeyStmt, insertUserRoomPrivateKeySQL},
-		{&s.insertUserRoomPublicKeyStmt, insertUserRoomPublicKeySQL},
-		{&s.selectUserRoomKeyStmt, selectUserRoomKeySQL},
-		{&s.selectUserRoomPublicKeyStmt, selectUserRoomPublicKeySQL},
-		{&s.selectUserNIDsStmt, selectUserNIDsSQL},
-		{&s.selectAllUserRoomPublicKeysForUser, selectAllUserRoomPublicKeyForUserSQL},
-	}.Prepare(db)
-}
-
-func (s *userRoomKeysStatements) InsertUserRoomPrivatePublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.insertUserRoomPrivateKeyStmt)
-	err = stmt.QueryRowContext(ctx, userNID, roomNID, key, key.Public()).Scan(&result)
+func (s *postgresUserRoomKeysTable) InsertUserRoomPrivatePublicKey(
+	ctx context.Context, 
+	userNID types.EventStateKeyNID, 
+	roomNID types.RoomNID, 
+	key ed25519.PrivateKey,
+) (result ed25519.PrivateKey, err error) {
+	db := s.cm.Connection(ctx, false)
+	row := db.Raw(
+		s.insertUserRoomPrivateKeyStmt,
+		userNID, 
+		roomNID, 
+		key, 
+		key.Public(),
+	).Row()
+	
+	err = row.Scan(&result)
 	return result, err
 }
 
-func (s *userRoomKeysStatements) InsertUserRoomPublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PublicKey) (result ed25519.PublicKey, err error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.insertUserRoomPublicKeyStmt)
-	err = stmt.QueryRowContext(ctx, userNID, roomNID, key).Scan(&result)
+func (s *postgresUserRoomKeysTable) InsertUserRoomPublicKey(
+	ctx context.Context, 
+	userNID types.EventStateKeyNID, 
+	roomNID types.RoomNID, 
+	key ed25519.PublicKey,
+) (result ed25519.PublicKey, err error) {
+	db := s.cm.Connection(ctx, false)
+	row := db.Raw(
+		s.insertUserRoomPublicKeyStmt,
+		userNID, 
+		roomNID, 
+		key,
+	).Row()
+	
+	err = row.Scan(&result)
 	return result, err
 }
 
-func (s *userRoomKeysStatements) SelectUserRoomPrivateKey(
+func (s *postgresUserRoomKeysTable) SelectUserRoomPrivateKey(
 	ctx context.Context,
-	txn *sql.Tx,
 	userNID types.EventStateKeyNID,
 	roomNID types.RoomNID,
 ) (ed25519.PrivateKey, error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserRoomKeyStmt)
+	db := s.cm.Connection(ctx, true)
+	
 	var result ed25519.PrivateKey
-	err := stmt.QueryRowContext(ctx, userNID, roomNID).Scan(&result)
+	row := db.Raw(
+		s.selectUserRoomKeyStmt,
+		userNID, 
+		roomNID,
+	).Row()
+	
+	err := row.Scan(&result)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return result, err
 }
 
-func (s *userRoomKeysStatements) SelectUserRoomPublicKey(
+func (s *postgresUserRoomKeysTable) SelectUserRoomPublicKey(
 	ctx context.Context,
-	txn *sql.Tx,
 	userNID types.EventStateKeyNID,
 	roomNID types.RoomNID,
 ) (ed25519.PublicKey, error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserRoomPublicKeyStmt)
+	db := s.cm.Connection(ctx, true)
+	
 	var result ed25519.PublicKey
-	err := stmt.QueryRowContext(ctx, userNID, roomNID).Scan(&result)
+	row := db.Raw(
+		s.selectUserRoomPublicKeyStmt,
+		userNID, 
+		roomNID,
+	).Row()
+	
+	err := row.Scan(&result)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return result, err
 }
 
-func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sql.Tx, senderKeys map[types.RoomNID][]ed25519.PublicKey) (map[string]types.UserRoomKeyPair, error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserNIDsStmt)
-
+func (s *postgresUserRoomKeysTable) BulkSelectUserNIDs(
+	ctx context.Context, 
+	senderKeys map[types.RoomNID][]ed25519.PublicKey,
+) (map[string]types.UserRoomKeyPair, error) {
+	db := s.cm.Connection(ctx, true)
+	
 	roomNIDs := make([]types.RoomNID, 0, len(senderKeys))
 	var senders [][]byte
 	for roomNID := range senderKeys {
@@ -137,7 +194,12 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 			senders = append(senders, key)
 		}
 	}
-	rows, err := stmt.QueryContext(ctx, pq.Array(roomNIDs), pq.Array(senders))
+	
+	rows, err := db.Raw(
+		s.selectUserNIDsStmt,
+		pq.Array(roomNIDs), 
+		pq.Array(senders),
+	).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -155,27 +217,29 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 	return result, rows.Err()
 }
 
-func (s *userRoomKeysStatements) SelectAllPublicKeysForUser(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID) (map[types.RoomNID]ed25519.PublicKey, error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectAllUserRoomPublicKeysForUser)
-
-	rows, err := stmt.QueryContext(ctx, userNID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
+func (s *postgresUserRoomKeysTable) SelectAllPublicKeysForUser(
+	ctx context.Context, 
+	userNID types.EventStateKeyNID,
+) (map[types.RoomNID]ed25519.PublicKey, error) {
+	db := s.cm.Connection(ctx, true)
+	
+	rows, err := db.Raw(
+		s.selectAllUserRoomPublicKeyForUserStmt,
+		userNID,
+	).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectAllPublicKeysForUser: failed to close rows")
+	defer internal.CloseAndLogIfError(ctx, rows, "failed to close rows")
 
-	resultMap := make(map[types.RoomNID]ed25519.PublicKey)
-
+	result := make(map[types.RoomNID]ed25519.PublicKey)
 	var roomNID types.RoomNID
-	var pubkey ed25519.PublicKey
+	var pubKey []byte
 	for rows.Next() {
-		if err = rows.Scan(&roomNID, &pubkey); err != nil {
+		if err = rows.Scan(&roomNID, &pubKey); err != nil {
 			return nil, err
 		}
-		resultMap[roomNID] = pubkey
+		result[roomNID] = pubKey
 	}
-	return resultMap, rows.Err()
+	return result, rows.Err()
 }

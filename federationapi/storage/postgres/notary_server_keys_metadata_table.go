@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
 const notaryServerKeysMetadataSchema = `
@@ -37,109 +37,127 @@ CREATE TABLE IF NOT EXISTS federationsender_notary_server_keys_metadata (
 );
 `
 
-const upsertServerKeysSQL = "" +
-	"INSERT INTO federationsender_notary_server_keys_metadata (notary_id, server_name, key_id) VALUES ($1, $2, $3)" +
-	" ON CONFLICT (server_name, key_id) DO UPDATE SET notary_id = $1"
+// notaryServerKeysMetadataTable contains the postgres-specific implementation
+type notaryServerKeysMetadataTable struct {
+	cm *sqlutil.Connections
 
-// for a given (server_name, key_id), find the existing notary ID and valid until. Used to check if we will replace it
-// JOINs with the json table
-const selectNotaryKeyMetadataSQL = `
-	SELECT federationsender_notary_server_keys_metadata.notary_id, valid_until FROM federationsender_notary_server_keys_json
-	JOIN federationsender_notary_server_keys_metadata ON
-	federationsender_notary_server_keys_metadata.notary_id = federationsender_notary_server_keys_json.notary_id
-	WHERE federationsender_notary_server_keys_metadata.server_name = $1 AND federationsender_notary_server_keys_metadata.key_id = $2
-`
+	// upsertServerKeysSQL inserts or updates a server key entry
+	upsertServerKeysSQL string
 
-// select the response which has the highest valid_until value
-// JOINs with the json table
-const selectNotaryKeyResponsesSQL = `
-	SELECT response_json FROM federationsender_notary_server_keys_json
-	WHERE server_name = $1 AND valid_until = (
-		SELECT MAX(valid_until) FROM federationsender_notary_server_keys_json WHERE server_name = $1
-	)
-`
+	// selectNotaryKeyMetadataSQL retrieves notary ID and valid until for a given server name and key ID
+	// JOINs with the json table
+	selectNotaryKeyMetadataSQL string
 
-// select the responses which have the given key IDs
-// JOINs with the json table
-const selectNotaryKeyResponsesWithKeyIDsSQL = `
-	SELECT response_json FROM federationsender_notary_server_keys_json
-	JOIN federationsender_notary_server_keys_metadata ON
-	federationsender_notary_server_keys_metadata.notary_id = federationsender_notary_server_keys_json.notary_id
-	WHERE federationsender_notary_server_keys_json.server_name = $1 AND federationsender_notary_server_keys_metadata.key_id = ANY ($2)
-	GROUP BY federationsender_notary_server_keys_json.notary_id
-`
+	// selectNotaryKeyResponsesSQL retrieves the response with the highest valid_until value
+	// JOINs with the json table
+	selectNotaryKeyResponsesSQL string
 
-// JOINs with the metadata table
-const deleteUnusedServerKeysJSONSQL = `
-	DELETE FROM federationsender_notary_server_keys_json WHERE federationsender_notary_server_keys_json.notary_id NOT IN (
-		SELECT DISTINCT notary_id FROM federationsender_notary_server_keys_metadata
-	)
-`
+	// selectNotaryKeyResponsesWithKeyIDsSQL retrieves responses with specific key IDs
+	// JOINs with the json table
+	selectNotaryKeyResponsesWithKeyIDsSQL string
 
-type notaryServerKeysMetadataStatements struct {
-	db                                     *sql.DB
-	upsertServerKeysStmt                   *sql.Stmt
-	selectNotaryKeyResponsesStmt           *sql.Stmt
-	selectNotaryKeyResponsesWithKeyIDsStmt *sql.Stmt
-	selectNotaryKeyMetadataStmt            *sql.Stmt
-	deleteUnusedServerKeysJSONStmt         *sql.Stmt
+	// deleteUnusedServerKeysJSONSQL removes unreferenced JSON responses
+	// JOINs with the metadata table
+	deleteUnusedServerKeysJSONSQL string
 }
 
-func NewPostgresNotaryServerKeysMetadataTable(ctx context.Context, db *sql.DB) (s *notaryServerKeysMetadataStatements, err error) {
-	s = &notaryServerKeysMetadataStatements{
-		db: db,
-	}
-	_, err = db.Exec(notaryServerKeysMetadataSchema)
-	if err != nil {
-		return
+// NewPostgresNotaryServerKeysMetadataTable creates a new postgres notary server keys metadata table
+func NewPostgresNotaryServerKeysMetadataTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationNotaryServerKeysMetadata, error) {
+	// Initialize schema using GORM
+	gormDB := cm.Connection(ctx, false)
+	if err := gormDB.Exec(notaryServerKeysMetadataSchema).Error; err != nil {
+		return nil, err
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.upsertServerKeysStmt, upsertServerKeysSQL},
-		{&s.selectNotaryKeyResponsesStmt, selectNotaryKeyResponsesSQL},
-		{&s.selectNotaryKeyResponsesWithKeyIDsStmt, selectNotaryKeyResponsesWithKeyIDsSQL},
-		{&s.selectNotaryKeyMetadataStmt, selectNotaryKeyMetadataSQL},
-		{&s.deleteUnusedServerKeysJSONStmt, deleteUnusedServerKeysJSONSQL},
-	}.Prepare(db)
+	s := &notaryServerKeysMetadataTable{
+		cm: cm,
+		upsertServerKeysSQL: "INSERT INTO federationsender_notary_server_keys_metadata (notary_id, server_name, key_id) VALUES ($1, $2, $3) ON CONFLICT (server_name, key_id) DO UPDATE SET notary_id = $1",
+		
+		selectNotaryKeyMetadataSQL: `
+			SELECT federationsender_notary_server_keys_metadata.notary_id, valid_until FROM federationsender_notary_server_keys_json
+			JOIN federationsender_notary_server_keys_metadata ON
+			federationsender_notary_server_keys_metadata.notary_id = federationsender_notary_server_keys_json.notary_id
+			WHERE federationsender_notary_server_keys_metadata.server_name = $1 AND federationsender_notary_server_keys_metadata.key_id = $2
+		`,
+		
+		selectNotaryKeyResponsesSQL: `
+			SELECT response_json FROM federationsender_notary_server_keys_json
+			WHERE server_name = $1 AND valid_until = (
+				SELECT MAX(valid_until) FROM federationsender_notary_server_keys_json WHERE server_name = $1
+			)
+		`,
+		
+		selectNotaryKeyResponsesWithKeyIDsSQL: `
+			SELECT response_json FROM federationsender_notary_server_keys_json
+			JOIN federationsender_notary_server_keys_metadata ON
+			federationsender_notary_server_keys_metadata.notary_id = federationsender_notary_server_keys_json.notary_id
+			WHERE federationsender_notary_server_keys_json.server_name = $1 AND federationsender_notary_server_keys_metadata.key_id = ANY ($2)
+			GROUP BY federationsender_notary_server_keys_json.notary_id
+		`,
+		
+		deleteUnusedServerKeysJSONSQL: `
+			DELETE FROM federationsender_notary_server_keys_json WHERE federationsender_notary_server_keys_json.notary_id NOT IN (
+				SELECT DISTINCT notary_id FROM federationsender_notary_server_keys_metadata
+			)
+		`,
+	}
+
+	return s, nil
 }
 
-func (s *notaryServerKeysMetadataStatements) UpsertKey(
-	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, keyID gomatrixserverlib.KeyID, newNotaryID tables.NotaryID, newValidUntil spec.Timestamp,
+// UpsertKey inserts or updates a server key entry
+func (s *notaryServerKeysMetadataTable) UpsertKey(
+	ctx context.Context, serverName spec.ServerName, keyID gomatrixserverlib.KeyID, newNotaryID tables.NotaryID, newValidUntil spec.Timestamp,
 ) (tables.NotaryID, error) {
+	db := s.cm.Connection(ctx, false)
+
 	notaryID := newNotaryID
 	// see if the existing notary ID a) exists, b) has a longer valid_until
 	var existingNotaryID tables.NotaryID
 	var existingValidUntil spec.Timestamp
-	if err := txn.Stmt(s.selectNotaryKeyMetadataStmt).QueryRowContext(ctx, serverName, keyID).Scan(&existingNotaryID, &existingValidUntil); err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+
+	row := db.Raw(s.selectNotaryKeyMetadataSQL, serverName, keyID).Row()
+	err := row.Scan(&existingNotaryID, &existingValidUntil)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, err
 		}
 	}
+
 	if existingValidUntil.Time().After(newValidUntil.Time()) {
 		// the existing valid_until is valid longer, so use that.
 		return existingNotaryID, nil
 	}
+
 	// overwrite the notary_id for this (server_name, key_id) tuple
-	_, err := txn.Stmt(s.upsertServerKeysStmt).ExecContext(ctx, notaryID, serverName, keyID)
+	err = db.Exec(s.upsertServerKeysSQL, notaryID, serverName, keyID).Error
 	return notaryID, err
 }
 
-func (s *notaryServerKeysMetadataStatements) SelectKeys(ctx context.Context, txn *sql.Tx, serverName spec.ServerName, keyIDs []gomatrixserverlib.KeyID) ([]gomatrixserverlib.ServerKeys, error) {
-	var rows *sql.Rows
+// SelectKeys retrieves server keys
+func (s *notaryServerKeysMetadataTable) SelectKeys(
+	ctx context.Context, serverName spec.ServerName, keyIDs []gomatrixserverlib.KeyID,
+) ([]gomatrixserverlib.ServerKeys, error) {
+	db := s.cm.Connection(ctx, true)
+
+	var rows *gorm.Rows
 	var err error
+
 	if len(keyIDs) == 0 {
-		rows, err = txn.Stmt(s.selectNotaryKeyResponsesStmt).QueryContext(ctx, string(serverName))
+		rows, err = db.Raw(s.selectNotaryKeyResponsesSQL, string(serverName)).Rows()
 	} else {
 		keyIDstr := make([]string, len(keyIDs))
 		for i := range keyIDs {
 			keyIDstr[i] = string(keyIDs[i])
 		}
-		rows, err = txn.Stmt(s.selectNotaryKeyResponsesWithKeyIDsStmt).QueryContext(ctx, string(serverName), pq.StringArray(keyIDstr))
+		rows, err = db.Raw(s.selectNotaryKeyResponsesWithKeyIDsSQL, string(serverName), pq.StringArray(keyIDstr)).Rows()
 	}
+
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectNotaryKeyResponsesStmt close failed")
+
 	var results []gomatrixserverlib.ServerKeys
 	for rows.Next() {
 		var sk gomatrixserverlib.ServerKeys
@@ -155,7 +173,8 @@ func (s *notaryServerKeysMetadataStatements) SelectKeys(ctx context.Context, txn
 	return results, rows.Err()
 }
 
-func (s *notaryServerKeysMetadataStatements) DeleteOldJSONResponses(ctx context.Context, txn *sql.Tx) error {
-	_, err := txn.Stmt(s.deleteUnusedServerKeysJSONStmt).ExecContext(ctx)
-	return err
+// DeleteOldJSONResponses removes unreferenced JSON responses
+func (s *notaryServerKeysMetadataTable) DeleteOldJSONResponses(ctx context.Context) error {
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.deleteUnusedServerKeysJSONSQL).Error
 }

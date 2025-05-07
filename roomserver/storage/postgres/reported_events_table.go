@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -41,76 +40,91 @@ CREATE TABLE IF NOT EXISTS roomserver_reported_events
     received_ts 		BIGINT NOT NULL
 );`
 
-const insertReportedEventSQL = `
-	INSERT INTO roomserver_reported_events (room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts) 
-	VALUES ($1, $2, $3, $4, $5, $6, $7)
-	RETURNING id
-`
+// SQL query constants for reported events operations
+const (
+	// insertReportedEventSQL inserts a new reported event
+	insertReportedEventSQL = `
+		INSERT INTO roomserver_reported_events (room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id
+	`
 
-const selectReportedEventsDescSQL = `
-WITH countReports AS (
-    SELECT count(*) as report_count
-    FROM roomserver_reported_events
-    WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
+	// selectReportedEventsDescSQL selects reported events in descending order
+	selectReportedEventsDescSQL = `
+	WITH countReports AS (
+		SELECT count(*) as report_count
+		FROM roomserver_reported_events
+		WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
+	)
+	SELECT report_count, id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
+	FROM roomserver_reported_events, countReports
+	WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
+	ORDER BY received_ts DESC
+	OFFSET $3
+	LIMIT $4
+	`
+
+	// selectReportedEventsAscSQL selects reported events in ascending order
+	selectReportedEventsAscSQL = `
+	WITH countReports AS (
+		SELECT count(*) as report_count
+		FROM roomserver_reported_events
+		WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
+	)
+	SELECT report_count, id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
+	FROM roomserver_reported_events, countReports
+	WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
+	ORDER BY received_ts ASC
+	OFFSET $3
+	LIMIT $4
+	`
+
+	// selectReportedEventSQL selects a single reported event by ID
+	selectReportedEventSQL = `
+	SELECT id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
+	FROM roomserver_reported_events
+	WHERE id = $1
+	`
+
+	// deleteReportedEventSQL deletes a reported event by ID
+	deleteReportedEventSQL = `DELETE FROM roomserver_reported_events WHERE id = $1`
 )
-SELECT report_count, id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
-FROM roomserver_reported_events, countReports
-WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
-ORDER BY received_ts DESC
-OFFSET $3
-LIMIT $4
-`
-
-const selectReportedEventsAscSQL = `
-WITH countReports AS (
-    SELECT count(*) as report_count
-    FROM roomserver_reported_events
-    WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
-)
-SELECT report_count, id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
-FROM roomserver_reported_events, countReports
-WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
-ORDER BY received_ts ASC
-OFFSET $3
-LIMIT $4
-`
-
-const selectReportedEventSQL = `
-SELECT id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
-FROM roomserver_reported_events
-WHERE id = $1
-`
-
-const deleteReportedEventSQL = `DELETE FROM roomserver_reported_events WHERE id = $1`
 
 type reportedEventsStatements struct {
-	insertReportedEventsStmt     *sql.Stmt
-	selectReportedEventsDescStmt *sql.Stmt
-	selectReportedEventsAscStmt  *sql.Stmt
-	selectReportedEventStmt      *sql.Stmt
-	deleteReportedEventStmt      *sql.Stmt
+	cm *sqlutil.Connections
+	
+	// SQL statements stored as struct fields
+	insertReportedEventStmt       string
+	selectReportedEventsDescStmt  string
+	selectReportedEventsAscStmt   string
+	selectReportedEventStmt       string
+	deleteReportedEventStmt       string
 }
 
-func CreateReportedEventsTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(reportedEventsScheme)
-	return err
-}
-
-func PrepareReportedEventsTable(ctx context.Context, db *sql.DB) (tables.ReportedEvents, error) {
-	s := &reportedEventsStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertReportedEventsStmt, insertReportedEventSQL},
-		{&s.selectReportedEventsDescStmt, selectReportedEventsDescSQL},
-		{&s.selectReportedEventsAscStmt, selectReportedEventsAscSQL},
-		{&s.selectReportedEventStmt, selectReportedEventSQL},
-		{&s.deleteReportedEventStmt, deleteReportedEventSQL},
-	}.Prepare(db)
+func NewPostgresReportedEventsTable(ctx context.Context, cm *sqlutil.Connections) (tables.ReportedEvents, error) {
+	// Create the table first
+	db := cm.Connection(ctx, false)
+	if err := db.Exec(reportedEventsScheme).Error; err != nil {
+		return nil, err
+	}
+	
+	// Initialize the table
+	s := &reportedEventsStatements{
+		cm: cm,
+		
+		// Initialize SQL statement fields with the constants
+		insertReportedEventStmt:      insertReportedEventSQL,
+		selectReportedEventsDescStmt: selectReportedEventsDescSQL,
+		selectReportedEventsAscStmt:  selectReportedEventsAscSQL,
+		selectReportedEventStmt:      selectReportedEventSQL,
+		deleteReportedEventStmt:      deleteReportedEventSQL,
+	}
+	
+	return s, nil
 }
 
 func (r *reportedEventsStatements) InsertReportedEvent(
 	ctx context.Context,
-	txn *sql.Tx,
 	roomNID types.RoomNID,
 	eventNID types.EventNID,
 	reportingUserID types.EventStateKeyNID,
@@ -118,10 +132,12 @@ func (r *reportedEventsStatements) InsertReportedEvent(
 	reason string,
 	score int64,
 ) (int64, error) {
-	stmt := sqlutil.TxStmt(txn, r.insertReportedEventsStmt)
-
+	// Get database connection
+	db := r.cm.Connection(ctx, false)
+	
 	var reportID int64
-	err := stmt.QueryRowContext(ctx,
+	err := db.Raw(
+		r.insertReportedEventStmt,
 		roomNID,
 		eventNID,
 		reportingUserID,
@@ -129,23 +145,26 @@ func (r *reportedEventsStatements) InsertReportedEvent(
 		reason,
 		score,
 		spec.AsTimestamp(time.Now()),
-	).Scan(&reportID)
+	).Scan(&reportID).Error
+	
 	return reportID, err
 }
 
 func (r *reportedEventsStatements) SelectReportedEvents(
 	ctx context.Context,
-	txn *sql.Tx,
 	from, limit uint64,
 	backwards bool,
 	reportingUserID types.EventStateKeyNID,
 	roomNID types.RoomNID,
 ) ([]api.QueryAdminEventReportsResponse, int64, error) {
-	var stmt *sql.Stmt
+	// Get database connection
+	db := r.cm.Connection(ctx, true)
+	
+	var sqlQuery string
 	if backwards {
-		stmt = sqlutil.TxStmt(txn, r.selectReportedEventsDescStmt)
+		sqlQuery = r.selectReportedEventsDescStmt
 	} else {
-		stmt = sqlutil.TxStmt(txn, r.selectReportedEventsAscStmt)
+		sqlQuery = r.selectReportedEventsAscStmt
 	}
 
 	var qryRoomNID *types.RoomNID
@@ -157,12 +176,14 @@ func (r *reportedEventsStatements) SelectReportedEvents(
 		qryReportingUser = &reportingUserID
 	}
 
-	rows, err := stmt.QueryContext(ctx,
+	rows, err := db.Raw(
+		sqlQuery,
 		qryRoomNID,
 		qryReportingUser,
 		from,
 		limit,
-	)
+	).Rows()
+	
 	if err != nil {
 		return nil, 0, err
 	}
@@ -193,13 +214,16 @@ func (r *reportedEventsStatements) SelectReportedEvents(
 
 func (r *reportedEventsStatements) SelectReportedEvent(
 	ctx context.Context,
-	txn *sql.Tx,
 	reportID uint64,
 ) (api.QueryAdminEventReportResponse, error) {
-	stmt := sqlutil.TxStmt(txn, r.selectReportedEventStmt)
-
+	// Get database connection
+	db := r.cm.Connection(ctx, true)
+	
 	var row api.QueryAdminEventReportResponse
-	if err := stmt.QueryRowContext(ctx, reportID).Scan(
+	err := db.Raw(
+		r.selectReportedEventStmt,
+		reportID,
+	).Scan(
 		&row.ID,
 		&row.RoomNID,
 		&row.EventNID,
@@ -208,14 +232,14 @@ func (r *reportedEventsStatements) SelectReportedEvent(
 		&row.Reason,
 		&row.Score,
 		&row.ReceivedTS,
-	); err != nil {
-		return api.QueryAdminEventReportResponse{}, err
-	}
-	return row, nil
+	).Error
+	
+	return row, err
 }
 
-func (r *reportedEventsStatements) DeleteReportedEvent(ctx context.Context, txn *sql.Tx, reportID uint64) error {
-	stmt := sqlutil.TxStmt(txn, r.deleteReportedEventStmt)
-	_, err := stmt.ExecContext(ctx, reportID)
-	return err
+func (r *reportedEventsStatements) DeleteReportedEvent(ctx context.Context, reportID uint64) error {
+	// Get database connection
+	db := r.cm.Connection(ctx, false)
+	
+	return db.Exec(r.deleteReportedEventStmt, reportID).Error
 }

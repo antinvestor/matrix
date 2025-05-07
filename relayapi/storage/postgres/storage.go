@@ -42,17 +42,24 @@ func NewDatabase(
 ) (*Database, error) {
 	var d Database
 	var err error
+	
+	// Get the database connections
 	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
 		return nil, err
 	}
-	queue, err := NewPostgresRelayQueueTable(ctx, d.db)
+	
+	// Create relay queue table
+	queue, err := NewPostgresRelayQueueTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
-	queueJSON, err := NewPostgresRelayQueueJSONTable(ctx, d.db)
+	
+	// Create relay queue JSON table
+	queueJSON, err := NewPostgresRelayQueueJSONTable(ctx, conMan)
 	if err != nil {
 		return nil, err
 	}
+	
 	d.Database = shared.Database{
 		DB:                d.db,
 		IsLocalServerName: isLocalServerName,

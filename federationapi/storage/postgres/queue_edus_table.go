@@ -23,6 +23,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/postgres/deltas"
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 )
@@ -47,117 +48,141 @@ CREATE INDEX IF NOT EXISTS federationsender_queue_edus_server_name_idx
     ON federationsender_queue_edus (server_name);
 `
 
-const insertQueueEDUSQL = "" +
-	"INSERT INTO federationsender_queue_edus (edu_type, server_name, json_nid, expires_at)" +
-	" VALUES ($1, $2, $3, $4)"
+// SQL query string constants
+const (
+	// insertQueueEDUSQL inserts a new EDU into the queue for a specific server
+	insertQueueEDUSQL = "" +
+		"INSERT INTO federationsender_queue_edus (edu_type, server_name, json_nid, expires_at)" +
+		" VALUES ($1, $2, $3, $4)"
 
-const deleteQueueEDUSQL = "" +
-	"DELETE FROM federationsender_queue_edus WHERE server_name = $1 AND json_nid = ANY($2)"
+	// deleteQueueEDUSQL deletes EDUs from the queue for a specific server by JSON NIDs
+	deleteQueueEDUSQL = "" +
+		"DELETE FROM federationsender_queue_edus WHERE server_name = $1 AND json_nid = ANY($2)"
 
-const selectQueueEDUSQL = "" +
-	"SELECT json_nid FROM federationsender_queue_edus" +
-	" WHERE server_name = $1" +
-	" LIMIT $2"
+	// selectQueueEDUSQL retrieves JSON NIDs of queued EDUs for a specific server with a limit
+	selectQueueEDUSQL = "" +
+		"SELECT json_nid FROM federationsender_queue_edus" +
+		" WHERE server_name = $1" +
+		" LIMIT $2"
 
-const selectQueueEDUReferenceJSONCountSQL = "" +
-	"SELECT COUNT(*) FROM federationsender_queue_edus" +
-	" WHERE json_nid = $1"
+	// selectQueueEDUReferenceJSONCountSQL counts references to a specific JSON NID in the queue
+	selectQueueEDUReferenceJSONCountSQL = "" +
+		"SELECT COUNT(*) FROM federationsender_queue_edus" +
+		" WHERE json_nid = $1"
 
-const selectQueueServerNamesSQL = "" +
-	"SELECT DISTINCT server_name FROM federationsender_queue_edus"
+	// selectQueueServerNamesSQL retrieves all distinct server names that have queued EDUs
+	selectQueueServerNamesSQL = "" +
+		"SELECT DISTINCT server_name FROM federationsender_queue_edus"
 
-const selectExpiredEDUsSQL = "" +
-	"SELECT DISTINCT json_nid FROM federationsender_queue_edus WHERE expires_at > 0 AND expires_at <= $1"
+	// selectExpiredEDUsSQL retrieves JSON NIDs of EDUs that have expired
+	selectExpiredEDUsSQL = "" +
+		"SELECT DISTINCT json_nid FROM federationsender_queue_edus WHERE expires_at > 0 AND expires_at <= $1"
 
-const deleteExpiredEDUsSQL = "" +
-	"DELETE FROM federationsender_queue_edus WHERE expires_at > 0 AND expires_at <= $1"
+	// deleteExpiredEDUsSQL deletes all EDUs that have expired
+	deleteExpiredEDUsSQL = "" +
+		"DELETE FROM federationsender_queue_edus WHERE expires_at > 0 AND expires_at <= $1"
+)
 
-type queueEDUsStatements struct {
-	db                                   *sql.DB
-	insertQueueEDUStmt                   *sql.Stmt
-	deleteQueueEDUStmt                   *sql.Stmt
-	selectQueueEDUStmt                   *sql.Stmt
-	selectQueueEDUReferenceJSONCountStmt *sql.Stmt
-	selectQueueEDUServerNamesStmt        *sql.Stmt
-	selectExpiredEDUsStmt                *sql.Stmt
-	deleteExpiredEDUsStmt                *sql.Stmt
+// queueEDUsTable contains the postgres-specific implementation
+type queueEDUsTable struct {
+	cm *sqlutil.Connections
+
+	insertQueueEDUStmt                   string
+	deleteQueueEDUStmt                   string
+	selectQueueEDUStmt                   string
+	selectQueueEDUReferenceJSONCountStmt string
+	selectQueueEDUServerNamesStmt        string
+	selectExpiredEDUsStmt                string
+	deleteExpiredEDUsStmt                string
 }
 
-func NewPostgresQueueEDUsTable(ctx context.Context, db *sql.DB) (s *queueEDUsStatements, err error) {
-	s = &queueEDUsStatements{
-		db: db,
-	}
-	_, err = s.db.Exec(queueEDUsSchema)
-	if err != nil {
-		return s, err
+// NewPostgresQueueEDUsTable creates a new postgres queue EDUs table and prepares all statements
+func NewPostgresQueueEDUsTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationQueueEDUs, error) {
+	// Initialize schema using GORM
+	gormDB := cm.Connection(ctx, false)
+	if err := gormDB.Exec(queueEDUsSchema).Error; err != nil {
+		return nil, err
 	}
 
-	m := sqlutil.NewMigrator(db)
+	// Apply migrations
+	m := sqlutil.NewMigrations()
 	m.AddMigrations(
 		sqlutil.Migration{
 			Version: "federationapi: add expiresat column",
 			Up:      deltas.UpAddexpiresat,
 		},
 	)
-	if err := m.Up(ctx); err != nil {
-		return s, err
+	if err := m.RunMigrations(ctx, gormDB); err != nil {
+		return nil, err
+	}
+
+	s := &queueEDUsTable{
+		cm:                                   cm,
+		insertQueueEDUStmt:                   insertQueueEDUSQL,
+		deleteQueueEDUStmt:                   deleteQueueEDUSQL,
+		selectQueueEDUStmt:                   selectQueueEDUSQL,
+		selectQueueEDUReferenceJSONCountStmt: selectQueueEDUReferenceJSONCountSQL,
+		selectQueueEDUServerNamesStmt:        selectQueueServerNamesSQL,
+		selectExpiredEDUsStmt:                selectExpiredEDUsSQL,
+		deleteExpiredEDUsStmt:                deleteExpiredEDUsSQL,
 	}
 
 	return s, nil
 }
 
-func (s *queueEDUsStatements) Prepare() error {
-	return sqlutil.StatementList{
-		{&s.insertQueueEDUStmt, insertQueueEDUSQL},
-		{&s.deleteQueueEDUStmt, deleteQueueEDUSQL},
-		{&s.selectQueueEDUStmt, selectQueueEDUSQL},
-		{&s.selectQueueEDUReferenceJSONCountStmt, selectQueueEDUReferenceJSONCountSQL},
-		{&s.selectQueueEDUServerNamesStmt, selectQueueServerNamesSQL},
-		{&s.selectExpiredEDUsStmt, selectExpiredEDUsSQL},
-		{&s.deleteExpiredEDUsStmt, deleteExpiredEDUsSQL},
-	}.Prepare(s.db)
-}
-
-func (s *queueEDUsStatements) InsertQueueEDU(
+// InsertQueueEDU adds a new EDU to the queue
+func (s *queueEDUsTable) InsertQueueEDU(
 	ctx context.Context,
-	txn *sql.Tx,
 	eduType string,
 	serverName spec.ServerName,
 	nid int64,
 	expiresAt spec.Timestamp,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
-	_, err := stmt.ExecContext(
-		ctx,
+	// Get writable database connection
+	db := s.cm.Connection(ctx, false)
+
+	return db.Exec(
+		s.insertQueueEDUStmt,
 		eduType,    // the EDU type
 		serverName, // destination server name
 		nid,        // JSON blob NID
 		expiresAt,  // timestamp of expiry
-	)
-	return err
+	).Error
 }
 
-func (s *queueEDUsStatements) DeleteQueueEDUs(
-	ctx context.Context, txn *sql.Tx,
+// DeleteQueueEDUs removes EDUs from the queue for a specific server
+func (s *queueEDUsTable) DeleteQueueEDUs(
+	ctx context.Context,
 	serverName spec.ServerName,
 	jsonNIDs []int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteQueueEDUStmt)
-	_, err := stmt.ExecContext(ctx, serverName, pq.Int64Array(jsonNIDs))
-	return err
+	// Get writable database connection
+	db := s.cm.Connection(ctx, false)
+
+	return db.Exec(
+		s.deleteQueueEDUStmt,
+		serverName, pq.Array(jsonNIDs),
+	).Error
 }
 
-func (s *queueEDUsStatements) SelectQueueEDUs(
-	ctx context.Context, txn *sql.Tx,
+// SelectQueueEDUs retrieves EDUs from the queue for a specific server
+func (s *queueEDUsTable) SelectQueueEDUs(
+	ctx context.Context,
 	serverName spec.ServerName,
 	limit int,
 ) ([]int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUStmt)
-	rows, err := stmt.QueryContext(ctx, serverName, limit)
+	// Get read-only database connection
+	db := s.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(
+		s.selectQueueEDUStmt,
+		serverName, limit,
+	).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectQueueEDUs: rows.close() failed")
+
 	var result []int64
 	for rows.Next() {
 		var nid int64
@@ -166,68 +191,103 @@ func (s *queueEDUsStatements) SelectQueueEDUs(
 		}
 		result = append(result, nid)
 	}
+
 	return result, rows.Err()
 }
 
-func (s *queueEDUsStatements) SelectQueueEDUReferenceJSONCount(
-	ctx context.Context, txn *sql.Tx, jsonNID int64,
+// SelectQueueEDUReferenceJSONCount counts references to a JSON NID in the queue
+func (s *queueEDUsTable) SelectQueueEDUReferenceJSONCount(
+	ctx context.Context, jsonNID int64,
 ) (int64, error) {
+	// Get read-only database connection
+	db := s.cm.Connection(ctx, true)
+
 	var count int64
-	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUReferenceJSONCountStmt)
-	err := stmt.QueryRowContext(ctx, jsonNID).Scan(&count)
+	row := db.Raw(
+		s.selectQueueEDUReferenceJSONCountStmt,
+		jsonNID,
+	).Row()
+	err := row.Scan(&count)
 	if errors.Is(err, sql.ErrNoRows) {
-		return -1, nil
+		// It's acceptable for there to be no rows referencing a given
+		// JSON NID but it's not an error condition. Just return as if
+		// there's a zero count.
+		return 0, nil
 	}
 	return count, err
 }
 
-func (s *queueEDUsStatements) SelectQueueEDUServerNames(
-	ctx context.Context, txn *sql.Tx,
+// SelectQueueEDUServerNames retrieves all server names with queued EDUs
+func (s *queueEDUsTable) SelectQueueEDUServerNames(
+	ctx context.Context,
 ) ([]spec.ServerName, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUServerNamesStmt)
-	rows, err := stmt.QueryContext(ctx)
+	// Get read-only database connection
+	db := s.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(
+		s.selectQueueEDUServerNamesStmt,
+	).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectQueueEDUServerNames: rows.close() failed")
+
 	var result []spec.ServerName
 	for rows.Next() {
-		var serverName spec.ServerName
+		var serverName string
 		if err = rows.Scan(&serverName); err != nil {
 			return nil, err
 		}
-		result = append(result, serverName)
+		result = append(result, spec.ServerName(serverName))
 	}
 
 	return result, rows.Err()
 }
 
-func (s *queueEDUsStatements) SelectExpiredEDUs(
-	ctx context.Context, txn *sql.Tx,
+// SelectExpiredEDUs retrieves JSON NIDs of expired EDUs
+func (s *queueEDUsTable) SelectExpiredEDUs(
+	ctx context.Context,
 	expiredBefore spec.Timestamp,
 ) ([]int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectExpiredEDUsStmt)
-	rows, err := stmt.QueryContext(ctx, expiredBefore)
+	// Get read-only database connection
+	db := s.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(
+		s.selectExpiredEDUsStmt,
+		expiredBefore,
+	).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectExpiredEDUs: rows.close() failed")
+
 	var result []int64
-	var nid int64
 	for rows.Next() {
+		var nid int64
 		if err = rows.Scan(&nid); err != nil {
 			return nil, err
 		}
 		result = append(result, nid)
 	}
+
 	return result, rows.Err()
 }
 
-func (s *queueEDUsStatements) DeleteExpiredEDUs(
-	ctx context.Context, txn *sql.Tx,
+// DeleteExpiredEDUs removes all expired EDUs
+func (s *queueEDUsTable) DeleteExpiredEDUs(
+	ctx context.Context,
 	expiredBefore spec.Timestamp,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteExpiredEDUsStmt)
-	_, err := stmt.ExecContext(ctx, expiredBefore)
-	return err
+	// Get writable database connection
+	db := s.cm.Connection(ctx, false)
+
+	return db.Exec(
+		s.deleteExpiredEDUsStmt,
+		expiredBefore,
+	).Error
+}
+
+// Prepare is called to initialize the table before use
+func (s *queueEDUsTable) Prepare() error {
+	return nil
 }
