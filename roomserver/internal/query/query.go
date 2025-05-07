@@ -426,11 +426,11 @@ func (r *Queryer) QueryMembershipsForRoom(
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil
 			}
-			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
+			return fmt.Errorf("r.Cm.GetMembershipEventNIDsForRoom: %w", err)
 		}
 		events, err = r.DB.Events(ctx, info.RoomVersion, eventNIDs)
 		if err != nil {
-			return fmt.Errorf("r.DB.Events: %w", err)
+			return fmt.Errorf("r.Cm.Events: %w", err)
 		}
 		for _, event := range events {
 			clientEvent := synctypes.ToClientEventDefault(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
@@ -501,7 +501,7 @@ func (r *Queryer) QueryServerJoinedToRoom(
 ) error {
 	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
-		return fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return fmt.Errorf("r.Cm.RoomInfo: %w", err)
 	}
 	if info != nil {
 		response.RoomVersion = info.RoomVersion
@@ -514,12 +514,12 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	if r.IsLocalServerName(request.ServerName) || request.ServerName == "" {
 		response.IsInRoom, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
 		if err != nil {
-			return fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
+			return fmt.Errorf("r.Cm.GetLocalServerInRoom: %w", err)
 		}
 	} else {
 		response.IsInRoom, err = r.DB.GetServerInRoom(ctx, info.RoomNID, request.ServerName)
 		if err != nil {
-			return fmt.Errorf("r.DB.GetServerInRoom: %w", err)
+			return fmt.Errorf("r.Cm.GetServerInRoom: %w", err)
 		}
 	}
 
@@ -551,12 +551,12 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 	if r.IsLocalServerName(serverName) || serverName == "" {
 		isInRoom, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
 		if err != nil {
-			return allowed, fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
+			return allowed, fmt.Errorf("r.Cm.GetLocalServerInRoom: %w", err)
 		}
 	} else {
 		isInRoom, err = r.DB.GetServerInRoom(ctx, info.RoomNID, serverName)
 		if err != nil {
-			return allowed, fmt.Errorf("r.DB.GetServerInRoom: %w", err)
+			return allowed, fmt.Errorf("r.Cm.GetServerInRoom: %w", err)
 		}
 	}
 
@@ -1038,7 +1038,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.Ro
 	// or is a stub entry then we can't do anything.
 	roomInfo, err := r.DB.RoomInfo(ctx, roomID.String())
 	if err != nil {
-		return "", fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return "", fmt.Errorf("r.Cm.RoomInfo: %w", err)
 	}
 	if roomInfo == nil || roomInfo.IsStub() {
 		return "", nil // fmt.Errorf("room %q doesn't exist or is stub room", req.RoomID)

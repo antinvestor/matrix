@@ -16,8 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -28,40 +26,35 @@ import (
 // Database stores information needed by the relayapi
 type Database struct {
 	shared.Database
-	db     *sql.DB
+	Cm     *sqlutil.Connections
 	writer sqlutil.Writer
 }
 
 // NewDatabase opens a new database
 func NewDatabase(
 	ctx context.Context,
-	conMan *sqlutil.Connections,
+	cm *sqlutil.Connections,
 	dbProperties *config.DatabaseOptions,
 	cache caching.FederationCache,
 	isLocalServerName func(spec.ServerName) bool,
 ) (*Database, error) {
 	var d Database
 	var err error
-	
-	// Get the database connections
-	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
-		return nil, err
-	}
-	
+
 	// Create relay queue table
-	queue, err := NewPostgresRelayQueueTable(ctx, conMan)
+	queue, err := NewPostgresRelayQueueTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create relay queue JSON table
-	queueJSON, err := NewPostgresRelayQueueJSONTable(ctx, conMan)
+	queueJSON, err := NewPostgresRelayQueueJSONTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	d.Database = shared.Database{
-		DB:                d.db,
+		Cm:                cm,
 		IsLocalServerName: isLocalServerName,
 		Cache:             cache,
 		Writer:            d.writer,

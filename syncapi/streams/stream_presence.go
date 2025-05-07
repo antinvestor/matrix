@@ -68,7 +68,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	// We pull out a larger number than the filter asks for, since we're filtering out events later
 	presences, err := snapshot.PresenceAfter(ctx, from, synctypes.EventFilter{Limit: 1000})
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.PresenceAfter failed")
+		req.Log.WithError(err).Error("p.Cm.PresenceAfter failed")
 		return from
 	}
 

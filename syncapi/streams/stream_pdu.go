@@ -75,7 +75,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	// Extract room state and recent events for all rooms the user is joined to.
 	joinedRoomIDs, err := snapshot.RoomIDsWithMembership(ctx, req.Device.UserID, spec.Join)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.RoomIDsWithMembership failed")
+		req.Log.WithError(err).Error("p.Cm.RoomIDsWithMembership failed")
 		return from
 	}
 
@@ -124,7 +124,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	// Add peeked rooms.
 	peeks, err := snapshot.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.PeeksInRange failed")
+		req.Log.WithError(err).Error("p.Cm.PeeksInRange failed")
 		return from
 	}
 	if len(peeks) > 0 {
@@ -182,12 +182,12 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	if req.WantFullState {
 		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
-			req.Log.WithError(err).Error("p.DB.GetStateDeltasForFullStateSync failed")
+			req.Log.WithError(err).Error("p.Cm.GetStateDeltasForFullStateSync failed")
 			return from
 		}
 	} else {
 		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
-			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
+			req.Log.WithError(err).Error("p.Cm.GetStateDeltas failed")
 			return from
 		}
 	}
@@ -392,7 +392,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 
 	prevBatch, err := snapshot.GetBackwardTopologyPos(ctx, events)
 	if err != nil {
-		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
+		return r.From, fmt.Errorf("p.Cm.GetBackwardTopologyPos: %w", err)
 	}
 
 	eventFormat := synctypes.FormatSync

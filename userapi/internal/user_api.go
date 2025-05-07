@@ -109,7 +109,7 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 		return fmt.Errorf("data type must not be empty")
 	}
 	if err := a.DB.SaveAccountData(ctx, local, domain, req.RoomID, req.DataType, req.AccountData); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("a.DB.SaveAccountData failed")
+		util.GetLogger(ctx).WithError(err).Error("a.Cm.SaveAccountData failed")
 		return fmt.Errorf("failed to save account data: %w", err)
 	}
 	var ignoredUsers *synctypes.IgnoredUsers
@@ -258,7 +258,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	}
 
 	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, serverName, req.DisplayName); err != nil {
-		return fmt.Errorf("a.DB.SetDisplayName: %w", err)
+		return fmt.Errorf("a.Cm.SetDisplayName: %w", err)
 	}
 
 	postRegisterJoinRooms(ctx, a.Config, acc, a.RSAPI)

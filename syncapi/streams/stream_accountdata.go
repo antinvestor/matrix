@@ -53,7 +53,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 		ctx, req.Device.UserID, r, &req.Filter.AccountData,
 	)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.GetAccountDataInRange failed")
+		req.Log.WithError(err).Error("p.Cm.GetAccountDataInRange failed")
 		return from
 	}
 

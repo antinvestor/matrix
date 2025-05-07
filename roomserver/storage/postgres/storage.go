@@ -37,28 +37,12 @@ type Database struct {
 }
 
 // Open a postgres database.
-func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
+func Open(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
-	var err error
-	db, writer, err := conMan.Connection(ctx, dbProperties)
-	if err != nil {
-		return nil, fmt.Errorf("sqlutil.Open: %w", err)
-	}
-
-	// Create the tables.
-	if err = d.create(ctx, db); err != nil {
-		return nil, err
-	}
-
-	// Special case, since this migration uses several tables, so it needs to
-	// be sure that all tables are created first.
-	if err = executeMigration(ctx, db); err != nil {
-		return nil, err
-	}
 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
-	if err = d.prepare(ctx, conMan, cache); err != nil {
+	if err := d.prepare(ctx, cm, cache); err != nil {
 		return nil, err
 	}
 
@@ -89,11 +73,6 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 	})
 
 	return m.Up(ctx)
-}
-
-func (d *Database) create(ctx context.Context, db *sql.DB) error {
-	// We no longer need to create tables here since it's handled in the respective NewPostgresXTable constructor methods
-	return nil
 }
 
 func (d *Database) prepare(ctx context.Context, cm *sqlutil.Connections, cache caching.RoomServerCaches) error {
@@ -128,7 +107,7 @@ func (d *Database) prepare(ctx context.Context, cm *sqlutil.Connections, cache c
 		return err
 	}
 	// Use the new constructor method for stateSnapshot
-	stateSnapshot, err := NewPostgresStateSnapshotTable(ctx, cm)
+	stateSnapshot, err := NewPostgresStateSnapshotsTable(ctx, cm)
 	if err != nil {
 		return err
 	}
@@ -162,7 +141,7 @@ func (d *Database) prepare(ctx context.Context, cm *sqlutil.Connections, cache c
 	if err != nil {
 		return err
 	}
-	purge, err := PreparePurgeStatements(cm)
+	purge, err := NewPostgresqlPurgeStatements(cm)
 	if err != nil {
 		return err
 	}
@@ -178,9 +157,9 @@ func (d *Database) prepare(ctx context.Context, cm *sqlutil.Connections, cache c
 	}
 
 	d.Database = shared.Database{
-		DB: cm,
+		Cm: cm,
 		EventDatabase: shared.EventDatabase{
-			DB:                  cm,
+			Cm:                  cm,
 			Cache:               cache,
 			Writer:              cm.Writer,
 			EventsTable:         events,

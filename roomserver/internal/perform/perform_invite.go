@@ -106,7 +106,7 @@ func (r *Inviter) ProcessInviteMembership(
 	}
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(userID.Domain())
 	if updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID().String(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
-		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
+		return nil, fmt.Errorf("r.Cm.MembershipUpdater: %w", err)
 	}
 	outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
 		EventNID: 0,

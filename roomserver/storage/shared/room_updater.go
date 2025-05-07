@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 
@@ -12,7 +13,7 @@ import (
 )
 
 type RoomUpdater struct {
-	transaction
+	txn                     sqlutil.Transaction
 	d                       *Database
 	roomInfo                *types.RoomInfo
 	latestEvents            []types.StateAtEventAndReference
@@ -21,46 +22,51 @@ type RoomUpdater struct {
 	roomExists              bool
 }
 
-func rollback(txn *sql.Tx) {
+func rollback(txn sqlutil.Transaction) {
 	if txn == nil {
 		return
 	}
-	txn.Rollback() // nolint: errcheck
+	_ = txn.Rollback() // nolint: errcheck
 }
 
-func NewRoomUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo *types.RoomInfo) (*RoomUpdater, error) {
+func NewRoomUpdater(ctx context.Context, d *Database, roomInfo *types.RoomInfo) (*RoomUpdater, error) {
 	// If the roomInfo is nil then that means that the room doesn't exist
 	// yet, so we can't do `SelectLatestEventsNIDsForUpdate` because that
 	// would involve locking a row on the table that doesn't exist. Instead
 	// we will just run with a normal database transaction. It'll either
 	// succeed, processing a create event which creates the room, or it won't.
+
+	var txn sqlutil.Transaction
+
+	ctx, txn = d.Cm.BeginTx(ctx)
+
 	if roomInfo == nil {
 		return &RoomUpdater{
-			transaction{ctx, txn}, d, nil, nil, "", 0, false,
+			txn, d, nil, nil, "", 0, false,
 		}, nil
 	}
 
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
-		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomInfo.RoomNID)
+		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, roomInfo.RoomNID)
 	if err != nil {
 		rollback(txn)
 		return nil, err
 	}
-	stateAndRefs, err := d.EventsTable.BulkSelectStateAtEventAndReference(ctx, txn, eventNIDs)
+	stateAndRefs, err := d.EventsTable.BulkSelectStateAtEventAndReference(ctx, eventNIDs)
 	if err != nil {
 		rollback(txn)
 		return nil, err
 	}
 	var lastEventIDSent string
 	if lastEventNIDSent != 0 {
-		lastEventIDSent, err = d.EventsTable.SelectEventID(ctx, txn, lastEventNIDSent)
+		lastEventIDSent, err = d.EventsTable.SelectEventID(ctx, lastEventNIDSent)
 		if err != nil {
 			rollback(txn)
 			return nil, err
 		}
 	}
 	return &RoomUpdater{
-		transaction{ctx, txn}, d, roomInfo, stateAndRefs, lastEventIDSent, currentStateSnapshotNID, true,
+		txn, d, roomInfo, stateAndRefs, lastEventIDSent, currentStateSnapshotNID, true,
 	}, nil
 }
 
@@ -109,25 +115,25 @@ func (u *RoomUpdater) Events(ctx context.Context, _ gomatrixserverlib.RoomVersio
 	if u.roomInfo == nil {
 		return nil, types.ErrorInvalidRoomInfo
 	}
-	return u.d.events(ctx, u.txn, u.roomInfo.RoomVersion, eventNIDs)
+	return u.d.events(ctx, u.roomInfo.RoomVersion, eventNIDs)
 }
 
 func (u *RoomUpdater) SnapshotNIDFromEventID(
 	ctx context.Context, eventID string,
 ) (types.StateSnapshotNID, error) {
-	return u.d.snapshotNIDFromEventID(ctx, u.txn, eventID)
+	return u.d.snapshotNIDFromEventID(ctx, eventID)
 }
 
 func (u *RoomUpdater) StateBlockNIDs(
 	ctx context.Context, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
-	return u.d.stateBlockNIDs(ctx, u.txn, stateNIDs)
+	return u.d.stateBlockNIDs(ctx, stateNIDs)
 }
 
 func (u *RoomUpdater) StateEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
-	return u.d.stateEntries(ctx, u.txn, stateBlockNIDs)
+	return u.d.stateEntries(ctx, stateBlockNIDs)
 }
 
 func (u *RoomUpdater) StateEntriesForTuples(
@@ -135,7 +141,7 @@ func (u *RoomUpdater) StateEntriesForTuples(
 	stateBlockNIDs []types.StateBlockNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
-	return u.d.stateEntriesForTuples(ctx, u.txn, stateBlockNIDs, stateKeyTuples)
+	return u.d.stateEntriesForTuples(ctx, stateBlockNIDs, stateKeyTuples)
 }
 
 func (u *RoomUpdater) AddState(
@@ -144,56 +150,56 @@ func (u *RoomUpdater) AddState(
 	stateBlockNIDs []types.StateBlockNID,
 	state []types.StateEntry,
 ) (stateNID types.StateSnapshotNID, err error) {
-	return u.d.addState(ctx, u.txn, roomNID, stateBlockNIDs, state)
+	return u.d.addState(ctx, roomNID, stateBlockNIDs, state)
 }
 
 func (u *RoomUpdater) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		return u.d.EventsTable.UpdateEventState(ctx, txn, eventNID, stateNID)
+	return u.d.Writer.Do(ctx, u.d.Cm, func(ctx context.Context) error {
+		return u.d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
 	})
 }
 
 func (u *RoomUpdater) EventTypeNIDs(
 	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
-	return u.d.eventTypeNIDs(ctx, u.txn, eventTypes)
+	return u.d.eventTypeNIDs(ctx, eventTypes)
 }
 
 func (u *RoomUpdater) EventStateKeyNIDs(
 	ctx context.Context, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
-	return u.d.eventStateKeyNIDs(ctx, u.txn, eventStateKeys)
+	return u.d.eventStateKeyNIDs(ctx, eventStateKeys)
 }
 
 func (u *RoomUpdater) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
-	return u.d.roomInfo(ctx, u.txn, roomID)
+	return u.d.roomInfo(ctx, roomID)
 }
 
 func (u *RoomUpdater) EventIDs(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) (map[types.EventNID]string, error) {
-	return u.d.EventsTable.BulkSelectEventID(ctx, u.txn, eventNIDs)
+	return u.d.EventsTable.BulkSelectEventID(ctx, eventNIDs)
 }
 
 func (u *RoomUpdater) BulkSelectSnapshotsFromEventIDs(ctx context.Context, eventIDs []string) (map[types.StateSnapshotNID][]string, error) {
-	return u.d.EventsTable.BulkSelectSnapshotsFromEventIDs(ctx, u.txn, eventIDs)
+	return u.d.EventsTable.BulkSelectSnapshotsFromEventIDs(ctx, eventIDs)
 }
 
 func (u *RoomUpdater) StateAtEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateAtEvent, error) {
-	return u.d.EventsTable.BulkSelectStateAtEventByID(ctx, u.txn, eventIDs)
+	return u.d.EventsTable.BulkSelectStateAtEventByID(ctx, eventIDs)
 }
 
 func (u *RoomUpdater) EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error) {
-	return u.d.eventsFromIDs(ctx, u.txn, u.roomInfo, eventIDs, NoFilter)
+	return u.d.eventsFromIDs(ctx, u.roomInfo, eventIDs, NoFilter)
 }
 
 // IsReferenced implements types.RoomRecentEventsUpdater
-func (u *RoomUpdater) IsReferenced(eventID string) (bool, error) {
-	err := u.d.PrevEventsTable.SelectPreviousEventExists(u.ctx, u.txn, eventID)
+func (u *RoomUpdater) IsReferenced(ctx context.Context, eventID string) (bool, error) {
+	err := u.d.PrevEventsTable.SelectPreviousEventExists(ctx, eventID)
 	if err == nil {
 		return true, nil
 	}
@@ -204,9 +210,9 @@ func (u *RoomUpdater) IsReferenced(eventID string) (bool, error) {
 }
 
 // SetLatestEvents implements types.RoomRecentEventsUpdater
-func (u *RoomUpdater) SetLatestEvents(
-	roomNID types.RoomNID, latest []types.StateAtEventAndReference, lastEventNIDSent types.EventNID,
-	currentStateSnapshotNID types.StateSnapshotNID,
+func (u *RoomUpdater) SetLatestEvents(ctx context.Context,
+	roomNID types.RoomNID, latest []types.StateAtEventAndReference,
+	lastEventNIDSent types.EventNID, currentStateSnapshotNID types.StateSnapshotNID,
 ) error {
 	switch {
 	case len(latest) == 0:
@@ -220,8 +226,8 @@ func (u *RoomUpdater) SetLatestEvents(
 	for i := range latest {
 		eventNIDs[i] = latest[i].EventNID
 	}
-	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		if err := u.d.RoomsTable.UpdateLatestEventNIDs(u.ctx, txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
+	return u.d.Writer.Do(ctx, u.d.Cm, func(ctx context.Context) error {
+		if err := u.d.RoomsTable.UpdateLatestEventNIDs(ctx, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
 			return fmt.Errorf("u.d.RoomsTable.updateLatestEventNIDs: %w", err)
 		}
 
@@ -237,19 +243,19 @@ func (u *RoomUpdater) SetLatestEvents(
 }
 
 // HasEventBeenSent implements types.RoomRecentEventsUpdater
-func (u *RoomUpdater) HasEventBeenSent(eventNID types.EventNID) (bool, error) {
-	return u.d.EventsTable.SelectEventSentToOutput(u.ctx, u.txn, eventNID)
+func (u *RoomUpdater) HasEventBeenSent(ctx context.Context, eventNID types.EventNID) (bool, error) {
+	return u.d.EventsTable.SelectEventSentToOutput(ctx, eventNID)
 }
 
 // MarkEventAsSent implements types.RoomRecentEventsUpdater
-func (u *RoomUpdater) MarkEventAsSent(eventNID types.EventNID) error {
-	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		return u.d.EventsTable.UpdateEventSentToOutput(u.ctx, txn, eventNID)
+func (u *RoomUpdater) MarkEventAsSent(ctx context.Context, eventNID types.EventNID) error {
+	return u.d.Writer.Do(ctx, u.d.Cm, func(ctx context.Context) error {
+		return u.d.EventsTable.UpdateEventSentToOutput(ctx, eventNID)
 	})
 }
 
-func (u *RoomUpdater) MembershipUpdater(targetUserNID types.EventStateKeyNID, targetLocal bool) (*MembershipUpdater, error) {
-	return u.d.membershipUpdaterTxn(u.ctx, u.txn, u.roomInfo.RoomNID, targetUserNID, targetLocal)
+func (u *RoomUpdater) MembershipUpdater(ctx context.Context, targetUserNID types.EventStateKeyNID, targetLocal bool) (*MembershipUpdater, error) {
+	return u.d.membershipUpdaterTxn(ctx, u.roomInfo.RoomNID, targetUserNID, targetLocal)
 }
 
 func (u *RoomUpdater) IsEventRejected(ctx context.Context, roomNID types.RoomNID, eventID string) (bool, error) {

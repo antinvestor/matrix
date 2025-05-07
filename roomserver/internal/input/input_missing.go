@@ -556,7 +556,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserver
 	logger := t.log.WithField("event_id", e.EventID()).WithField("room_id", e.RoomID().String())
 	latest, _, _, err := t.db.LatestEventIDs(ctx, t.roomInfo.RoomNID)
 	if err != nil {
-		return nil, false, false, fmt.Errorf("t.DB.LatestEventIDs: %w", err)
+		return nil, false, false, fmt.Errorf("t.Cm.LatestEventIDs: %w", err)
 	}
 	latestEvents := make([]string, len(latest))
 	for i := range latest {

@@ -121,7 +121,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 	p.stats["daily_active_rooms"] = activeRooms
 	p.stats["daily_active_e2ee_rooms"] = activeE2EERooms
 
-	// user stats and DB engine
+	// user stats and Cm engine
 	userStats, db, err := p.db.UserStatistics(iCtx)
 	if err != nil {
 		logrus.WithError(err).Warn("unable to query userstats, using default values")

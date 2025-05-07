@@ -44,11 +44,26 @@ func (c *Connections) Migrate() bool {
 
 func (c *Connections) Connection(ctx context.Context, readOnly bool) *gorm.DB {
 
+	txn, ok := ctx.Value(ctxKeyTransaction).(*defaultTransaction)
+	if ok {
+		return txn.txn
+	}
+
 	if c.dbPool == nil {
 		return nil
 	}
 
 	return c.dbPool.DB(ctx, readOnly)
+}
+
+func (c *Connections) BeginTx(ctx context.Context) (context.Context, Transaction) {
+
+	writeDb := c.Connection(ctx, false)
+	gormTxn := writeDb.Begin()
+	txn := newDefaultTransaction(gormTxn)
+	ctx = context.WithValue(ctx, ctxKeyTransaction, txn)
+	return ctx, txn
+
 }
 
 func (c *Connections) FromOptions(ctx context.Context, opts *config.DatabaseOptions) (*Connections, error) {

@@ -39,7 +39,7 @@ const (
 type openIDTable struct {
 	cm         *sqlutil.Connections
 	serverName spec.ServerName
-	
+
 	insertTokenStmt string
 	selectTokenStmt string
 }
@@ -50,19 +50,19 @@ func NewPostgresOpenIDTable(cm *sqlutil.Connections, serverName spec.ServerName)
 	if err := db.Exec(openIDTokenSchema).Error; err != nil {
 		return nil, err
 	}
-	
+
 	// Initialize table with SQL statements
 	t := &openIDTable{
-		cm: cm,
+		cm:              cm,
 		insertTokenStmt: insertOpenIDTokenSQL,
 		selectTokenStmt: selectOpenIDTokenSQL,
-		serverName: serverName,
+		serverName:      serverName,
 	}
-	
+
 	return t, nil
 }
 
-// insertToken inserts a new OpenID Connect token to the DB.
+// insertToken inserts a new OpenID Connect token to the Cm.
 // Returns new token, otherwise returns error if the token already exists.
 func (t *openIDTable) InsertOpenIDToken(
 	ctx context.Context,
@@ -70,11 +70,11 @@ func (t *openIDTable) InsertOpenIDToken(
 	expiresAtMS int64,
 ) (err error) {
 	db := t.cm.Connection(ctx, false)
-	
+
 	return db.Exec(t.insertTokenStmt, token, localpart, serverName, expiresAtMS).Error
 }
 
-// selectOpenIDTokenAtrributes gets the attributes associated with an OpenID token from the DB
+// selectOpenIDTokenAtrributes gets the attributes associated with an OpenID token from the Cm
 // Returns the existing token's attributes, or err if no token is found
 func (t *openIDTable) SelectOpenIDTokenAtrributes(
 	ctx context.Context,
@@ -82,14 +82,14 @@ func (t *openIDTable) SelectOpenIDTokenAtrributes(
 ) (*api.OpenIDTokenAttributes, error) {
 	// Get read-only database connection
 	db := t.cm.Connection(ctx, true)
-	
+
 	var openIDTokenAttrs api.OpenIDTokenAttributes
 	var localpart string
 	var serverName spec.ServerName
-	
+
 	row := db.Raw(t.selectTokenStmt, token).Row()
 	err := row.Scan(&localpart, &serverName, &openIDTokenAttrs.ExpiresAtMS)
-	
+
 	openIDTokenAttrs.UserID = fmt.Sprintf("@%s:%s", localpart, serverName)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {

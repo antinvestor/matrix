@@ -41,7 +41,7 @@ import (
 // Database is a temporary struct until we have made syncserver.go the same for both pq/sqlite
 // For now this contains the shared functions
 type Database struct {
-	DB                  *sql.DB
+	Cm                  *sqlutil.Connections
 	Writer              sqlutil.Writer
 	Invites             tables.Invites
 	Peeks               tables.Peeks
@@ -61,7 +61,7 @@ type Database struct {
 }
 
 func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransaction, error) {
-	txn, err := d.DB.BeginTx(ctx, &sql.TxOptions{
+	txn, err := d.Cm.BeginTx(ctx, &sql.TxOptions{
 		// Set the isolation level so that we see a snapshot of the database.
 		// In PostgreSQL repeatable read transactions will see a snapshot taken
 		// at the first query, and since the transaction is read-only it can't
@@ -142,8 +142,8 @@ func (d *Database) SearchEvents(ctx context.Context, searchTerm string, roomIDs 
 }
 
 func (d *Database) ExcludeEventsFromSearchIndex(ctx context.Context, eventIDs []string) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.OutputEvents.ExcludeEventsFromSearchIndex(ctx, txn, eventIDs)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.OutputEvents.ExcludeEventsFromSearchIndex(ctx, eventIDs)
 	})
 }
 
@@ -153,8 +153,8 @@ func (d *Database) ExcludeEventsFromSearchIndex(ctx context.Context, eventIDs []
 func (d *Database) AddInviteEvent(
 	ctx context.Context, inviteEvent *rstypes.HeaderedEvent,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		sp, err = d.Invites.InsertInviteEvent(ctx, txn, inviteEvent)
+	_ = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		sp, err = d.Invites.InsertInviteEvent(ctx, inviteEvent)
 		return err
 	})
 	return
@@ -165,8 +165,8 @@ func (d *Database) AddInviteEvent(
 func (d *Database) RetireInviteEvent(
 	ctx context.Context, inviteEventID string,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		sp, err = d.Invites.DeleteInviteEvent(ctx, txn, inviteEventID)
+	_ = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		sp, err = d.Invites.DeleteInviteEvent(ctx, inviteEventID)
 		return err
 	})
 	return
@@ -178,8 +178,8 @@ func (d *Database) RetireInviteEvent(
 func (d *Database) AddPeek(
 	ctx context.Context, roomID, userID, deviceID string,
 ) (sp types.StreamPosition, err error) {
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		sp, err = d.Peeks.InsertPeek(ctx, txn, roomID, userID, deviceID)
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		sp, err = d.Peeks.InsertPeek(ctx, roomID, userID, deviceID)
 		return err
 	})
 	return
@@ -191,8 +191,8 @@ func (d *Database) AddPeek(
 func (d *Database) DeletePeek(
 	ctx context.Context, roomID, userID, deviceID string,
 ) (sp types.StreamPosition, err error) {
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		sp, err = d.Peeks.DeletePeek(ctx, txn, roomID, userID, deviceID)
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		sp, err = d.Peeks.DeletePeek(ctx, roomID, userID, deviceID)
 		return err
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -208,8 +208,8 @@ func (d *Database) DeletePeek(
 func (d *Database) DeletePeeks(
 	ctx context.Context, roomID, userID string,
 ) (sp types.StreamPosition, err error) {
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		sp, err = d.Peeks.DeletePeeks(ctx, txn, roomID, userID)
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		sp, err = d.Peeks.DeletePeeks(ctx, roomID, userID)
 		return err
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -228,8 +228,8 @@ func (d *Database) DeletePeeks(
 func (d *Database) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
 ) (sp types.StreamPosition, err error) {
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		sp, err = d.AccountData.InsertAccountData(ctx, txn, userID, roomID, dataType)
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		sp, err = d.AccountData.InsertAccountData(ctx, userID, roomID, dataType)
 		return err
 	})
 	return
@@ -240,13 +240,13 @@ func (d *Database) UpsertAccountData(
 // to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
 // This function should always be called within a sqlutil.Writer for safety in SQLite.
 func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *rstypes.HeaderedEvent) error {
-	if err := d.BackwardExtremities.DeleteBackwardExtremity(ctx, txn, ev.RoomID().String(), ev.EventID()); err != nil {
+	if err := d.BackwardExtremities.DeleteBackwardExtremity(ctx, ev.RoomID().String(), ev.EventID()); err != nil {
 		return err
 	}
 
 	// Check if we have all of the event's previous events. If an event is
 	// missing, add it to the room's backward extremities.
-	prevEvents, err := d.OutputEvents.SelectEvents(ctx, txn, ev.PrevEventIDs(), nil, false)
+	prevEvents, err := d.OutputEvents.SelectEvents(ctx, ev.PrevEventIDs(), nil, false)
 	if err != nil {
 		return err
 	}
@@ -261,7 +261,7 @@ func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, e
 
 		// If the event is missing, consider it a backward extremity.
 		if !found {
-			if err = d.BackwardExtremities.InsertsBackwardExtremity(ctx, txn, ev.RoomID().String(), ev.EventID(), eID); err != nil {
+			if err = d.BackwardExtremities.InsertsBackwardExtremity(ctx, ev.RoomID().String(), ev.EventID(), eID); err != nil {
 				return err
 			}
 		}
@@ -278,7 +278,7 @@ func (d *Database) WriteEvent(
 	transactionID *api.TransactionID, excludeFromSync bool,
 	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (pduPosition types.StreamPosition, returnErr error) {
-	returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	returnErr = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
 		var err error
 		ev.Visibility = historyVisibility
 		pos, err := d.OutputEvents.InsertEvent(
@@ -289,11 +289,11 @@ func (d *Database) WriteEvent(
 		}
 		pduPosition = pos
 		var topoPosition types.StreamPosition
-		if topoPosition, err = d.Topology.InsertEventInTopology(ctx, txn, ev, pos); err != nil {
+		if topoPosition, err = d.Topology.InsertEventInTopology(ctx, ev, pos); err != nil {
 			return fmt.Errorf("d.Topology.InsertEventInTopology: %w", err)
 		}
 
-		if err = d.handleBackwardExtremities(ctx, txn, ev); err != nil {
+		if err = d.handleBackwardExtremities(ctx, ev); err != nil {
 			return fmt.Errorf("d.handleBackwardExtremities: %w", err)
 		}
 
@@ -304,7 +304,7 @@ func (d *Database) WriteEvent(
 		for i := range addStateEvents {
 			addStateEvents[i].Visibility = historyVisibility
 		}
-		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition, topoPosition)
+		return d.updateRoomState(ctx, removeStateEventIDs, addStateEvents, pduPosition, topoPosition)
 	})
 
 	return pduPosition, returnErr
@@ -320,7 +320,7 @@ func (d *Database) updateRoomState(
 ) error {
 	// remove first, then add, as we do not ever delete state, but do replace state which is a remove followed by an add.
 	for _, eventID := range removedEventIDs {
-		if err := d.CurrentRoomState.DeleteRoomStateByEventID(ctx, txn, eventID); err != nil {
+		if err := d.CurrentRoomState.DeleteRoomStateByEventID(ctx, eventID); err != nil {
 			return fmt.Errorf("d.CurrentRoomState.DeleteRoomStateByEventID: %w", err)
 		}
 	}
@@ -337,12 +337,12 @@ func (d *Database) updateRoomState(
 				return fmt.Errorf("event.Membership: %w", err)
 			}
 			membership = &value
-			if err = d.Memberships.UpsertMembership(ctx, txn, event, pduPosition, topoPosition); err != nil {
+			if err = d.Memberships.UpsertMembership(ctx, event, pduPosition, topoPosition); err != nil {
 				return fmt.Errorf("d.Memberships.UpsertMembership: %w", err)
 			}
 		}
 
-		if err := d.CurrentRoomState.UpsertRoomState(ctx, txn, event, membership, pduPosition); err != nil {
+		if err := d.CurrentRoomState.UpsertRoomState(ctx, event, membership, pduPosition); err != nil {
 			return fmt.Errorf("d.CurrentRoomState.UpsertRoomState: %w", err)
 		}
 	}
@@ -361,8 +361,8 @@ func (d *Database) PutFilter(
 ) (string, error) {
 	var filterID string
 	var err error
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		filterID, err = d.Filter.InsertFilter(ctx, txn, filter, localpart)
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		filterID, err = d.Filter.InsertFilter(ctx, filter, localpart)
 		return err
 	})
 	return filterID, err
@@ -384,8 +384,8 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 
 	newEvent := &rstypes.HeaderedEvent{PDU: eventToRedact}
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.OutputEvents.UpdateEventJSON(ctx, txn, newEvent)
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.OutputEvents.UpdateEventJSON(ctx, newEvent)
 	})
 	return err
 }
@@ -424,7 +424,7 @@ func (d *Database) fetchStateEvents(
 		for _, missingEvIDs := range missingEvents {
 			allMissingEventIDs = append(allMissingEventIDs, missingEvIDs...)
 		}
-		evs, err := d.fetchMissingStateEvents(ctx, txn, allMissingEventIDs)
+		evs, err := d.fetchMissingStateEvents(ctx, allMissingEventIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -442,7 +442,7 @@ func (d *Database) fetchMissingStateEvents(
 ) ([]types.StreamEvent, error) {
 	// Fetch from the events table first so we pick up the stream ID for the
 	// event.
-	events, err := d.OutputEvents.SelectEvents(ctx, txn, eventIDs, nil, false)
+	events, err := d.OutputEvents.SelectEvents(ctx, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -464,7 +464,7 @@ func (d *Database) fetchMissingStateEvents(
 	// If they are missing from the events table then they should be state
 	// events that we received from outside the main event stream.
 	// These should be in the room state table.
-	stateEvents, err := d.CurrentRoomState.SelectEventsWithEventIDs(ctx, txn, missing)
+	stateEvents, err := d.CurrentRoomState.SelectEventsWithEventIDs(ctx, missing)
 
 	if err != nil {
 		return nil, err
@@ -491,7 +491,7 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	}
 	// Delegate the database write task to the SendToDeviceWriter. It'll guarantee
 	// that we don't lock the table for writes in more than one place.
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
 		newPos, err = d.SendToDevice.InsertSendToDeviceMessage(
 			ctx, txn, userID, deviceID, string(j),
 		)
@@ -507,8 +507,8 @@ func (d *Database) CleanSendToDeviceUpdates(
 	ctx context.Context,
 	userID, deviceID string, before types.StreamPosition,
 ) (err error) {
-	if err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.SendToDevice.DeleteSendToDeviceMessages(ctx, txn, userID, deviceID, before)
+	if err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.SendToDevice.DeleteSendToDeviceMessages(ctx, userID, deviceID, before)
 	}); err != nil {
 		logrus.WithError(err).Errorf("Failed to clean up old send-to-device messages for user %q device %q", userID, deviceID)
 		return err
@@ -544,16 +544,16 @@ func getMembershipFromEvent(ctx context.Context, ev gomatrixserverlib.PDU, userI
 
 // StoreReceipt stores user receipts
 func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error) {
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		pos, err = d.Receipts.UpsertReceipt(ctx, txn, roomId, receiptType, userId, eventId, timestamp)
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		pos, err = d.Receipts.UpsertReceipt(ctx, roomId, receiptType, userId, eventId, timestamp)
 		return err
 	})
 	return
 }
 
 func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		pos, err = d.NotificationData.UpsertRoomUnreadCounts(ctx, txn, userID, roomID, notificationCount, highlightCount)
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		pos, err = d.NotificationData.UpsertRoomUnreadCounts(ctx, userID, roomID, notificationCount, highlightCount)
 		return err
 	})
 	return
@@ -575,16 +575,16 @@ func (d *Database) IgnoresForUser(ctx context.Context, userID string) (*types.Ig
 }
 
 func (d *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Ignores.UpsertIgnores(ctx, txn, userID, ignores)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.Ignores.UpsertIgnores(ctx, userID, ignores)
 	})
 }
 
 func (d *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS spec.Timestamp, fromSync bool) (types.StreamPosition, error) {
 	var pos types.StreamPosition
 	var err error
-	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		pos, err = d.Presence.UpsertPresence(ctx, txn, userID, statusMsg, presence, lastActiveTS, fromSync)
+	_ = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		pos, err = d.Presence.UpsertPresence(ctx, userID, statusMsg, presence, lastActiveTS, fromSync)
 		return nil
 	})
 	return pos, err
@@ -624,7 +624,7 @@ func (d *Database) UpdateRelations(ctx context.Context, event *rstypes.HeaderedE
 	case content.Relations.RelationType == "":
 		return nil
 	default:
-		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
 			return d.Relations.InsertRelation(
 				ctx, txn, event.RoomID().String(), content.Relations.EventID,
 				event.EventID(), event.Type(), content.Relations.RelationType,
@@ -634,8 +634,8 @@ func (d *Database) UpdateRelations(ctx context.Context, event *rstypes.HeaderedE
 }
 
 func (d *Database) RedactRelations(ctx context.Context, roomID, redactedEventID string) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Relations.DeleteRelation(ctx, txn, roomID, redactedEventID)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.Relations.DeleteRelation(ctx, roomID, redactedEventID)
 	})
 }
 

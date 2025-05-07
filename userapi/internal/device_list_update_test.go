@@ -197,7 +197,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 		t.Errorf("Update didn't produce correct event, got %v want %v", producer.events, want)
 	}
 	if !reflect.DeepEqual(db.storedKeys, []api.DeviceMessage{want}) {
-		t.Errorf("DB didn't store correct event, got %v want %v", db.storedKeys, want)
+		t.Errorf("Cm didn't store correct event, got %v want %v", db.storedKeys, want)
 	}
 	if db.isStale(event.UserID) {
 		t.Errorf("%s incorrectly marked as stale", event.UserID)
@@ -286,7 +286,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 		t.Errorf("Update didn't produce correct event, got %v want %v", producer.events, want)
 	}
 	if !reflect.DeepEqual(db.storedKeys, []api.DeviceMessage{want}) {
-		t.Errorf("DB didn't store correct event, got %v want %v", db.storedKeys, want)
+		t.Errorf("Cm didn't store correct event, got %v want %v", db.storedKeys, want)
 	}
 
 }

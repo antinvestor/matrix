@@ -171,7 +171,7 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 		}
 
 		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			err = db.Table.DeleteQueueEntries(ctx, txn, serverName, []int64{nid})
+			err = db.Table.DeleteQueueEntries(ctx, serverName, []int64{nid})
 			return err
 		})
 		if err != nil {
@@ -215,7 +215,7 @@ func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
 		}
 
 		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			err = db.Table.DeleteQueueEntries(ctx, txn, serverName, []int64{nid})
+			err = db.Table.DeleteQueueEntries(ctx, serverName, []int64{nid})
 			return err
 		})
 		if err != nil {

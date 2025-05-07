@@ -46,7 +46,7 @@ func NewUserDatabase(
 	if !dbProperties.ConnectionString.IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type")
 	}
-	pgUserDb, err := postgres.NewDatabase(ctx, conMan, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+	pgUserDb, err := postgres.NewDatabase(ctx, cm, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +65,10 @@ func NewUserDatabase(
 
 // NewKeyDatabase opens a new Postgres database (base on dataSourceName) scheme)
 // and sets postgres connection parameters.
-func NewKeyDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
+func NewKeyDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
 	switch {
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewKeyDatabase(ctx, conMan, dbProperties)
+		return postgres.NewKeyDatabase(ctx, cm, dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

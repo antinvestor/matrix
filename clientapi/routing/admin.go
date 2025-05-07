@@ -100,7 +100,7 @@ func AdminCreateNewRegistrationToken(req *http.Request, cfg *config.ClientAPI, u
 	}
 	pending := int32(0)
 	completed := int32(0)
-	// If usesAllowed or expiryTime is 0, it means they are not present in the request. NULL (indicating unlimited uses / no expiration will be persisted in DB)
+	// If usesAllowed or expiryTime is 0, it means they are not present in the request. NULL (indicating unlimited uses / no expiration will be persisted in Cm)
 	registrationToken := &clientapi.RegistrationToken{
 		Token:       &token,
 		UsesAllowed: usesAllowed,

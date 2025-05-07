@@ -316,7 +316,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	// Clean up old send-to-device messages from before this stream position.
 	// This is needed to avoid sending the same message multiple times
 	if err = rp.db.CleanSendToDeviceUpdates(syncReq.Context, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
-		syncReq.Log.WithError(err).Error("p.DB.CleanSendToDeviceUpdates failed")
+		syncReq.Log.WithError(err).Error("p.Cm.CleanSendToDeviceUpdates failed")
 	}
 
 	// loop until we get some data

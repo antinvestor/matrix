@@ -20,7 +20,7 @@ func newSyncDB(ctx context.Context, t *testing.T, testOpts test.DependancyOption
 	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 	syncDB, err := storage.NewSyncServerDatasource(ctx, cm, &cfg.SyncAPI.Database)
 	if err != nil {
-		t.Fatalf("failed to create sync DB: %s", err)
+		t.Fatalf("failed to create sync Cm: %s", err)
 	}
 
 	return syncDB, closeDB

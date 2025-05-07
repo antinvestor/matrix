@@ -79,12 +79,12 @@ const (
 
 type stateSnapshotStatements struct {
 	cm *sqlutil.Connections
-	
+
 	// SQL statements stored as struct fields
-	insertStateStmt           string
-	selectNextStateSnapshotNIDStmt  string
-	selectStateSnapshotStmt   string
-	bulkSelectStateBlockNIDsStmt string
+	insertStateStmt                     string
+	selectNextStateSnapshotNIDStmt      string
+	selectStateSnapshotStmt             string
+	bulkSelectStateBlockNIDsStmt        string
 	bulkSelectStateBlockNIDsForRoomStmt string
 }
 
@@ -98,12 +98,12 @@ func NewPostgresStateSnapshotsTable(ctx context.Context, cm *sqlutil.Connections
 	// Initialize the struct
 	s := &stateSnapshotStatements{
 		cm: cm,
-		
+
 		// Initialize SQL statement fields with the constants
-		insertStateStmt:           insertStateSQL,
-		selectNextStateSnapshotNIDStmt:  selectNextStateSnapshotNIDSQL,
-		selectStateSnapshotStmt:   selectStateSnapshotSQL,
-		bulkSelectStateBlockNIDsStmt: bulkSelectStateBlockNIDsSQL,
+		insertStateStmt:                     insertStateSQL,
+		selectNextStateSnapshotNIDStmt:      selectNextStateSnapshotNIDSQL,
+		selectStateSnapshotStmt:             selectStateSnapshotSQL,
+		bulkSelectStateBlockNIDsStmt:        bulkSelectStateBlockNIDsSQL,
 		bulkSelectStateBlockNIDsForRoomStmt: bulkSelectStateBlockNIDsForRoomSQL,
 	}
 
@@ -119,12 +119,12 @@ func (s *stateSnapshotStatements) InsertState(
 ) (stateNID types.StateSnapshotNID, err error) {
 	// Get the next state NID from the sequence
 	var nextStateNID types.StateSnapshotNID
-	if err = s.selectNextStateSnapshotNID(ctx, txn, &nextStateNID); err != nil {
+	if err = s.selectNextStateSnapshotNID(ctx, &nextStateNID); err != nil {
 		return 0, err
 	}
 
 	// Insert the new state snapshot
-	if err = s.insertState(ctx, txn, nextStateNID, roomNID, stateBlockNID); err != nil {
+	if err = s.insertState(ctx, nextStateNID, roomNID, stateBlockNID); err != nil {
 		return 0, err
 	}
 
@@ -161,14 +161,14 @@ func (s *stateSnapshotStatements) insertState(
 	var db *sql.Conn
 	var stmt *sql.Stmt
 	var err error
-	
+
 	if txn != nil {
 		// Use existing transaction.
 		if stmt, err = txn.PrepareContext(ctx, s.insertStateStmt); err != nil {
 			return err
 		}
 		defer internal.CloseAndLogIfError(ctx, stmt, "insertState: failed to close statement")
-		
+
 		_, err = stmt.ExecContext(ctx, stateNID, roomNID, stateBlockNID)
 		return err
 	} else {
@@ -177,12 +177,12 @@ func (s *stateSnapshotStatements) insertState(
 			return err
 		}
 		defer internal.CloseAndLogIfError(ctx, db, "insertState: failed to close connection")
-		
+
 		if stmt, err = db.PrepareContext(ctx, s.insertStateStmt); err != nil {
 			return err
 		}
 		defer internal.CloseAndLogIfError(ctx, stmt, "insertState: failed to close statement")
-		
+
 		_, err = stmt.ExecContext(ctx, stateNID, roomNID, stateBlockNID)
 		return err
 	}
@@ -195,7 +195,7 @@ func (s *stateSnapshotStatements) GetState(
 ) (roomNID types.RoomNID, stateBlockNID types.StateBlockNID, err error) {
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	
+
 	row := db.Raw(s.selectStateSnapshotStmt, stateNID).Row()
 	err = row.Scan(&roomNID, &stateBlockNID)
 	if err == sql.ErrNoRows {
@@ -214,25 +214,25 @@ func (s *stateSnapshotStatements) BulkGetStateBlockNIDs(
 	}
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	
+
 	// Convert state NIDs to int64 for SQL parameter
 	sqlStateNIDs := make([]int64, len(stateNIDs))
 	for i := range stateNIDs {
 		sqlStateNIDs[i] = int64(stateNIDs[i])
 	}
-	
+
 	// Execute the query
 	rows, err := db.Raw(s.bulkSelectStateBlockNIDsStmt, pq.Array(sqlStateNIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "BulkGetStateBlockNIDs: failed to close rows")
-	
+
 	// Create result map
 	results := make(map[types.StateSnapshotNID]types.StateBlockNID, len(stateNIDs))
 	var stateNID types.StateSnapshotNID
 	var stateBlockNID types.StateBlockNID
-	
+
 	// Process rows
 	for rows.Next() {
 		if err = rows.Scan(&stateNID, &stateBlockNID); err != nil {
@@ -240,7 +240,7 @@ func (s *stateSnapshotStatements) BulkGetStateBlockNIDs(
 		}
 		results[stateNID] = stateBlockNID
 	}
-	
+
 	return results, rows.Err()
 }
 
@@ -251,20 +251,20 @@ func (s *stateSnapshotStatements) BulkGetStateBlockNIDsForRoom(
 ) ([]types.StateSnapshotNID, []types.StateBlockNID, error) {
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	
+
 	// Execute the query
 	rows, err := db.Raw(s.bulkSelectStateBlockNIDsForRoomStmt, roomNID).Rows()
 	if err != nil {
 		return nil, nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "BulkGetStateBlockNIDsForRoom: failed to close rows")
-	
+
 	// Create result slices
 	var results []types.StateSnapshotNID
 	var blocks []types.StateBlockNID
 	var stateNID types.StateSnapshotNID
 	var stateBlockNID types.StateBlockNID
-	
+
 	// Process rows
 	for rows.Next() {
 		if err = rows.Scan(&stateNID, &stateBlockNID); err != nil {
@@ -273,6 +273,6 @@ func (s *stateSnapshotStatements) BulkGetStateBlockNIDsForRoom(
 		results = append(results, stateNID)
 		blocks = append(blocks, stateBlockNID)
 	}
-	
+
 	return results, blocks, rows.Err()
 }

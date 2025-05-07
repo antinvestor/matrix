@@ -126,7 +126,7 @@ func (r *Inputer) processRoomEvent(
 	// event.
 	roomInfo, rerr := r.DB.RoomInfo(ctx, event.RoomID().String())
 	if rerr != nil {
-		return fmt.Errorf("r.DB.RoomInfo: %w", rerr)
+		return fmt.Errorf("r.Cm.RoomInfo: %w", rerr)
 	}
 	isCreateEvent := event.Type() == spec.MRoomCreate && event.StateKeyEquals("")
 	if roomInfo == nil && !isCreateEvent {
@@ -367,18 +367,18 @@ func (r *Inputer) processRoomEvent(
 	if roomInfo == nil {
 		roomInfo, err = r.DB.GetOrCreateRoomInfo(ctx, event)
 		if err != nil {
-			return fmt.Errorf("r.DB.GetOrCreateRoomInfo: %w", err)
+			return fmt.Errorf("r.Cm.GetOrCreateRoomInfo: %w", err)
 		}
 	}
 
 	eventTypeNID, err := r.DB.GetOrCreateEventTypeNID(ctx, event.Type())
 	if err != nil {
-		return fmt.Errorf("r.DB.GetOrCreateEventTypeNID: %w", err)
+		return fmt.Errorf("r.Cm.GetOrCreateEventTypeNID: %w", err)
 	}
 
 	eventStateKeyNID, err := r.DB.GetOrCreateEventStateKeyNID(ctx, event.StateKey())
 	if err != nil {
-		return fmt.Errorf("r.DB.GetOrCreateEventStateKeyNID: %w", err)
+		return fmt.Errorf("r.Cm.GetOrCreateEventStateKeyNID: %w", err)
 	}
 
 	// Store the event.
@@ -599,7 +599,7 @@ func (r *Inputer) processStateBefore(
 		// them from the database. It's a hard error if they are missing.
 		stateEvents, err = r.DB.EventsFromIDs(ctx, roomInfo, input.StateEventIDs)
 		if err != nil {
-			return "", nil, fmt.Errorf("r.DB.EventsFromIDs: %w", err)
+			return "", nil, fmt.Errorf("r.Cm.EventsFromIDs: %w", err)
 		}
 		stateBeforeEvent = make([]gomatrixserverlib.PDU, 0, len(stateEvents))
 		for _, entry := range stateEvents {
@@ -657,7 +657,7 @@ func (r *Inputer) processStateBefore(
 		gomatrixserverlib.ToPDUs(stateBeforeEvent),
 	)
 	if err != nil {
-		rejectionErr = fmt.Errorf("r.DB.EventsFromIDs: %w", err)
+		rejectionErr = fmt.Errorf("r.Cm.EventsFromIDs: %w", err)
 		return
 	}
 
@@ -720,7 +720,7 @@ func (r *Inputer) fetchAuthEvents(
 		if roomInfo != nil {
 			isRejected, err = r.DB.IsEventRejected(ctx, roomInfo.RoomNID, ev.EventID())
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("r.DB.IsEventRejected failed: %w", err)
+				return fmt.Errorf("r.Cm.IsEventRejected failed: %w", err)
 			}
 		}
 		known[authEventID] = &ev // don't take the pointer of the iterated event
@@ -802,18 +802,18 @@ nextAuthEvent:
 		if roomInfo == nil {
 			roomInfo, err = r.DB.GetOrCreateRoomInfo(ctx, authEvent)
 			if err != nil {
-				return fmt.Errorf("r.DB.GetOrCreateRoomInfo: %w", err)
+				return fmt.Errorf("r.Cm.GetOrCreateRoomInfo: %w", err)
 			}
 		}
 
 		eventTypeNID, err := r.DB.GetOrCreateEventTypeNID(ctx, authEvent.Type())
 		if err != nil {
-			return fmt.Errorf("r.DB.GetOrCreateEventTypeNID: %w", err)
+			return fmt.Errorf("r.Cm.GetOrCreateEventTypeNID: %w", err)
 		}
 
 		eventStateKeyNID, err := r.DB.GetOrCreateEventStateKeyNID(ctx, event.StateKey())
 		if err != nil {
-			return fmt.Errorf("r.DB.GetOrCreateEventStateKeyNID: %w", err)
+			return fmt.Errorf("r.Cm.GetOrCreateEventStateKeyNID: %w", err)
 		}
 
 		// Finally, store the event in the database.
@@ -854,7 +854,7 @@ func (r *Inputer) calculateAndSetState(
 	var succeeded bool
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
 	if err != nil {
-		return fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
+		return fmt.Errorf("r.Cm.GetRoomUpdater: %w", err)
 	}
 	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 	roomState := state.NewStateResolution(updater, roomInfo, r.Queryer)
@@ -880,7 +880,7 @@ func (r *Inputer) calculateAndSetState(
 
 	err = updater.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
 	if err != nil {
-		return fmt.Errorf("r.DB.SetState: %w", err)
+		return fmt.Errorf("r.Cm.SetState: %w", err)
 	}
 	succeeded = true
 	return nil

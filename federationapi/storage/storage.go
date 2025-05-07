@@ -26,9 +26,9 @@ import (
 )
 
 // NewDatabase opens a new database
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (Database, error) {
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (Database, error) {
 	if !dbProperties.ConnectionString.IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type")
 	}
-	return postgres.NewDatabase(ctx, conMan, dbProperties, cache, isLocalServerName)
+	return postgres.NewDatabase(ctx, cm, dbProperties, cache, isLocalServerName)
 }

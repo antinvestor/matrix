@@ -33,7 +33,7 @@ func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) 
 		"conn_max_lifetime": dbProperties.ConnMaxLifetime(),
 		"data_source_name":  regexp.MustCompile(`://[^@]*@`).ReplaceAllLiteralString(dsn, "://"),
 	})
-	logger.Debug("Setting DB connection limits")
+	logger.Debug("Setting Cm connection limits")
 	db.SetMaxOpenConns(dbProperties.MaxOpenConns())
 	db.SetMaxIdleConns(dbProperties.MaxIdleConns())
 	db.SetConnMaxLifetime(dbProperties.ConnMaxLifetime())

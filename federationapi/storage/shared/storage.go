@@ -16,7 +16,6 @@ package shared
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -30,7 +29,7 @@ import (
 )
 
 type Database struct {
-	DB                       *sql.DB
+	Cm                       *sqlutil.Connections
 	IsLocalServerName        func(spec.ServerName) bool
 	Cache                    caching.FederationCache
 	Writer                   sqlutil.Writer
@@ -60,27 +59,27 @@ func (d *Database) UpdateRoom(
 	removeHosts []string,
 	purgeRoomFirst bool,
 ) (joinedHosts []types.JoinedHost, err error) {
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
 		if purgeRoomFirst {
-			if err = d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
+			if err = d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, roomID); err != nil {
 				return fmt.Errorf("d.FederationJoinedHosts.DeleteJoinedHosts: %w", err)
 			}
 			for _, add := range addHosts {
-				if err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName); err != nil {
+				if err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, roomID, add.MemberEventID, add.ServerName); err != nil {
 					return err
 				}
 				joinedHosts = append(joinedHosts, add)
 			}
 		} else {
-			if joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID); err != nil {
+			if joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, roomID); err != nil {
 				return err
 			}
 			for _, add := range addHosts {
-				if err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName); err != nil {
+				if err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, roomID, add.MemberEventID, add.ServerName); err != nil {
 					return err
 				}
 			}
-			if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
+			if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, removeHosts); err != nil {
 				return err
 			}
 		}
@@ -137,8 +136,8 @@ func (d *Database) StoreJSON(
 ) (*receipt.Receipt, error) {
 	var nid int64
 	var err error
-	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nid, err = d.FederationQueueJSON.InsertQueueJSON(ctx, txn, js)
+	_ = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		nid, err = d.FederationQueueJSON.InsertQueueJSON(ctx, js)
 		return err
 	})
 	if err != nil {
@@ -151,37 +150,37 @@ func (d *Database) StoreJSON(
 func (d *Database) AddServerToBlacklist(
 	ctx context.Context, serverName spec.ServerName,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationBlacklist.InsertBlacklist(ctx, txn, serverName)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationBlacklist.InsertBlacklist(ctx, serverName)
 	})
 }
 
 func (d *Database) RemoveServerFromBlacklist(
 	ctx context.Context, serverName spec.ServerName,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationBlacklist.DeleteBlacklist(ctx, txn, serverName)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationBlacklist.DeleteBlacklist(ctx, serverName)
 	})
 }
 
 func (d *Database) RemoveAllServersFromBlacklist(ctx context.Context) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationBlacklist.DeleteAllBlacklist(ctx, txn)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationBlacklist.DeleteAllBlacklist(ctx)
 	})
 }
 
 func (d *Database) IsServerBlacklisted(
 	ctx context.Context, serverName spec.ServerName,
 ) (bool, error) {
-	return d.FederationBlacklist.SelectBlacklist(ctx, nil, serverName)
+	return d.FederationBlacklist.SelectBlacklist(ctx, serverName)
 }
 
 func (d *Database) SetServerAssumedOffline(
 	ctx context.Context,
 	serverName spec.ServerName,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationAssumedOffline.InsertAssumedOffline(ctx, txn, serverName)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationAssumedOffline.InsertAssumedOffline(ctx, serverName)
 	})
 }
 
@@ -189,16 +188,16 @@ func (d *Database) RemoveServerAssumedOffline(
 	ctx context.Context,
 	serverName spec.ServerName,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationAssumedOffline.DeleteAssumedOffline(ctx, txn, serverName)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationAssumedOffline.DeleteAssumedOffline(ctx, serverName)
 	})
 }
 
 func (d *Database) RemoveAllServersAssumedOffline(
 	ctx context.Context,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationAssumedOffline.DeleteAllAssumedOffline(ctx, txn)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationAssumedOffline.DeleteAllAssumedOffline(ctx)
 	})
 }
 
@@ -206,7 +205,7 @@ func (d *Database) IsServerAssumedOffline(
 	ctx context.Context,
 	serverName spec.ServerName,
 ) (bool, error) {
-	return d.FederationAssumedOffline.SelectAssumedOffline(ctx, nil, serverName)
+	return d.FederationAssumedOffline.SelectAssumedOffline(ctx, serverName)
 }
 
 func (d *Database) P2PAddRelayServersForServer(
@@ -214,8 +213,8 @@ func (d *Database) P2PAddRelayServersForServer(
 	serverName spec.ServerName,
 	relayServers []spec.ServerName,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationRelayServers.InsertRelayServers(ctx, txn, serverName, relayServers)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationRelayServers.InsertRelayServers(ctx, serverName, relayServers)
 	})
 }
 
@@ -223,7 +222,7 @@ func (d *Database) P2PGetRelayServersForServer(
 	ctx context.Context,
 	serverName spec.ServerName,
 ) ([]spec.ServerName, error) {
-	return d.FederationRelayServers.SelectRelayServers(ctx, nil, serverName)
+	return d.FederationRelayServers.SelectRelayServers(ctx, serverName)
 }
 
 func (d *Database) P2PRemoveRelayServersForServer(
@@ -231,8 +230,8 @@ func (d *Database) P2PRemoveRelayServersForServer(
 	serverName spec.ServerName,
 	relayServers []spec.ServerName,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationRelayServers.DeleteRelayServers(ctx, txn, serverName, relayServers)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationRelayServers.DeleteRelayServers(ctx, serverName, relayServers)
 	})
 }
 
@@ -240,8 +239,8 @@ func (d *Database) P2PRemoveAllRelayServersForServer(
 	ctx context.Context,
 	serverName spec.ServerName,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationRelayServers.DeleteAllRelayServers(ctx, txn, serverName)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationRelayServers.DeleteAllRelayServers(ctx, serverName)
 	})
 }
 
@@ -252,8 +251,8 @@ func (d *Database) AddOutboundPeek(
 	peekID string,
 	renewalInterval int64,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationOutboundPeeks.InsertOutboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationOutboundPeeks.InsertOutboundPeek(ctx, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
@@ -264,8 +263,8 @@ func (d *Database) RenewOutboundPeek(
 	peekID string,
 	renewalInterval int64,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationOutboundPeeks.RenewOutboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationOutboundPeeks.RenewOutboundPeek(ctx, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
@@ -275,14 +274,14 @@ func (d *Database) GetOutboundPeek(
 	roomID,
 	peekID string,
 ) (*types.OutboundPeek, error) {
-	return d.FederationOutboundPeeks.SelectOutboundPeek(ctx, nil, serverName, roomID, peekID)
+	return d.FederationOutboundPeeks.SelectOutboundPeek(ctx, serverName, roomID, peekID)
 }
 
 func (d *Database) GetOutboundPeeks(
 	ctx context.Context,
 	roomID string,
 ) ([]types.OutboundPeek, error) {
-	return d.FederationOutboundPeeks.SelectOutboundPeeks(ctx, nil, roomID)
+	return d.FederationOutboundPeeks.SelectOutboundPeeks(ctx, roomID)
 }
 
 func (d *Database) AddInboundPeek(
@@ -292,8 +291,8 @@ func (d *Database) AddInboundPeek(
 	peekID string,
 	renewalInterval int64,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationInboundPeeks.InsertInboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationInboundPeeks.InsertInboundPeek(ctx, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
@@ -304,8 +303,8 @@ func (d *Database) RenewInboundPeek(
 	peekID string,
 	renewalInterval int64,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationInboundPeeks.RenewInboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.FederationInboundPeeks.RenewInboundPeek(ctx, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
@@ -315,14 +314,14 @@ func (d *Database) GetInboundPeek(
 	roomID string,
 	peekID string,
 ) (*types.InboundPeek, error) {
-	return d.FederationInboundPeeks.SelectInboundPeek(ctx, nil, serverName, roomID, peekID)
+	return d.FederationInboundPeeks.SelectInboundPeek(ctx, serverName, roomID, peekID)
 }
 
 func (d *Database) GetInboundPeeks(
 	ctx context.Context,
 	roomID string,
 ) ([]types.InboundPeek, error) {
-	return d.FederationInboundPeeks.SelectInboundPeeks(ctx, nil, roomID)
+	return d.FederationInboundPeeks.SelectInboundPeeks(ctx, roomID)
 }
 
 func (d *Database) UpdateNotaryKeys(
@@ -330,7 +329,7 @@ func (d *Database) UpdateNotaryKeys(
 	serverName spec.ServerName,
 	serverKeys gomatrixserverlib.ServerKeys,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
 		validUntil := serverKeys.ValidUntilTS
 		// Servers MUST use the lesser of this field and 7 days into the future when determining if a key is valid.
 		// This is to avoid a situation where an attacker publishes a key which is valid for a significant amount of
@@ -340,26 +339,26 @@ func (d *Database) UpdateNotaryKeys(
 		if weekIntoFuture.Before(validUntil.Time()) {
 			validUntil = spec.AsTimestamp(weekIntoFuture)
 		}
-		notaryID, err := d.NotaryServerKeysJSON.InsertJSONResponse(ctx, txn, serverKeys, serverName, validUntil)
+		notaryID, err := d.NotaryServerKeysJSON.InsertJSONResponse(ctx, serverKeys, serverName, validUntil)
 		if err != nil {
 			return err
 		}
 		// update the metadata for the keys
 		for keyID := range serverKeys.OldVerifyKeys {
-			_, err = d.NotaryServerKeysMetadata.UpsertKey(ctx, txn, serverName, keyID, notaryID, validUntil)
+			_, err = d.NotaryServerKeysMetadata.UpsertKey(ctx, serverName, keyID, notaryID, validUntil)
 			if err != nil {
 				return err
 			}
 		}
 		for keyID := range serverKeys.VerifyKeys {
-			_, err = d.NotaryServerKeysMetadata.UpsertKey(ctx, txn, serverName, keyID, notaryID, validUntil)
+			_, err = d.NotaryServerKeysMetadata.UpsertKey(ctx, serverName, keyID, notaryID, validUntil)
 			if err != nil {
 				return err
 			}
 		}
 
 		// clean up old responses
-		return d.NotaryServerKeysMetadata.DeleteOldJSONResponses(ctx, txn)
+		return d.NotaryServerKeysMetadata.DeleteOldJSONResponses(ctx)
 	})
 }
 
@@ -368,22 +367,22 @@ func (d *Database) GetNotaryKeys(
 	serverName spec.ServerName,
 	optKeyIDs []gomatrixserverlib.KeyID,
 ) (sks []gomatrixserverlib.ServerKeys, err error) {
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		sks, err = d.NotaryServerKeysMetadata.SelectKeys(ctx, txn, serverName, optKeyIDs)
+	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		sks, err = d.NotaryServerKeysMetadata.SelectKeys(ctx, serverName, optKeyIDs)
 		return err
 	})
 	return sks, err
 }
 
 func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		if err := d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, roomID); err != nil {
 			return fmt.Errorf("failed to purge joined hosts: %w", err)
 		}
-		if err := d.FederationInboundPeeks.DeleteInboundPeeks(ctx, txn, roomID); err != nil {
+		if err := d.FederationInboundPeeks.DeleteInboundPeeks(ctx, roomID); err != nil {
 			return fmt.Errorf("failed to purge inbound peeks: %w", err)
 		}
-		if err := d.FederationOutboundPeeks.DeleteOutboundPeeks(ctx, txn, roomID); err != nil {
+		if err := d.FederationOutboundPeeks.DeleteOutboundPeeks(ctx, roomID); err != nil {
 			return fmt.Errorf("failed to purge outbound peeks: %w", err)
 		}
 		return nil

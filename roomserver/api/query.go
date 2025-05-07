@@ -351,8 +351,8 @@ type QueryAdminEventReportsResponse struct {
 	Score            int64                  `json:"score"`
 	EventNID         types.EventNID         `json:"-"` // only used to query the state
 	RoomNID          types.RoomNID          `json:"-"` // only used to query the state
-	ReportingUserNID types.EventStateKeyNID `json:"-"` // only used in the DB
-	SenderNID        types.EventStateKeyNID `json:"-"` // only used in the DB
+	ReportingUserNID types.EventStateKeyNID `json:"-"` // only used in the Cm
+	SenderNID        types.EventStateKeyNID `json:"-"` // only used in the Cm
 	RoomID           string                 `json:"room_id"`
 	EventID          string                 `json:"event_id"`
 	UserID           string                 `json:"user_id"` // the user reporting the event

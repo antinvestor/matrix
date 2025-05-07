@@ -3,7 +3,6 @@ package tables
 import (
 	"context"
 	"crypto/ed25519"
-	"database/sql"
 	"errors"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -23,13 +22,13 @@ type EventJSONPair struct {
 
 type EventJSON interface {
 	// Insert the event JSON. On conflict, replace the event JSON with the new value (for redactions).
-	InsertEventJSON(ctx context.Context, tx *sql.Tx, eventNID types.EventNID, eventJSON []byte) error
-	BulkSelectEventJSON(ctx context.Context, tx *sql.Tx, eventNIDs []types.EventNID) ([]EventJSONPair, error)
+	InsertEventJSON(ctx context.Context, eventNID types.EventNID, eventJSON []byte) error
+	BulkSelectEventJSON(ctx context.Context, eventNIDs []types.EventNID) ([]EventJSONPair, error)
 }
 
 type EventTypes interface {
-	InsertEventTypeNID(ctx context.Context, tx *sql.Tx, eventType string) (types.EventTypeNID, error)
-	SelectEventTypeNID(ctx context.Context, tx *sql.Tx, eventType string) (types.EventTypeNID, error)
+	InsertEventTypeNID(ctx context.Context, eventType string) (types.EventTypeNID, error)
+	SelectEventTypeNID(ctx context.Context, eventType string) (types.EventTypeNID, error)
 	BulkSelectEventTypeNID(ctx context.Context, eventTypes []string) (map[string]types.EventTypeNID, error)
 }
 
@@ -131,7 +130,7 @@ type Invites interface {
 type ReportedEvents interface {
 	InsertReportedEvent(
 		ctx context.Context,
-		txn *sql.Tx,
+
 		roomNID types.RoomNID,
 		eventNID types.EventNID,
 		reportingUserID types.EventStateKeyNID,
@@ -141,7 +140,7 @@ type ReportedEvents interface {
 	) (int64, error)
 	SelectReportedEvents(
 		ctx context.Context,
-		txn *sql.Tx,
+
 		from, limit uint64,
 		backwards bool,
 		reportingUserID types.EventStateKeyNID,
@@ -149,7 +148,7 @@ type ReportedEvents interface {
 	) ([]api.QueryAdminEventReportsResponse, int64, error)
 	SelectReportedEvent(
 		ctx context.Context,
-		txn *sql.Tx,
+
 		reportID uint64,
 	) (api.QueryAdminEventReportResponse, error)
 	DeleteReportedEvent(ctx context.Context, reportID uint64) error

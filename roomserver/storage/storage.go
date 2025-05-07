@@ -25,9 +25,9 @@ import (
 )
 
 // Open opens a database connection.
-func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
+func Open(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
 	if !dbProperties.ConnectionString.IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type : %v", dbProperties.ConnectionString)
 	}
-	return postgres.Open(ctx, conMan, dbProperties, cache)
+	return postgres.Open(ctx, cm, dbProperties, cache)
 }

@@ -122,7 +122,7 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 
 		var storedJSON map[int64][]byte
 		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			storedJSON, err = db.Table.SelectQueueJSON(ctx, txn, []int64{nid})
+			storedJSON, err = db.Table.SelectQueueJSON(ctx, []int64{nid})
 			return err
 		})
 		if err != nil {
@@ -161,7 +161,7 @@ func TestShouldDeleteTransaction(t *testing.T) {
 
 		storedJSON := map[int64][]byte{}
 		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			err = db.Table.DeleteQueueJSON(ctx, txn, []int64{nid})
+			err = db.Table.DeleteQueueJSON(ctx, []int64{nid})
 			return err
 		})
 		if err != nil {
@@ -170,7 +170,7 @@ func TestShouldDeleteTransaction(t *testing.T) {
 
 		storedJSON = map[int64][]byte{}
 		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			storedJSON, err = db.Table.SelectQueueJSON(ctx, txn, []int64{nid})
+			storedJSON, err = db.Table.SelectQueueJSON(ctx, []int64{nid})
 			return err
 		})
 		if err != nil {

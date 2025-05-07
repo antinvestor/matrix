@@ -104,7 +104,7 @@ func IsInvitePending(
 	// Look up the room NID for the supplied room ID.
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
-		return false, "", "", nil, fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.Cm.RoomInfo: %w", err)
 	}
 	if info == nil {
 		return false, "", "", nil, fmt.Errorf("cannot get RoomInfo: unknown room ID %s", roomID)
@@ -113,7 +113,7 @@ func IsInvitePending(
 	// Look up the state key NID for the supplied user ID.
 	targetUserNIDs, err := db.EventStateKeyNIDs(ctx, []string{string(senderID)})
 	if err != nil {
-		return false, "", "", nil, fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.Cm.EventStateKeyNIDs: %w", err)
 	}
 	targetUserNID, targetUserFound := targetUserNIDs[string(senderID)]
 	if !targetUserFound {
@@ -125,7 +125,7 @@ func IsInvitePending(
 	// send_leave to.
 	senderUserNIDs, eventIDs, eventJSON, err := db.GetInvitesForUser(ctx, info.RoomNID, targetUserNID)
 	if err != nil {
-		return false, "", "", nil, fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.Cm.GetInvitesForUser: %w", err)
 	}
 	if len(senderUserNIDs) == 0 {
 		return false, "", "", nil, nil
@@ -138,7 +138,7 @@ func IsInvitePending(
 	// Look up the user ID from the NID.
 	senderUsers, err := db.EventStateKeys(ctx, senderUserNIDs)
 	if err != nil {
-		return false, "", "", nil, fmt.Errorf("r.DB.EventStateKeys: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.Cm.EventStateKeys: %w", err)
 	}
 	if len(senderUsers) == 0 {
 		return false, "", "", nil, fmt.Errorf("no senderUsers")
@@ -424,7 +424,7 @@ BFSLoop:
 						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
 							"Error checking if allowed to see event",
 						)
-						// drop the error, as we will often error at the DB level if we don't have the prev_event itself. Let's
+						// drop the error, as we will often error at the Cm level if we don't have the prev_event itself. Let's
 						// just return what we have.
 						return resultNIDs, redactEventIDs, nil
 					}

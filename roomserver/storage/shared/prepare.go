@@ -20,29 +20,13 @@ import (
 	"database/sql"
 )
 
-// StatementList is a list of SQL statements to prepare and a pointer to where to store the resulting prepared statement.
-type StatementList []struct {
-	Statement **sql.Stmt
-	SQL       string
-}
-
-// Prepare the SQL for each statement in the list and assign the result to the prepared statement.
-func (s StatementList) Prepare(db *sql.DB) (err error) {
-	for _, statement := range s {
-		if *statement.Statement, err = db.Prepare(statement.SQL); err != nil {
-			return
-		}
-	}
-	return
-}
-
 type transaction struct {
 	ctx context.Context
-	txn *sql.Tx
 }
 
 // Commit implements types.Transaction
 func (t *transaction) Commit() error {
+
 	if t.txn == nil {
 		// The Updater structs can operate in useTxns=false mode. The code will still call this though.
 		return nil

@@ -55,7 +55,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 		events := room.Events()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			for _, ev := range events {
-				_, err := tab.InsertEvent(ctx, txn, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
+				_, err := tab.InsertEvent(ctx, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 				if err != nil {
 					return fmt.Errorf("failed to InsertEvent: %s", err)
 				}
@@ -64,7 +64,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 			wantEventIDs := []string{
 				events[2].EventID(), events[0].EventID(), events[3].EventID(), events[1].EventID(),
 			}
-			gotEvents, err := tab.SelectEvents(ctx, txn, wantEventIDs, nil, true)
+			gotEvents, err := tab.SelectEvents(ctx, wantEventIDs, nil, true)
 			if err != nil {
 				return fmt.Errorf("failed to SelectEvents: %s", err)
 			}
@@ -81,12 +81,12 @@ func TestOutputRoomEventsTable(t *testing.T) {
 				"body": "test.txt",
 				"url":  "mxc://test.txt",
 			})
-			if _, err = tab.InsertEvent(ctx, txn, urlEv, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared); err != nil {
+			if _, err = tab.InsertEvent(ctx, urlEv, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared); err != nil {
 				return fmt.Errorf("failed to InsertEvent: %s", err)
 			}
 			wantEventID := []string{urlEv.EventID()}
 			t := true
-			gotEvents, err = tab.SelectEvents(ctx, txn, wantEventID, &synctypes.RoomEventFilter{Limit: 1, ContainsURL: &t}, true)
+			gotEvents, err = tab.SelectEvents(ctx, wantEventID, &synctypes.RoomEventFilter{Limit: 1, ContainsURL: &t}, true)
 			if err != nil {
 				return fmt.Errorf("failed to SelectEvents: %s", err)
 			}
@@ -130,7 +130,7 @@ func TestReindex(t *testing.T) {
 		defer closeDb()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			for _, ev := range room.Events() {
-				_, err := tab.InsertEvent(ctx, txn, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
+				_, err := tab.InsertEvent(ctx, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 				if err != nil {
 					return fmt.Errorf("failed to InsertEvent: %s", err)
 				}

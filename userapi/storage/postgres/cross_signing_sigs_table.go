@@ -52,7 +52,7 @@ const (
 )
 
 type crossSigningSigsTable struct {
-	cm *sqlutil.Connections
+	cm                                  *sqlutil.Connections
 	selectCrossSigningSigsForTargetStmt string
 	upsertCrossSigningSigsForTargetStmt string
 	deleteCrossSigningSigsForTargetStmt string
@@ -65,7 +65,7 @@ func NewPostgresCrossSigningSigsTable(ctx context.Context, cm *sqlutil.Connectio
 		return nil, err
 	}
 
-	// Get SQL DB for migrations
+	// Get SQL Cm for migrations
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func NewPostgresCrossSigningSigsTable(ctx context.Context, cm *sqlutil.Connectio
 
 	// Initialize table with SQL statements
 	t := &crossSigningSigsTable{
-		cm: cm,
+		cm:                                  cm,
 		selectCrossSigningSigsForTargetStmt: selectCrossSigningSigsForTargetSQL,
 		upsertCrossSigningSigsForTargetStmt: upsertCrossSigningSigsForTargetSQL,
 		deleteCrossSigningSigsForTargetStmt: deleteCrossSigningSigsForTargetSQL,
@@ -97,7 +97,7 @@ func (s *crossSigningSigsTable) SelectCrossSigningSigsForTarget(
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningSigsForTarget: rows.close() failed")
-	
+
 	r = types.CrossSigningSigMap{}
 	for rows.Next() {
 		var userID string
@@ -123,7 +123,7 @@ func (s *crossSigningSigsTable) UpsertCrossSigningSigsForTarget(
 ) error {
 	db := s.cm.Connection(ctx, false)
 
-	err := db.Exec(s.upsertCrossSigningSigsForTargetStmt, 
+	err := db.Exec(s.upsertCrossSigningSigsForTargetStmt,
 		originUserID, originKeyID, targetUserID, targetKeyID, signature).Error
 	if err != nil {
 		return fmt.Errorf("failed to upsert cross signing signatures: %w", err)

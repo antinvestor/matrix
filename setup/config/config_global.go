@@ -415,9 +415,9 @@ func (c *Sentry) Verify(configErrs *ConfigErrors) {
 type DatabaseOptions struct {
 	// The connection string, file:filename.db or postgres://server....
 	ConnectionString DataSource `env:"DATABASE_URI"  yaml:"connection_string"`
-	// Maximum open connections to the DB (0 = use default, negative means unlimited)
+	// Maximum open connections to the Cm (0 = use default, negative means unlimited)
 	MaxOpenConnections int `yaml:"max_open_conns"`
-	// Maximum idle connections to the DB (0 = use default, negative means unlimited)
+	// Maximum idle connections to the Cm (0 = use default, negative means unlimited)
 	MaxIdleConnections int `yaml:"max_idle_conns"`
 	// maximum amount of time (in seconds) a connection may be reused (<= 0 means unlimited)
 	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
@@ -458,12 +458,12 @@ func (c *DatabaseOptions) Verify(configErrs *ConfigErrors) {
 
 }
 
-// MaxIdleConns returns maximum idle connections to the DB
+// MaxIdleConns returns maximum idle connections to the Cm
 func (c *DatabaseOptions) MaxIdleConns() int {
 	return c.MaxIdleConnections
 }
 
-// MaxOpenConns returns maximum open connections to the DB
+// MaxOpenConns returns maximum open connections to the Cm
 func (c *DatabaseOptions) MaxOpenConns() int {
 	return c.MaxOpenConnections
 }

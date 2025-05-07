@@ -803,7 +803,7 @@ func TestOneTimeKeys(t *testing.T) {
 			KeyJSON:  map[string]json.RawMessage{"curve25519:KEY1": []byte(`{"key":"v1"}`)},
 		}
 
-		// Add a one time key to the DB
+		// Add a one time key to the Cm
 		_, err := db.StoreOneTimeKeys(ctx, otk)
 		MustNotError(t, err)
 

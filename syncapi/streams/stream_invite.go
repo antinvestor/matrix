@@ -59,7 +59,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		ctx, req.Device.UserID, r,
 	)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.InviteEventsInRange failed")
+		req.Log.WithError(err).Error("p.Cm.InviteEventsInRange failed")
 		return from
 	}
 

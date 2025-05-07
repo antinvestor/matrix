@@ -1195,7 +1195,7 @@ func TestStateReset(t *testing.T) {
 
 		// Craft the state reset message, which is using Bobs initial join event and the
 		// last message Charlie sent as the prev_events. This should trigger the recalculation
-		// of the "current" state, since the message event does not have state and no missing events in the DB.
+		// of the "current" state, since the message event does not have state and no missing events in the Cm.
 		stateResetMsg := mustCreateEvent(t, fledglingEvent{
 			Type:     "m.room.message",
 			SenderID: charlie.ID,

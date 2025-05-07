@@ -16,7 +16,6 @@ package tables
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -121,7 +120,7 @@ type PusherTable interface {
 }
 
 type NotificationTable interface {
-	Clean(ctx context.Context, txn *sql.Tx) error
+	Clean(ctx context.Context) error
 	Insert(ctx context.Context, localpart string, serverName spec.ServerName, eventID string, pos uint64, highlight bool, n *api.Notification) error
 	DeleteUpTo(ctx context.Context, localpart string, serverName spec.ServerName, roomID string, pos uint64) (affected bool, _ error)
 	UpdateRead(ctx context.Context, localpart string, serverName spec.ServerName, roomID string, pos uint64, v bool) (affected bool, _ error)
@@ -131,7 +130,7 @@ type NotificationTable interface {
 }
 
 type StatsTable interface {
-	UserStatistics(ctx context.Context, txn *sql.Tx) (*types.UserStatistics, *types.DatabaseEngine, error)
+	UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error)
 	DailyRoomsMessages(ctx context.Context, serverName spec.ServerName) (msgStats types.MessageStats, activeRooms, activeE2EERooms int64, err error)
 	UpdateUserDailyVisits(ctx context.Context, startTime, lastUpdate time.Time) error
 	UpsertDailyStats(ctx context.Context, serverName spec.ServerName, stats types.MessageStats, activeRooms, activeE2EERooms int64) error

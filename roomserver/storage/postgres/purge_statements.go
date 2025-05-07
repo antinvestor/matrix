@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -83,41 +84,41 @@ const (
 
 type purgeStatements struct {
 	cm *sqlutil.Connections
-	
+
 	// SQL statements stored as struct fields
-	purgeEventJSONStmt             string
-	purgeEventsStmt                string
-	purgeInvitesStmt               string
-	purgeMembershipsStmt           string
-	purgePreviousEventsStmt        string
-	purgePreviousEvents2Stmt       string
-	purgePublishedStmt             string
-	purgeRedactionsStmt            string
-	purgeRoomAliasesStmt           string
-	purgeRoomStmt                  string
-	purgeStateBlockEntriesStmt     string
-	purgeStateSnapshotEntriesStmt  string
+	purgeEventJSONStmt            string
+	purgeEventsStmt               string
+	purgeInvitesStmt              string
+	purgeMembershipsStmt          string
+	purgePreviousEventsStmt       string
+	purgePreviousEvents2Stmt      string
+	purgePublishedStmt            string
+	purgeRedactionsStmt           string
+	purgeRoomAliasesStmt          string
+	purgeRoomStmt                 string
+	purgeStateBlockEntriesStmt    string
+	purgeStateSnapshotEntriesStmt string
 }
 
-// PreparePurgeStatements creates and initializes the purge statements
-func PreparePurgeStatements(cm *sqlutil.Connections) (*purgeStatements, error) {
+// NewPostgresqlPurgeStatements creates and initializes the purge statements
+func NewPostgresqlPurgeStatements(cm *sqlutil.Connections) (tables.Purge, error) {
 	// Initialize statements with SQL constants
 	s := &purgeStatements{
 		cm: cm,
-		
+
 		// Initialize SQL statement fields with the constants
-		purgeEventJSONStmt:             purgeEventJSONSQL,
-		purgeEventsStmt:                purgeEventsSQL, 
-		purgeInvitesStmt:               purgeInvitesSQL,
-		purgeMembershipsStmt:           purgeMembershipsSQL,
-		purgePreviousEventsStmt:        purgePreviousEventsSQL,
-		purgePreviousEvents2Stmt:       purgePreviousEvents2SQL,
-		purgePublishedStmt:             purgePublishedSQL,
-		purgeRedactionsStmt:            purgeRedactionsSQL,
-		purgeRoomAliasesStmt:           purgeRoomAliasesSQL,
-		purgeRoomStmt:                  purgeRoomSQL,
-		purgeStateBlockEntriesStmt:     purgeStateBlockEntriesSQL,
-		purgeStateSnapshotEntriesStmt:  purgeStateSnapshotEntriesSQL,
+		purgeEventJSONStmt:            purgeEventJSONSQL,
+		purgeEventsStmt:               purgeEventsSQL,
+		purgeInvitesStmt:              purgeInvitesSQL,
+		purgeMembershipsStmt:          purgeMembershipsSQL,
+		purgePreviousEventsStmt:       purgePreviousEventsSQL,
+		purgePreviousEvents2Stmt:      purgePreviousEvents2SQL,
+		purgePublishedStmt:            purgePublishedSQL,
+		purgeRedactionsStmt:           purgeRedactionsSQL,
+		purgeRoomAliasesStmt:          purgeRoomAliasesSQL,
+		purgeRoomStmt:                 purgeRoomSQL,
+		purgeStateBlockEntriesStmt:    purgeStateBlockEntriesSQL,
+		purgeStateSnapshotEntriesStmt: purgeStateSnapshotEntriesSQL,
 	}
 
 	return s, nil
@@ -131,10 +132,10 @@ func (s *purgeStatements) PurgeRoom(
 
 	// purge by roomID
 	purgeByRoomID := map[string]string{
-		"purge room aliases": s.purgeRoomAliasesStmt,
+		"purge room aliases":   s.purgeRoomAliasesStmt,
 		"purge published room": s.purgePublishedStmt,
 	}
-	for name, query := range purgeByRoomID {
+	for _, query := range purgeByRoomID {
 		if err := db.Exec(query, roomID).Error; err != nil {
 			return err
 		}
@@ -142,22 +143,22 @@ func (s *purgeStatements) PurgeRoom(
 
 	// purge by roomNID
 	purgeByRoomNID := map[string]string{
-		"purge state block entries": s.purgeStateBlockEntriesStmt,
-		"purge state snapshot entries": s.purgeStateSnapshotEntriesStmt,
-		"purge invites": s.purgeInvitesStmt,
-		"purge memberships": s.purgeMembershipsStmt,
-		"purge previous events (fast)": s.purgePreviousEvents2Stmt, // Fast purge the majority of events
-		"purge previous events (thorough)": s.purgePreviousEventsStmt, // Slow purge the remaining events
-		"purge event JSON": s.purgeEventJSONStmt,
-		"purge redactions": s.purgeRedactionsStmt, 
-		"purge events": s.purgeEventsStmt,
-		"purge room": s.purgeRoomStmt,
+		"purge state block entries":        s.purgeStateBlockEntriesStmt,
+		"purge state snapshot entries":     s.purgeStateSnapshotEntriesStmt,
+		"purge invites":                    s.purgeInvitesStmt,
+		"purge memberships":                s.purgeMembershipsStmt,
+		"purge previous events (fast)":     s.purgePreviousEvents2Stmt, // Fast purge the majority of events
+		"purge previous events (thorough)": s.purgePreviousEventsStmt,  // Slow purge the remaining events
+		"purge event JSON":                 s.purgeEventJSONStmt,
+		"purge redactions":                 s.purgeRedactionsStmt,
+		"purge events":                     s.purgeEventsStmt,
+		"purge room":                       s.purgeRoomStmt,
 	}
-	for name, query := range purgeByRoomNID {
+	for _, query := range purgeByRoomNID {
 		if err := db.Exec(query, roomNID).Error; err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }

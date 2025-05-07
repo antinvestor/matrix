@@ -138,7 +138,7 @@ func (v *StateResolution) LoadStateAtSnapshot(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+			panic(fmt.Errorf("corrupt Cm: Missing state block numeric ID %d", stateBlockNID))
 		}
 		fullState = append(fullState, entries...)
 	}
@@ -220,7 +220,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			return nil, fmt.Errorf("corrupt DB: Missing state snapshot numeric ID %d", stateBlockNIDList.StateSnapshotNID)
+			return nil, fmt.Errorf("corrupt Cm: Missing state snapshot numeric ID %d", stateBlockNIDList.StateSnapshotNID)
 		}
 
 		for _, stateBlockNID := range stateBlockNIDs {
@@ -228,7 +228,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 			if !ok {
 				// This should only get hit if the database is corrupt.
 				// It should be impossible for an event to reference a NID that doesn't exist
-				return nil, fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID)
+				return nil, fmt.Errorf("corrupt Cm: Missing state block numeric ID %d", stateBlockNID)
 			}
 
 			evIDs := snapshotNIDMap[stateBlockNIDList.StateSnapshotNID]
@@ -310,7 +310,7 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("corrupt DB: Missing state snapshot numeric ID %d", prevState.BeforeStateSnapshotNID))
+			panic(fmt.Errorf("corrupt Cm: Missing state snapshot numeric ID %d", prevState.BeforeStateSnapshotNID))
 		}
 
 		// Combine all the state entries for this snapshot.
@@ -321,7 +321,7 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 			if !ok {
 				// This should only get hit if the database is corrupt.
 				// It should be impossible for an event to reference a NID that doesn't exist
-				panic(fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+				panic(fmt.Errorf("corrupt Cm: Missing state block numeric ID %d", stateBlockNID))
 			}
 			fullState = append(fullState, entries...)
 		}
@@ -1166,7 +1166,7 @@ func (v *StateResolution) loadStateEvents(
 	for _, entry := range eventEntries {
 		event, ok := eventMap(events).lookup(entry.EventNID)
 		if !ok {
-			panic(fmt.Errorf("corrupt DB: Missing event numeric ID %d", entry.EventNID))
+			panic(fmt.Errorf("corrupt Cm: Missing event numeric ID %d", entry.EventNID))
 		}
 		result = append(result, event.PDU)
 		eventIDMap[event.EventID()] = entry

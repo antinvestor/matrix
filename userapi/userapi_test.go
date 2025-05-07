@@ -83,12 +83,12 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, testOpts test.Dependanc
 
 	accountDB, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
-		t.Fatalf("failed to create account DB: %s", err)
+		t.Fatalf("failed to create account Cm: %s", err)
 	}
 
 	keyDB, err := storage.NewKeyDatabase(ctx, cm, &cfg.KeyServer.Database)
 	if err != nil {
-		t.Fatalf("failed to create key DB: %s", err)
+		t.Fatalf("failed to create key Cm: %s", err)
 	}
 
 	cfg.Global.SigningIdentity = fclient.SigningIdentity{

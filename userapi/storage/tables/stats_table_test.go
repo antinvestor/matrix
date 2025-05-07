@@ -134,7 +134,7 @@ func Test_UserStatistics(t *testing.T) {
 			}
 
 			if wantType != gotDB.Engine { // can't use DeepEqual, as the Version might differ
-				t.Errorf("UserStatistics() got DB engine = %+v, want %s", gotDB.Engine, wantType)
+				t.Errorf("UserStatistics() got Cm engine = %+v, want %s", gotDB.Engine, wantType)
 			}
 		})
 

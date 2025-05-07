@@ -428,7 +428,7 @@ func (rc *reqCtx) includeChildren(ctx context.Context, db Database, parentID str
 		if result != nil {
 			rc.injectResponseToRoomserver(ctx, result)
 		}
-		// fallthrough to pull these new events from the DB
+		// fallthrough to pull these new events from the Cm
 	}
 	children, err := db.ChildrenForParent(ctx, parentID, constRelType, recentFirst)
 	if err != nil {
@@ -476,7 +476,7 @@ func walkThread(
 			// if event is not found, use remoteEventRelationships to explore that part of the thread remotely.
 			// This will probably be easiest if the event relationships response is directly pumped into the database
 			// so the next walk will do the right thing. This requires those events to be authed and likely injected as
-			// outliers into the roomserver DB, which will de-dupe appropriately.
+			// outliers into the roomserver Cm, which will de-dupe appropriately.
 			event := rc.lookForEvent(ctx, wi.EventID)
 			if event != nil {
 				result = append(result, event)

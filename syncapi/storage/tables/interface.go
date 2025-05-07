@@ -171,7 +171,7 @@ type BackwardsExtremities interface {
 // what the "since" parameter was when we tried to send it.
 //
 // When the client syncs again, if their "since" parameter is *later* than
-// the recorded one, we drop the entry from the DB as it's "sent". If the
+// the recorded one, we drop the entry from the Cm as it's "sent". If the
 // sync parameter isn't later then we will keep including the updates in the
 // sync response, as the client is seemingly trying to repeat the same /sync.
 type SendToDevice interface {

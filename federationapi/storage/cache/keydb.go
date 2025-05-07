@@ -46,7 +46,7 @@ func (d *KeyDatabase) FetchKeys(
 			delete(requests, req)
 		}
 	}
-	// Don't bother hitting the DB if we got everything from cache.
+	// Don't bother hitting the Cm if we got everything from cache.
 	if len(requests) == 0 {
 		return results, nil
 	}

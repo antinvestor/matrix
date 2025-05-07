@@ -24,10 +24,10 @@ import (
 )
 
 // NewMediaAPIDatasource opens a database connection.
-func NewMediaAPIDatasource(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
+func NewMediaAPIDatasource(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(ctx, conMan, dbProperties)
+		return postgres.NewDatabase(ctx, cm, dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

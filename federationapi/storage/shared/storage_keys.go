@@ -41,10 +41,10 @@ func (d *Database) StoreKeys(
 	ctx context.Context,
 	keyMap map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
 		var lastErr error
 		for request, keys := range keyMap {
-			if err := d.ServerSigningKeys.UpsertServerKeys(ctx, txn, request, keys); err != nil {
+			if err := d.ServerSigningKeys.UpsertServerKeys(ctx, request, keys); err != nil {
 				// Rather than returning immediately on error we try to insert the
 				// remaining keys.
 				// Since we are inserting the keys outside of a transaction it is

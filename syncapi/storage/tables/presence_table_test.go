@@ -58,7 +58,7 @@ func TestPresence(t *testing.T) {
 		defer closeDB()
 
 		// Insert some presences
-		pos, err := tab.UpsertPresence(ctx, txn, alice.ID, &statusMsg, types.PresenceOnline, timestamp, false)
+		pos, err := tab.UpsertPresence(ctx, alice.ID, &statusMsg, types.PresenceOnline, timestamp, false)
 		if err != nil {
 			t.Error(err)
 		}
@@ -66,7 +66,7 @@ func TestPresence(t *testing.T) {
 		if pos != wantPos {
 			t.Errorf("expected pos to be %d, got %d", wantPos, pos)
 		}
-		pos, err = tab.UpsertPresence(ctx, txn, bob.ID, &statusMsg, types.PresenceOnline, timestamp, false)
+		pos, err = tab.UpsertPresence(ctx, bob.ID, &statusMsg, types.PresenceOnline, timestamp, false)
 		if err != nil {
 			t.Error(err)
 		}
@@ -85,7 +85,7 @@ func TestPresence(t *testing.T) {
 		}
 
 		// This should increment the position
-		pos, err = tab.UpsertPresence(ctx, txn, bob.ID, &statusMsg, types.PresenceOnline, timestamp, true)
+		pos, err = tab.UpsertPresence(ctx, bob.ID, &statusMsg, types.PresenceOnline, timestamp, true)
 		if err != nil {
 			t.Error(err)
 		}
@@ -95,7 +95,7 @@ func TestPresence(t *testing.T) {
 		}
 
 		// This should return only Bobs status
-		presences, err := tab.GetPresenceAfter(ctx, txn, maxPos, synctypes.EventFilter{Limit: 10})
+		presences, err := tab.GetPresenceAfter(ctx, maxPos, synctypes.EventFilter{Limit: 10})
 		if err != nil {
 			t.Error(err)
 		}

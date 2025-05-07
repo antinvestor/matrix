@@ -35,7 +35,7 @@ func NewDatabase(
 ) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(ctx, conMan, dbProperties, cache, isLocalServerName)
+		return postgres.NewDatabase(ctx, cm, dbProperties, cache, isLocalServerName)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

@@ -751,7 +751,7 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 		}
 		// NOTE: It should really not be possible to fail the uniqueness test here so
 		// there is no need to handle that separately
-		return errors.New("failed to store file metadata in DB")
+		return errors.New("failed to store file metadata in Cm")
 	}
 
 	go func() {

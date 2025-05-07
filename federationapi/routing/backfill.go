@@ -95,7 +95,7 @@ func Backfill(
 		}
 	}
 
-	// Enforce a limit of 100 events, as not to hit the DB to hard.
+	// Enforce a limit of 100 events, as not to hit the Cm to hard.
 	// Synapse has a hard limit of 100 events as well.
 	if req.Limit > 100 {
 		req.Limit = 100

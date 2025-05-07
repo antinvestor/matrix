@@ -60,7 +60,7 @@ func TestCurrentRoomStateTable(t *testing.T) {
 					return err
 				}
 				ev.UserID = *userID
-				err = tab.UpsertRoomState(ctx, txn, ev, nil, types.StreamPosition(i))
+				err = tab.UpsertRoomState(ctx, ev, nil, types.StreamPosition(i))
 				if err != nil {
 					return fmt.Errorf("failed to UpsertRoomState: %w", err)
 				}
@@ -68,7 +68,7 @@ func TestCurrentRoomStateTable(t *testing.T) {
 			wantEventIDs := []string{
 				events[0].EventID(), events[1].EventID(), events[2].EventID(), events[3].EventID(),
 			}
-			gotEvents, err := tab.SelectEventsWithEventIDs(ctx, txn, wantEventIDs)
+			gotEvents, err := tab.SelectEventsWithEventIDs(ctx, wantEventIDs)
 			if err != nil {
 				return fmt.Errorf("failed to SelectEventsWithEventIDs: %w", err)
 			}
@@ -102,7 +102,7 @@ func testCurrentState(t *testing.T, ctx context.Context, txn *sql.Tx, tab tables
 	t.Run("test currentState", func(t *testing.T) {
 		// returns the complete state of the room with a default filter
 		filter := synctypes.DefaultStateFilter()
-		evs, err := tab.SelectCurrentState(ctx, txn, room.ID, &filter, nil)
+		evs, err := tab.SelectCurrentState(ctx, room.ID, &filter, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -113,7 +113,7 @@ func testCurrentState(t *testing.T, ctx context.Context, txn *sql.Tx, tab tables
 		// When lazy loading, we expect no membership event, so only 4 events
 		filter.LazyLoadMembers = true
 		expectCount = 4
-		evs, err = tab.SelectCurrentState(ctx, txn, room.ID, &filter, nil)
+		evs, err = tab.SelectCurrentState(ctx, room.ID, &filter, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -123,7 +123,7 @@ func testCurrentState(t *testing.T, ctx context.Context, txn *sql.Tx, tab tables
 		// same as above, but with existing NotTypes defined
 		notTypes := []string{spec.MRoomMember}
 		filter.NotTypes = &notTypes
-		evs, err = tab.SelectCurrentState(ctx, txn, room.ID, &filter, nil)
+		evs, err = tab.SelectCurrentState(ctx, room.ID, &filter, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

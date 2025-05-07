@@ -221,7 +221,7 @@ func (a *UserInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.
 	// Store the keys.
 	if err := a.KeyDatabase.StoreCrossSigningKeysForUser(ctx, req.UserID, toStore); err != nil {
 		res.Error = &api.KeyError{
-			Err: fmt.Sprintf("a.DB.StoreCrossSigningKeysForUser: %s", err),
+			Err: fmt.Sprintf("a.Cm.StoreCrossSigningKeysForUser: %s", err),
 		}
 		return
 	}
@@ -239,7 +239,7 @@ func (a *UserInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.
 			for sigKeyID, sigBytes := range forSigUserID {
 				if err := a.KeyDatabase.StoreCrossSigningSigsForTarget(ctx, sigUserID, sigKeyID, req.UserID, targetKeyID, sigBytes); err != nil {
 					res.Error = &api.KeyError{
-						Err: fmt.Sprintf("a.DB.StoreCrossSigningSigsForTarget: %s", err),
+						Err: fmt.Sprintf("a.Cm.StoreCrossSigningSigsForTarget: %s", err),
 					}
 					return
 				}
@@ -376,7 +376,7 @@ func (a *UserInternalAPI) processSelfSignatures(
 						if err := a.KeyDatabase.StoreCrossSigningSigsForTarget(
 							ctx, originUserID, originKeyID, targetUserID, targetKeyID, originSig,
 						); err != nil {
-							return fmt.Errorf("a.DB.StoreCrossSigningKeysForTarget: %w", err)
+							return fmt.Errorf("a.Cm.StoreCrossSigningKeysForTarget: %w", err)
 						}
 					}
 				}
@@ -387,7 +387,7 @@ func (a *UserInternalAPI) processSelfSignatures(
 						if err := a.KeyDatabase.StoreCrossSigningSigsForTarget(
 							ctx, originUserID, originKeyID, targetUserID, targetKeyID, originSig,
 						); err != nil {
-							return fmt.Errorf("a.DB.StoreCrossSigningKeysForTarget: %w", err)
+							return fmt.Errorf("a.Cm.StoreCrossSigningKeysForTarget: %w", err)
 						}
 					}
 				}
@@ -445,7 +445,7 @@ func (a *UserInternalAPI) processOtherSignatures(
 						if err := a.KeyDatabase.StoreCrossSigningSigsForTarget(
 							ctx, userID, originKeyID, targetUserID, targetKeyID, originSig,
 						); err != nil {
-							return fmt.Errorf("a.DB.StoreCrossSigningKeysForTarget: %w", err)
+							return fmt.Errorf("a.Cm.StoreCrossSigningKeysForTarget: %w", err)
 						}
 					}
 				}
@@ -527,7 +527,7 @@ func (a *UserInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySig
 		keyMap, err := a.KeyDatabase.CrossSigningKeysForUser(ctx, targetUserID)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("a.DB.CrossSigningKeysForUser: %s", err),
+				Err: fmt.Sprintf("a.Cm.CrossSigningKeysForUser: %s", err),
 			}
 			continue
 		}
@@ -559,7 +559,7 @@ func (a *UserInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySig
 			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, targetUserID, targetUserID, targetKeyID)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				res.Error = &api.KeyError{
-					Err: fmt.Sprintf("a.DB.CrossSigningSigsForTarget: %s", err),
+					Err: fmt.Sprintf("a.Cm.CrossSigningSigsForTarget: %s", err),
 				}
 				return
 			}

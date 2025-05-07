@@ -86,7 +86,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		// Create DB and Dendrite base
+		// Create Cm and Dendrite base
 		connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
 		if err != nil {
 			t.Fatalf("failed to open database: %s", err)

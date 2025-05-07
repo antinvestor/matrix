@@ -31,78 +31,75 @@ import (
 // Database stores information needed by the federation sender
 type Database struct {
 	shared.Database
-	db     *sql.DB
+	Cm     *sqlutil.Connections
 	writer sqlutil.Writer
 }
 
 // NewDatabase opens a new database
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
-		return nil, err
-	}
-	
-	blacklist, err := NewPostgresBlacklistTable(ctx, conMan)
+
+	blacklist, err := NewPostgresBlacklistTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
-	joinedHosts, err := NewPostgresJoinedHostsTable(ctx, conMan)
+
+	joinedHosts, err := NewPostgresJoinedHostsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
-	queuePDUs, err := NewPostgresQueuePDUsTable(ctx, conMan)
+
+	queuePDUs, err := NewPostgresQueuePDUsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
-	queueEDUs, err := NewPostgresQueueEDUsTable(ctx, conMan)
+
+	queueEDUs, err := NewPostgresQueueEDUsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
-	queueJSON, err := NewPostgresQueueJSONTable(ctx, conMan)
+
+	queueJSON, err := NewPostgresQueueJSONTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
-	assumedOffline, err := NewPostgresAssumedOfflineTable(ctx, conMan)
+
+	assumedOffline, err := NewPostgresAssumedOfflineTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
-	relayServers, err := NewPostgresRelayServersTable(ctx, conMan)
+
+	relayServers, err := NewPostgresRelayServersTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
-	inboundPeeks, err := NewPostgresInboundPeeksTable(ctx, conMan)
+
+	inboundPeeks, err := NewPostgresInboundPeeksTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
-	outboundPeeks, err := NewPostgresOutboundPeeksTable(ctx, conMan)
+
+	outboundPeeks, err := NewPostgresOutboundPeeksTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
-	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, conMan)
+
+	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotaryServerKeysTable: %s", err)
 	}
-	
-	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, conMan)
+
+	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotaryServerKeysMetadataTable: %s", err)
 	}
-	
-	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, conMan)
+
+	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	m := sqlutil.NewMigrator(d.db)
 	m.AddMigrations(sqlutil.Migration{
 		Version: "federationsender: drop federationsender_rooms",
@@ -112,13 +109,13 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if err = queueEDUs.Prepare(); err != nil {
 		return nil, err
 	}
-	
+
 	d.Database = shared.Database{
-		DB:                       d.db,
+		Cm:                       cm,
 		IsLocalServerName:        isLocalServerName,
 		Cache:                    cache,
 		Writer:                   d.writer,

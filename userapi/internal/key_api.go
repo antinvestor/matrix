@@ -185,7 +185,7 @@ func (a *UserInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Quer
 	msgs, err := a.KeyDatabase.DeviceKeysForUser(ctx, req.UserID, nil, false)
 	if err != nil {
 		res.Error = &api.KeyError{
-			Err: fmt.Sprintf("failed to query DB for device keys: %s", err),
+			Err: fmt.Sprintf("failed to query Cm for device keys: %s", err),
 		}
 		return nil
 	}
@@ -524,7 +524,7 @@ func (a *UserInternalAPI) queryRemoteKeysOnServer(
 			devKeys[userID] = []string{}
 			continue
 		}
-		// refresh entries from DB: unlike remoteKeysFromDatabase we know we previously had no device info for this
+		// refresh entries from Cm: unlike remoteKeysFromDatabase we know we previously had no device info for this
 		// user so the fact that we're populating all devices here isn't a problem so long as we have devices.
 		err = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, respMu, userID, nil)
 		if err != nil {

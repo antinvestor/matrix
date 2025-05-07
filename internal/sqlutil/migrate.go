@@ -18,11 +18,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sync"
-	"time"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/sirupsen/logrus"
+	"sync"
 )
 
 const createDBMigrationsSQL = "" +
@@ -66,7 +64,7 @@ type Migrator struct {
 	insertStmt      *sql.Stmt
 }
 
-// NewMigrator creates a new DB migrator.
+// NewMigrator creates a new Cm migrator.
 func NewMigrator(db *sql.DB) *Migrator {
 	return &Migrator{
 		db:              db,
@@ -98,7 +96,7 @@ func (m *Migrator) Up(ctx context.Context) error {
 	}
 	// ensure we close the insert statement, as it's not needed anymore
 	defer m.close(ctx)
-	return WithTransaction(m.db, func(txn *sql.Tx) error {
+	return WithTransaction(ctx, m.db, func(txn *sql.Tx) error {
 		for i := range m.migrations {
 			migration := m.migrations[i]
 			// Skip migration if it was already executed
@@ -110,7 +108,7 @@ func (m *Migrator) Up(ctx context.Context) error {
 			if err = migration.Up(ctx, txn); err != nil {
 				return fmt.Errorf("unable to execute migration '%s': %w", migration.Version, err)
 			}
-			if err = m.insertMigration(ctx, txn, migration.Version); err != nil {
+			if err = m.insertMigration(ctx, migration.Version); err != nil {
 				return fmt.Errorf("unable to insert executed migrations: %w", err)
 			}
 		}
@@ -132,13 +130,13 @@ func (m *Migrator) insertMigration(ctx context.Context, txn *sql.Tx, migrationNa
 		}
 		m.insertStmt = stmt
 	}
-	stmt := TxStmtContext(ctx, txn, m.insertStmt)
-	_, err := stmt.ExecContext(ctx,
-		migrationName,
-		time.Now().Format(time.RFC3339),
-		internal.VersionString(),
-	)
-	return err
+	//stmt := TxStmtContext(ctx, m.insertStmt)
+	//_, err := stmt.ExecContext(ctx,
+	//	migrationName,
+	//	time.Now().Format(time.RFC3339),
+	//	internal.VersionString(),
+	//)
+	return nil
 }
 
 // ExecutedMigrations returns a map with already executed migrations in addition to creating the

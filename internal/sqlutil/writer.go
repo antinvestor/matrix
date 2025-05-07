@@ -1,6 +1,8 @@
 package sqlutil
 
-import "database/sql"
+import (
+	"context"
+)
 
 // The Writer interface is designed to solve the problem of how
 // to handle database writes for database engines that don't allow
@@ -42,5 +44,5 @@ import "database/sql"
 type Writer interface {
 	// Queue up one or more database write operations within the
 	// provided function to be executed when it is safe to do so.
-	Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error
+	Do(ctx context.Context, cm *Connections, f func(ctx context.Context) error) error
 }

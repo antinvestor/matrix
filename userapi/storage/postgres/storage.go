@@ -29,8 +29,8 @@ import (
 )
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
-	// Initialize DB migration
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+	// Initialize Cm migration
 	db := conMan.Connection(ctx, false)
 	if db.Error != nil {
 		return nil, db.Error
@@ -41,31 +41,31 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 		return nil, err
 	}
 
-	registationTokensTable, err := NewPostgresRegistrationTokensTable(ctx, conMan)
+	registationTokensTable, err := NewPostgresRegistrationTokensTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresRegistrationsTokenTable: %w", err)
 	}
-	accountsTable, err := NewPostgresAccountsTable(ctx, conMan, serverName)
+	accountsTable, err := NewPostgresAccountsTable(ctx, cm, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresAccountsTable: %w", err)
 	}
-	accountDataTable, err := NewPostgresAccountDataTable(ctx, conMan)
+	accountDataTable, err := NewPostgresAccountDataTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresAccountDataTable: %w", err)
 	}
-	devicesTable, err := NewPostgresDevicesTable(ctx, conMan, serverName)
+	devicesTable, err := NewPostgresDevicesTable(ctx, cm, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresDevicesTable: %w", err)
 	}
-	keyBackupTable, err := NewPostgresKeyBackupTable(ctx, conMan)
+	keyBackupTable, err := NewPostgresKeyBackupTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresKeyBackupTable: %w", err)
 	}
-	keyBackupVersionTable, err := NewPostgresKeyBackupVersionTable(ctx, conMan)
+	keyBackupVersionTable, err := NewPostgresKeyBackupVersionTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresKeyBackupVersionTable: %w", err)
 	}
-	loginTokenTable, err := NewPostgresLoginTokenTable(ctx, conMan)
+	loginTokenTable, err := NewPostgresLoginTokenTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresLoginTokenTable: %w", err)
 	}
@@ -73,23 +73,23 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresOpenIDTable: %w", err)
 	}
-	profilesTable, err := NewPostgresProfilesTable(ctx, conMan, serverNoticesLocalpart)
+	profilesTable, err := NewPostgresProfilesTable(ctx, cm, serverNoticesLocalpart)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresProfilesTable: %w", err)
 	}
-	threePIDTable, err := NewPostgresThreePIDTable(ctx, conMan)
+	threePIDTable, err := NewPostgresThreePIDTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresThreePIDTable: %w", err)
 	}
-	pusherTable, err := NewPostgresPusherTable(ctx, conMan)
+	pusherTable, err := NewPostgresPusherTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresPusherTable: %w", err)
 	}
-	notificationsTable, err := NewPostgresNotificationTable(ctx, conMan)
+	notificationsTable, err := NewPostgresNotificationTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotificationTable: %w", err)
 	}
-	statsTable, err := NewPostgresStatsTable(ctx, conMan, serverName)
+	statsTable, err := NewPostgresStatsTable(ctx, cm, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresStatsTable: %w", err)
 	}
@@ -120,34 +120,34 @@ func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties 
 	}, nil
 }
 
-func NewKeyDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
+func NewKeyDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
 	// Initialize connection
 	db := conMan.Connection(ctx, false)
 	if db.Error != nil {
 		return nil, db.Error
 	}
 
-	otk, err := NewPostgresOneTimeKeysTable(ctx, conMan)
+	otk, err := NewPostgresOneTimeKeysTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	dk, err := NewPostgresDeviceKeysTable(ctx, conMan)
+	dk, err := NewPostgresDeviceKeysTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	kc, err := NewPostgresKeyChangesTable(ctx, conMan)
+	kc, err := NewPostgresKeyChangesTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	sdl, err := NewPostgresStaleDeviceListsTable(ctx, conMan)
+	sdl, err := NewPostgresStaleDeviceListsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	csk, err := NewPostgresCrossSigningKeysTable(ctx, conMan)
+	csk, err := NewPostgresCrossSigningKeysTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	css, err := NewPostgresCrossSigningSigsTable(ctx, conMan)
+	css, err := NewPostgresCrossSigningSigsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
