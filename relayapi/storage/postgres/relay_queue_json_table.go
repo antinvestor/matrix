@@ -16,12 +16,11 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/relayapi/storage/tables"
 	"github.com/lib/pq"
-	"gorm.io/gorm"
 )
 
 const relayQueueJSONSchema = `
@@ -38,97 +37,70 @@ CREATE UNIQUE INDEX IF NOT EXISTS relayapi_queue_json_json_nid_idx
 	ON relayapi_queue_json (json_nid);
 `
 
-// SQL query constants for relay queue JSON operations
-const (
-	// insertQueueJSONSQL inserts a new JSON blob and returns its ID
-	insertQueueJSONSQL = `
-	INSERT INTO relayapi_queue_json (json_body)
-	VALUES ($1)
-	RETURNING json_nid
-	`
+const insertQueueJSONSQL = "" +
+	"INSERT INTO relayapi_queue_json (json_body)" +
+	" VALUES ($1)" +
+	" RETURNING json_nid"
 
-	// deleteQueueJSONSQL removes JSON blobs by their IDs
-	deleteQueueJSONSQL = `
-	DELETE FROM relayapi_queue_json WHERE json_nid = ANY($1)
-	`
+const deleteQueueJSONSQL = "" +
+	"DELETE FROM relayapi_queue_json WHERE json_nid = ANY($1)"
 
-	// selectQueueJSONSQL retrieves JSON blobs by their IDs
-	selectQueueJSONSQL = `
-	SELECT json_nid, json_body FROM relayapi_queue_json
-	WHERE json_nid = ANY($1)
-	`
-)
+const selectQueueJSONSQL = "" +
+	"SELECT json_nid, json_body FROM relayapi_queue_json" +
+	" WHERE json_nid = ANY($1)"
 
-// relayQueueJSONStatements contains the PostgreSQL statements for interacting with relay queue JSON
 type relayQueueJSONStatements struct {
-	insertJSONStmt string
-	deleteJSONStmt string
-	selectJSONStmt string
+	db             *sql.DB
+	insertJSONStmt *sql.Stmt
+	deleteJSONStmt *sql.Stmt
+	selectJSONStmt *sql.Stmt
 }
 
-// postgresRelayQueueJSONTable implements the tables.RelayQueueJSON interface
-type postgresRelayQueueJSONTable struct {
-	cm         *sqlutil.Connections
-	statements relayQueueJSONStatements
-}
-
-// NewPostgresRelayQueueJSONTable creates a new PostgreSQL-backed relay queue JSON table
-func NewPostgresRelayQueueJSONTable(ctx context.Context, cm *sqlutil.Connections) (tables.RelayQueueJSON, error) {
-	// Initialize schema using GORM
-	gormDB := cm.Connection(ctx, false)
-	if err := gormDB.Exec(relayQueueJSONSchema).Error; err != nil {
-		return nil, err
+func NewPostgresRelayQueueJSONTable(ctx context.Context, db *sql.DB) (s *relayQueueJSONStatements, err error) {
+	s = &relayQueueJSONStatements{
+		db: db,
+	}
+	_, err = s.db.Exec(relayQueueJSONSchema)
+	if err != nil {
+		return
 	}
 
-	// Initialize statements
-	s := &postgresRelayQueueJSONTable{
-		cm: cm,
-		statements: relayQueueJSONStatements{
-			insertJSONStmt: insertQueueJSONSQL,
-			deleteJSONStmt: deleteQueueJSONSQL,
-			selectJSONStmt: selectQueueJSONSQL,
-		},
-	}
-
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertJSONStmt, insertQueueJSONSQL},
+		{&s.deleteJSONStmt, deleteQueueJSONSQL},
+		{&s.selectJSONStmt, selectQueueJSONSQL},
+	}.Prepare(db)
 }
 
-// InsertQueueJSON adds a JSON blob to the relay queue
-func (s *postgresRelayQueueJSONTable) InsertQueueJSON(
-	ctx context.Context, json string,
+func (s *relayQueueJSONStatements) InsertQueueJSON(
+	ctx context.Context, txn *sql.Tx, json string,
 ) (int64, error) {
-	db := s.cm.Connection(ctx, false)
-
+	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
 	var lastid int64
-	row := db.Raw(s.statements.insertJSONStmt, json).Row()
-	if err := row.Scan(&lastid); err != nil {
+	if err := stmt.QueryRowContext(ctx, json).Scan(&lastid); err != nil {
 		return 0, err
 	}
 	return lastid, nil
 }
 
-// DeleteQueueJSON removes JSON blobs from the relay queue
-func (s *postgresRelayQueueJSONTable) DeleteQueueJSON(
-	ctx context.Context, nids []int64,
+func (s *relayQueueJSONStatements) DeleteQueueJSON(
+	ctx context.Context, txn *sql.Tx, nids []int64,
 ) error {
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(s.statements.deleteJSONStmt, pq.Int64Array(nids)).Error
+	stmt := sqlutil.TxStmt(txn, s.deleteJSONStmt)
+	_, err := stmt.ExecContext(ctx, pq.Int64Array(nids))
+	return err
 }
 
-// SelectQueueJSON retrieves JSON blobs from the relay queue
-func (s *postgresRelayQueueJSONTable) SelectQueueJSON(
-	ctx context.Context, jsonNIDs []int64,
+func (s *relayQueueJSONStatements) SelectQueueJSON(
+	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
 ) (map[int64][]byte, error) {
-	db := s.cm.Connection(ctx, true)
-
-	rows, err := db.Raw(s.statements.selectJSONStmt, pq.Int64Array(jsonNIDs)).Rows()
+	blobs := map[int64][]byte{}
+	stmt := sqlutil.TxStmt(txn, s.selectJSONStmt)
+	rows, err := stmt.QueryContext(ctx, pq.Int64Array(jsonNIDs))
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJSON: rows.close() failed")
-
-	blobs := map[int64][]byte{}
 	for rows.Next() {
 		var nid int64
 		var blob []byte

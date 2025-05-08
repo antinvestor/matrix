@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -52,70 +53,47 @@ CREATE TABLE IF NOT EXISTS mediaapi_thumbnail (
 CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_thumbnail_index ON mediaapi_thumbnail (media_id, media_origin, width, height, resize_method);
 `
 
-// SQL query constants for thumbnail operations
-const (
-	// insertThumbnailSQL inserts a new thumbnail record into the database
-	insertThumbnailSQL = `
-    INSERT INTO mediaapi_thumbnail (media_id, media_origin, content_type, file_size_bytes, creation_ts, width, height, resize_method)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    `
+const insertThumbnailSQL = `
+INSERT INTO mediaapi_thumbnail (media_id, media_origin, content_type, file_size_bytes, creation_ts, width, height, resize_method)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+`
 
-	// selectThumbnailSQL retrieves a specific thumbnail by media ID, origin, dimensions, and resize method
-	selectThumbnailSQL = `
-    SELECT content_type, file_size_bytes, creation_ts FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2 AND width = $3 AND height = $4 AND resize_method = $5
-    `
+// Note: this selects one specific thumbnail
+const selectThumbnailSQL = `
+SELECT content_type, file_size_bytes, creation_ts FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2 AND width = $3 AND height = $4 AND resize_method = $5
+`
 
-	// selectThumbnailsSQL retrieves all thumbnails for a given media ID and origin
-	selectThumbnailsSQL = `
-    SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2 ORDER BY creation_ts ASC
-    `
-)
+// Note: this selects all thumbnails for a media_origin and media_id
+const selectThumbnailsSQL = `
+SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2 ORDER BY creation_ts ASC
+`
 
-// thumbnailsTable contains the postgres-specific implementation
-type thumbnailsTable struct {
-	// cm is the connection manager for the database
-	cm *sqlutil.Connections
-
-	// SQL queries stored as fields for better maintainability
-	// insertThumbnailSQL inserts a new thumbnail record into the database
-	insertThumbnailSQL string
-
-	// selectThumbnailSQL retrieves a specific thumbnail by media ID, origin, dimensions, and resize method
-	selectThumbnailSQL string
-
-	// selectThumbnailsSQL retrieves all thumbnails for a given media ID and origin
-	selectThumbnailsSQL string
+type thumbnailStatements struct {
+	insertThumbnailStmt  *sql.Stmt
+	selectThumbnailStmt  *sql.Stmt
+	selectThumbnailsStmt *sql.Stmt
 }
 
-// NewPostgresThumbnailsTable creates a new postgres thumbnails table
-func NewPostgresThumbnailsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Thumbnails, error) {
-	// Initialize schema using GORM
-	gormDB := cm.Connection(ctx, false)
-	if err := gormDB.Exec(thumbnailSchema).Error; err != nil {
+func NewPostgresThumbnailsTable(ctx context.Context, db *sql.DB) (tables.Thumbnails, error) {
+	s := &thumbnailStatements{}
+	_, err := db.Exec(thumbnailSchema)
+	if err != nil {
 		return nil, err
 	}
 
-	// Initialize table with SQL statements
-	t := &thumbnailsTable{
-		cm:                  cm,
-		insertThumbnailSQL:  insertThumbnailSQL,
-		selectThumbnailSQL:  selectThumbnailSQL,
-		selectThumbnailsSQL: selectThumbnailsSQL,
-	}
-
-	return t, nil
+	return s, sqlutil.StatementList{
+		{&s.insertThumbnailStmt, insertThumbnailSQL},
+		{&s.selectThumbnailStmt, selectThumbnailSQL},
+		{&s.selectThumbnailsStmt, selectThumbnailsSQL},
+	}.Prepare(db)
 }
 
-// InsertThumbnail inserts thumbnail metadata into the database
-func (s *thumbnailsTable) InsertThumbnail(
-	ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata,
+func (s *thumbnailStatements) InsertThumbnail(
+	ctx context.Context, txn *sql.Tx, thumbnailMetadata *types.ThumbnailMetadata,
 ) error {
 	thumbnailMetadata.MediaMetadata.CreationTimestamp = spec.AsTimestamp(time.Now())
-
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(
-		s.insertThumbnailSQL,
+	_, err := sqlutil.TxStmtContext(ctx, txn, s.insertThumbnailStmt).ExecContext(
+		ctx,
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
 		thumbnailMetadata.MediaMetadata.ContentType,
@@ -124,12 +102,13 @@ func (s *thumbnailsTable) InsertThumbnail(
 		thumbnailMetadata.ThumbnailSize.Width,
 		thumbnailMetadata.ThumbnailSize.Height,
 		thumbnailMetadata.ThumbnailSize.ResizeMethod,
-	).Error
+	)
+	return err
 }
 
-// SelectThumbnail retrieves a specific thumbnail by media ID, origin, dimensions, and resize method
-func (s *thumbnailsTable) SelectThumbnail(
+func (s *thumbnailStatements) SelectThumbnail(
 	ctx context.Context,
+	txn *sql.Tx,
 	mediaID types.MediaID,
 	mediaOrigin spec.ServerName,
 	width, height int,
@@ -146,19 +125,14 @@ func (s *thumbnailsTable) SelectThumbnail(
 			ResizeMethod: resizeMethod,
 		},
 	}
-
-	db := s.cm.Connection(ctx, true)
-
-	row := db.Raw(
-		s.selectThumbnailSQL,
+	err := sqlutil.TxStmtContext(ctx, txn, s.selectThumbnailStmt).QueryRowContext(
+		ctx,
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
 		thumbnailMetadata.ThumbnailSize.Width,
 		thumbnailMetadata.ThumbnailSize.Height,
 		thumbnailMetadata.ThumbnailSize.ResizeMethod,
-	).Row()
-
-	err := row.Scan(
+	).Scan(
 		&thumbnailMetadata.MediaMetadata.ContentType,
 		&thumbnailMetadata.MediaMetadata.FileSizeBytes,
 		&thumbnailMetadata.MediaMetadata.CreationTimestamp,
@@ -166,17 +140,12 @@ func (s *thumbnailsTable) SelectThumbnail(
 	return &thumbnailMetadata, err
 }
 
-// SelectThumbnails retrieves all thumbnails for a given media ID and origin
-func (s *thumbnailsTable) SelectThumbnails(
-	ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName,
+func (s *thumbnailStatements) SelectThumbnails(
+	ctx context.Context, txn *sql.Tx, mediaID types.MediaID, mediaOrigin spec.ServerName,
 ) ([]*types.ThumbnailMetadata, error) {
-	db := s.cm.Connection(ctx, true)
-
-	rows, err := db.Raw(
-		s.selectThumbnailsSQL,
-		mediaID,
-		mediaOrigin,
-	).Rows()
+	rows, err := sqlutil.TxStmtContext(ctx, txn, s.selectThumbnailsStmt).QueryContext(
+		ctx, mediaID, mediaOrigin,
+	)
 	if err != nil {
 		return nil, err
 	}

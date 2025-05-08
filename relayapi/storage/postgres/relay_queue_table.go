@@ -16,15 +16,14 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/relayapi/storage/tables"
 	"github.com/lib/pq"
-	"gorm.io/gorm"
 )
 
 const relayQueueSchema = `
@@ -45,123 +44,90 @@ CREATE INDEX IF NOT EXISTS relayapi_queue_server_name_idx
 	ON relayapi_queue (server_name);
 `
 
-// SQL query constants for relay queue operations
-const (
-	// insertQueueEntrySQL inserts a new entry into the relay queue
-	insertQueueEntrySQL = `
-	INSERT INTO relayapi_queue (transaction_id, server_name, json_nid)
-	VALUES ($1, $2, $3)
-	`
+const insertQueueEntrySQL = "" +
+	"INSERT INTO relayapi_queue (transaction_id, server_name, json_nid)" +
+	" VALUES ($1, $2, $3)"
 
-	// deleteQueueEntriesSQL removes entries from the relay queue for a specific server and JSON NIDs
-	deleteQueueEntriesSQL = `
-	DELETE FROM relayapi_queue WHERE server_name = $1 AND json_nid = ANY($2)
-	`
+const deleteQueueEntriesSQL = "" +
+	"DELETE FROM relayapi_queue WHERE server_name = $1 AND json_nid = ANY($2)"
 
-	// selectQueueEntriesSQL retrieves queue entries for a specific server with a limit
-	selectQueueEntriesSQL = `
-	SELECT json_nid FROM relayapi_queue
-	WHERE server_name = $1
-	ORDER BY json_nid
-	LIMIT $2
-	`
+const selectQueueEntriesSQL = "" +
+	"SELECT json_nid FROM relayapi_queue" +
+	" WHERE server_name = $1" +
+	" ORDER BY json_nid" +
+	" LIMIT $2"
 
-	// selectQueueEntryCountSQL counts the number of queue entries for a specific server
-	selectQueueEntryCountSQL = `
-	SELECT COUNT(*) FROM relayapi_queue
-	WHERE server_name = $1
-	`
-)
+const selectQueueEntryCountSQL = "" +
+	"SELECT COUNT(*) FROM relayapi_queue" +
+	" WHERE server_name = $1"
 
-// relayQueueStatements contains the PostgreSQL statements for interacting with the relay queue
 type relayQueueStatements struct {
-	insertQueueEntryStmt      string
-	deleteQueueEntriesStmt    string
-	selectQueueEntriesStmt    string
-	selectQueueEntryCountStmt string
+	db                        *sql.DB
+	insertQueueEntryStmt      *sql.Stmt
+	deleteQueueEntriesStmt    *sql.Stmt
+	selectQueueEntriesStmt    *sql.Stmt
+	selectQueueEntryCountStmt *sql.Stmt
 }
 
-// postgresRelayQueueTable implements the tables.RelayQueue interface
-type postgresRelayQueueTable struct {
-	cm         *sqlutil.Connections
-	statements relayQueueStatements
-}
-
-// NewPostgresRelayQueueTable creates a new PostgreSQL-backed relay queue table
 func NewPostgresRelayQueueTable(
-	ctx context.Context, cm *sqlutil.Connections,
-) (tables.RelayQueue, error) {
-	// Initialize schema using GORM
-	gormDB := cm.Connection(ctx, false)
-	if err := gormDB.Exec(relayQueueSchema).Error; err != nil {
-		return nil, err
+	_ context.Context, db *sql.DB,
+) (s *relayQueueStatements, err error) {
+	s = &relayQueueStatements{
+		db: db,
+	}
+	_, err = s.db.Exec(relayQueueSchema)
+	if err != nil {
+		return
 	}
 
-	// Initialize statements
-	s := &postgresRelayQueueTable{
-		cm: cm,
-		statements: relayQueueStatements{
-			insertQueueEntryStmt:      insertQueueEntrySQL,
-			deleteQueueEntriesStmt:    deleteQueueEntriesSQL,
-			selectQueueEntriesStmt:    selectQueueEntriesSQL,
-			selectQueueEntryCountStmt: selectQueueEntryCountSQL,
-		},
-	}
-
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertQueueEntryStmt, insertQueueEntrySQL},
+		{&s.deleteQueueEntriesStmt, deleteQueueEntriesSQL},
+		{&s.selectQueueEntriesStmt, selectQueueEntriesSQL},
+		{&s.selectQueueEntryCountStmt, selectQueueEntryCountSQL},
+	}.Prepare(db)
 }
 
-// InsertQueueEntry adds an entry to the relay queue
-func (s *postgresRelayQueueTable) InsertQueueEntry(
+func (s *relayQueueStatements) InsertQueueEntry(
 	ctx context.Context,
+	txn *sql.Tx,
 	transactionID gomatrixserverlib.TransactionID,
 	serverName spec.ServerName,
 	nid int64,
 ) error {
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(
-		s.statements.insertQueueEntryStmt,
+	stmt := sqlutil.TxStmt(txn, s.insertQueueEntryStmt)
+	_, err := stmt.ExecContext(
+		ctx,
 		transactionID, // the transaction ID that we initially attempted
 		serverName,    // destination server name
 		nid,           // JSON blob NID
-	).Error
+	)
+	return err
 }
 
-// DeleteQueueEntries removes entries from the relay queue
-func (s *postgresRelayQueueTable) DeleteQueueEntries(
+func (s *relayQueueStatements) DeleteQueueEntries(
 	ctx context.Context,
+	txn *sql.Tx,
 	serverName spec.ServerName,
 	jsonNIDs []int64,
 ) error {
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(
-		s.statements.deleteQueueEntriesStmt,
-		serverName,
-		pq.Int64Array(jsonNIDs),
-	).Error
+	stmt := sqlutil.TxStmt(txn, s.deleteQueueEntriesStmt)
+	_, err := stmt.ExecContext(ctx, serverName, pq.Int64Array(jsonNIDs))
+	return err
 }
 
-// SelectQueueEntries retrieves entries from the relay queue
-func (s *postgresRelayQueueTable) SelectQueueEntries(
+func (s *relayQueueStatements) SelectQueueEntries(
 	ctx context.Context,
+	txn *sql.Tx,
 	serverName spec.ServerName,
 	limit int,
 ) ([]int64, error) {
-	db := s.cm.Connection(ctx, true)
-
-	rows, err := db.Raw(
-		s.statements.selectQueueEntriesStmt,
-		serverName,
-		limit,
-	).Rows()
-
+	stmt := sqlutil.TxStmt(txn, s.selectQueueEntriesStmt)
+	rows, err := stmt.QueryContext(ctx, serverName, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
-
 	var result []int64
 	for rows.Next() {
 		var nid int64
@@ -174,26 +140,19 @@ func (s *postgresRelayQueueTable) SelectQueueEntries(
 	return result, rows.Err()
 }
 
-// SelectQueueEntryCount counts the number of entries in the relay queue
-func (s *postgresRelayQueueTable) SelectQueueEntryCount(
+func (s *relayQueueStatements) SelectQueueEntryCount(
 	ctx context.Context,
+	txn *sql.Tx,
 	serverName spec.ServerName,
 ) (int64, error) {
-	db := s.cm.Connection(ctx, true)
-
 	var count int64
-	row := db.Raw(
-		s.statements.selectQueueEntryCountStmt,
-		serverName,
-	).Row()
-
-	err := row.Scan(&count)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	stmt := sqlutil.TxStmt(txn, s.selectQueueEntryCountStmt)
+	err := stmt.QueryRowContext(ctx, serverName).Scan(&count)
+	if errors.Is(err, sql.ErrNoRows) {
 		// It's acceptable for there to be no rows referencing a given
 		// JSON NID but it's not an error condition. Just return as if
 		// there's a zero count.
 		return 0, nil
 	}
-
 	return count, err
 }
