@@ -55,7 +55,7 @@ func AddPublicRoutes(
 
 func NewRelayInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Dendrite,
+	cfg *config.Dendrite,
 	cm *sqlutil.Connections,
 	fedClient fclient.FederationClient,
 	rsAPI rsAPI.RoomserverInternalAPI,
@@ -64,7 +64,12 @@ func NewRelayInternalAPI(
 	relayingEnabled bool,
 	caches caching.FederationCache,
 ) api.RelayInternalAPI {
-	relayDB, err := storage.NewDatabase(ctx, cm, &dendriteCfg.RelayAPI.Database, caches, dendriteCfg.Global.IsLocalServerName)
+
+	relayCm, err := cm.FromOptions(ctx, &cfg.RelayAPI.Database)
+	if err != nil {
+		logrus.WithError(err).Panic("failed to obtain relay db connection manager")
+	}
+	relayDB, err := storage.NewDatabase(ctx, relayCm, caches, cfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to relay db")
 	}
@@ -75,8 +80,8 @@ func NewRelayInternalAPI(
 		rsAPI,
 		keyRing,
 		producer,
-		dendriteCfg.Global.Presence.EnableInbound,
-		dendriteCfg.Global.ServerName,
+		cfg.Global.Presence.EnableInbound,
+		cfg.Global.ServerName,
 		relayingEnabled,
 	)
 }

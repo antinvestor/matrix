@@ -22,20 +22,18 @@ import (
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/postgres"
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 // NewDatabase opens a new database
 func NewDatabase(
 	ctx context.Context,
-	conMan *sqlutil.Connections,
-	dbProperties *config.DatabaseOptions,
+	cm *sqlutil.Connections,
 	cache caching.FederationCache,
 	isLocalServerName func(spec.ServerName) bool,
 ) (Database, error) {
 	switch {
-	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(ctx, cm, dbProperties, cache, isLocalServerName)
+	case cm.DS().IsPostgres():
+		return postgres.NewDatabase(ctx, cm, cache, isLocalServerName)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

@@ -16,13 +16,16 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+
+	"github.com/antinvestor/matrix/relayapi/storage/tables"
 	"github.com/lib/pq"
 )
 
+// relayQueueJSONSchema defines the table structure for storing JSON event content
 const relayQueueJSONSchema = `
 -- The relayapi_queue_json table contains event contents that
 -- we are storing for future forwarding. 
@@ -37,66 +40,85 @@ CREATE UNIQUE INDEX IF NOT EXISTS relayapi_queue_json_json_nid_idx
 	ON relayapi_queue_json (json_nid);
 `
 
+// relayQueueJSONSchemaRevert defines SQL to revert the schema for migrations
+const relayQueueJSONSchemaRevert = `
+DROP TABLE IF EXISTS relayapi_queue_json;
+`
+
+// insertQueueJSONSQL inserts a new JSON blob and returns its NID
 const insertQueueJSONSQL = "" +
 	"INSERT INTO relayapi_queue_json (json_body)" +
 	" VALUES ($1)" +
 	" RETURNING json_nid"
 
+// deleteQueueJSONSQL deletes JSON blobs by their NIDs
 const deleteQueueJSONSQL = "" +
 	"DELETE FROM relayapi_queue_json WHERE json_nid = ANY($1)"
 
+// selectQueueJSONSQL retrieves JSON blobs by their NIDs
 const selectQueueJSONSQL = "" +
 	"SELECT json_nid, json_body FROM relayapi_queue_json" +
 	" WHERE json_nid = ANY($1)"
 
-type relayQueueJSONStatements struct {
-	db             *sql.DB
-	insertJSONStmt *sql.Stmt
-	deleteJSONStmt *sql.Stmt
-	selectJSONStmt *sql.Stmt
+// relayQueueJSONTable implements the tables.RelayQueueJSON interface
+type relayQueueJSONTable struct {
+	cm *sqlutil.Connections
+
+	// SQL queries stored as struct fields
+	insertQueueJSONSQL string
+	deleteQueueJSONSQL string
+	selectQueueJSONSQL string
 }
 
-func NewPostgresRelayQueueJSONTable(ctx context.Context, db *sql.DB) (s *relayQueueJSONStatements, err error) {
-	s = &relayQueueJSONStatements{
-		db: db,
+// NewPostgresRelayQueueJSONTable creates a new relay queue JSON table
+func NewPostgresRelayQueueJSONTable(ctx context.Context, cm *sqlutil.Connections) (tables.RelayQueueJSON, error) {
+	t := &relayQueueJSONTable{
+		cm: cm,
+
+		// Initialize SQL query struct fields
+		insertQueueJSONSQL: insertQueueJSONSQL,
+		deleteQueueJSONSQL: deleteQueueJSONSQL,
+		selectQueueJSONSQL: selectQueueJSONSQL,
 	}
-	_, err = s.db.Exec(relayQueueJSONSchema)
+
+	// Migrate the table schema
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "relayapi_relay_queue_json_table_schema_001",
+		Patch:       relayQueueJSONSchema,
+		RevertPatch: relayQueueJSONSchemaRevert,
+	})
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.insertJSONStmt, insertQueueJSONSQL},
-		{&s.deleteJSONStmt, deleteQueueJSONSQL},
-		{&s.selectJSONStmt, selectQueueJSONSQL},
-	}.Prepare(db)
+	return t, nil
 }
 
-func (s *relayQueueJSONStatements) InsertQueueJSON(
-	ctx context.Context, txn *sql.Tx, json string,
+func (t *relayQueueJSONTable) InsertQueueJSON(
+	ctx context.Context, json string,
 ) (int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
+	db := t.cm.Connection(ctx, false) // Not read-only
 	var lastid int64
-	if err := stmt.QueryRowContext(ctx, json).Scan(&lastid); err != nil {
+	err := db.Raw(t.insertQueueJSONSQL, json).Row().Scan(&lastid)
+	if err != nil {
 		return 0, err
 	}
 	return lastid, nil
 }
 
-func (s *relayQueueJSONStatements) DeleteQueueJSON(
-	ctx context.Context, txn *sql.Tx, nids []int64,
+func (t *relayQueueJSONTable) DeleteQueueJSON(
+	ctx context.Context, nids []int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteJSONStmt)
-	_, err := stmt.ExecContext(ctx, pq.Int64Array(nids))
-	return err
+	db := t.cm.Connection(ctx, false) // Not read-only
+	return db.Exec(t.deleteQueueJSONSQL, pq.Int64Array(nids)).Error
 }
 
-func (s *relayQueueJSONStatements) SelectQueueJSON(
-	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
+func (t *relayQueueJSONTable) SelectQueueJSON(
+	ctx context.Context, jsonNIDs []int64,
 ) (map[int64][]byte, error) {
 	blobs := map[int64][]byte{}
-	stmt := sqlutil.TxStmt(txn, s.selectJSONStmt)
-	rows, err := stmt.QueryContext(ctx, pq.Int64Array(jsonNIDs))
+	db := t.cm.Connection(ctx, true) // Read-only
+	rows, err := db.Raw(t.selectQueueJSONSQL, pq.Int64Array(jsonNIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
