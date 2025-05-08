@@ -132,7 +132,7 @@ func (s *stateSnapshotStatements) InsertState(
 }
 
 func (s *stateSnapshotStatements) selectNextStateSnapshotNID(
-	ctx context.Context, txn *sql.Tx, stateNID *types.StateSnapshotNID,
+	ctx context.Context, stateNID *types.StateSnapshotNID,
 ) error {
 	// Get database connection
 	var db *sql.Conn

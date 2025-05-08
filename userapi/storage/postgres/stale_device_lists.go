@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS keyserver_stale_device_lists_idx ON keyserver_stale_d
 
 type staleDeviceListsTable struct {
 	cm *sqlutil.Connections
-	
+
 	upsertStaleDeviceListStmt             string
 	selectStaleDeviceListsWithDomainsStmt string
 	selectStaleDeviceListsStmt            string
@@ -61,7 +61,7 @@ func NewPostgresStaleDeviceListsTable(ctx context.Context, cm *sqlutil.Connectio
 	// Initialize table with SQL statements
 	t := &staleDeviceListsTable{
 		cm: cm,
-		upsertStaleDeviceListStmt:             "INSERT INTO keyserver_stale_device_lists (user_id, domain, is_stale, ts_added_secs)" +
+		upsertStaleDeviceListStmt: "INSERT INTO keyserver_stale_device_lists (user_id, domain, is_stale, ts_added_secs)" +
 			" VALUES ($1, $2, $3, $4)" +
 			" ON CONFLICT (user_id)" +
 			" DO UPDATE SET is_stale = $3, ts_added_secs = $4",
@@ -78,7 +78,7 @@ func (s *staleDeviceListsTable) InsertStaleDeviceList(ctx context.Context, userI
 	if err != nil {
 		return err
 	}
-	
+
 	db := s.cm.Connection(ctx, false)
 	err = db.Exec(s.upsertStaleDeviceListStmt, userID, string(domain), isStale, spec.AsTimestamp(time.Now())).Error
 	return err
@@ -86,7 +86,7 @@ func (s *staleDeviceListsTable) InsertStaleDeviceList(ctx context.Context, userI
 
 func (s *staleDeviceListsTable) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []spec.ServerName) ([]string, error) {
 	db := s.cm.Connection(ctx, true)
-	
+
 	// we only query for 1 domain or all domains so optimise for those use cases
 	if len(domains) == 0 {
 		rows, err := db.Raw(s.selectStaleDeviceListsStmt, true).Rows()
@@ -95,7 +95,7 @@ func (s *staleDeviceListsTable) SelectUserIDsWithStaleDeviceLists(ctx context.Co
 		}
 		return rowsToUserIDs(ctx, rows)
 	}
-	
+
 	var result []string
 	for _, domain := range domains {
 		rows, err := db.Raw(s.selectStaleDeviceListsWithDomainsStmt, true, string(domain)).Rows()
@@ -113,15 +113,10 @@ func (s *staleDeviceListsTable) SelectUserIDsWithStaleDeviceLists(ctx context.Co
 
 // DeleteStaleDeviceLists removes users from stale device lists
 func (s *staleDeviceListsTable) DeleteStaleDeviceLists(
-	ctx context.Context, txn *sql.Tx, userIDs []string,
+	ctx context.Context, userIDs []string,
 ) error {
-	var db *gorm.DB
-	if txn != nil {
-		db = s.cm.GetTransactionAsGorm(ctx, txn)
-	} else {
-		db = s.cm.Connection(ctx, false)
-	}
-	
+	db := s.cm.Connection(ctx, false)
+
 	return db.Exec(s.deleteStaleDeviceListsStmt, pq.Array(userIDs)).Error
 }
 

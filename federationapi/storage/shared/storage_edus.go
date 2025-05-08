@@ -177,7 +177,7 @@ func (d *Database) GetPendingEDUServerNames(
 // DeleteExpiredEDUs deletes expired EDUs and evicts them from the cache.
 func (d *Database) DeleteExpiredEDUs(ctx context.Context) error {
 	var jsonNIDs []int64
-	err := d.Writer.Do(d.Cm, nil, func(txn *sql.Tx) (err error) {
+	err := d.Writer.Do(ctx, d.Cm, func(ctx context.Context) (err error) {
 		expiredBefore := spec.AsTimestamp(time.Now())
 		jsonNIDs, err = d.FederationQueueEDUs.SelectExpiredEDUs(ctx, expiredBefore)
 		if err != nil {

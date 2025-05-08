@@ -17,8 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -78,12 +76,18 @@ const (
 )
 
 type inviteTable struct {
+	// cm is the connection manager for the database
 	cm *sqlutil.Connections
-	
-	// SQL statements stored as struct fields
-	insertInviteEventStmt              string
-	updateInviteRetiredStmt            string
-	selectInviteActiveForUserInRoomStmt string
+
+	// SQL queries stored as fields for better maintainability
+	// insertInviteEventSQL inserts a new invite event into the invites table
+	insertInviteEventSQL string
+
+	// updateInviteRetiredSQL marks invites as retired (no longer active)
+	updateInviteRetiredSQL string
+
+	// selectInviteActiveForUserInRoomSQL selects active invites for a user in a room
+	selectInviteActiveForUserInRoomSQL string
 }
 
 // NewPostgresInvitesTable creates a new PostgreSQL invites table and initializes it
@@ -98,9 +102,9 @@ func NewPostgresInvitesTable(ctx context.Context, cm *sqlutil.Connections) (tabl
 	s := &inviteTable{
 		cm: cm,
 		// Initialize SQL statement fields with the constants
-		insertInviteEventStmt:              insertInviteEventSQL,
-		updateInviteRetiredStmt:            updateInviteRetiredSQL,
-		selectInviteActiveForUserInRoomStmt: selectInviteActiveForUserInRoomSQL,
+		insertInviteEventSQL:               insertInviteEventSQL,
+		updateInviteRetiredSQL:             updateInviteRetiredSQL,
+		selectInviteActiveForUserInRoomSQL: selectInviteActiveForUserInRoomSQL,
 	}
 
 	return s, nil
@@ -119,7 +123,7 @@ func (s *inviteTable) InsertInviteEvent(
 	db := s.cm.Connection(ctx, false)
 
 	result := db.Exec(
-		s.insertInviteEventStmt,
+		s.insertInviteEventSQL,
 		inviteEventID,
 		roomNID,
 		targetUserNID,
@@ -129,7 +133,7 @@ func (s *inviteTable) InsertInviteEvent(
 	if result.Error != nil {
 		return false, result.Error
 	}
-	
+
 	// Check if anything was inserted
 	return result.RowsAffected > 0, nil
 }
@@ -145,7 +149,7 @@ func (s *inviteTable) UpdateInviteRetired(
 	db := s.cm.Connection(ctx, false)
 
 	rows, err := db.Raw(
-		s.updateInviteRetiredStmt,
+		s.updateInviteRetiredSQL,
 		roomNID,
 		targetUserNID,
 	).Rows()
@@ -178,7 +182,7 @@ func (s *inviteTable) SelectInviteActiveForUserInRoom(
 	db := s.cm.Connection(ctx, true)
 
 	rows, err := db.Raw(
-		s.selectInviteActiveForUserInRoomStmt,
+		s.selectInviteActiveForUserInRoomSQL,
 		targetUserNID,
 		roomNID,
 	).Rows()
@@ -191,10 +195,10 @@ func (s *inviteTable) SelectInviteActiveForUserInRoom(
 	var senderUserNIDs []types.EventStateKeyNID
 	var eventIDs []string
 	var eventJSONs []byte
-	
+
 	// Track if this is our first result
 	first := true
-	
+
 	for rows.Next() {
 		var (
 			inviteEventID   string
@@ -204,16 +208,16 @@ func (s *inviteTable) SelectInviteActiveForUserInRoom(
 		if err = rows.Scan(&inviteEventID, &senderUserNID, &inviteEventJSON); err != nil {
 			return nil, nil, nil, err
 		}
-		
+
 		senderUserNIDs = append(senderUserNIDs, types.EventStateKeyNID(senderUserNID))
 		eventIDs = append(eventIDs, inviteEventID)
-		
+
 		// Preserve the first invite_event_json
 		if first {
 			eventJSONs = inviteEventJSON
 			first = false
 		}
 	}
-	
+
 	return senderUserNIDs, eventIDs, eventJSONs, rows.Err()
 }

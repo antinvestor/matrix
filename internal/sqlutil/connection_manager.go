@@ -16,6 +16,7 @@ package sqlutil
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/frame" // assumed path; adjust if needed
@@ -56,14 +57,17 @@ func (c *Connections) Connection(ctx context.Context, readOnly bool) *gorm.DB {
 	return c.dbPool.DB(ctx, readOnly)
 }
 
-func (c *Connections) BeginTx(ctx context.Context) (context.Context, Transaction) {
+func (c *Connections) BeginTx(ctx context.Context, opts ...*sql.TxOptions) (context.Context, Transaction, error) {
 
 	writeDb := c.Connection(ctx, false)
-	gormTxn := writeDb.Begin()
+	gormTxn := writeDb.Begin(opts...)
 	txn := newDefaultTransaction(gormTxn)
 	ctx = context.WithValue(ctx, ctxKeyTransaction, txn)
-	return ctx, txn
+	return ctx, txn, gormTxn.Error
+}
 
+func (c *Connections) Writer() Writer {
+	return c.writer
 }
 
 func (c *Connections) FromOptions(ctx context.Context, opts *config.DatabaseOptions) (*Connections, error) {
@@ -80,7 +84,6 @@ func (c *Connections) FromOptions(ctx context.Context, opts *config.DatabaseOpti
 	}
 
 	return conn, nil
-
 }
 
 func (c *Connections) MigrateStrings(ctx context.Context, migrations ...frame.MigrationPatch) error {
@@ -119,6 +122,7 @@ func NewConnectionManager(service *frame.Service) *Connections {
 		service: service,
 		dbPool:  dbPool,
 		opts:    opts,
+		writer:  NewDefaultWriter(),
 	}
 }
 
@@ -157,5 +161,6 @@ func NewConnectionManagerWithOptions(ctx context.Context, service *frame.Service
 		service: service,
 		dbPool:  pool,
 		opts:    opts,
+		writer:  NewDefaultWriter(),
 	}, nil
 }

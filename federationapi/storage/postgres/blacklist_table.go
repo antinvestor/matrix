@@ -20,7 +20,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"gorm.io/gorm"
 )
 
 const blacklistSchema = `
@@ -31,20 +30,35 @@ CREATE TABLE IF NOT EXISTS federationsender_blacklist (
 );
 `
 
+// SQL query constants for blacklist operations
+const (
+	// insertBlacklistSQL adds a server name to the blacklist
+	insertBlacklistSQL = "INSERT INTO federationsender_blacklist (server_name) VALUES ($1) ON CONFLICT DO NOTHING"
+
+	// selectBlacklistSQL checks if a server name is blacklisted
+	selectBlacklistSQL = "SELECT server_name FROM federationsender_blacklist WHERE server_name = $1"
+
+	// deleteBlacklistSQL removes a server name from the blacklist
+	deleteBlacklistSQL = "DELETE FROM federationsender_blacklist WHERE server_name = $1"
+
+	// deleteAllBlacklistSQL removes all server names from the blacklist
+	deleteAllBlacklistSQL = "TRUNCATE federationsender_blacklist"
+)
+
 // blacklistTable contains the postgres-specific implementation of the blacklist table
 type blacklistTable struct {
 	cm *sqlutil.Connections
-	
+
 	// SQL queries stored as fields for better maintainability
 	// insertBlacklistSQL adds a server name to the blacklist
 	insertBlacklistSQL string
-	
+
 	// selectBlacklistSQL checks if a server name is blacklisted
 	selectBlacklistSQL string
-	
+
 	// deleteBlacklistSQL removes a server name from the blacklist
 	deleteBlacklistSQL string
-	
+
 	// deleteAllBlacklistSQL removes all server names from the blacklist
 	deleteAllBlacklistSQL string
 }
@@ -56,13 +70,13 @@ func NewPostgresBlacklistTable(ctx context.Context, cm *sqlutil.Connections) (ta
 	if err := gormDB.Exec(blacklistSchema).Error; err != nil {
 		return nil, err
 	}
-	
+
 	s := &blacklistTable{
-		cm: cm,
-		insertBlacklistSQL: "INSERT INTO federationsender_blacklist (server_name) VALUES ($1) ON CONFLICT DO NOTHING",
-		selectBlacklistSQL: "SELECT server_name FROM federationsender_blacklist WHERE server_name = $1",
-		deleteBlacklistSQL: "DELETE FROM federationsender_blacklist WHERE server_name = $1",
-		deleteAllBlacklistSQL: "TRUNCATE federationsender_blacklist",
+		cm:                    cm,
+		insertBlacklistSQL:    insertBlacklistSQL,
+		selectBlacklistSQL:    selectBlacklistSQL,
+		deleteBlacklistSQL:    deleteBlacklistSQL,
+		deleteAllBlacklistSQL: deleteAllBlacklistSQL,
 	}
 
 	return s, nil
@@ -86,7 +100,7 @@ func (s *blacklistTable) SelectBlacklist(
 		return false, err
 	}
 	defer rows.Close() // nolint:errcheck
-	
+
 	// The query will return the server name if the server is blacklisted, and
 	// will return no rows if not. By calling Next, we find out if a row was
 	// returned or not - we don't care about the value itself.

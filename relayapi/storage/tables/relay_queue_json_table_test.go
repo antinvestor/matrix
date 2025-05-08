@@ -16,7 +16,6 @@ package tables_test
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"testing"
 
@@ -47,7 +46,7 @@ func mustCreateTransaction() gomatrixserverlib.Transaction {
 }
 
 type RelayQueueJSONDatabase struct {
-	DB     *sql.DB
+	Cm     *sqlutil.Connections
 	Writer sqlutil.Writer
 	Table  tables.RelayQueueJSON
 }
@@ -75,8 +74,8 @@ func mustCreateQueueJSONTable(
 	assert.NoError(t, err)
 
 	database = RelayQueueJSONDatabase{
-		DB:     db,
-		Writer: sqlutil.NewDummyWriter(),
+		Cm:     cm,
+		Writer: sqlutil.NewDefaultWriter(),
 		Table:  tab,
 	}
 	return database, closeDb
@@ -95,7 +94,7 @@ func TestShoudInsertTransaction(t *testing.T) {
 			t.Fatalf("Invalid transaction: %s", err.Error())
 		}
 
-		_, err = db.Table.InsertQueueJSON(ctx, nil, string(tx))
+		_, err = db.Table.InsertQueueJSON(ctx, string(tx))
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
@@ -115,13 +114,13 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 			t.Fatalf("Invalid transaction: %s", err.Error())
 		}
 
-		nid, err := db.Table.InsertQueueJSON(ctx, nil, string(tx))
+		nid, err := db.Table.InsertQueueJSON(ctx, string(tx))
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
 		var storedJSON map[int64][]byte
-		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
+		_ = db.Writer.Do(ctx, db.Cm, func(ctx context.Context) error {
 			storedJSON, err = db.Table.SelectQueueJSON(ctx, []int64{nid})
 			return err
 		})
@@ -154,13 +153,13 @@ func TestShouldDeleteTransaction(t *testing.T) {
 			t.Fatalf("Invalid transaction: %s", err.Error())
 		}
 
-		nid, err := db.Table.InsertQueueJSON(ctx, nil, string(tx))
+		nid, err := db.Table.InsertQueueJSON(ctx, string(tx))
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
 		storedJSON := map[int64][]byte{}
-		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
+		_ = db.Writer.Do(ctx, db.Cm, func(ctx context.Context) error {
 			err = db.Table.DeleteQueueJSON(ctx, []int64{nid})
 			return err
 		})
@@ -169,7 +168,7 @@ func TestShouldDeleteTransaction(t *testing.T) {
 		}
 
 		storedJSON = map[int64][]byte{}
-		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
+		_ = db.Writer.Do(ctx, db.Cm, func(ctx context.Context) error {
 			storedJSON, err = db.Table.SelectQueueJSON(ctx, []int64{nid})
 			return err
 		})

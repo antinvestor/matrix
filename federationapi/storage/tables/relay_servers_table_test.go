@@ -53,7 +53,7 @@ func mustCreateRelayServersTable(
 
 	database = RelayServersDatabase{
 		DB:     db,
-		Writer: sqlutil.NewDummyWriter(),
+		Writer: sqlutil.NewDefaultWriter(),
 		Table:  tab,
 	}
 	return database, closeDb

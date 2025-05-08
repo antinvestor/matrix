@@ -36,9 +36,10 @@ func NewRoomUpdater(ctx context.Context, d *Database, roomInfo *types.RoomInfo) 
 	// we will just run with a normal database transaction. It'll either
 	// succeed, processing a create event which creates the room, or it won't.
 
-	var txn sqlutil.Transaction
-
-	ctx, txn = d.Cm.BeginTx(ctx)
+	ctx, txn, err := d.Cm.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	if roomInfo == nil {
 		return &RoomUpdater{

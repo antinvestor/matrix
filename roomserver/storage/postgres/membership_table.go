@@ -20,573 +20,489 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/pitabwire/frame"
 
+	"github.com/lib/pq"
+
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/lib/pq"
 )
 
 const membershipSchema = `
--- Stores the membership states for local users in local rooms.
+-- The membership table is used to coordinate updates between the invite table
+-- and the room state tables.
+-- This table is updated in one of 3 ways:
+--   1) The membership of a user changes within the current state of the room.
+--   2) An invite is received outside of a room over federation.
+--   3) An invite is rejected outside of a room over federation.
 CREATE TABLE IF NOT EXISTS roomserver_membership (
-	-- The ID of the room.
 	room_nid BIGINT NOT NULL,
-	-- The ID of the user.
+	-- Numeric state key ID for the user ID this state is for.
 	target_nid BIGINT NOT NULL,
-	-- The membership event type of the user in the room, e.g. "join".
-	membership_nid BIGINT NOT NULL,
-	-- The ID of the event that changed the membership state.
-	event_nid BIGINT NOT NULL,
-	-- The state_snapshot ID when the event was added.
-	target_order BIGINT NOT NULL,
-	-- The outbound topology position of the event associated with this membership update
-	event_position BIGINT NOT NULL,
-	-- Unique index on (room_nid, target_nid).
-	-- There can only be one entry per user per room.
-	CONSTRAINT roomserver_membership_unique UNIQUE (room_nid, target_nid),
-	PRIMARY KEY(room_nid, target_nid)
+	-- Numeric state key ID for the user ID who changed the state.
+	-- This may be 0 since it is not always possible to identify the user that
+	-- changed the state.
+	sender_nid BIGINT NOT NULL DEFAULT 0,
+	-- The state the user is in within this room.
+	-- Default value is "membershipStateLeaveOrBan"
+	membership_nid BIGINT NOT NULL DEFAULT 1,
+	-- The numeric ID of the membership event.
+	-- It refers to the join membership event if the membership_nid is join (3),
+	-- and to the leave/ban membership event if the membership_nid is leave or
+	-- ban (1).
+	-- If the membership_nid is invite (2) and the user has been in the room
+	-- before, it will refer to the previous leave/ban membership event, and will
+	-- be equals to 0 (its default) if the user never joined the room before.
+	-- This NID is updated if the join event gets updated (e.g. profile update),
+	-- or if the user leaves/joins the room.
+	event_nid BIGINT NOT NULL DEFAULT 0,
+	-- Local target is true if the target_nid refers to a local user rather than
+	-- a federated one. This is an optimisation for resetting state on federated
+	-- room joins.
+	target_local BOOLEAN NOT NULL DEFAULT false,
+	forgotten BOOLEAN NOT NULL DEFAULT FALSE,
+	UNIQUE (room_nid, target_nid)
 );
-CREATE INDEX IF NOT EXISTS roomserver_membership_room_nid_membership_nid_idx ON roomserver_membership (room_nid, membership_nid);
-CREATE INDEX IF NOT EXISTS roomserver_membership_membership_nid_idx ON roomserver_membership (membership_nid) WHERE membership_nid > 3;
 `
 
-// SQL query constants for membership operations
-const (
-	// Insert or update membership state for a user (upsert)
-	upsertMembershipSQL = "" +
-		"INSERT INTO roomserver_membership AS m" +
-		" (room_nid, target_nid, membership_nid, event_nid, target_order, event_position)" +
-		" VALUES ($1, $2, $3, $4, $5, $6)" +
-		" ON CONFLICT (room_nid, target_nid)" +
-		" DO UPDATE SET membership_nid = $3, event_nid = $4, target_order = $5, event_position = $6" +
-		" WHERE m.event_position <= $6"
+var selectJoinedUsersSetForRoomsAndUserSQL = "" +
+	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
+	" WHERE (target_local OR $1 = false)" +
+	" AND room_nid = ANY($2) AND target_nid = ANY($3)" +
+	" AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
+	" AND forgotten = false" +
+	" GROUP BY target_nid"
 
-	// Select membership states for a target user NID
-	selectMembershipForUserSQL = "" +
-		"SELECT room_nid, membership_nid FROM roomserver_membership" +
-		" WHERE target_nid = $1"
+var selectJoinedUsersSetForRoomsSQL = "" +
+	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
+	" WHERE (target_local OR $1 = false) " +
+	" AND room_nid = ANY($2)" +
+	" AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
+	" AND forgotten = false" +
+	" GROUP BY target_nid"
 
-	// Bulk select membership states for a list of room/user combinations
-	bulkSelectMembershipSQL = "" +
-		"SELECT room_nid, target_nid, membership_nid FROM roomserver_membership" +
-		" WHERE (room_nid, target_nid) = ANY($1)"
+// Insert a row in to membership table so that it can be locked by the
+// SELECT FOR UPDATE
+const insertMembershipSQL = "" +
+	"INSERT INTO roomserver_membership (room_nid, target_nid, target_local)" +
+	" VALUES ($1, $2, $3)" +
+	" ON CONFLICT DO NOTHING"
 
-	// Select event NIDs for all members who are joined to a room
-	selectJoinedUsersInRoomSQL = "" +
-		"SELECT target_nid, event_nid FROM roomserver_membership" +
-		" WHERE room_nid = $1 AND membership_nid = $2"
+const selectMembershipFromRoomAndTargetSQL = "" +
+	"SELECT membership_nid, event_nid, forgotten FROM roomserver_membership" +
+	" WHERE room_nid = $1 AND event_nid != 0 AND target_nid = $2"
 
-	// Select membership state for a room and user
-	selectMembershipForRoomAndTargetSQL = "" +
-		"SELECT membership_nid FROM roomserver_membership" +
-		" WHERE room_nid = $1 AND target_nid = $2"
+const selectMembershipsFromRoomAndMembershipSQL = "" +
+	"SELECT event_nid FROM roomserver_membership" +
+	" WHERE room_nid = $1 AND event_nid != 0 AND membership_nid = $2 and forgotten = false"
 
-	// Select all rooms a user is joined to
-	selectRoomsWithMembershipSQL = "" +
-		"SELECT room_nid FROM roomserver_membership" +
-		" WHERE target_nid = $1 AND membership_nid = $2"
+const selectLocalMembershipsFromRoomAndMembershipSQL = "" +
+	"SELECT event_nid FROM roomserver_membership" +
+	" WHERE room_nid = $1 AND event_nid != 0 AND membership_nid = $2" +
+	" AND target_local = true and forgotten = false"
 
-	// Select all joined members in a room
-	selectJoinedMembersInRoomSQL = "" +
-		"SELECT target_nid FROM roomserver_membership" +
-		" WHERE room_nid = $1 AND membership_nid = $2"
+const selectMembershipsFromRoomSQL = "" +
+	"SELECT event_nid FROM roomserver_membership" +
+	" WHERE room_nid = $1 AND event_nid != 0 and forgotten = false"
 
-	// Select membership events for a room and membership type
-	selectMembershipsInRoomSQL = "" +
-		"SELECT event_nid FROM roomserver_membership" +
-		" WHERE room_nid = $1 AND membership_nid = $2"
+const selectLocalMembershipsFromRoomSQL = "" +
+	"SELECT event_nid FROM roomserver_membership" +
+	" WHERE room_nid = $1 AND event_nid != 0" +
+	" AND target_local = true and forgotten = false"
 
-	// Select all membership events for a room
-	selectMembershipsInRoomByTargetSQL = "" +
-		"SELECT target_nid, membership_nid FROM roomserver_membership" +
-		" WHERE room_nid = $1"
-		
-	// Count members in a room by membership type
-	countMembershipsInRoomSQL = "" +
-		"SELECT COUNT(*) FROM roomserver_membership" +
-		" WHERE room_nid = $1 AND membership_nid = $2"
-)
+const selectMembershipForUpdateSQL = "" +
+	"SELECT membership_nid FROM roomserver_membership" +
+	" WHERE room_nid = $1 AND target_nid = $2 FOR UPDATE"
+
+const updateMembershipSQL = "" +
+	"UPDATE roomserver_membership SET sender_nid = $3, membership_nid = $4, event_nid = $5, forgotten = $6" +
+	" WHERE room_nid = $1 AND target_nid = $2"
+
+const updateMembershipForgetRoom = "" +
+	"UPDATE roomserver_membership SET forgotten = $3" +
+	" WHERE room_nid = $1 AND target_nid = $2"
+
+const deleteMembershipSQL = "" +
+	"DELETE FROM roomserver_membership WHERE room_nid = $1 AND target_nid = $2"
+
+const selectRoomsWithMembershipSQL = "" +
+	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2 and forgotten = false"
+
+// selectKnownUsersSQL uses a sub-select statement here to find rooms that the user is
+// joined to. Since this information is used to populate the user directory, we will
+// only return users that the user would ordinarily be able to see anyway.
+var selectKnownUsersSQL = "" +
+	"SELECT DISTINCT event_state_key FROM roomserver_membership INNER JOIN roomserver_event_state_keys ON " +
+	"roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
+	" WHERE room_nid = ANY(" +
+	"  SELECT DISTINCT room_nid FROM roomserver_membership WHERE target_nid=$1 AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
+	") AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " AND event_state_key LIKE $2 LIMIT $3"
+
+// selectLocalServerInRoomSQL is an optimised case for checking if we, the local server,
+// are in the room by using the target_local column of the membership table. Normally when
+// we want to know if a server is in a room, we have to unmarshal the entire room state which
+// is expensive. The presence of a single row from this query suggests we're still in the
+// room, no rows returned suggests we aren't.
+const selectLocalServerInRoomSQL = "" +
+	"SELECT room_nid FROM roomserver_membership WHERE target_local = true AND membership_nid = $1 AND room_nid = $2 LIMIT 1"
+
+// selectServerMembersInRoomSQL is an optimised case for checking for server members in a room.
+// The JOIN is significantly leaner than the previous case of looking up event NIDs and reading the
+// membership events from the database, as the JOIN query amounts to little more than two index
+// scans which are very fast. The presence of a single row from this query suggests the server is
+// in the room, no rows returned suggests they aren't.
+const selectServerInRoomSQL = "" +
+	"SELECT room_nid FROM roomserver_membership" +
+	" JOIN roomserver_event_state_keys ON roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
+	" WHERE membership_nid = $1 AND room_nid = $2 AND event_state_key LIKE '%:' || $3 LIMIT 1"
+
+const selectJoinedUsersSQL = `
+SELECT DISTINCT target_nid
+FROM roomserver_membership m
+WHERE membership_nid > $1 AND target_nid = ANY($2)
+`
 
 type membershipStatements struct {
 	cm *sqlutil.Connections
-	
-	// SQL statements stored as struct fields
-	upsertMembershipStmt                 string
-	selectMembershipForUserStmt          string
-	bulkSelectMembershipStmt             string
-	selectJoinedUsersInRoomStmt          string
-	selectMembershipForRoomAndTargetStmt string
-	selectRoomsWithMembershipStmt        string
-	selectJoinedMembersInRoomStmt        string
-	selectMembershipsInRoomStmt          string
-	selectMembershipsInRoomByTargetStmt  string
-	countMembershipsInRoomStmt           string
+
+	// SQL statement fields
+	insertMembershipSQL                            string
+	selectMembershipForUpdateSQL                   string
+	selectMembershipFromRoomAndTargetSQL           string
+	selectMembershipsFromRoomAndMembershipSQL      string
+	selectLocalMembershipsFromRoomAndMembershipSQL string
+	selectMembershipsFromRoomSQL                   string
+	selectLocalMembershipsFromRoomSQL              string
+	updateMembershipSQL                            string
+	selectRoomsWithMembershipSQL                   string
+	selectJoinedUsersSetForRoomsAndUserSQL         string
+	selectJoinedUsersSetForRoomsSQL                string
+	selectKnownUsersSQL                            string
+	updateMembershipForgetRoomSQL                  string
+	selectLocalServerInRoomSQL                     string
+	selectServerInRoomSQL                          string
+	deleteMembershipSQL                            string
+	selectJoinedUsersSQL                           string
 }
 
 // NewPostgresMembershipTable creates a new PostgreSQL membership table and prepares all statements
 func NewPostgresMembershipTable(ctx context.Context, cm *sqlutil.Connections) (tables.Membership, error) {
-	// Create the table first
-	if err := cm.Writer.ExecSQL(ctx, membershipSchema); err != nil {
+
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "roomserver_membership_schema_001",
+		Patch:       membershipSchema,
+		RevertPatch: "",
+	})
+	if err != nil {
 		return nil, err
 	}
-	
+
 	// Initialize the statements
 	s := &membershipStatements{
 		cm: cm,
-		
+
 		// Initialize SQL statement fields with the constants
-		upsertMembershipStmt:                 upsertMembershipSQL,
-		selectMembershipForUserStmt:          selectMembershipForUserSQL,
-		bulkSelectMembershipStmt:             bulkSelectMembershipSQL,
-		selectJoinedUsersInRoomStmt:          selectJoinedUsersInRoomSQL,
-		selectMembershipForRoomAndTargetStmt: selectMembershipForRoomAndTargetSQL,
-		selectRoomsWithMembershipStmt:        selectRoomsWithMembershipSQL,
-		selectJoinedMembersInRoomStmt:        selectJoinedMembersInRoomSQL,
-		selectMembershipsInRoomStmt:          selectMembershipsInRoomSQL,
-		selectMembershipsInRoomByTargetStmt:  selectMembershipsInRoomByTargetSQL,
-		countMembershipsInRoomStmt:           countMembershipsInRoomSQL,
+		insertMembershipSQL:                            insertMembershipSQL,
+		selectMembershipForUpdateSQL:                   selectMembershipForUpdateSQL,
+		selectMembershipFromRoomAndTargetSQL:           selectMembershipFromRoomAndTargetSQL,
+		selectMembershipsFromRoomAndMembershipSQL:      selectMembershipsFromRoomAndMembershipSQL,
+		selectLocalMembershipsFromRoomAndMembershipSQL: selectLocalMembershipsFromRoomAndMembershipSQL,
+		selectMembershipsFromRoomSQL:                   selectMembershipsFromRoomSQL,
+		selectLocalMembershipsFromRoomSQL:              selectLocalMembershipsFromRoomSQL,
+		updateMembershipSQL:                            updateMembershipSQL,
+		selectRoomsWithMembershipSQL:                   selectRoomsWithMembershipSQL,
+		selectJoinedUsersSetForRoomsAndUserSQL:         selectJoinedUsersSetForRoomsAndUserSQL,
+		selectJoinedUsersSetForRoomsSQL:                selectJoinedUsersSetForRoomsSQL,
+		selectKnownUsersSQL:                            selectKnownUsersSQL,
+		updateMembershipForgetRoomSQL:                  updateMembershipForgetRoom,
+		selectLocalServerInRoomSQL:                     selectLocalServerInRoomSQL,
+		selectServerInRoomSQL:                          selectServerInRoomSQL,
+		deleteMembershipSQL:                            deleteMembershipSQL,
+		selectJoinedUsersSQL:                           selectJoinedUsersSQL,
 	}
-	
+
 	return s, nil
 }
 
-// UpsertMembershipRoom inserts or updates a user's membership in a room
-func (s *membershipStatements) UpsertMembershipRoom(
-	ctx context.Context, txn *sql.Tx,
-	roomNID types.RoomNID,
-	targetUserNID types.EventStateKeyNID,
-	membership tables.MembershipState,
-	eventNID types.EventNID,
-	roomVersion string,
-	targetOrder tables.TargetOrder,
-	eventOrder tables.EventOrder,
-) error {
-	// Get database connection
-	var result error
-	
-	if txn != nil {
-		// Use existing transaction
-		_, err := txn.ExecContext(
-			ctx,
-			s.upsertMembershipStmt,
-			roomNID,
-			targetUserNID,
-			membership,
-			eventNID,
-			targetOrder,
-			eventOrder,
-		)
-		result = err
-	} else {
-		// Use a new connection
-		db := s.cm.Connection(ctx, false)
-		result = db.Exec(
-			s.upsertMembershipStmt,
-			roomNID,
-			targetUserNID,
-			membership,
-			eventNID,
-			targetOrder,
-			eventOrder,
-		).Error
-	}
-	
-	return result
-}
-
-// SelectMembershipForUser returns the membership states for a user
-func (s *membershipStatements) SelectMembershipForUser(
-	ctx context.Context, txn *sql.Tx,
-	targetUserNID types.EventStateKeyNID,
-) (memberships map[types.RoomNID]tables.MembershipState, err error) {
-	// Get database connection
-	var rows *sql.Rows
-	
-	if txn != nil {
-		// Use existing transaction
-		rows, err = txn.QueryContext(ctx, s.selectMembershipForUserStmt, targetUserNID)
-	} else {
-		// Use a new connection
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(s.selectMembershipForUserStmt, targetUserNID).Rows()
-	}
-	
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectMembershipForUser: rows.close() failed")
-	
-	// Initialize the result map
-	memberships = map[types.RoomNID]tables.MembershipState{}
-	
-	// Process rows
-	var roomNID types.RoomNID
-	var membershipState tables.MembershipState
-	
-	for rows.Next() {
-		if err = rows.Scan(&roomNID, &membershipState); err != nil {
-			return nil, err
-		}
-		memberships[roomNID] = membershipState
-	}
-	
-	return memberships, rows.Err()
-}
-
-// BulkSelectMembership returns membership states for a list of room/user combinations
-func (s *membershipStatements) BulkSelectMembership(
-	ctx context.Context, txn *sql.Tx,
-	roomNIDs []types.RoomNID,
+func (s *membershipStatements) SelectJoinedUsers(
+	ctx context.Context,
 	targetUserNIDs []types.EventStateKeyNID,
-) (memberships map[types.RoomNID]map[types.EventStateKeyNID]tables.MembershipState, err error) {
-	// Get database connection
-	var rows *sql.Rows
-	
-	tuples := make([]string, len(roomNIDs))
-	params := make([]interface{}, len(roomNIDs)*2)
-	
-	for i := range roomNIDs {
-		tuples[i] = fmt.Sprintf("($%d, $%d)", (i*2)+1, (i*2)+2)
-		params[i*2] = roomNIDs[i]
-		params[i*2+1] = targetUserNIDs[i]
-	}
-	
-	// Create the query
-	query := fmt.Sprintf(
-		s.bulkSelectMembershipStmt,
-		strings.Join(tuples, ","),
-	)
-	
-	if txn != nil {
-		// Use existing transaction
-		rows, err = txn.QueryContext(ctx, query, params...)
-	} else {
-		// Use a new connection
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(query, params...).Rows()
-	}
-	
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectMembership: rows.close() failed")
-	
-	// Initialize the result map
-	memberships = make(map[types.RoomNID]map[types.EventStateKeyNID]tables.MembershipState)
-	
-	// Process rows
-	var roomNID types.RoomNID
-	var targetUserNID types.EventStateKeyNID
-	var membershipState tables.MembershipState
-	
-	for rows.Next() {
-		if err = rows.Scan(&roomNID, &targetUserNID, &membershipState); err != nil {
-			return nil, err
-		}
-		
-		if _, ok := memberships[roomNID]; !ok {
-			memberships[roomNID] = make(map[types.EventStateKeyNID]tables.MembershipState)
-		}
-		
-		memberships[roomNID][targetUserNID] = membershipState
-	}
-	
-	return memberships, rows.Err()
-}
+) ([]types.EventStateKeyNID, error) {
+	result := make([]types.EventStateKeyNID, 0, len(targetUserNIDs))
 
-// SelectJoinedUsersInRoom returns a map of user NID -> event NID for all joined users in a room
-func (s *membershipStatements) SelectJoinedUsersInRoom(
-	ctx context.Context, txn *sql.Tx,
-	roomNID types.RoomNID,
-) (map[types.EventStateKeyNID]types.EventNID, error) {
-	// Get database connection
-	var rows *sql.Rows
-	var err error
-	
-	if txn != nil {
-		// Use existing transaction
-		rows, err = txn.QueryContext(
-			ctx,
-			s.selectJoinedUsersInRoomStmt,
-			roomNID,
-			tables.MembershipStateJoin,
-		)
-	} else {
-		// Use a new connection
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(
-			s.selectJoinedUsersInRoomStmt,
-			roomNID,
-			tables.MembershipStateJoin,
-		).Rows()
-	}
-	
+	// Use GORM for database access
+	db := s.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(s.selectJoinedUsersSQL, tables.MembershipStateLeaveOrBan, pq.Array(targetUserNIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectJoinedUsersInRoom: rows.close() failed")
-	
-	// Initialize the result map
-	result := map[types.EventStateKeyNID]types.EventNID{}
-	
-	// Process rows
-	var userNID types.EventStateKeyNID
-	var eventNID types.EventNID
-	
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectJoinedUsers: rows.close() failed")
+
+	var targetNID types.EventStateKeyNID
 	for rows.Next() {
-		if err = rows.Scan(&userNID, &eventNID); err != nil {
+		if err = rows.Scan(&targetNID); err != nil {
 			return nil, err
 		}
-		result[userNID] = eventNID
+		result = append(result, targetNID)
 	}
-	
+
 	return result, rows.Err()
 }
 
-// SelectMembershipForRoomAndTarget returns the membership state for a user in a room
-func (s *membershipStatements) SelectMembershipForRoomAndTarget(
-	ctx context.Context, txn *sql.Tx,
-	roomNID types.RoomNID,
-	targetUserNID types.EventStateKeyNID,
+func (s *membershipStatements) InsertMembership(
+	ctx context.Context,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+	localTarget bool,
+) error {
+	// Use GORM for database access
+	db := s.cm.Connection(ctx, false)
+
+	return db.Exec(s.insertMembershipSQL, roomNID, targetUserNID, localTarget).Error
+}
+
+func (s *membershipStatements) SelectMembershipForUpdate(
+	ctx context.Context,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
 ) (membership tables.MembershipState, err error) {
-	// Get database connection
-	
-	if txn != nil {
-		// Use existing transaction
-		err = txn.QueryRowContext(
-			ctx,
-			s.selectMembershipForRoomAndTargetStmt,
-			roomNID,
-			targetUserNID,
-		).Scan(&membership)
-	} else {
-		// Use a new connection
-		db := s.cm.Connection(ctx, true)
-		err = db.Raw(
-			s.selectMembershipForRoomAndTargetStmt,
-			roomNID,
-			targetUserNID,
-		).Row().Scan(&membership)
-	}
-	
-	if err == sql.ErrNoRows {
-		// If there is no membership state then the user is not a member of the room.
-		return tables.MembershipStateLeaveOrBan, nil
-	}
-	
+	db := s.cm.Connection(ctx, true)
+	row := db.Raw(s.selectMembershipForUpdateSQL, roomNID, targetUserNID).Row()
+	err = row.Scan(&membership)
+	return membership, err
+}
+
+func (s *membershipStatements) SelectMembershipFromRoomAndTarget(
+	ctx context.Context,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+) (eventNID types.EventNID, membership tables.MembershipState, forgotten bool, err error) {
+
+	db := s.cm.Connection(ctx, true)
+	err = db.Raw(s.selectMembershipFromRoomAndTargetSQL, roomNID, targetUserNID).Row().Scan(&membership, &eventNID, &forgotten)
 	return
 }
 
-// SelectRoomsWithMembership returns a list of room NIDs that a user has membership with
-func (s *membershipStatements) SelectRoomsWithMembership(
-	ctx context.Context, txn *sql.Tx,
-	targetUserNID types.EventStateKeyNID,
-	membershipState tables.MembershipState,
-) (roomNIDs []types.RoomNID, err error) {
-	// Get database connection
-	var rows *sql.Rows
-	
-	if txn != nil {
-		// Use existing transaction
-		rows, err = txn.QueryContext(
-			ctx,
-			s.selectRoomsWithMembershipStmt,
-			targetUserNID,
-			membershipState,
-		)
+func (s *membershipStatements) SelectMembershipsFromRoom(
+	ctx context.Context,
+	roomNID types.RoomNID, localOnly bool,
+) (eventNIDs []types.EventNID, err error) {
+	var query string
+	if localOnly {
+		query = s.selectLocalMembershipsFromRoomSQL
 	} else {
-		// Use a new connection
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(
-			s.selectRoomsWithMembershipStmt,
-			targetUserNID,
-			membershipState,
-		).Rows()
+		query = s.selectMembershipsFromRoomSQL
 	}
-	
+
+	var rows *sql.Rows
+
+	db := s.cm.Connection(ctx, true)
+	rows, err = db.Raw(query, roomNID).Rows()
+
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoom: rows.close() failed")
+
+	var eNID types.EventNID
+	for rows.Next() {
+		if err = rows.Scan(&eNID); err != nil {
+			return nil, err
+		}
+		eventNIDs = append(eventNIDs, eNID)
+	}
+	return eventNIDs, rows.Err()
+}
+
+func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
+	ctx context.Context,
+	roomNID types.RoomNID, membership tables.MembershipState, localOnly bool,
+) (eventNIDs []types.EventNID, err error) {
+	var query string
+	if localOnly {
+		query = s.selectLocalMembershipsFromRoomAndMembershipSQL
+	} else {
+		query = s.selectMembershipsFromRoomAndMembershipSQL
+	}
+
+	var rows *sql.Rows
+
+	db := s.cm.Connection(ctx, true)
+	rows, err = db.Raw(query, roomNID, membership).Rows()
+
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoomAndMembership: rows.close() failed")
+
+	var eNID types.EventNID
+	for rows.Next() {
+		if err = rows.Scan(&eNID); err != nil {
+			return nil, err
+		}
+		eventNIDs = append(eventNIDs, eNID)
+	}
+	return eventNIDs, rows.Err()
+}
+
+func (s *membershipStatements) UpdateMembership(
+	ctx context.Context,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, senderUserNID types.EventStateKeyNID, membership tables.MembershipState,
+	eventNID types.EventNID, forgotten bool,
+) (bool, error) {
+
+	db := s.cm.Connection(ctx, false)
+	err := db.Exec(s.updateMembershipSQL, roomNID, targetUserNID, senderUserNID, membership, eventNID, forgotten).Error
+	// We need to get the rows affected
+	if err == nil {
+		var rowsAffected int64
+		rowsAffected = db.RowsAffected
+		return rowsAffected > 0, nil
+	}
+	return false, err
+
+}
+
+func (s *membershipStatements) SelectRoomsWithMembership(
+	ctx context.Context,
+	userID types.EventStateKeyNID, membershipState tables.MembershipState,
+) ([]types.RoomNID, error) {
+	var rows *sql.Rows
+	var err error
+
+	db := s.cm.Connection(ctx, true)
+	rows, err = db.Raw(s.selectRoomsWithMembershipSQL, membershipState, userID).Rows()
+
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomsWithMembership: rows.close() failed")
-	
-	// Process rows
+
+	var roomNIDs []types.RoomNID
 	var roomNID types.RoomNID
-	
 	for rows.Next() {
-		if err = rows.Scan(&roomNID); err != nil {
+		if err := rows.Scan(&roomNID); err != nil {
 			return nil, err
 		}
 		roomNIDs = append(roomNIDs, roomNID)
 	}
-	
 	return roomNIDs, rows.Err()
 }
 
-// SelectJoinedMembersInRoom returns a list of all users who are joined to a room
-func (s *membershipStatements) SelectJoinedMembersInRoom(
-	ctx context.Context, txn *sql.Tx,
-	roomNID types.RoomNID,
-) ([]types.EventStateKeyNID, error) {
-	// Get database connection
+func (s *membershipStatements) SelectJoinedUsersSetForRooms(
+	ctx context.Context,
+	roomNIDs []types.RoomNID,
+	userNIDs []types.EventStateKeyNID,
+	localOnly bool,
+) (map[types.EventStateKeyNID]int, error) {
 	var rows *sql.Rows
 	var err error
-	
-	if txn != nil {
-		// Use existing transaction
-		rows, err = txn.QueryContext(
-			ctx,
-			s.selectJoinedMembersInRoomStmt,
-			roomNID,
-			tables.MembershipStateJoin,
-		)
-	} else {
-		// Use a new connection
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(
-			s.selectJoinedMembersInRoomStmt,
-			roomNID,
-			tables.MembershipStateJoin,
-		).Rows()
-	}
-	
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectJoinedMembersInRoom: rows.close() failed")
-	
-	// Process rows
-	var targetUserNIDs []types.EventStateKeyNID
-	var targetUserNID types.EventStateKeyNID
-	
-	for rows.Next() {
-		if err = rows.Scan(&targetUserNID); err != nil {
-			return nil, err
-		}
-		targetUserNIDs = append(targetUserNIDs, targetUserNID)
-	}
-	
-	return targetUserNIDs, rows.Err()
-}
 
-// SelectMembershipsInRoom returns the event NIDs for all memberships in a room with a specific membership state
-func (s *membershipStatements) SelectMembershipsInRoom(
-	ctx context.Context, txn *sql.Tx,
-	roomNID types.RoomNID,
-	membershipState tables.MembershipState,
-) (eventNIDs []types.EventNID, err error) {
-	// Get database connection
-	var rows *sql.Rows
-	
-	if txn != nil {
-		// Use existing transaction
-		rows, err = txn.QueryContext(
-			ctx,
-			s.selectMembershipsInRoomStmt,
-			roomNID,
-			membershipState,
-		)
+	db := s.cm.Connection(ctx, true)
+	if len(userNIDs) > 0 {
+		rows, err = db.Raw(s.selectJoinedUsersSetForRoomsAndUserSQL, localOnly, pq.Array(roomNIDs), pq.Array(userNIDs)).Rows()
 	} else {
-		// Use a new connection
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(
-			s.selectMembershipsInRoomStmt,
-			roomNID,
-			membershipState,
-		).Rows()
+		rows, err = db.Raw(s.selectJoinedUsersSetForRoomsSQL, localOnly, pq.Array(roomNIDs)).Rows()
 	}
-	
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectMembershipsInRoom: rows.close() failed")
-	
-	// Process rows
-	var eventNID types.EventNID
-	
-	for rows.Next() {
-		if err = rows.Scan(&eventNID); err != nil {
-			return nil, err
-		}
-		eventNIDs = append(eventNIDs, eventNID)
-	}
-	
-	return eventNIDs, rows.Err()
-}
 
-// SelectMembershipsInRoomByTarget returns a map of target user NID -> membership state for all users in a room
-func (s *membershipStatements) SelectMembershipsInRoomByTarget(
-	ctx context.Context, txn *sql.Tx,
-	roomNID types.RoomNID,
-) (map[types.EventStateKeyNID]tables.MembershipState, error) {
-	// Get database connection
-	var rows *sql.Rows
-	var err error
-	
-	if txn != nil {
-		// Use existing transaction
-		rows, err = txn.QueryContext(
-			ctx,
-			s.selectMembershipsInRoomByTargetStmt,
-			roomNID,
-		)
-	} else {
-		// Use a new connection
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(
-			s.selectMembershipsInRoomByTargetStmt,
-			roomNID,
-		).Rows()
-	}
-	
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectMembershipsInRoomByTarget: rows.close() failed")
-	
-	// Initialize result map
-	result := make(map[types.EventStateKeyNID]tables.MembershipState)
-	
-	// Process rows
-	var targetUserNID types.EventStateKeyNID
-	var membershipState tables.MembershipState
-	
+	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsersSetForRooms: rows.close() failed")
+
+	result := make(map[types.EventStateKeyNID]int)
+	var userID types.EventStateKeyNID
+	var count int
 	for rows.Next() {
-		if err = rows.Scan(&targetUserNID, &membershipState); err != nil {
+		if err := rows.Scan(&userID, &count); err != nil {
 			return nil, err
 		}
-		result[targetUserNID] = membershipState
+		result[userID] = count
 	}
-	
 	return result, rows.Err()
 }
 
-// CountMembershipsInRoom counts the number of members with a given membership state in a room
-func (s *membershipStatements) CountMembershipsInRoom(
-	ctx context.Context, txn *sql.Tx,
-	roomNID types.RoomNID,
-	membershipState tables.MembershipState,
-) (count int, err error) {
-	// Get database connection
-	
-	if txn != nil {
-		// Use existing transaction
-		err = txn.QueryRowContext(
-			ctx,
-			s.countMembershipsInRoomStmt,
-			roomNID,
-			membershipState,
-		).Scan(&count)
-	} else {
-		// Use a new connection
-		db := s.cm.Connection(ctx, true)
-		err = db.Raw(
-			s.countMembershipsInRoomStmt,
-			roomNID,
-			membershipState,
-		).Row().Scan(&count)
+func (s *membershipStatements) SelectKnownUsers(
+	ctx context.Context,
+	userID types.EventStateKeyNID, searchString string, limit int,
+) ([]string, error) {
+	var rows *sql.Rows
+	var err error
+
+	db := s.cm.Connection(ctx, true)
+	rows, err = db.Raw(s.selectKnownUsersSQL, userID, fmt.Sprintf("%%%s%%", searchString), limit).Rows()
+
+	if err != nil {
+		return nil, err
 	}
-	
-	return
+	var result []string
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectKnownUsers: rows.close() failed")
+
+	var resUserID string
+	for rows.Next() {
+		err = rows.Scan(&resUserID)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, resUserID)
+	}
+	return result, rows.Err()
+}
+
+func (s *membershipStatements) UpdateForgetMembership(
+	ctx context.Context,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, forget bool,
+) error {
+
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.updateMembershipForgetRoomSQL, roomNID, targetUserNID, forget).Error
+}
+
+func (s *membershipStatements) SelectLocalServerInRoom(
+	ctx context.Context,
+	roomNID types.RoomNID,
+) (bool, error) {
+	var nid types.RoomNID
+	var err error
+
+	db := s.cm.Connection(ctx, true)
+	err = db.Raw(s.selectLocalServerInRoomSQL, tables.MembershipStateJoin, roomNID).Row().Scan(&nid)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	found := nid > 0
+	return found, nil
+}
+
+func (s *membershipStatements) SelectServerInRoom(
+	ctx context.Context,
+	roomNID types.RoomNID, serverName spec.ServerName,
+) (bool, error) {
+	var nid types.RoomNID
+	var err error
+
+	db := s.cm.Connection(ctx, true)
+	err = db.Raw(s.selectServerInRoomSQL, tables.MembershipStateJoin, roomNID, serverName).Row().Scan(&nid)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return roomNID == nid, nil
+}
+
+func (s *membershipStatements) DeleteMembership(
+	ctx context.Context,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+) error {
+
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.deleteMembershipSQL, roomNID, targetUserNID).Error
 }

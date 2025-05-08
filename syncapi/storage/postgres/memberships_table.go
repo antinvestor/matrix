@@ -16,8 +16,8 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -77,12 +77,12 @@ const selectMembersSQL = `
 `
 
 type membershipsTable struct {
-	cm                          *sqlutil.Connections
-	upsertMembershipSQL         string
-	selectMembershipCountSQL    string
-	selectMembershipBeforeSQL   string
-	purgeMembershipsSQL         string
-	selectMembersSQL            string
+	cm                        *sqlutil.Connections
+	upsertMembershipSQL       string
+	selectMembershipCountSQL  string
+	selectMembershipBeforeSQL string
+	purgeMembershipsSQL       string
+	selectMembersSQL          string
 }
 
 func NewPostgresMembershipsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Memberships, error) {
@@ -91,7 +91,7 @@ func NewPostgresMembershipsTable(ctx context.Context, cm *sqlutil.Connections) (
 	if err := db.Exec(membershipsSchema).Error; err != nil {
 		return nil, err
 	}
-	
+
 	// Initialize the table with SQL statements
 	s := &membershipsTable{
 		cm:                        cm,
@@ -101,7 +101,7 @@ func NewPostgresMembershipsTable(ctx context.Context, cm *sqlutil.Connections) (
 		purgeMembershipsSQL:       purgeMembershipsSQL,
 		selectMembersSQL:          selectMembersSQL,
 	}
-	
+
 	return s, nil
 }
 
@@ -111,12 +111,12 @@ func (s *membershipsTable) UpsertMembership(
 ) error {
 	// Get database connection
 	db := s.cm.Connection(ctx, false)
-	
+
 	membership, err := event.Membership()
 	if err != nil {
 		return fmt.Errorf("event.Membership: %w", err)
 	}
-	
+
 	return db.Exec(
 		s.upsertMembershipSQL,
 		event.RoomID().String(),
@@ -133,7 +133,7 @@ func (s *membershipsTable) SelectMembershipCount(
 ) (count int, err error) {
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	
+
 	err = db.Raw(s.selectMembershipCountSQL, roomID, pos, membership).Scan(&count).Error
 	return
 }
@@ -146,11 +146,11 @@ func (s *membershipsTable) SelectMembershipForUser(
 ) (membership string, topologyPos int64, err error) {
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	
+
 	row := db.Raw(s.selectMembershipBeforeSQL, roomID, userID, pos).Row()
 	err = row.Scan(&membership, &topologyPos)
 	if err != nil {
-		if errors.Is(err, sqlutil.ErrNoRows) {
+		if frame.DBErrorIsRecordNotFound(err) {
 			return "leave", 0, nil
 		}
 		return "", 0, err
@@ -163,7 +163,7 @@ func (s *membershipsTable) PurgeMemberships(
 ) error {
 	// Get database connection
 	db := s.cm.Connection(ctx, false)
-	
+
 	return db.Exec(s.purgeMembershipsSQL, roomID).Error
 }
 
@@ -174,13 +174,13 @@ func (s *membershipsTable) SelectMemberships(
 ) (eventIDs []string, err error) {
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	
+
 	rows, err := db.Raw(s.selectMembersSQL, roomID, pos.Depth, membership, notMembership).Rows()
 	if err != nil {
 		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectMemberships: failed to close rows")
-	
+
 	var eventID string
 	for rows.Next() {
 		if err = rows.Scan(&eventID); err != nil {

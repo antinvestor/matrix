@@ -57,31 +57,31 @@ const (
 		"INSERT INTO roomserver_rooms (room_id, room_version) VALUES ($1, $2)" +
 		" ON CONFLICT ON CONSTRAINT roomserver_room_id_unique" +
 		" DO NOTHING RETURNING (room_nid)"
-		
+
 	selectRoomNIDSQL = "" +
 		"SELECT room_nid FROM roomserver_rooms WHERE room_id = $1"
-		
+
 	selectRoomNIDForUpdateSQL = "" +
 		"SELECT room_nid FROM roomserver_rooms WHERE room_id = $1 FOR UPDATE"
-		
+
 	selectLatestEventNIDsSQL = "" +
 		"SELECT latest_event_nids, state_snapshot_nid FROM roomserver_rooms WHERE room_nid = $1"
-		
+
 	selectLatestEventNIDsForUpdateSQL = "" +
 		"SELECT latest_event_nids, last_event_sent_nid, state_snapshot_nid FROM roomserver_rooms WHERE room_nid = $1 FOR UPDATE"
-		
+
 	updateLatestEventNIDsSQL = "" +
 		"UPDATE roomserver_rooms SET latest_event_nids = $2, last_event_sent_nid = $3, state_snapshot_nid = $4 WHERE room_nid = $1"
-		
+
 	selectRoomVersionsForRoomNIDsSQL = "" +
 		"SELECT room_nid, room_version FROM roomserver_rooms WHERE room_nid = ANY($1)"
-		
+
 	selectRoomInfoSQL = "" +
 		"SELECT room_version, room_nid, state_snapshot_nid, latest_event_nids FROM roomserver_rooms WHERE room_id = $1"
-		
+
 	bulkSelectRoomIDsSQL = "" +
 		"SELECT room_id FROM roomserver_rooms WHERE room_nid = ANY($1)"
-		
+
 	bulkSelectRoomNIDsSQL = "" +
 		"SELECT room_nid FROM roomserver_rooms WHERE room_id = ANY($1)"
 )
@@ -89,18 +89,18 @@ const (
 // roomsStatements implements tables.Rooms interface
 type roomsStatements struct {
 	cm *sqlutil.Connections
-	
+
 	// SQL statements stored as struct fields
-	insertRoomNIDStmt                 string
-	selectRoomNIDStmt                 string
-	selectRoomNIDForUpdateStmt        string
-	selectLatestEventNIDsStmt         string
+	insertRoomNIDStmt                  string
+	selectRoomNIDStmt                  string
+	selectRoomNIDForUpdateStmt         string
+	selectLatestEventNIDsStmt          string
 	selectLatestEventNIDsForUpdateStmt string
-	updateLatestEventNIDsStmt         string
-	selectRoomVersionsForRoomNIDsStmt string
-	selectRoomInfoStmt                string
-	bulkSelectRoomIDsStmt             string
-	bulkSelectRoomNIDsStmt            string
+	updateLatestEventNIDsStmt          string
+	selectRoomVersionsForRoomNIDsStmt  string
+	selectRoomInfoStmt                 string
+	bulkSelectRoomIDsStmt              string
+	bulkSelectRoomNIDsStmt             string
 }
 
 // NewPostgresRoomsTable creates a new PostgreSQL rooms table and prepares all statements
@@ -109,42 +109,39 @@ func NewPostgresRoomsTable(ctx context.Context, cm *sqlutil.Connections) (tables
 	if err := cm.Writer.ExecSQL(ctx, roomsSchema); err != nil {
 		return nil, err
 	}
-	
+
 	// Run any migrations if needed
 	// (Currently no migrations for this table)
-	
+
 	// Initialize the table
 	r := &roomsStatements{
 		cm: cm,
-		
+
 		// Initialize SQL statement fields with the constants
-		insertRoomNIDStmt:                 insertRoomNIDSQL,
-		selectRoomNIDStmt:                 selectRoomNIDSQL,
-		selectRoomNIDForUpdateStmt:        selectRoomNIDForUpdateSQL,
-		selectLatestEventNIDsStmt:         selectLatestEventNIDsSQL,
+		insertRoomNIDStmt:                  insertRoomNIDSQL,
+		selectRoomNIDStmt:                  selectRoomNIDSQL,
+		selectRoomNIDForUpdateStmt:         selectRoomNIDForUpdateSQL,
+		selectLatestEventNIDsStmt:          selectLatestEventNIDsSQL,
 		selectLatestEventNIDsForUpdateStmt: selectLatestEventNIDsForUpdateSQL,
-		updateLatestEventNIDsStmt:         updateLatestEventNIDsSQL,
-		selectRoomVersionsForRoomNIDsStmt: selectRoomVersionsForRoomNIDsSQL,
-		selectRoomInfoStmt:                selectRoomInfoSQL,
-		bulkSelectRoomIDsStmt:             bulkSelectRoomIDsSQL,
-		bulkSelectRoomNIDsStmt:            bulkSelectRoomNIDsSQL,
+		updateLatestEventNIDsStmt:          updateLatestEventNIDsSQL,
+		selectRoomVersionsForRoomNIDsStmt:  selectRoomVersionsForRoomNIDsSQL,
+		selectRoomInfoStmt:                 selectRoomInfoSQL,
+		bulkSelectRoomIDsStmt:              bulkSelectRoomIDsSQL,
+		bulkSelectRoomNIDsStmt:             bulkSelectRoomNIDsSQL,
 	}
-	
+
 	return r, nil
 }
 
 // InsertRoomNID inserts a new room with the given ID and version, then returns a new room NID
 func (s *roomsStatements) InsertRoomNID(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	var roomNID int64
 
 	// Get database connection
 	db := s.cm.Connection(ctx, false)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
 
 	row := db.Raw(s.insertRoomNIDStmt, roomID, roomVersion).Row()
 	err := row.Scan(&roomNID)
@@ -153,16 +150,13 @@ func (s *roomsStatements) InsertRoomNID(
 }
 
 // SelectRoomInfo retrieves room information for a given room ID
-func (s *roomsStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
+func (s *roomsStatements) SelectRoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
 	var info types.RoomInfo
 	var latestNIDs pq.Int64Array
 	var stateSnapshotNID types.StateSnapshotNID
 
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
 
 	row := db.Raw(s.selectRoomInfoStmt, roomID).Row()
 	err := row.Scan(&info.RoomVersion, &info.RoomNID, &stateSnapshotNID, &latestNIDs)
@@ -178,15 +172,12 @@ func (s *roomsStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomI
 
 // SelectRoomNID retrieves the numeric ID for a room given its string ID
 func (s *roomsStatements) SelectRoomNID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, roomID string,
 ) (types.RoomNID, error) {
 	var roomNID int64
 
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
 
 	row := db.Raw(s.selectRoomNIDStmt, roomID).Row()
 	err := row.Scan(&roomNID)
@@ -195,15 +186,12 @@ func (s *roomsStatements) SelectRoomNID(
 
 // SelectRoomNIDForUpdate retrieves the numeric ID for a room with FOR UPDATE clause
 func (s *roomsStatements) SelectRoomNIDForUpdate(
-	ctx context.Context, txn *sql.Tx, roomID string,
+	ctx context.Context, roomID string,
 ) (types.RoomNID, error) {
 	var roomNID int64
 
 	// Get database connection
 	db := s.cm.Connection(ctx, false)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
 
 	row := db.Raw(s.selectRoomNIDForUpdateStmt, roomID).Row()
 	err := row.Scan(&roomNID)
@@ -212,7 +200,7 @@ func (s *roomsStatements) SelectRoomNIDForUpdate(
 
 // SelectLatestEventNIDs retrieves the latest event NIDs and state snapshot NID for a room
 func (s *roomsStatements) SelectLatestEventNIDs(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+	ctx context.Context, roomNID types.RoomNID,
 ) ([]types.EventNID, types.StateSnapshotNID, error) {
 	var eventNIDs []types.EventNID
 	var stateSnapshotNID types.StateSnapshotNID
@@ -220,9 +208,6 @@ func (s *roomsStatements) SelectLatestEventNIDs(
 
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
 
 	row := db.Raw(s.selectLatestEventNIDsStmt, int64(roomNID)).Row()
 	err := row.Scan(&latestNIDs, &stateSnapshotNID)
@@ -240,7 +225,7 @@ func (s *roomsStatements) SelectLatestEventNIDs(
 
 // SelectLatestEventsNIDsForUpdate retrieves the latest event NIDs, last event sent NID, and state snapshot NID with FOR UPDATE clause
 func (s *roomsStatements) SelectLatestEventsNIDsForUpdate(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+	ctx context.Context, roomNID types.RoomNID,
 ) ([]types.EventNID, types.EventNID, types.StateSnapshotNID, error) {
 	var eventNIDs []types.EventNID
 	var lastEventSentNID types.EventNID
@@ -249,9 +234,6 @@ func (s *roomsStatements) SelectLatestEventsNIDsForUpdate(
 
 	// Get database connection
 	db := s.cm.Connection(ctx, false)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
 
 	row := db.Raw(s.selectLatestEventNIDsForUpdateStmt, int64(roomNID)).Row()
 	err := row.Scan(&latestNIDs, &lastEventSentNID, &stateSnapshotNID)
@@ -278,9 +260,6 @@ func (s *roomsStatements) UpdateLatestEventNIDs(
 ) error {
 	// Get database connection
 	db := s.cm.Connection(ctx, false)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
 
 	// Convert event NIDs to int64 array
 	nids := make([]int64, len(eventNIDs))
@@ -299,13 +278,10 @@ func (s *roomsStatements) UpdateLatestEventNIDs(
 
 // SelectRoomVersionsForRoomNIDs retrieves the room versions for a list of room NIDs
 func (s *roomsStatements) SelectRoomVersionsForRoomNIDs(
-	ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID,
+	ctx context.Context, roomNIDs []types.RoomNID,
 ) (map[types.RoomNID]gomatrixserverlib.RoomVersion, error) {
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
 
 	// Convert room NIDs to int64 array
 	nids := roomNIDsAsArray(roomNIDs)
@@ -330,12 +306,9 @@ func (s *roomsStatements) SelectRoomVersionsForRoomNIDs(
 }
 
 // BulkSelectRoomIDs looks up room IDs for a list of room NIDs
-func (s *roomsStatements) BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID) ([]string, error) {
+func (s *roomsStatements) BulkSelectRoomIDs(ctx context.Context, roomNIDs []types.RoomNID) ([]string, error) {
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
 
 	// Convert room NIDs to int64 array
 	nids := roomNIDsAsArray(roomNIDs)
@@ -359,12 +332,9 @@ func (s *roomsStatements) BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, ro
 }
 
 // BulkSelectRoomNIDs looks up room NIDs for a list of room IDs
-func (s *roomsStatements) BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, roomIDs []string) ([]types.RoomNID, error) {
+func (s *roomsStatements) BulkSelectRoomNIDs(ctx context.Context, roomIDs []string) ([]types.RoomNID, error) {
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
 
 	rows, err := db.Raw(s.bulkSelectRoomNIDsStmt, pq.StringArray(roomIDs)).Rows()
 	if err != nil {

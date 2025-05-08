@@ -16,7 +16,6 @@ package test
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"sync"
 
@@ -41,8 +40,7 @@ func NewInMemoryRelayDatabase() *InMemoryRelayDatabase {
 }
 
 func (d *InMemoryRelayDatabase) InsertQueueEntry(
-	ctx context.Context,
-	txn *sql.Tx,
+	_ context.Context,
 	transactionID gomatrixserverlib.TransactionID,
 	serverName spec.ServerName,
 	nid int64,
@@ -55,8 +53,7 @@ func (d *InMemoryRelayDatabase) InsertQueueEntry(
 }
 
 func (d *InMemoryRelayDatabase) DeleteQueueEntries(
-	ctx context.Context,
-	txn *sql.Tx,
+	_ context.Context,
 	serverName spec.ServerName,
 	jsonNIDs []int64,
 ) error {
@@ -72,8 +69,7 @@ func (d *InMemoryRelayDatabase) DeleteQueueEntries(
 }
 
 func (d *InMemoryRelayDatabase) SelectQueueEntries(
-	ctx context.Context,
-	txn *sql.Tx, serverName spec.ServerName,
+	_ context.Context, serverName spec.ServerName,
 	limit int,
 ) ([]int64, error) {
 	results := []int64{}
@@ -91,16 +87,14 @@ func (d *InMemoryRelayDatabase) SelectQueueEntries(
 }
 
 func (d *InMemoryRelayDatabase) SelectQueueEntryCount(
-	ctx context.Context,
-	txn *sql.Tx,
+	_ context.Context,
 	serverName spec.ServerName,
 ) (int64, error) {
 	return int64(len(d.associations[serverName])), nil
 }
 
 func (d *InMemoryRelayDatabase) InsertQueueJSON(
-	ctx context.Context,
-	txn *sql.Tx,
+	_ context.Context,
 	json string,
 ) (int64, error) {
 	d.nidMutex.Lock()
@@ -114,8 +108,7 @@ func (d *InMemoryRelayDatabase) InsertQueueJSON(
 }
 
 func (d *InMemoryRelayDatabase) DeleteQueueJSON(
-	ctx context.Context,
-	txn *sql.Tx,
+	_ context.Context,
 	nids []int64,
 ) error {
 	for _, nid := range nids {
@@ -126,8 +119,7 @@ func (d *InMemoryRelayDatabase) DeleteQueueJSON(
 }
 
 func (d *InMemoryRelayDatabase) SelectQueueJSON(
-	ctx context.Context,
-	txn *sql.Tx,
+	_ context.Context,
 	jsonNIDs []int64,
 ) (map[int64][]byte, error) {
 	result := make(map[int64][]byte)

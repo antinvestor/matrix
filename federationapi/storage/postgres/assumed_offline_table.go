@@ -55,10 +55,18 @@ const (
 type assumedOfflineTable struct {
 	cm *sqlutil.Connections
 
-	insertAssumedOfflineStmt    string
-	selectAssumedOfflineStmt    string
-	deleteAssumedOfflineStmt    string
-	deleteAllAssumedOfflineStmt string
+	// SQL queries stored as fields for better maintainability
+	// insertAssumedOfflineSQL inserts a server name into the assumed offline list with conflict handling
+	insertAssumedOfflineSQL string
+	
+	// selectAssumedOfflineSQL checks if a server is in the assumed offline list
+	selectAssumedOfflineSQL string
+	
+	// deleteAssumedOfflineSQL removes a server from the assumed offline list
+	deleteAssumedOfflineSQL string
+	
+	// deleteAllAssumedOfflineSQL removes all servers from the assumed offline list
+	deleteAllAssumedOfflineSQL string
 }
 
 // NewPostgresAssumedOfflineTable creates a new postgres assumed offline table
@@ -71,10 +79,10 @@ func NewPostgresAssumedOfflineTable(ctx context.Context, cm *sqlutil.Connections
 
 	s := &assumedOfflineTable{
 		cm: cm,
-		insertAssumedOfflineStmt:    insertAssumedOfflineSQL,
-		selectAssumedOfflineStmt:    selectAssumedOfflineSQL,
-		deleteAssumedOfflineStmt:    deleteAssumedOfflineSQL,
-		deleteAllAssumedOfflineStmt: deleteAllAssumedOfflineSQL,
+		insertAssumedOfflineSQL:    insertAssumedOfflineSQL,
+		selectAssumedOfflineSQL:    selectAssumedOfflineSQL,
+		deleteAssumedOfflineSQL:    deleteAssumedOfflineSQL,
+		deleteAllAssumedOfflineSQL: deleteAllAssumedOfflineSQL,
 	}
 
 	return s, nil
@@ -87,7 +95,7 @@ func (s *assumedOfflineTable) InsertAssumedOffline(
 	// Get writable database connection
 	db := s.cm.Connection(ctx, false)
 
-	return db.Exec(s.insertAssumedOfflineStmt, serverName).Error
+	return db.Exec(s.insertAssumedOfflineSQL, serverName).Error
 }
 
 // SelectAssumedOffline checks if a server is in the assumed offline list
@@ -98,7 +106,7 @@ func (s *assumedOfflineTable) SelectAssumedOffline(
 	db := s.cm.Connection(ctx, true)
 
 	var result string
-	err := db.Raw(s.selectAssumedOfflineStmt, serverName).Scan(&result).Error
+	err := db.Raw(s.selectAssumedOfflineSQL, serverName).Scan(&result).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return false, nil
 	}
@@ -116,7 +124,7 @@ func (s *assumedOfflineTable) DeleteAssumedOffline(
 	// Get writable database connection
 	db := s.cm.Connection(ctx, false)
 
-	return db.Exec(s.deleteAssumedOfflineStmt, serverName).Error
+	return db.Exec(s.deleteAssumedOfflineSQL, serverName).Error
 }
 
 // DeleteAllAssumedOffline removes all servers from the assumed offline list
@@ -126,5 +134,5 @@ func (s *assumedOfflineTable) DeleteAllAssumedOffline(
 	// Get writable database connection
 	db := s.cm.Connection(ctx, false)
 
-	return db.Exec(s.deleteAllAssumedOfflineStmt).Error
+	return db.Exec(s.deleteAllAssumedOfflineSQL).Error
 }

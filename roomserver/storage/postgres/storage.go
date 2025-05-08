@@ -161,7 +161,7 @@ func (d *Database) prepare(ctx context.Context, cm *sqlutil.Connections, cache c
 		EventDatabase: shared.EventDatabase{
 			Cm:                  cm,
 			Cache:               cache,
-			Writer:              cm.Writer,
+			Writer:              cm.Writer(),
 			EventsTable:         events,
 			EventJSONTable:      eventJSON,
 			EventTypesTable:     eventTypes,
@@ -171,7 +171,7 @@ func (d *Database) prepare(ctx context.Context, cm *sqlutil.Connections, cache c
 			ReportedEventsTable: reportedEvents,
 		},
 		Cache:              cache,
-		Writer:             cm.Writer,
+		Writer:             cm.Writer(),
 		RoomsTable:         rooms,
 		StateBlockTable:    stateBlock,
 		StateSnapshotTable: stateSnapshot,

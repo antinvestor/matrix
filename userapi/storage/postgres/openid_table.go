@@ -11,7 +11,6 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	log "github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 )
 
 const openIDTokenSchema = `
@@ -37,11 +36,16 @@ const (
 )
 
 type openIDTable struct {
+	// cm is the connection manager for the database
 	cm         *sqlutil.Connections
 	serverName spec.ServerName
 
-	insertTokenStmt string
-	selectTokenStmt string
+	// SQL queries stored as fields for better maintainability
+	// insertOpenIDTokenSQL inserts a new OpenID token
+	insertOpenIDTokenSQL string
+
+	// selectOpenIDTokenSQL selects an OpenID token by token value
+	selectOpenIDTokenSQL string
 }
 
 func NewPostgresOpenIDTable(cm *sqlutil.Connections, serverName spec.ServerName) (tables.OpenIDTable, error) {
@@ -53,10 +57,10 @@ func NewPostgresOpenIDTable(cm *sqlutil.Connections, serverName spec.ServerName)
 
 	// Initialize table with SQL statements
 	t := &openIDTable{
-		cm:              cm,
-		insertTokenStmt: insertOpenIDTokenSQL,
-		selectTokenStmt: selectOpenIDTokenSQL,
-		serverName:      serverName,
+		cm:                   cm,
+		insertOpenIDTokenSQL: insertOpenIDTokenSQL,
+		selectOpenIDTokenSQL: selectOpenIDTokenSQL,
+		serverName:           serverName,
 	}
 
 	return t, nil
@@ -71,7 +75,7 @@ func (t *openIDTable) InsertOpenIDToken(
 ) (err error) {
 	db := t.cm.Connection(ctx, false)
 
-	return db.Exec(t.insertTokenStmt, token, localpart, serverName, expiresAtMS).Error
+	return db.Exec(t.insertOpenIDTokenSQL, token, localpart, serverName, expiresAtMS).Error
 }
 
 // selectOpenIDTokenAtrributes gets the attributes associated with an OpenID token from the Cm
@@ -87,7 +91,7 @@ func (t *openIDTable) SelectOpenIDTokenAtrributes(
 	var localpart string
 	var serverName spec.ServerName
 
-	row := db.Raw(t.selectTokenStmt, token).Row()
+	row := db.Raw(t.selectOpenIDTokenSQL, token).Row()
 	err := row.Scan(&localpart, &serverName, &openIDTokenAttrs.ExpiresAtMS)
 
 	openIDTokenAttrs.UserID = fmt.Sprintf("@%s:%s", localpart, serverName)

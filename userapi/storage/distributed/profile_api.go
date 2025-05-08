@@ -93,7 +93,7 @@ func (s *profilesApi) SelectProfileByLocalpart(
 }
 
 func (s *profilesApi) SetAvatarURL(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 	avatarURL string,
 ) (*authtypes.Profile, bool, error) {
@@ -113,7 +113,7 @@ func (s *profilesApi) SetAvatarURL(
 }
 
 func (s *profilesApi) SetDisplayName(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 	displayName string,
 ) (*authtypes.Profile, bool, error) {

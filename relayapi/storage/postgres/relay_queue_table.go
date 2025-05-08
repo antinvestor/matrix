@@ -114,16 +114,11 @@ func NewPostgresRelayQueueTable(
 // InsertQueueEntry adds an entry to the relay queue
 func (s *postgresRelayQueueTable) InsertQueueEntry(
 	ctx context.Context,
-	txn *gorm.DB,
 	transactionID gomatrixserverlib.TransactionID,
 	serverName spec.ServerName,
 	nid int64,
 ) error {
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, false)
-	}
+	db := s.cm.Connection(ctx, false)
 
 	return db.Exec(
 		s.statements.insertQueueEntryStmt,
@@ -136,15 +131,10 @@ func (s *postgresRelayQueueTable) InsertQueueEntry(
 // DeleteQueueEntries removes entries from the relay queue
 func (s *postgresRelayQueueTable) DeleteQueueEntries(
 	ctx context.Context,
-	txn *gorm.DB,
 	serverName spec.ServerName,
 	jsonNIDs []int64,
 ) error {
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, false)
-	}
+	db := s.cm.Connection(ctx, false)
 
 	return db.Exec(
 		s.statements.deleteQueueEntriesStmt,
@@ -156,15 +146,10 @@ func (s *postgresRelayQueueTable) DeleteQueueEntries(
 // SelectQueueEntries retrieves entries from the relay queue
 func (s *postgresRelayQueueTable) SelectQueueEntries(
 	ctx context.Context,
-	txn *gorm.DB,
 	serverName spec.ServerName,
 	limit int,
 ) ([]int64, error) {
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, true)
-	}
+	db := s.cm.Connection(ctx, true)
 
 	rows, err := db.Raw(
 		s.statements.selectQueueEntriesStmt,
@@ -176,7 +161,7 @@ func (s *postgresRelayQueueTable) SelectQueueEntries(
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
-	
+
 	var result []int64
 	for rows.Next() {
 		var nid int64
@@ -192,14 +177,9 @@ func (s *postgresRelayQueueTable) SelectQueueEntries(
 // SelectQueueEntryCount counts the number of entries in the relay queue
 func (s *postgresRelayQueueTable) SelectQueueEntryCount(
 	ctx context.Context,
-	txn *gorm.DB,
 	serverName spec.ServerName,
 ) (int64, error) {
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, true)
-	}
+	db := s.cm.Connection(ctx, true)
 
 	var count int64
 	row := db.Raw(
@@ -214,6 +194,6 @@ func (s *postgresRelayQueueTable) SelectQueueEntryCount(
 		// there's a zero count.
 		return 0, nil
 	}
-	
+
 	return count, err
 }

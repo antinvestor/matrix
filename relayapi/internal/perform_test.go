@@ -67,7 +67,7 @@ func TestPerformRelayServerSync(t *testing.T) {
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Writer:         sqlutil.NewDefaultWriter(),
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -89,7 +89,7 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Writer:         sqlutil.NewDefaultWriter(),
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -111,7 +111,7 @@ func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Writer:         sqlutil.NewDefaultWriter(),
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}

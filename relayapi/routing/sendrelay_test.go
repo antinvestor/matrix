@@ -63,7 +63,7 @@ func createFederationRequest(
 func TestForwardEmptyReturnsOk(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Writer:         sqlutil.NewDefaultWriter(),
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -86,7 +86,7 @@ func TestForwardEmptyReturnsOk(t *testing.T) {
 func TestForwardBadJSONReturnsError(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Writer:         sqlutil.NewDefaultWriter(),
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -115,7 +115,7 @@ func TestForwardBadJSONReturnsError(t *testing.T) {
 func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Writer:         sqlutil.NewDefaultWriter(),
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -149,7 +149,7 @@ func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Writer:         sqlutil.NewDefaultWriter(),
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -186,7 +186,7 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Writer:         sqlutil.NewDefaultWriter(),
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}

@@ -66,7 +66,10 @@ func EndTransactionWithCheck(txn Transaction, succeeded *bool, err *error) {
 // Otherwise the transaction is committed.
 func WithTransaction(ctx context.Context, cm *Connections, fn func(ctx context.Context) error) (err error) {
 
-	ctx, txn := cm.BeginTx(ctx)
+	ctx, txn, err := cm.BeginTx(ctx)
+	if err != nil {
+		return
+	}
 
 	succeeded := false
 	defer EndTransactionWithCheck(txn, &succeeded, &err)

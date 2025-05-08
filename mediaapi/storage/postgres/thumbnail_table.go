@@ -24,7 +24,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/tables"
 	"github.com/antinvestor/matrix/mediaapi/types"
-	"gorm.io/gorm"
 )
 
 const thumbnailSchema = `
@@ -72,17 +71,20 @@ const (
     `
 )
 
-// thumbnailStatements holds the SQL statements for thumbnail operations
-type thumbnailStatements struct {
-	insertThumbnailStmt  string
-	selectThumbnailStmt  string
-	selectThumbnailsStmt string
-}
-
 // thumbnailsTable contains the postgres-specific implementation
 type thumbnailsTable struct {
-	cm         *sqlutil.Connections
-	statements thumbnailStatements
+	// cm is the connection manager for the database
+	cm *sqlutil.Connections
+
+	// SQL queries stored as fields for better maintainability
+	// insertThumbnailSQL inserts a new thumbnail record into the database
+	insertThumbnailSQL string
+
+	// selectThumbnailSQL retrieves a specific thumbnail by media ID, origin, dimensions, and resize method
+	selectThumbnailSQL string
+
+	// selectThumbnailsSQL retrieves all thumbnails for a given media ID and origin
+	selectThumbnailsSQL string
 }
 
 // NewPostgresThumbnailsTable creates a new postgres thumbnails table
@@ -95,12 +97,10 @@ func NewPostgresThumbnailsTable(ctx context.Context, cm *sqlutil.Connections) (t
 
 	// Initialize table with SQL statements
 	t := &thumbnailsTable{
-		cm: cm,
-		statements: thumbnailStatements{
-			insertThumbnailStmt:  insertThumbnailSQL,
-			selectThumbnailStmt:  selectThumbnailSQL,
-			selectThumbnailsStmt: selectThumbnailsSQL,
-		},
+		cm:                  cm,
+		insertThumbnailSQL:  insertThumbnailSQL,
+		selectThumbnailSQL:  selectThumbnailSQL,
+		selectThumbnailsSQL: selectThumbnailsSQL,
 	}
 
 	return t, nil
@@ -108,18 +108,14 @@ func NewPostgresThumbnailsTable(ctx context.Context, cm *sqlutil.Connections) (t
 
 // InsertThumbnail inserts thumbnail metadata into the database
 func (s *thumbnailsTable) InsertThumbnail(
-	ctx context.Context, txn *gorm.DB, thumbnailMetadata *types.ThumbnailMetadata,
+	ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata,
 ) error {
 	thumbnailMetadata.MediaMetadata.CreationTimestamp = spec.AsTimestamp(time.Now())
-	
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, false)
-	}
+
+	db := s.cm.Connection(ctx, false)
 
 	return db.Exec(
-		s.statements.insertThumbnailStmt,
+		s.insertThumbnailSQL,
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
 		thumbnailMetadata.MediaMetadata.ContentType,
@@ -134,7 +130,6 @@ func (s *thumbnailsTable) InsertThumbnail(
 // SelectThumbnail retrieves a specific thumbnail by media ID, origin, dimensions, and resize method
 func (s *thumbnailsTable) SelectThumbnail(
 	ctx context.Context,
-	txn *gorm.DB,
 	mediaID types.MediaID,
 	mediaOrigin spec.ServerName,
 	width, height int,
@@ -151,15 +146,11 @@ func (s *thumbnailsTable) SelectThumbnail(
 			ResizeMethod: resizeMethod,
 		},
 	}
-	
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, true)
-	}
+
+	db := s.cm.Connection(ctx, true)
 
 	row := db.Raw(
-		s.statements.selectThumbnailStmt,
+		s.selectThumbnailSQL,
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
 		thumbnailMetadata.ThumbnailSize.Width,
@@ -177,16 +168,12 @@ func (s *thumbnailsTable) SelectThumbnail(
 
 // SelectThumbnails retrieves all thumbnails for a given media ID and origin
 func (s *thumbnailsTable) SelectThumbnails(
-	ctx context.Context, txn *gorm.DB, mediaID types.MediaID, mediaOrigin spec.ServerName,
+	ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName,
 ) ([]*types.ThumbnailMetadata, error) {
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, true)
-	}
+	db := s.cm.Connection(ctx, true)
 
 	rows, err := db.Raw(
-		s.statements.selectThumbnailsStmt,
+		s.selectThumbnailsSQL,
 		mediaID,
 		mediaOrigin,
 	).Rows()

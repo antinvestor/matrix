@@ -98,7 +98,7 @@ func TestCurrentRoomStateTable(t *testing.T) {
 	})
 }
 
-func testCurrentState(t *testing.T, ctx context.Context, txn *sql.Tx, tab tables.CurrentRoomState, room *test.Room) {
+func testCurrentState(t *testing.T, ctx context.Context, tab tables.CurrentRoomState, room *test.Room) {
 	t.Run("test currentState", func(t *testing.T) {
 		// returns the complete state of the room with a default filter
 		filter := synctypes.DefaultStateFilter()

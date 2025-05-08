@@ -17,7 +17,7 @@ func TestUpDropEventReferenceSHAPrevEvents(t *testing.T) {
 	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer closeRig()
 
-	db, err := sqlutil.Open(&cfg.Global.DatabaseOptions, sqlutil.NewDummyWriter())
+	db, err := sqlutil.Open(&cfg.Global.DatabaseOptions, sqlutil.NewDefaultWriter())
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 	defer db.Close()

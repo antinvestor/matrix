@@ -59,9 +59,9 @@ const (
 
 type previousEventsStatements struct {
 	cm *sqlutil.Connections
-	
+
 	// SQL statements stored as struct fields
-	insertPreviousEventStmt      string
+	insertPreviousEventStmt       string
 	selectPreviousEventExistsStmt string
 }
 
@@ -71,7 +71,7 @@ func NewPostgresPreviousEventsTable(ctx context.Context, cm *sqlutil.Connections
 	if err := cm.Writer.ExecSQL(ctx, previousEventSchema); err != nil {
 		return nil, err
 	}
-	
+
 	// Run any migrations
 	m := sqlutil.NewMigrator(cm.Writer.DB)
 	m.AddMigrations([]sqlutil.Migration{
@@ -83,23 +83,23 @@ func NewPostgresPreviousEventsTable(ctx context.Context, cm *sqlutil.Connections
 	if err := m.Up(ctx); err != nil {
 		return nil, err
 	}
-	
+
 	// Initialize the table
 	s := &previousEventsStatements{
 		cm: cm,
-		
+
 		// Initialize SQL statement fields with the constants
-		insertPreviousEventStmt:      insertPreviousEventSQL,
+		insertPreviousEventStmt:       insertPreviousEventSQL,
 		selectPreviousEventExistsStmt: selectPreviousEventExistsSQL,
 	}
-	
+
 	return s, nil
 }
 
 // InsertPreviousEvent inserts a previous event into the table
 // This updates the event_nids list for the previous_event_id in the table
 func (s *previousEventsStatements) InsertPreviousEvent(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	previousEventID string,
 	eventNID types.EventNID,
 ) error {
@@ -108,33 +108,29 @@ func (s *previousEventsStatements) InsertPreviousEvent(
 	if txn != nil {
 		return txn.Exec(s.insertPreviousEventStmt, previousEventID, int64(eventNID)).Error
 	}
-	
+
 	return db.Exec(s.insertPreviousEventStmt, previousEventID, int64(eventNID)).Error
 }
 
 // SelectPreviousEventExists checks if the event reference exists
 // Returns sql.ErrNoRows if the event reference doesn't exist.
 func (s *previousEventsStatements) SelectPreviousEventExists(
-	ctx context.Context, txn *sql.Tx, eventID string,
+	ctx context.Context, eventID string,
 ) error {
 	// Get database connection
 	var count int64
 	var err error
-	
-	if txn != nil {
-		err = txn.QueryRow(s.selectPreviousEventExistsStmt, eventID).Scan(&count)
-	} else {
-		db := s.cm.Connection(ctx, true)
-		err = db.Raw(s.selectPreviousEventExistsStmt, eventID).Row().Scan(&count)
-	}
-	
+
+	db := s.cm.Connection(ctx, true)
+	err = db.Raw(s.selectPreviousEventExistsStmt, eventID).Row().Scan(&count)
+
 	if err != nil {
 		return err
 	}
-	
+
 	if count == 0 {
 		return sql.ErrNoRows
 	}
-	
+
 	return nil
 }

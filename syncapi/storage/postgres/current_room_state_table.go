@@ -71,19 +71,19 @@ CREATE INDEX IF NOT EXISTS syncapi_current_room_state_type_state_key_idx ON sync
 type currentRoomStateTable struct {
 	cm *sqlutil.Connections
 
-	upsertRoomStateStmt             string
-	deleteRoomStateByEventIDStmt    string
-	deleteRoomStateForRoomStmt      string
-	selectRoomIDsWithMembershipStmt string
+	upsertRoomStateStmt                string
+	deleteRoomStateByEventIDStmt       string
+	deleteRoomStateForRoomStmt         string
+	selectRoomIDsWithMembershipStmt    string
 	selectRoomIDsWithAnyMembershipStmt string
-	selectCurrentStateStmt          string
-	selectJoinedUsersStmt           string
-	selectJoinedUsersInRoomStmt     string
-	selectStateEventStmt            string
-	selectEventsWithEventIDsStmt    string
-	selectSharedUsersStmt           string
-	selectMembershipCountStmt       string
-	selectRoomHeroesStmt            string
+	selectCurrentStateStmt             string
+	selectJoinedUsersStmt              string
+	selectJoinedUsersInRoomStmt        string
+	selectStateEventStmt               string
+	selectEventsWithEventIDsStmt       string
+	selectSharedUsersStmt              string
+	selectMembershipCountStmt          string
+	selectRoomHeroesStmt               string
 }
 
 func NewPostgresCurrentRoomStateTable(ctx context.Context, cm *sqlutil.Connections) (tables.CurrentRoomState, error) {
@@ -108,20 +108,20 @@ func NewPostgresCurrentRoomStateTable(ctx context.Context, cm *sqlutil.Connectio
 	}
 
 	return &currentRoomStateTable{
-		cm: cm,
-		upsertRoomStateStmt:             `INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at, history_visibility) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT ON CONSTRAINT syncapi_room_state_unique DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9`,
-		deleteRoomStateByEventIDStmt:    `DELETE FROM syncapi_current_room_state WHERE event_id = $1`,
-		deleteRoomStateForRoomStmt:      `DELETE FROM syncapi_current_room_state WHERE room_id = $1`,
-		selectRoomIDsWithMembershipStmt: `SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2`,
+		cm:                                 cm,
+		upsertRoomStateStmt:                `INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at, history_visibility) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT ON CONSTRAINT syncapi_room_state_unique DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9`,
+		deleteRoomStateByEventIDStmt:       `DELETE FROM syncapi_current_room_state WHERE event_id = $1`,
+		deleteRoomStateForRoomStmt:         `DELETE FROM syncapi_current_room_state WHERE room_id = $1`,
+		selectRoomIDsWithMembershipStmt:    `SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2`,
 		selectRoomIDsWithAnyMembershipStmt: `SELECT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1`,
-		selectCurrentStateStmt:          `SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND ( $2::text[] IS NULL OR     sender  = ANY($2)  ) AND ( $3::text[] IS NULL OR NOT(sender  = ANY($3)) ) AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  ) AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) ) AND ( $6::bool IS NULL   OR     contains_url = $6  ) AND (event_id = ANY($7)) IS NOT TRUE`,
-		selectJoinedUsersStmt:           `SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'`,
-		selectJoinedUsersInRoomStmt:     `SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join' AND room_id = ANY($1)`,
-		selectStateEventStmt:            `SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3`,
-		selectEventsWithEventIDsStmt:    `SELECT event_id, added_at, headered_event_json, history_visibility FROM syncapi_current_room_state WHERE event_id = ANY($1)`,
-		selectSharedUsersStmt:           `SELECT state_key FROM syncapi_current_room_state WHERE room_id = ANY( SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join' ) AND type = 'm.room.member' AND state_key = ANY($2) AND membership IN ('join', 'invite')`,
-		selectMembershipCountStmt:       `SELECT count(*) FROM syncapi_current_room_state WHERE type = 'm.room.member' AND room_id = $1 AND membership = $2`,
-		selectRoomHeroesStmt:            `SELECT state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND room_id = $1 AND membership = ANY($2) AND state_key != $3 ORDER BY added_at, state_key LIMIT 5`,
+		selectCurrentStateStmt:             `SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND ( $2::text[] IS NULL OR     sender  = ANY($2)  ) AND ( $3::text[] IS NULL OR NOT(sender  = ANY($3)) ) AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  ) AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) ) AND ( $6::bool IS NULL   OR     contains_url = $6  ) AND (event_id = ANY($7)) IS NOT TRUE`,
+		selectJoinedUsersStmt:              `SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'`,
+		selectJoinedUsersInRoomStmt:        `SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join' AND room_id = ANY($1)`,
+		selectStateEventStmt:               `SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3`,
+		selectEventsWithEventIDsStmt:       `SELECT event_id, added_at, headered_event_json, history_visibility FROM syncapi_current_room_state WHERE event_id = ANY($1)`,
+		selectSharedUsersStmt:              `SELECT state_key FROM syncapi_current_room_state WHERE room_id = ANY( SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join' ) AND type = 'm.room.member' AND state_key = ANY($2) AND membership IN ('join', 'invite')`,
+		selectMembershipCountStmt:          `SELECT count(*) FROM syncapi_current_room_state WHERE type = 'm.room.member' AND room_id = $1 AND membership = $2`,
+		selectRoomHeroesStmt:               `SELECT state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND room_id = $1 AND membership = ANY($2) AND state_key != $3 ORDER BY added_at, state_key LIMIT 5`,
 	}, nil
 }
 
@@ -188,7 +188,7 @@ func (s *currentRoomStateTable) SelectRoomIDsWithMembership(ctx context.Context,
 	return result, rows.Err()
 }
 
-func (s *currentRoomStateTable) SelectRoomIDsWithAnyMembership(ctx context.Context, txn *sql.Tx, userID string) (map[string]string, error) {
+func (s *currentRoomStateTable) SelectRoomIDsWithAnyMembership(ctx context.Context, userID string) (map[string]string, error) {
 	rows, err := txn.Query(s.selectRoomIDsWithAnyMembershipStmt, userID)
 	if err != nil {
 		return nil, err

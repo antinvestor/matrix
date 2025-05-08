@@ -844,11 +844,11 @@ func (d *Database) PublishRoom(ctx context.Context, roomID, appserviceID, networ
 }
 
 func (d *Database) GetPublishedRoom(ctx context.Context, roomID string) (bool, error) {
-	return d.PublishedTable.SelectPublishedFromRoomID(ctx, nil, roomID)
+	return d.PublishedTable.SelectPublishedFromRoomID(ctx, roomID)
 }
 
 func (d *Database) GetPublishedRooms(ctx context.Context, networkID string, includeAllNetworks bool) ([]string, error) {
-	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, networkID, true, includeAllNetworks)
+	return d.PublishedTable.SelectAllPublishedRooms(ctx, networkID, true, includeAllNetworks)
 }
 
 func (d *Database) MissingAuthPrevEvents(
@@ -1191,7 +1191,7 @@ func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *type
 	}
 	events := make([]gomatrixserverlib.PDU, 0, len(eventNIDs))
 	for _, eventNID := range eventNIDs {
-		data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{eventNID})
+		data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, []types.EventNID{eventNID})
 		if err != nil {
 			return nil, err
 		}
@@ -1249,7 +1249,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
-	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, eventNIDs)
+	eventIDs, err := d.EventsTable.BulkSelectEventID(ctx, eventNIDs)
 	if err != nil {
 		eventIDs = map[types.EventNID]string{}
 	}
@@ -1260,7 +1260,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 			if ok {
 				return &types.HeaderedEvent{PDU: cachedEvent}, nil
 			}
-			data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{e.EventNID})
+			data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, []types.EventNID{e.EventNID})
 			if err != nil {
 				return nil, err
 			}
@@ -1292,7 +1292,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 	if roomInfo.IsStub() {
 		return nil, nil
 	}
-	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
+	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, evType)
 	if errors.Is(err, sql.ErrNoRows) {
 		// No rooms have an event of this type, otherwise we'd have an event type NID
 		return nil, nil
@@ -1310,12 +1310,12 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 			eventNIDs = append(eventNIDs, e.EventNID)
 		}
 	}
-	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, eventNIDs)
+	eventIDs, err := d.EventsTable.BulkSelectEventID(ctx, eventNIDs)
 	if err != nil {
 		eventIDs = map[types.EventNID]string{}
 	}
 	// return the events requested
-	eventPairs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, eventNIDs)
+	eventPairs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, eventNIDs)
 	if err != nil {
 		return nil, err
 	}

@@ -116,7 +116,7 @@ func (m *Migrator) Up(ctx context.Context) error {
 	})
 }
 
-func (m *Migrator) insertMigration(ctx context.Context, txn *sql.Tx, migrationName string) error {
+func (m *Migrator) insertMigration(ctx context.Context, migrationName string) error {
 	if m.insertStmt == nil {
 		var stmt *sql.Stmt
 		var err error

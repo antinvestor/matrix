@@ -95,13 +95,9 @@ func NewPostgresRelayQueueJSONTable(ctx context.Context, cm *sqlutil.Connections
 
 // InsertQueueJSON adds a JSON blob to the relay queue
 func (s *postgresRelayQueueJSONTable) InsertQueueJSON(
-	ctx context.Context, txn *gorm.DB, json string,
+	ctx context.Context, json string,
 ) (int64, error) {
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, false)
-	}
+	db := s.cm.Connection(ctx, false)
 
 	var lastid int64
 	row := db.Raw(s.statements.insertJSONStmt, json).Row()
@@ -113,26 +109,18 @@ func (s *postgresRelayQueueJSONTable) InsertQueueJSON(
 
 // DeleteQueueJSON removes JSON blobs from the relay queue
 func (s *postgresRelayQueueJSONTable) DeleteQueueJSON(
-	ctx context.Context, txn *gorm.DB, nids []int64,
+	ctx context.Context, nids []int64,
 ) error {
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, false)
-	}
+	db := s.cm.Connection(ctx, false)
 
 	return db.Exec(s.statements.deleteJSONStmt, pq.Int64Array(nids)).Error
 }
 
 // SelectQueueJSON retrieves JSON blobs from the relay queue
 func (s *postgresRelayQueueJSONTable) SelectQueueJSON(
-	ctx context.Context, txn *gorm.DB, jsonNIDs []int64,
+	ctx context.Context, jsonNIDs []int64,
 ) (map[int64][]byte, error) {
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, true)
-	}
+	db := s.cm.Connection(ctx, true)
 
 	rows, err := db.Raw(s.statements.selectJSONStmt, pq.Int64Array(jsonNIDs)).Rows()
 	if err != nil {

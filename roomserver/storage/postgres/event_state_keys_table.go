@@ -18,7 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -71,11 +71,11 @@ const (
 
 type eventStateKeysStatements struct {
 	cm *sqlutil.Connections
-	
+
 	// SQL statements stored as struct fields
-	insertEventStateKeyStmt      string
-	selectEventStateKeyStmt      string
-	bulkSelectEventStateKeyStmt  string
+	insertEventStateKeyStmt        string
+	selectEventStateKeyStmt        string
+	bulkSelectEventStateKeyStmt    string
 	bulkSelectEventStateKeyNIDStmt string
 }
 
@@ -85,72 +85,49 @@ func NewPostgresEventStateKeysTable(ctx context.Context, cm *sqlutil.Connections
 	if err := cm.Writer.ExecSQL(ctx, eventStateKeysSchema); err != nil {
 		return nil, err
 	}
-	
+
 	// Initialize and return the statements
 	s := &eventStateKeysStatements{
 		cm: cm,
-		
+
 		// Initialize SQL statement fields with the constants
-		insertEventStateKeyStmt:      insertEventStateKeySQL,
-		selectEventStateKeyStmt:      selectEventStateKeySQL,
-		bulkSelectEventStateKeyStmt:  bulkSelectEventStateKeySQL,
+		insertEventStateKeyStmt:        insertEventStateKeySQL,
+		selectEventStateKeyStmt:        selectEventStateKeySQL,
+		bulkSelectEventStateKeyStmt:    bulkSelectEventStateKeySQL,
 		bulkSelectEventStateKeyNIDStmt: bulkSelectEventStateKeyNIDSQL,
 	}
-	
+
 	return s, nil
 }
 
 // InsertEventStateKey implements tables.EventStateKeys
 func (s *eventStateKeysStatements) InsertEventStateKey(
-	ctx context.Context, txn *sql.Tx, key string,
+	ctx context.Context, key string,
 ) (types.EventStateKeyNID, error) {
 	// Get database connection
-	var db *sql.Conn
-	var err error
-	
-	if txn != nil {
-		// Use existing transaction.
-		var eventStateKeyNID int64
-		err = txn.QueryRowContext(ctx, s.insertEventStateKeyStmt, key).Scan(&eventStateKeyNID)
-		if err == sql.ErrNoRows {
-			// We didn't insert a new event state key so we need to look up what
-			// the existing NID is.
-			err = txn.QueryRowContext(ctx, s.selectEventStateKeyStmt, key).Scan(&eventStateKeyNID)
-		}
-		return types.EventStateKeyNID(eventStateKeyNID), err
-	}
-	
-	// Acquire a new connection, since we're not using a transaction.
-	if db, err = s.cm.Writer.GetSQLConn(ctx); err != nil {
-		return 0, err
-	}
-	defer internal.CloseAndLogIfError(ctx, db, "InsertEventStateKey: failed to close connection")
-	
+	db := s.cm.Connection(ctx, false)
+
 	// Execute the insertion
 	var eventStateKeyNID int64
-	err = db.QueryRowContext(ctx, s.insertEventStateKeyStmt, key).Scan(&eventStateKeyNID)
-	if err == sql.ErrNoRows {
+	row := db.Raw(s.insertEventStateKeyStmt, key).Row()
+	err := row.Scan(&eventStateKeyNID)
+	if frame.DBErrorIsRecordNotFound(err) {
 		// We didn't insert a new event state key so we need to look up what
 		// the existing NID is.
-		err = db.QueryRowContext(ctx, s.selectEventStateKeyStmt, key).Scan(&eventStateKeyNID)
+		row = db.Raw(s.selectEventStateKeyStmt, key).Row()
+		err = row.Scan(&eventStateKeyNID)
 	}
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
 // SelectEventStateKeyNID implements tables.EventStateKeys
 func (s *eventStateKeysStatements) SelectEventStateKeyNID(
-	ctx context.Context, txn *sql.Tx, key string,
+	ctx context.Context, key string,
 ) (types.EventStateKeyNID, error) {
 	// Get database connection
 	var eventStateKeyNID int64
 	var err error
-	
-	if txn != nil {
-		// Use existing transaction.
-		err = txn.QueryRowContext(ctx, s.selectEventStateKeyStmt, key).Scan(&eventStateKeyNID)
-		return types.EventStateKeyNID(eventStateKeyNID), err
-	}
-	
+
 	// Use a new connection since we're not in a transaction.
 	db := s.cm.Connection(ctx, true)
 	err = db.Raw(s.selectEventStateKeyStmt, key).Row().Scan(&eventStateKeyNID)
@@ -159,35 +136,30 @@ func (s *eventStateKeysStatements) SelectEventStateKeyNID(
 
 // BulkSelectEventStateKeyNID implements tables.EventStateKeys
 func (s *eventStateKeysStatements) BulkSelectEventStateKeyNID(
-	ctx context.Context, txn *sql.Tx, keys []string,
+	ctx context.Context, keys []string,
 ) (map[string]types.EventStateKeyNID, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
-	
+
 	// Get database connection
 	var err error
 	var rows *sql.Rows
-	
-	if txn != nil {
-		// Use existing transaction.
-		rows, err = txn.QueryContext(ctx, s.bulkSelectEventStateKeyStmt, pq.StringArray(keys))
-	} else {
-		// Use a new connection since we're not in a transaction.
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(s.bulkSelectEventStateKeyStmt, pq.StringArray(keys)).Rows()
-	}
-	
+
+	// Use a new connection since we're not in a transaction.
+	db := s.cm.Connection(ctx, true)
+	rows, err = db.Raw(s.bulkSelectEventStateKeyStmt, pq.StringArray(keys)).Rows()
+
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectEventStateKeyNID: rows.close() failed")
-	
+
 	// Create result map
 	result := make(map[string]types.EventStateKeyNID, len(keys))
 	var eventStateKey string
 	var eventStateKeyNID int64
-	
+
 	// Process rows
 	for rows.Next() {
 		if err = rows.Scan(&eventStateKey, &eventStateKeyNID); err != nil {
@@ -195,53 +167,48 @@ func (s *eventStateKeysStatements) BulkSelectEventStateKeyNID(
 		}
 		result[eventStateKey] = types.EventStateKeyNID(eventStateKeyNID)
 	}
-	
+
 	return result, rows.Err()
 }
 
 // BulkSelectEventStateKey implements tables.EventStateKeys
 func (s *eventStateKeysStatements) BulkSelectEventStateKey(
-	ctx context.Context, txn *sql.Tx, nids []types.EventStateKeyNID,
+	ctx context.Context, nids []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
 	if len(nids) == 0 {
 		return nil, nil
 	}
-	
+
 	// Convert nids to int64 array
 	stateKeyNIDs := make([]int64, len(nids))
 	for i := range nids {
 		stateKeyNIDs[i] = int64(nids[i])
 	}
-	
+
 	// Get database connection
 	var err error
 	var rows *sql.Rows
-	
-	if txn != nil {
-		// Use existing transaction.
-		rows, err = txn.QueryContext(ctx, s.bulkSelectEventStateKeyNIDStmt, pq.Int64Array(stateKeyNIDs))
-	} else {
-		// Use a new connection since we're not in a transaction.
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(s.bulkSelectEventStateKeyNIDStmt, pq.Int64Array(stateKeyNIDs)).Rows()
-	}
-	
+
+	// Use a new connection since we're not in a transaction.
+	db := s.cm.Connection(ctx, true)
+	rows, err = db.Raw(s.bulkSelectEventStateKeyNIDStmt, pq.Int64Array(stateKeyNIDs)).Rows()
+
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectEventStateKey: rows.close() failed")
-	
+
 	// Create result map and process rows
 	result := make(map[types.EventStateKeyNID]string, len(nids))
 	var eventStateKeyNID int64
 	var eventStateKey string
-	
+
 	for rows.Next() {
 		if err = rows.Scan(&eventStateKeyNID, &eventStateKey); err != nil {
 			return nil, err
 		}
 		result[types.EventStateKeyNID(eventStateKeyNID)] = eventStateKey
 	}
-	
+
 	return result, rows.Err()
 }

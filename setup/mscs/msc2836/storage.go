@@ -149,7 +149,7 @@ type postgresDB struct {
 
 // NewDatabase loads the database for msc2836
 func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
-	if !conMan.DS().IsPostgres() {
+	if !cm.DS().IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type")
 	}
 	return newPostgresDatabase(ctx, cm)
@@ -159,13 +159,13 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbOpts *config.Da
 func newPostgresDatabase(ctx context.Context, cm *sqlutil.Connections) (Database, error) {
 
 	// Create tables if they don't exist
-	if err := conMan.Connection(ctx, false).Exec(postgresSchema).Error; err != nil {
+	if err := cm.Connection(ctx, false).Exec(postgresSchema).Error; err != nil {
 		return nil, err
 	}
 
 	// Initialize the database
 	d := &postgresDB{
-		cm:                                    conMan,
+		cm:                                    cm,
 		insertEdgeSQL:                         insertEdgeSQL,
 		insertNodeSQL:                         insertNodeSQL,
 		selectChildrenForParentOldestFirstSQL: selectChildrenForParentOldestFirstSQL,

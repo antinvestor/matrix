@@ -107,15 +107,11 @@ func NewPostgresMediaRepositoryTable(ctx context.Context, cm *sqlutil.Connection
 
 // InsertMedia inserts media metadata into the repository
 func (s *mediaRepository) InsertMedia(
-	ctx context.Context, txn *gorm.DB, mediaMetadata *types.MediaMetadata,
+	ctx context.Context, mediaMetadata *types.MediaMetadata,
 ) error {
 	mediaMetadata.CreationTimestamp = spec.AsTimestamp(time.Now())
-	
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, false)
-	}
+
+	db := s.cm.Connection(ctx, false)
 
 	return db.Exec(
 		s.statements.insertMediaStmt,
@@ -132,22 +128,18 @@ func (s *mediaRepository) InsertMedia(
 
 // SelectMedia retrieves media metadata by ID and origin
 func (s *mediaRepository) SelectMedia(
-	ctx context.Context, txn *gorm.DB, mediaID types.MediaID, mediaOrigin spec.ServerName,
+	ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName,
 ) (*types.MediaMetadata, error) {
 	mediaMetadata := types.MediaMetadata{
 		MediaID: mediaID,
 		Origin:  mediaOrigin,
 	}
-	
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, true)
-	}
+
+	db := s.cm.Connection(ctx, true)
 
 	row := db.Raw(
-		s.statements.selectMediaStmt, 
-		mediaMetadata.MediaID, 
+		s.statements.selectMediaStmt,
+		mediaMetadata.MediaID,
 		mediaMetadata.Origin,
 	).Row()
 
@@ -164,22 +156,18 @@ func (s *mediaRepository) SelectMedia(
 
 // SelectMediaByHash retrieves media metadata by hash and origin
 func (s *mediaRepository) SelectMediaByHash(
-	ctx context.Context, txn *gorm.DB, mediaHash types.Base64Hash, mediaOrigin spec.ServerName,
+	ctx context.Context, mediaHash types.Base64Hash, mediaOrigin spec.ServerName,
 ) (*types.MediaMetadata, error) {
 	mediaMetadata := types.MediaMetadata{
 		Base64Hash: mediaHash,
 		Origin:     mediaOrigin,
 	}
-	
-	// Use provided transaction or create a new one
-	db := txn
-	if db == nil {
-		db = s.cm.Connection(ctx, true)
-	}
+
+	db := s.cm.Connection(ctx, true)
 
 	row := db.Raw(
 		s.statements.selectMediaByHashStmt,
-		mediaMetadata.Base64Hash, 
+		mediaMetadata.Base64Hash,
 		mediaMetadata.Origin,
 	).Row()
 

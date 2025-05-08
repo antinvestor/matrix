@@ -78,17 +78,17 @@ func NewPostgresStateBlockTable(ctx context.Context, cm *sqlutil.Connections) (t
 	if err := db.Exec(stateDataSchema).Error; err != nil {
 		return nil, err
 	}
-	
+
 	// Initialize the table
 	s := &stateBlockTable{
 		cm: cm,
 	}
-	
+
 	return s, nil
 }
 
 func (s *stateBlockTable) BulkInsertStateData(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	entries types.StateEntries,
 ) (id types.StateBlockNID, err error) {
 	// Sort and deduplicate the entries
@@ -97,39 +97,33 @@ func (s *stateBlockTable) BulkInsertStateData(
 	for i := range entries {
 		nids[i] = entries[i].EventNID
 	}
-	
+
 	// Get database connection
 	db := s.cm.Connection(ctx, false)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
-	
+
 	// Execute query
 	err = db.Raw(
 		insertStateDataSQL,
 		nids.Hash(),
 		eventNIDsAsArray(nids),
 	).Scan(&id).Error
-	
+
 	return
 }
 
 func (s *stateBlockTable) BulkSelectStateBlockEntries(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	stateBlockNIDs types.StateBlockNIDs,
 ) ([][]types.EventNID, error) {
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	if txn != nil {
-		db = db.WithContext(ctx)
-	}
-	
+
 	// Execute query
 	rows, err := db.Raw(
 		bulkSelectStateBlockEntriesSQL,
 		stateBlockNIDsAsArray(stateBlockNIDs),
 	).Rows()
-	
+
 	if err != nil {
 		return nil, err
 	}

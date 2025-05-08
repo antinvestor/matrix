@@ -18,14 +18,13 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
+	"github.com/lib/pq"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/lib/pq"
 )
 
 const eventJSONSchema = `
@@ -62,20 +61,20 @@ const (
 		"DELETE FROM roomserver_event_json WHERE event_nid = $1"
 
 	// Delete multiple event JSON entries by their NIDs
-	purgeEventJSONSQL = "" +
+	deleteMultipleEventJSONSQL = "" +
 		"DELETE FROM roomserver_event_json WHERE event_nid = ANY($1)"
 )
 
 // eventJSONTable implements tables.EventJSON
 type eventJSONTable struct {
 	cm *sqlutil.Connections
-	
+
 	// SQL statements stored as struct fields
-	insertEventJSONStmt      string
-	selectEventJSONStmt      string
-	bulkSelectEventJSONStmt  string
-	deleteEventJSONStmt      string
-	purgeEventJSONStmt       string
+	insertEventJSONStmt         string
+	selectEventJSONStmt         string
+	bulkSelectEventJSONStmt     string
+	deleteEventJSONStmt         string
+	deleteMultipleEventJSONStmt string
 }
 
 // NewPostgresEventJSONTable creates a new PostgreSQL event JSON table
@@ -88,13 +87,13 @@ func NewPostgresEventJSONTable(ctx context.Context, cm *sqlutil.Connections) (ta
 	// Initialize the table struct with SQL statements
 	s := &eventJSONTable{
 		cm: cm,
-		
+
 		// Initialize SQL statement fields with the constants
-		insertEventJSONStmt:     insertEventJSONSQL,
-		selectEventJSONStmt:     selectEventJSONSQL,
-		bulkSelectEventJSONStmt: bulkSelectEventJSONSQL,
-		deleteEventJSONStmt:     deleteEventJSONSQL,
-		purgeEventJSONStmt:      purgeEventJSONSQL,
+		insertEventJSONStmt:         insertEventJSONSQL,
+		selectEventJSONStmt:         selectEventJSONSQL,
+		bulkSelectEventJSONStmt:     bulkSelectEventJSONSQL,
+		deleteEventJSONStmt:         deleteEventJSONSQL,
+		deleteMultipleEventJSONStmt: deleteMultipleEventJSONSQL,
 	}
 
 	return s, nil
@@ -115,22 +114,21 @@ func (s *eventJSONTable) BulkInsertEventJSON(
 	if len(eventNIDs) == 0 {
 		return nil
 	}
-	
-	db := s.cm.Connection(ctx, false)
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	
-	defer internal.EndTransaction(ctx, tx, &err)
-	
-	for i := range eventNIDs {
-		if err = tx.Exec(s.insertEventJSONStmt, int64(eventNIDs[i]), string(eventJSONs[i])).Error; err != nil {
-			return err
+
+	return sqlutil.WithTransaction(ctx, s.cm, func(ctx context.Context) error {
+
+		var err error
+		db := s.cm.Connection(ctx, false)
+
+		for i := range eventNIDs {
+			if err = db.Exec(s.insertEventJSONStmt, int64(eventNIDs[i]), string(eventJSONs[i])).Error; err != nil {
+				return err
+			}
 		}
-	}
-	
-	return nil
+
+		return nil
+	})
+
 }
 
 // SelectEventJSON implements tables.EventJSON
@@ -139,79 +137,53 @@ func (s *eventJSONTable) SelectEventJSON(
 ) ([]byte, error) {
 	db := s.cm.Connection(ctx, true)
 	var eventJSON string
-	
+
 	if err := db.Raw(s.selectEventJSONStmt, int64(eventNID)).Row().Scan(&eventJSON); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	
+
 	return []byte(eventJSON), nil
 }
 
 // BulkSelectEventJSON implements tables.EventJSON
 func (s *eventJSONTable) BulkSelectEventJSON(
 	ctx context.Context, eventNIDs []types.EventNID,
-) (map[types.EventNID][]byte, error) {
+) ([]tables.EventJSONPair, error) {
 	if len(eventNIDs) == 0 {
 		return nil, nil
 	}
-	
+
 	db := s.cm.Connection(ctx, true)
-	
+
 	// Convert event NIDs to int64s for the query
 	eventNIDInt64s := make([]int64, len(eventNIDs))
 	for i := range eventNIDs {
 		eventNIDInt64s[i] = int64(eventNIDs[i])
 	}
-	
+
 	// Execute query
 	rows, err := db.Raw(s.bulkSelectEventJSONStmt, pq.Int64Array(eventNIDInt64s)).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventJSON: rows.close() failed")
-	
-	// Scan results
-	result := make(map[types.EventNID][]byte, len(eventNIDs))
+
+	// We know that we will only get as many results as event NIDs
+	// because of the unique constraint on event NIDs.
+	// So we can allocate an array of the correct size now.
+	// We might get fewer results than NIDs so we adjust the length of the slice before returning it.
+	results := make([]tables.EventJSONPair, len(eventNIDs))
+	i := 0
 	var eventNID int64
-	var eventJSON string
-	
-	for rows.Next() {
-		if err = rows.Scan(&eventNID, &eventJSON); err != nil {
+	for ; rows.Next(); i++ {
+		result := &results[i]
+		if err := rows.Scan(&eventNID, &result.EventJSON); err != nil {
 			return nil, err
 		}
-		result[types.EventNID(eventNID)] = []byte(eventJSON)
+		result.EventNID = types.EventNID(eventNID)
 	}
-	
-	return result, rows.Err()
-}
-
-// DeleteEventJSON implements tables.EventJSON
-func (s *eventJSONTable) DeleteEventJSON(
-	ctx context.Context, eventNID types.EventNID,
-) error {
-	db := s.cm.Connection(ctx, false)
-	return db.Exec(s.deleteEventJSONStmt, int64(eventNID)).Error
-}
-
-// PurgeEventJSON implements tables.EventJSON
-func (s *eventJSONTable) PurgeEventJSON(
-	ctx context.Context, eventNIDs []types.EventNID,
-) error {
-	if len(eventNIDs) == 0 {
-		return nil
-	}
-	
-	db := s.cm.Connection(ctx, false)
-	
-	// Convert event NIDs to int64s for the query
-	eventNIDInt64s := make([]int64, len(eventNIDs))
-	for i := range eventNIDs {
-		eventNIDInt64s[i] = int64(eventNIDs[i])
-	}
-	
-	// Execute query
-	return db.Exec(s.purgeEventJSONStmt, pq.Int64Array(eventNIDInt64s)).Error
+	return results[:i], rows.Err()
 }

@@ -86,10 +86,10 @@ const (
 	// Queries are taken from: https://github.com/matrix-org/synapse/blob/9ce51a47f6e37abd0a1275281806399d874eb026/synapse/storage/databases/main/stats.py
 
 	/*
-	R30Users counts the number of 30 day retained users, defined as:
-	- Users who have created their accounts more than 30 days ago
-	- Where last seen at most 30 days ago
-	- Where account creation and last_seen are > 30 days apart
+		R30Users counts the number of 30 day retained users, defined as:
+		- Users who have created their accounts more than 30 days ago
+		- Where last seen at most 30 days ago
+		- Where account creation and last_seen are > 30 days apart
 	*/
 	countR30UsersSQL = `
 	SELECT platform, COUNT(*) FROM (
@@ -119,9 +119,9 @@ const (
 	`
 
 	/*
-	R30UsersV2 counts the number of 30 day retained users, defined as users that:
-	- Appear more than once in the past 60 days
-	- Have more than 30 days between the most and least recent appearances that occurred in the past 60 days.
+		R30UsersV2 counts the number of 30 day retained users, defined as users that:
+		- Appear more than once in the past 60 days
+		- Have more than 30 days between the most and least recent appearances that occurred in the past 60 days.
 	*/
 	countR30UsersV2SQL = `
 	SELECT
@@ -235,12 +235,12 @@ func NewPostgresStatsTable(ctx context.Context, db *sql.DB, serverName spec.Serv
 	if err != nil {
 		return nil, err
 	}
-	
+
 	_, err = db.Exec(messagesDailySchema)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	go s.startTimers(ctx)
 	return s, nil
 }
@@ -303,10 +303,10 @@ func (s *statsTable) nonBridgedUsers(ctx context.Context, txn *sql.Tx) (result i
 
 func (s *statsTable) registeredUserByType(ctx context.Context, txn *sql.Tx) (map[string]int64, error) {
 	registeredAfter := time.Now().AddDate(0, 0, -30)
-	
+
 	var rows *sql.Rows
 	var err error
-	
+
 	if txn != nil {
 		rows, err = txn.QueryContext(ctx, s.statements.countRegisteredUserByTypeStmt,
 			pq.Int64Array{
@@ -326,7 +326,7 @@ func (s *statsTable) registeredUserByType(ctx context.Context, txn *sql.Tx) (map
 			api.AccountTypeGuest,
 			spec.AsTimestamp(registeredAfter))
 	}
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +347,7 @@ func (s *statsTable) registeredUserByType(ctx context.Context, txn *sql.Tx) (map
 
 func (s *statsTable) dailyUsers(ctx context.Context, txn *sql.Tx) (result int64, err error) {
 	lastSeenAfter := time.Now().AddDate(0, 0, -1)
-	
+
 	var rows *sql.Row
 	if txn != nil {
 		rows = txn.QueryRowContext(ctx, s.statements.countUsersLastSeenAfterStmt,
@@ -356,14 +356,14 @@ func (s *statsTable) dailyUsers(ctx context.Context, txn *sql.Tx) (result int64,
 		rows = s.db.QueryRowContext(ctx, s.statements.countUsersLastSeenAfterStmt,
 			spec.AsTimestamp(lastSeenAfter))
 	}
-	
+
 	err = rows.Scan(&result)
 	return
 }
 
 func (s *statsTable) monthlyUsers(ctx context.Context, txn *sql.Tx) (result int64, err error) {
 	lastSeenAfter := time.Now().AddDate(0, 0, -30)
-	
+
 	var rows *sql.Row
 	if txn != nil {
 		rows = txn.QueryRowContext(ctx, s.statements.countUsersLastSeenAfterStmt,
@@ -372,7 +372,7 @@ func (s *statsTable) monthlyUsers(ctx context.Context, txn *sql.Tx) (result int6
 		rows = s.db.QueryRowContext(ctx, s.statements.countUsersLastSeenAfterStmt,
 			spec.AsTimestamp(lastSeenAfter))
 	}
-	
+
 	err = rows.Scan(&result)
 	return
 }
@@ -389,7 +389,7 @@ func (s *statsTable) r30Users(ctx context.Context, txn *sql.Tx) (map[string]int6
 
 	var rows *sql.Rows
 	var err error
-	
+
 	if txn != nil {
 		rows, err = txn.QueryContext(ctx, s.statements.countR30UsersStmt,
 			spec.AsTimestamp(lastSeenAfter),
@@ -399,7 +399,7 @@ func (s *statsTable) r30Users(ctx context.Context, txn *sql.Tx) (map[string]int6
 			spec.AsTimestamp(lastSeenAfter),
 			diff.Milliseconds())
 	}
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +434,7 @@ func (s *statsTable) r30UsersV2(ctx context.Context, txn *sql.Tx) (map[string]in
 
 	var rows *sql.Rows
 	var err error
-	
+
 	if txn != nil {
 		rows, err = txn.QueryContext(ctx, s.statements.countR30UsersV2Stmt,
 			spec.AsTimestamp(sixtyDaysAgo),
@@ -446,7 +446,7 @@ func (s *statsTable) r30UsersV2(ctx context.Context, txn *sql.Tx) (map[string]in
 			spec.AsTimestamp(tomorrow),
 			diff.Milliseconds())
 	}
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -529,13 +529,13 @@ func (s *statsTable) UserStatistics(ctx context.Context, txn *sql.Tx) (*types.Us
 	} else {
 		rows = s.db.QueryRowContext(ctx, s.statements.dbEngineVersionStmt)
 	}
-	
+
 	err = rows.Scan(&dbEngine.Version)
 	return stats, dbEngine, err
 }
 
 func (s *statsTable) UpdateUserDailyVisits(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	startTime, lastUpdate time.Time,
 ) error {
 	startTime = startTime.Truncate(time.Hour * 24)
@@ -544,7 +544,7 @@ func (s *statsTable) UpdateUserDailyVisits(
 	if startTime.After(s.statements.lastUpdate) {
 		startTime = startTime.AddDate(0, 0, -1)
 	}
-	
+
 	var err error
 	if txn != nil {
 		_, err = txn.ExecContext(ctx, s.statements.updateUserDailyVisitsStmt,
@@ -557,7 +557,7 @@ func (s *statsTable) UpdateUserDailyVisits(
 			spec.AsTimestamp(lastUpdate),
 			spec.AsTimestamp(time.Now()))
 	}
-	
+
 	if err == nil {
 		s.statements.lastUpdate = time.Now()
 	}
@@ -565,12 +565,12 @@ func (s *statsTable) UpdateUserDailyVisits(
 }
 
 func (s *statsTable) UpsertDailyStats(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	serverName spec.ServerName, stats types.MessageStats,
 	activeRooms, activeE2EERooms int64,
 ) error {
 	timestamp := time.Now().Truncate(time.Hour * 24)
-	
+
 	var err error
 	if txn != nil {
 		_, err = txn.ExecContext(ctx, s.statements.upsertMessagesStmt,
@@ -585,25 +585,25 @@ func (s *statsTable) UpsertDailyStats(
 			stats.Messages, stats.SentMessages, stats.MessagesE2EE, stats.SentMessagesE2EE,
 			activeRooms, activeE2EERooms)
 	}
-	
+
 	return err
 }
 
 func (s *statsTable) DailyRoomsMessages(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	serverName spec.ServerName,
 ) (msgStats types.MessageStats, activeRooms, activeE2EERooms int64, err error) {
 	timestamp := time.Now().Truncate(time.Hour * 24)
 
 	var rows *sql.Row
 	if txn != nil {
-		rows = txn.QueryRowContext(ctx, s.statements.selectDailyMessagesStmt, 
+		rows = txn.QueryRowContext(ctx, s.statements.selectDailyMessagesStmt,
 			serverName, spec.AsTimestamp(timestamp))
 	} else {
-		rows = s.db.QueryRowContext(ctx, s.statements.selectDailyMessagesStmt, 
+		rows = s.db.QueryRowContext(ctx, s.statements.selectDailyMessagesStmt,
 			serverName, spec.AsTimestamp(timestamp))
 	}
-	
+
 	err = rows.Scan(&msgStats.Messages, &msgStats.SentMessages, &msgStats.MessagesE2EE, &msgStats.SentMessagesE2EE, &activeRooms, &activeE2EERooms)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return msgStats, 0, 0, err

@@ -52,7 +52,6 @@ func TestPresence(t *testing.T) {
 	statusMsg := "Hello World!"
 	timestamp := spec.AsTimestamp(time.Now())
 
-	var txn *sql.Tx
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		tab, closeDB := mustPresenceTable(t, testOpts)
 		defer closeDB()
@@ -76,7 +75,7 @@ func TestPresence(t *testing.T) {
 		}
 
 		// verify the expected max presence ID
-		maxPos, err := tab.GetMaxPresenceID(ctx, txn)
+		maxPos, err := tab.GetMaxPresenceID(ctx)
 		if err != nil {
 			t.Error(err)
 		}
@@ -122,7 +121,7 @@ func TestPresence(t *testing.T) {
 
 		// Try getting presences for existing and non-existing users
 		getUsers := []string{alice.ID, bob.ID, "@doesntexist:test"}
-		presencesForUsers, err := tab.GetPresenceForUsers(ctx, nil, getUsers)
+		presencesForUsers, err := tab.GetPresenceForUsers(ctx, getUsers)
 		if err != nil {
 			t.Error(err)
 		}

@@ -63,7 +63,7 @@ func mustCreateQueueTable(
 
 	database = RelayQueueDatabase{
 		DB:     db,
-		Writer: sqlutil.NewDummyWriter(),
+		Writer: sqlutil.NewDefaultWriter(),
 		Table:  tab,
 	}
 	return database, closeDb
@@ -170,7 +170,8 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
-		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
+		_ = db.Writer.Do(ctx, db.Cm, func(ctx context.Context) error
+		error{
 			err = db.Table.DeleteQueueEntries(ctx, serverName, []int64{nid})
 			return err
 		})
@@ -214,7 +215,8 @@ func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
-		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
+		_ = db.Writer.Do(ctx, db.Cm, func(ctx context.Context) error
+		error{
 			err = db.Table.DeleteQueueEntries(ctx, serverName, []int64{nid})
 			return err
 		})

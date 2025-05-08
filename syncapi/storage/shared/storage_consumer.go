@@ -61,7 +61,7 @@ type Database struct {
 }
 
 func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransaction, error) {
-	txn, err := d.Cm.BeginTx(ctx, &sql.TxOptions{
+	ctx, txn, err := d.Cm.BeginTx(ctx, &sql.TxOptions{
 		// Set the isolation level so that we see a snapshot of the database.
 		// In PostgreSQL repeatable read transactions will see a snapshot taken
 		// at the first query, and since the transaction is read-only it can't
@@ -70,6 +70,7 @@ func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransactio
 		Isolation: sql.LevelRepeatableRead,
 		ReadOnly:  true,
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +82,7 @@ func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransactio
 }
 
 func (d *Database) NewDatabaseTransaction(ctx context.Context) (*DatabaseTransaction, error) {
-	txn, err := d.DB.BeginTx(ctx, nil)
+	ctx, txn, err := d.Cm.BeginTx(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +94,7 @@ func (d *Database) NewDatabaseTransaction(ctx context.Context) (*DatabaseTransac
 }
 
 func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*rstypes.HeaderedEvent, error) {
-	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs, nil, false)
+	streamEvents, err := d.OutputEvents.SelectEvents(ctx, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +240,7 @@ func (d *Database) UpsertAccountData(
 // the events listed in the event's 'prev_events'. This function also updates the backwards extremities table
 // to account for the fact that the given event is no longer a backwards extremity, but may be marked as such.
 // This function should always be called within a sqlutil.Writer for safety in SQLite.
-func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, ev *rstypes.HeaderedEvent) error {
+func (d *Database) handleBackwardExtremities(ctx context.Context, ev *rstypes.HeaderedEvent) error {
 	if err := d.BackwardExtremities.DeleteBackwardExtremity(ctx, ev.RoomID().String(), ev.EventID()); err != nil {
 		return err
 	}
@@ -282,7 +283,7 @@ func (d *Database) WriteEvent(
 		var err error
 		ev.Visibility = historyVisibility
 		pos, err := d.OutputEvents.InsertEvent(
-			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync, historyVisibility,
+			ctx, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync, historyVisibility,
 		)
 		if err != nil {
 			return fmt.Errorf("d.OutputEvents.InsertEvent: %w", err)
@@ -312,7 +313,7 @@ func (d *Database) WriteEvent(
 
 // This function should always be called within a sqlutil.Writer for safety in SQLite.
 func (d *Database) updateRoomState(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	removedEventIDs []string,
 	addedEvents []*rstypes.HeaderedEvent,
 	pduPosition types.StreamPosition,
@@ -353,7 +354,7 @@ func (d *Database) updateRoomState(
 func (d *Database) GetFilter(
 	ctx context.Context, target *synctypes.Filter, localpart string, filterID string,
 ) error {
-	return d.Filter.SelectFilter(ctx, nil, target, localpart, filterID)
+	return d.Filter.SelectFilter(ctx, target, localpart, filterID)
 }
 
 func (d *Database) PutFilter(
@@ -393,7 +394,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 // fetchStateEvents converts the set of event IDs into a set of events. It will fetch any which are missing from the database.
 // Returns a map of room ID to list of events.
 func (d *Database) fetchStateEvents(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	roomIDToEventIDSet map[string]map[string]bool,
 	eventIDToEvent map[string]types.StreamEvent,
 ) (map[string][]types.StreamEvent, error) {
@@ -438,7 +439,7 @@ func (d *Database) fetchStateEvents(
 }
 
 func (d *Database) fetchMissingStateEvents(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+	ctx context.Context, eventIDs []string,
 ) ([]types.StreamEvent, error) {
 	// Fetch from the events table first so we pick up the stream ID for the
 	// event.
@@ -493,7 +494,7 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	// that we don't lock the table for writes in more than one place.
 	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
 		newPos, err = d.SendToDevice.InsertSendToDeviceMessage(
-			ctx, txn, userID, deviceID, string(j),
+			ctx, userID, deviceID, string(j),
 		)
 		return err
 	})
@@ -560,18 +561,18 @@ func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userI
 }
 
 func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, rstypes.HeaderedEvent, error) {
-	return d.OutputEvents.SelectContextEvent(ctx, nil, roomID, eventID)
+	return d.OutputEvents.SelectContextEvent(ctx, roomID, eventID)
 }
 
 func (d *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *synctypes.RoomEventFilter) ([]*rstypes.HeaderedEvent, error) {
-	return d.OutputEvents.SelectContextBeforeEvent(ctx, nil, id, roomID, filter)
+	return d.OutputEvents.SelectContextBeforeEvent(ctx, id, roomID, filter)
 }
 func (d *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *synctypes.RoomEventFilter) (int, []*rstypes.HeaderedEvent, error) {
-	return d.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
+	return d.OutputEvents.SelectContextAfterEvent(ctx, id, roomID, filter)
 }
 
 func (d *Database) IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error) {
-	return d.Ignores.SelectIgnores(ctx, nil, userID)
+	return d.Ignores.SelectIgnores(ctx, userID)
 }
 
 func (d *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
@@ -591,15 +592,15 @@ func (d *Database) UpdatePresence(ctx context.Context, userID string, presence t
 }
 
 func (d *Database) GetPresences(ctx context.Context, userIDs []string) ([]*types.PresenceInternal, error) {
-	return d.Presence.GetPresenceForUsers(ctx, nil, userIDs)
+	return d.Presence.GetPresenceForUsers(ctx, userIDs)
 }
 
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int64, err error) {
-	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
+	return d.Memberships.SelectMembershipForUser(ctx, roomID, userID, pos)
 }
 
 func (d *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]rstypes.HeaderedEvent, error) {
-	return d.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
+	return d.OutputEvents.ReIndex(ctx, limit, afterID, []string{
 		spec.MRoomName,
 		spec.MRoomTopic,
 		"m.room.message",
@@ -626,7 +627,7 @@ func (d *Database) UpdateRelations(ctx context.Context, event *rstypes.HeaderedE
 	default:
 		return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
 			return d.Relations.InsertRelation(
-				ctx, txn, event.RoomID().String(), content.Relations.EventID,
+				ctx, event.RoomID().String(), content.Relations.EventID,
 				event.EventID(), event.Type(), content.Relations.RelationType,
 			)
 		})
@@ -644,5 +645,5 @@ func (d *Database) SelectMemberships(
 	roomID string, pos types.TopologyToken,
 	membership, notMembership *string,
 ) (eventIDs []string, err error) {
-	return d.Memberships.SelectMemberships(ctx, nil, roomID, pos, membership, notMembership)
+	return d.Memberships.SelectMemberships(ctx, roomID, pos, membership, notMembership)
 }

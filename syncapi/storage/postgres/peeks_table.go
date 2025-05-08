@@ -40,42 +40,68 @@ CREATE INDEX IF NOT EXISTS syncapi_peeks_room_id_idx ON syncapi_peeks(room_id);
 CREATE INDEX IF NOT EXISTS syncapi_peeks_user_id_device_id_idx ON syncapi_peeks(user_id, device_id);
 `
 
-const insertPeekSQL = "" +
-	"INSERT INTO syncapi_peeks" +
-	" (room_id, user_id, device_id, creation_ts)" +
-	" VALUES ($1, $2, $3, $4)" +
-	" ON CONFLICT (room_id, user_id, device_id) DO UPDATE SET deleted=false, creation_ts=$4" +
-	" RETURNING id"
+// SQL query constants for peek operations
+const (
+	// insertPeekSQL inserts a new peek or updates an existing one
+	insertPeekSQL = "" +
+		"INSERT INTO syncapi_peeks" +
+		" (room_id, user_id, device_id, creation_ts)" +
+		" VALUES ($1, $2, $3, $4)" +
+		" ON CONFLICT (room_id, user_id, device_id) DO UPDATE SET deleted=false, creation_ts=$4" +
+		" RETURNING id"
 
-const deletePeekSQL = "" +
-	"UPDATE syncapi_peeks SET deleted=true, id=nextval('syncapi_stream_id') WHERE room_id = $1 AND user_id = $2 AND device_id = $3 RETURNING id"
+	// deletePeekSQL marks a peek as deleted for a specific device
+	deletePeekSQL = "" +
+		"UPDATE syncapi_peeks SET deleted=true, id=nextval('syncapi_stream_id') WHERE room_id = $1 AND user_id = $2 AND device_id = $3 RETURNING id"
 
-const deletePeeksSQL = "" +
-	"UPDATE syncapi_peeks SET deleted=true, id=nextval('syncapi_stream_id') WHERE room_id = $1 AND user_id = $2 RETURNING id"
+	// deletePeeksSQL marks all peeks for a user in a room as deleted
+	deletePeeksSQL = "" +
+		"UPDATE syncapi_peeks SET deleted=true, id=nextval('syncapi_stream_id') WHERE room_id = $1 AND user_id = $2 RETURNING id"
 
-// we care about all the peeks which were created in this range, deleted in this range,
-// or were created before this range but haven't been deleted yet.
-const selectPeeksInRangeSQL = "" +
-	"SELECT room_id, deleted, (id > $3 AND id <= $4) AS changed FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND ((id <= $3 AND NOT deleted) OR (id > $3 AND id <= $4))"
+	// selectPeeksInRangeSQL selects all peeks for a user/device in a given range
+	// we care about all the peeks which were created in this range, deleted in this range,
+	// or were created before this range but haven't been deleted yet.
+	selectPeeksInRangeSQL = "" +
+		"SELECT room_id, deleted, (id > $3 AND id <= $4) AS changed FROM syncapi_peeks WHERE user_id = $1 AND device_id = $2 AND ((id <= $3 AND NOT deleted) OR (id > $3 AND id <= $4))"
 
-const selectPeekingDevicesSQL = "" +
-	"SELECT room_id, user_id, device_id FROM syncapi_peeks WHERE deleted=false"
+	// selectPeekingDevicesSQL gets all active peeking devices
+	selectPeekingDevicesSQL = "" +
+		"SELECT room_id, user_id, device_id FROM syncapi_peeks WHERE deleted=false"
 
-const selectMaxPeekIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_peeks"
+	// selectMaxPeekIDSQL gets the highest peek ID
+	selectMaxPeekIDSQL = "" +
+		"SELECT MAX(id) FROM syncapi_peeks"
 
-const purgePeeksSQL = "" +
-	"DELETE FROM syncapi_peeks WHERE room_id = $1"
+	// purgePeeksSQL removes all peeks for a room
+	purgePeeksSQL = "" +
+		"DELETE FROM syncapi_peeks WHERE room_id = $1"
+)
 
 type peeksTable struct {
-	cm                       *sqlutil.Connections
-	insertPeekSQL            string
-	deletePeekSQL            string
-	deletePeeksSQL           string
-	selectPeeksInRangeSQL    string
-	selectPeekingDevicesSQL  string
-	selectMaxPeekIDSQL       string
-	purgePeeksSQL            string
+	// cm is the connection manager for the database
+	cm *sqlutil.Connections
+
+	// SQL queries stored as fields for better maintainability
+	// insertPeekSQL inserts a new peek or updates an existing one
+	insertPeekSQL string
+
+	// deletePeekSQL marks a peek as deleted for a specific device
+	deletePeekSQL string
+
+	// deletePeeksSQL marks all peeks for a user in a room as deleted
+	deletePeeksSQL string
+
+	// selectPeeksInRangeSQL selects all peeks for a user/device in a given range
+	selectPeeksInRangeSQL string
+
+	// selectPeekingDevicesSQL gets all active peeking devices
+	selectPeekingDevicesSQL string
+
+	// selectMaxPeekIDSQL gets the highest peek ID
+	selectMaxPeekIDSQL string
+
+	// purgePeeksSQL removes all peeks for a room
+	purgePeeksSQL string
 }
 
 func NewPostgresPeeksTable(ctx context.Context, cm *sqlutil.Connections) (tables.Peeks, error) {

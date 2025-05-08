@@ -117,7 +117,7 @@ func NewPostgresEventTypesTable(ctx context.Context, cm *sqlutil.Connections) (t
 
 // InsertEventTypeNID implements tables.EventTypes
 func (s *eventTypesStatements) InsertEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventType string,
+	ctx context.Context, eventType string,
 ) (types.EventTypeNID, error) {
 	// Get database connection
 	var db *sql.Conn
@@ -154,19 +154,12 @@ func (s *eventTypesStatements) InsertEventTypeNID(
 
 // SelectEventTypeNID implements tables.EventTypes
 func (s *eventTypesStatements) SelectEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventType string,
+	ctx context.Context, eventType string,
 ) (types.EventTypeNID, error) {
 	// Get database connection
 	var eventTypeNID int64
 	var err error
 
-	if txn != nil {
-		// Use existing transaction.
-		err = txn.QueryRowContext(ctx, s.selectEventTypeNIDStmt, eventType).Scan(&eventTypeNID)
-		return types.EventTypeNID(eventTypeNID), err
-	}
-
-	// Use a new connection since we're not in a transaction.
 	db := s.cm.Connection(ctx, true)
 	err = db.Raw(s.selectEventTypeNIDStmt, eventType).Row().Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
@@ -174,7 +167,7 @@ func (s *eventTypesStatements) SelectEventTypeNID(
 
 // BulkSelectEventTypeNID implements tables.EventTypes
 func (s *eventTypesStatements) BulkSelectEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventTypes []string,
+	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
 	if len(eventTypes) == 0 {
 		return nil, nil
@@ -184,14 +177,8 @@ func (s *eventTypesStatements) BulkSelectEventTypeNID(
 	var err error
 	var rows *sql.Rows
 
-	if txn != nil {
-		// Use existing transaction.
-		rows, err = txn.QueryContext(ctx, s.bulkSelectEventTypeNIDStmt, pq.StringArray(eventTypes))
-	} else {
-		// Use a new connection since we're not in a transaction.
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(s.bulkSelectEventTypeNIDStmt, pq.StringArray(eventTypes)).Rows()
-	}
+	db := s.cm.Connection(ctx, true)
+	rows, err = db.Raw(s.bulkSelectEventTypeNIDStmt, pq.StringArray(eventTypes)).Rows()
 
 	if err != nil {
 		return nil, err
@@ -216,7 +203,7 @@ func (s *eventTypesStatements) BulkSelectEventTypeNID(
 
 // BulkSelectEventType implements tables.EventTypes
 func (s *eventTypesStatements) BulkSelectEventType(
-	ctx context.Context, txn *sql.Tx, nids []types.EventTypeNID,
+	ctx context.Context, nids []types.EventTypeNID,
 ) (map[types.EventTypeNID]string, error) {
 	if len(nids) == 0 {
 		return nil, nil
@@ -232,14 +219,9 @@ func (s *eventTypesStatements) BulkSelectEventType(
 	var err error
 	var rows *sql.Rows
 
-	if txn != nil {
-		// Use existing transaction.
-		rows, err = txn.QueryContext(ctx, s.bulkSelectEventTypeStmt, pq.Int64Array(eventTypeNIDs))
-	} else {
-		// Use a new connection since we're not in a transaction.
-		db := s.cm.Connection(ctx, true)
-		rows, err = db.Raw(s.bulkSelectEventTypeStmt, pq.Int64Array(eventTypeNIDs)).Rows()
-	}
+	// Use a new connection since we're not in a transaction.
+	db := s.cm.Connection(ctx, true)
+	rows, err = db.Raw(s.bulkSelectEventTypeStmt, pq.Int64Array(eventTypeNIDs)).Rows()
 
 	if err != nil {
 		return nil, err
