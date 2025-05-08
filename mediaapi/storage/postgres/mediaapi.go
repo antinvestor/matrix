@@ -20,28 +20,24 @@ import (
 	// Import the postgres database driver.
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/shared"
-	"github.com/antinvestor/matrix/setup/config"
 	_ "github.com/lib/pq"
 )
 
 // NewDatabase opens a postgres database.
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
-	db, writer, err := conMan.Connection(ctx, dbProperties)
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections) (*shared.Database, error) {
+
+	mediaRepo, err := NewPostgresMediaRepositoryTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	mediaRepo, err := NewPostgresMediaRepositoryTable(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	thumbnails, err := NewPostgresThumbnailsTable(ctx, db)
+	thumbnails, err := NewPostgresThumbnailsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
 	return &shared.Database{
 		MediaRepository: mediaRepo,
 		Thumbnails:      thumbnails,
-		DB:              db,
-		Writer:          writer,
+		Cm:              cm,
+		Writer:          cm.Writer(),
 	}, nil
 }

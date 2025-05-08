@@ -39,7 +39,12 @@ func AddPublicRoutes(
 	fedClient fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 ) {
-	mediaDB, err := storage.NewMediaAPIDatasource(ctx, cm, &cfg.MediaAPI.Database)
+	mediaCm, err := cm.FromOptions(ctx, &cfg.MediaAPI.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to obtain a media db connection manager")
+	}
+
+	mediaDB, err := storage.NewMediaAPIDatasource(ctx, mediaCm)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to media db")
 	}

@@ -17,13 +17,13 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/tables"
 	"github.com/antinvestor/matrix/mediaapi/types"
+	"github.com/pitabwire/frame"
 )
 
 const mediaSchema = `
@@ -52,6 +52,10 @@ CREATE TABLE IF NOT EXISTS mediaapi_media_repository (
 CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);
 `
 
+const mediaSchemaRevert = `
+DROP TABLE IF EXISTS mediaapi_media_repository;
+`
+
 const insertMediaSQL = `
 INSERT INTO mediaapi_media_repository (media_id, media_origin, content_type, file_size_bytes, creation_ts, upload_name, base64hash, user_id)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -66,31 +70,47 @@ SELECT content_type, file_size_bytes, creation_ts, upload_name, media_id, user_i
 `
 
 type mediaStatements struct {
-	insertMediaStmt       *sql.Stmt
-	selectMediaStmt       *sql.Stmt
-	selectMediaByHashStmt *sql.Stmt
+	cm *sqlutil.Connections
+
+	// SQL statements stored as struct fields
+	insertMediaStmt       string
+	selectMediaStmt       string
+	selectMediaByHashStmt string
 }
 
-func NewPostgresMediaRepositoryTable(ctx context.Context, db *sql.DB) (tables.MediaRepository, error) {
-	s := &mediaStatements{}
-	_, err := db.Exec(mediaSchema)
+func NewPostgresMediaRepositoryTable(ctx context.Context, cm *sqlutil.Connections) (tables.MediaRepository, error) {
+	// Create the table using standardized migration approach
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "mediaapi_media_repository_table_schema_001",
+		Patch:       mediaSchema,
+		RevertPatch: mediaSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.insertMediaStmt, insertMediaSQL},
-		{&s.selectMediaStmt, selectMediaSQL},
-		{&s.selectMediaByHashStmt, selectMediaByHashSQL},
-	}.Prepare(db)
+	// Initialize the statements
+	s := &mediaStatements{
+		cm:                    cm,
+		insertMediaStmt:       insertMediaSQL,
+		selectMediaStmt:       selectMediaSQL,
+		selectMediaByHashStmt: selectMediaByHashSQL,
+	}
+
+	return s, nil
 }
 
 func (s *mediaStatements) InsertMedia(
-	ctx context.Context, txn *sql.Tx, mediaMetadata *types.MediaMetadata,
+	ctx context.Context, mediaMetadata *types.MediaMetadata,
 ) error {
 	mediaMetadata.CreationTimestamp = spec.AsTimestamp(time.Now())
-	_, err := sqlutil.TxStmtContext(ctx, txn, s.insertMediaStmt).ExecContext(
-		ctx,
+
+	// Get database connection
+	db := s.cm.Connection(ctx, false)
+
+	// Execute the insertion
+	return db.Exec(
+		s.insertMediaStmt,
 		mediaMetadata.MediaID,
 		mediaMetadata.Origin,
 		mediaMetadata.ContentType,
@@ -99,20 +119,28 @@ func (s *mediaStatements) InsertMedia(
 		mediaMetadata.UploadName,
 		mediaMetadata.Base64Hash,
 		mediaMetadata.UserID,
-	)
-	return err
+	).Error
 }
 
 func (s *mediaStatements) SelectMedia(
-	ctx context.Context, txn *sql.Tx, mediaID types.MediaID, mediaOrigin spec.ServerName,
+	ctx context.Context, mediaID types.MediaID, mediaOrigin spec.ServerName,
 ) (*types.MediaMetadata, error) {
 	mediaMetadata := types.MediaMetadata{
 		MediaID: mediaID,
 		Origin:  mediaOrigin,
 	}
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectMediaStmt).QueryRowContext(
-		ctx, mediaMetadata.MediaID, mediaMetadata.Origin,
-	).Scan(
+
+	// Get database connection
+	db := s.cm.Connection(ctx, true)
+
+	// Execute the query
+	row := db.Raw(
+		s.selectMediaStmt,
+		mediaMetadata.MediaID,
+		mediaMetadata.Origin,
+	).Row()
+
+	err := row.Scan(
 		&mediaMetadata.ContentType,
 		&mediaMetadata.FileSizeBytes,
 		&mediaMetadata.CreationTimestamp,
@@ -124,15 +152,24 @@ func (s *mediaStatements) SelectMedia(
 }
 
 func (s *mediaStatements) SelectMediaByHash(
-	ctx context.Context, txn *sql.Tx, mediaHash types.Base64Hash, mediaOrigin spec.ServerName,
+	ctx context.Context, mediaHash types.Base64Hash, mediaOrigin spec.ServerName,
 ) (*types.MediaMetadata, error) {
 	mediaMetadata := types.MediaMetadata{
 		Base64Hash: mediaHash,
 		Origin:     mediaOrigin,
 	}
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectMediaByHashStmt).QueryRowContext(
-		ctx, mediaMetadata.Base64Hash, mediaMetadata.Origin,
-	).Scan(
+
+	// Get database connection
+	db := s.cm.Connection(ctx, true)
+
+	// Execute the query
+	row := db.Raw(
+		s.selectMediaByHashStmt,
+		mediaMetadata.Base64Hash,
+		mediaMetadata.Origin,
+	).Row()
+
+	err := row.Scan(
 		&mediaMetadata.ContentType,
 		&mediaMetadata.FileSizeBytes,
 		&mediaMetadata.CreationTimestamp,
