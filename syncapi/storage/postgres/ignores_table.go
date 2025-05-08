@@ -16,14 +16,15 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/frame"
 )
 
+// Schema for creating the ignores table
 const ignoresSchema = `
 -- Stores data about ignoress
 CREATE TABLE IF NOT EXISTS syncapi_ignores (
@@ -34,39 +35,63 @@ CREATE TABLE IF NOT EXISTS syncapi_ignores (
 );
 `
 
-const selectIgnoresSQL = "" +
-	"SELECT ignores_json FROM syncapi_ignores WHERE user_id = $1"
+// Revert schema for ignores table
+const ignoresSchemaRevert = `
+DROP TABLE IF EXISTS syncapi_ignores;
+`
 
-const upsertIgnoresSQL = "" +
-	"INSERT INTO syncapi_ignores (user_id, ignores_json) VALUES ($1, $2)" +
-	" ON CONFLICT (user_id) DO UPDATE set ignores_json = $2"
+// SQL query to select user ignores
+const selectIgnoresSQL = `
+SELECT ignores_json FROM syncapi_ignores WHERE user_id = $1
+`
 
-type ignoresStatements struct {
-	selectIgnoresStmt *sql.Stmt
-	upsertIgnoresStmt *sql.Stmt
+// SQL query to insert or update user ignores
+const upsertIgnoresSQL = `
+INSERT INTO syncapi_ignores (user_id, ignores_json) VALUES ($1, $2)
+ON CONFLICT (user_id) DO UPDATE set ignores_json = $2
+`
+
+// ignoresTable implements tables.Ignores
+type ignoresTable struct {
+	cm               *sqlutil.Connections
+	selectIgnoresSQL string
+	upsertIgnoresSQL string
 }
 
-func NewPostgresIgnoresTable(ctx context.Context, db *sql.DB) (tables.Ignores, error) {
-	_, err := db.Exec(ignoresSchema)
+// NewPostgresIgnoresTable creates a new ignores table
+func NewPostgresIgnoresTable(ctx context.Context, cm *sqlutil.Connections) (tables.Ignores, error) {
+	t := &ignoresTable{
+		cm:               cm,
+		selectIgnoresSQL: selectIgnoresSQL,
+		upsertIgnoresSQL: upsertIgnoresSQL,
+	}
+
+	// Perform the migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "syncapi_ignores_table_schema_001",
+		Patch:       ignoresSchema,
+		RevertPatch: ignoresSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	s := &ignoresStatements{}
 
-	return s, sqlutil.StatementList{
-		{&s.selectIgnoresStmt, selectIgnoresSQL},
-		{&s.upsertIgnoresStmt, upsertIgnoresSQL},
-	}.Prepare(db)
+	return t, nil
 }
 
-func (s *ignoresStatements) SelectIgnores(
-	ctx context.Context, txn *sql.Tx, userID string,
+// SelectIgnores retrieves the ignored users for a given user
+func (t *ignoresTable) SelectIgnores(
+	ctx context.Context, userID string,
 ) (*types.IgnoredUsers, error) {
 	var ignoresData []byte
-	err := sqlutil.TxStmt(txn, s.selectIgnoresStmt).QueryRowContext(ctx, userID).Scan(&ignoresData)
+	db := t.cm.Connection(ctx, true)
+
+	row := db.Raw(t.selectIgnoresSQL, userID).Row()
+	err := row.Scan(&ignoresData)
 	if err != nil {
 		return nil, err
 	}
+
 	var ignores types.IgnoredUsers
 	if err = json.Unmarshal(ignoresData, &ignores); err != nil {
 		return nil, err
@@ -74,13 +99,15 @@ func (s *ignoresStatements) SelectIgnores(
 	return &ignores, nil
 }
 
-func (s *ignoresStatements) UpsertIgnores(
-	ctx context.Context, txn *sql.Tx, userID string, ignores *types.IgnoredUsers,
+// UpsertIgnores updates or inserts the ignored users for a given user
+func (t *ignoresTable) UpsertIgnores(
+	ctx context.Context, userID string, ignores *types.IgnoredUsers,
 ) error {
 	ignoresJSON, err := json.Marshal(ignores)
 	if err != nil {
 		return err
 	}
-	_, err = sqlutil.TxStmt(txn, s.upsertIgnoresStmt).ExecContext(ctx, userID, ignoresJSON)
-	return err
+
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.upsertIgnoresSQL, userID, ignoresJSON).Error
 }

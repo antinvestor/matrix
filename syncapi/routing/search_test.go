@@ -213,7 +213,7 @@ func TestSearch(t *testing.T) {
 		defer closeDB()
 
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		db, err := storage.NewSyncServerDatasource(ctx, cm, &cfg.SyncAPI.Database)
+		db, err := storage.NewSyncServerDatabase(ctx, cm, &cfg.SyncAPI.Database)
 		assert.NoError(t, err)
 
 		// store the events in the database

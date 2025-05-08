@@ -30,12 +30,12 @@ func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOpti
 		t.Fatalf("failed to open database: %s", err)
 	}
 	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewSyncServerDatasource(ctx, cm, &config.DatabaseOptions{
+	db, err := storage.NewSyncServerDatabase(ctx, cm, &config.DatabaseOptions{
 		ConnectionString:   connStr,
 		MaxOpenConnections: 10,
 	})
 	if err != nil {
-		t.Fatalf("NewSyncServerDatasource returned %s", err)
+		t.Fatalf("NewSyncServerDatabase returned %s", err)
 	}
 	return db, closeDb
 }

@@ -19,15 +19,14 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 )
 
-// NewSyncServerDatasource opens a database connection.
-func NewSyncServerDatasource(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
+// NewSyncServerDatabase opens a database connection.
+func NewSyncServerDatabase(ctx context.Context, cm *sqlutil.Connections) (Database, error) {
 	switch {
 	case cm.DS().IsPostgres():
-		return postgres.NewDatabase(ctx, cm, dbProperties)
+		return postgres.NewDatabase(ctx, cm)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

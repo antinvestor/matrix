@@ -1354,7 +1354,7 @@ func TestUpdateRelations(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
 
-		db, err := storage.NewSyncServerDatasource(ctx, cm, &cfg.SyncAPI.Database)
+		db, err := storage.NewSyncServerDatabase(ctx, cm, &cfg.SyncAPI.Database)
 		if err != nil {
 			t.Fatal(err)
 		}

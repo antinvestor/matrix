@@ -25,6 +25,7 @@ import (
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/frame"
 )
 
 // The memberships table is designed to track the last time that
@@ -52,90 +53,117 @@ CREATE TABLE IF NOT EXISTS syncapi_memberships (
 );
 `
 
-const upsertMembershipSQL = "" +
-	"INSERT INTO syncapi_memberships (room_id, user_id, membership, event_id, stream_pos, topological_pos)" +
-	" VALUES ($1, $2, $3, $4, $5, $6)" +
-	" ON CONFLICT ON CONSTRAINT syncapi_memberships_unique" +
-	" DO UPDATE SET event_id = $4, stream_pos = $5, topological_pos = $6"
-
-const selectMembershipCountSQL = "" +
-	"SELECT COUNT(*) FROM (" +
-	" SELECT DISTINCT ON (room_id, user_id) room_id, user_id, membership FROM syncapi_memberships WHERE room_id = $1 AND stream_pos <= $2 ORDER BY room_id, user_id, stream_pos DESC" +
-	") t WHERE t.membership = $3"
-
-const selectMembershipBeforeSQL = "" +
-	"SELECT membership, topological_pos FROM syncapi_memberships WHERE room_id = $1 and user_id = $2 AND topological_pos <= $3 ORDER BY topological_pos DESC LIMIT 1"
-
-const purgeMembershipsSQL = "" +
-	"DELETE FROM syncapi_memberships WHERE room_id = $1"
-
-const selectMembersSQL = `
-	SELECT event_id FROM (
-		SELECT DISTINCT ON (room_id, user_id) room_id, user_id, event_id, membership FROM syncapi_memberships WHERE room_id = $1 AND topological_pos <= $2 ORDER BY room_id, user_id, stream_pos DESC  
-	) t 
-	WHERE ($3::text IS NULL OR t.membership = $3)
-		AND ($4::text IS NULL OR t.membership <> $4)
+// Revert schema for memberships table
+const membershipsSchemaRevert = `
+DROP TABLE IF EXISTS syncapi_memberships;
 `
 
-type membershipsStatements struct {
-	upsertMembershipStmt        *sql.Stmt
-	selectMembershipCountStmt   *sql.Stmt
-	selectMembershipForUserStmt *sql.Stmt
-	purgeMembershipsStmt        *sql.Stmt
-	selectMembersStmt           *sql.Stmt
+const upsertMembershipSQL = `
+INSERT INTO syncapi_memberships (room_id, user_id, membership, event_id, stream_pos, topological_pos)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT ON CONSTRAINT syncapi_memberships_unique
+DO UPDATE SET event_id = $4, stream_pos = $5, topological_pos = $6
+`
+
+const selectMembershipCountSQL = `
+SELECT COUNT(*) FROM (
+ SELECT DISTINCT ON (room_id, user_id) room_id, user_id, membership FROM syncapi_memberships WHERE room_id = $1 AND stream_pos <= $2 ORDER BY room_id, user_id, stream_pos DESC
+) t WHERE t.membership = $3
+`
+
+const selectMembershipBeforeSQL = `
+SELECT membership, topological_pos FROM syncapi_memberships WHERE room_id = $1 and user_id = $2 AND topological_pos <= $3 ORDER BY topological_pos DESC LIMIT 1
+`
+
+const purgeMembershipsSQL = `
+DELETE FROM syncapi_memberships WHERE room_id = $1
+`
+
+const selectMembersSQL = `
+SELECT event_id FROM (
+    SELECT DISTINCT ON (room_id, user_id) room_id, user_id, event_id, membership FROM syncapi_memberships WHERE room_id = $1 AND topological_pos <= $2 ORDER BY room_id, user_id, stream_pos DESC  
+) t 
+WHERE ($3::text IS NULL OR t.membership = $3)
+    AND ($4::text IS NULL OR t.membership <> $4)
+`
+
+// membershipsTable implements tables.Memberships
+type membershipsTable struct {
+	cm                        *sqlutil.Connections
+	upsertMembershipSQL       string
+	selectMembershipCountSQL  string
+	selectMembershipBeforeSQL string
+	purgeMembershipsSQL       string
+	selectMembersSQL          string
 }
 
-func NewPostgresMembershipsTable(ctx context.Context, db *sql.DB) (tables.Memberships, error) {
-	s := &membershipsStatements{}
-	_, err := db.Exec(membershipsSchema)
+// NewPostgresMembershipsTable creates a new memberships table
+func NewPostgresMembershipsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Memberships, error) {
+	t := &membershipsTable{
+		cm:                        cm,
+		upsertMembershipSQL:       upsertMembershipSQL,
+		selectMembershipCountSQL:  selectMembershipCountSQL,
+		selectMembershipBeforeSQL: selectMembershipBeforeSQL,
+		purgeMembershipsSQL:       purgeMembershipsSQL,
+		selectMembersSQL:          selectMembersSQL,
+	}
+
+	// Perform the migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "syncapi_memberships_table_schema_001",
+		Patch:       membershipsSchema,
+		RevertPatch: membershipsSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.upsertMembershipStmt, upsertMembershipSQL},
-		{&s.selectMembershipCountStmt, selectMembershipCountSQL},
-		{&s.selectMembershipForUserStmt, selectMembershipBeforeSQL},
-		{&s.purgeMembershipsStmt, purgeMembershipsSQL},
-		{&s.selectMembersStmt, selectMembersSQL},
-	}.Prepare(db)
+
+	return t, nil
 }
 
-func (s *membershipsStatements) UpsertMembership(
-	ctx context.Context, txn *sql.Tx, event *rstypes.HeaderedEvent,
+// UpsertMembership adds or updates a membership record
+func (t *membershipsTable) UpsertMembership(
+	ctx context.Context, event *rstypes.HeaderedEvent,
 	streamPos, topologicalPos types.StreamPosition,
 ) error {
 	membership, err := event.Membership()
 	if err != nil {
 		return fmt.Errorf("event.Membership: %w", err)
 	}
-	_, err = sqlutil.TxStmt(txn, s.upsertMembershipStmt).ExecContext(
-		ctx,
+
+	db := t.cm.Connection(ctx, false)
+	err = db.Exec(
+		t.upsertMembershipSQL,
 		event.RoomID().String(),
 		event.StateKeyResolved,
 		membership,
 		event.EventID(),
 		streamPos,
 		topologicalPos,
-	)
+	).Error
+
 	return err
 }
 
-func (s *membershipsStatements) SelectMembershipCount(
-	ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition,
+// SelectMembershipCount returns the count of members with the given membership
+func (t *membershipsTable) SelectMembershipCount(
+	ctx context.Context, roomID, membership string, pos types.StreamPosition,
 ) (count int, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMembershipCountStmt)
-	err = stmt.QueryRowContext(ctx, roomID, pos, membership).Scan(&count)
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectMembershipCountSQL, roomID, pos, membership).Row()
+	err = row.Scan(&count)
 	return
 }
 
 // SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
 // returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
 // string as the membership.
-func (s *membershipsStatements) SelectMembershipForUser(
-	ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64,
+func (t *membershipsTable) SelectMembershipForUser(
+	ctx context.Context, roomID, userID string, pos int64,
 ) (membership string, topologyPos int64, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMembershipForUserStmt)
-	err = stmt.QueryRowContext(ctx, roomID, userID, pos).Scan(&membership, &topologyPos)
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectMembershipBeforeSQL, roomID, userID, pos).Row()
+	err = row.Scan(&membership, &topologyPos)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "leave", 0, nil
@@ -145,27 +173,28 @@ func (s *membershipsStatements) SelectMembershipForUser(
 	return membership, topologyPos, nil
 }
 
-func (s *membershipsStatements) PurgeMemberships(
-	ctx context.Context, txn *sql.Tx, roomID string,
+// PurgeMemberships removes all membership records for a room
+func (t *membershipsTable) PurgeMemberships(
+	ctx context.Context, roomID string,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeMembershipsStmt).ExecContext(ctx, roomID)
-	return err
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.purgeMembershipsSQL, roomID).Error
 }
 
-func (s *membershipsStatements) SelectMemberships(
-	ctx context.Context, txn *sql.Tx,
+// SelectMemberships returns the event IDs for memberships matching the criteria
+func (t *membershipsTable) SelectMemberships(
+	ctx context.Context,
 	roomID string, pos types.TopologyToken,
 	membership, notMembership *string,
 ) (eventIDs []string, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMembersStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, pos.Depth, membership, notMembership)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectMembersSQL, roomID, pos.Depth, membership, notMembership).Rows()
 	if err != nil {
 		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectMemberships: failed to close rows")
-	var (
-		eventID string
-	)
+
+	var eventID string
 	for rows.Next() {
 		if err = rows.Scan(&eventID); err != nil {
 			return

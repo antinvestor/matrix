@@ -21,12 +21,13 @@ import (
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/syncapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/frame"
 	"github.com/sirupsen/logrus"
 )
 
+// Schema for send-to-device table
 const sendToDeviceSchema = `
 CREATE SEQUENCE IF NOT EXISTS syncapi_send_to_device_id;
 
@@ -45,68 +46,87 @@ CREATE TABLE IF NOT EXISTS syncapi_send_to_device (
 CREATE INDEX IF NOT EXISTS syncapi_send_to_device_user_id_device_id_idx ON syncapi_send_to_device(user_id, device_id);
 `
 
+// Revert schema for send-to-device table
+const sendToDeviceSchemaRevert = `
+DROP INDEX IF EXISTS syncapi_send_to_device_user_id_device_id_idx;
+DROP TABLE IF EXISTS syncapi_send_to_device;
+DROP SEQUENCE IF EXISTS syncapi_send_to_device_id;
+`
+
+// SQL query to insert a send-to-device message
 const insertSendToDeviceMessageSQL = `
-	INSERT INTO syncapi_send_to_device (user_id, device_id, content)
-	  VALUES ($1, $2, $3)
-	  RETURNING id
+INSERT INTO syncapi_send_to_device (user_id, device_id, content)
+  VALUES ($1, $2, $3)
+  RETURNING id
 `
 
+// SQL query to select send-to-device messages
 const selectSendToDeviceMessagesSQL = `
-	SELECT id, user_id, device_id, content
-	  FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2 AND id > $3 AND id <= $4
-	  ORDER BY id ASC
+SELECT id, user_id, device_id, content
+  FROM syncapi_send_to_device
+  WHERE user_id = $1 AND device_id = $2 AND id > $3 AND id <= $4
+  ORDER BY id ASC
 `
 
+// SQL query to delete send-to-device messages
 const deleteSendToDeviceMessagesSQL = `
-	DELETE FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2 AND id <= $3
+DELETE FROM syncapi_send_to_device
+  WHERE user_id = $1 AND device_id = $2 AND id <= $3
 `
 
-const selectMaxSendToDeviceIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_send_to_device"
+// SQL query to select max send-to-device ID
+const selectMaxSendToDeviceIDSQL = `
+SELECT MAX(id) FROM syncapi_send_to_device
+`
 
-type sendToDeviceStatements struct {
-	insertSendToDeviceMessageStmt  *sql.Stmt
-	selectSendToDeviceMessagesStmt *sql.Stmt
-	deleteSendToDeviceMessagesStmt *sql.Stmt
-	selectMaxSendToDeviceIDStmt    *sql.Stmt
+// sendToDeviceTable implements tables.SendToDevice
+type sendToDeviceTable struct {
+	cm                             *sqlutil.Connections
+	insertSendToDeviceMessageSQL   string
+	selectSendToDeviceMessagesSQL  string
+	deleteSendToDeviceMessagesSQL  string
+	selectMaxSendToDeviceIDSQL     string
 }
 
-func NewPostgresSendToDeviceTable(ctx context.Context, db *sql.DB) (tables.SendToDevice, error) {
-	s := &sendToDeviceStatements{}
-	_, err := db.Exec(sendToDeviceSchema)
-	if err != nil {
-		return nil, err
+// NewPostgresSendToDeviceTable creates a new send-to-device table
+func NewPostgresSendToDeviceTable(ctx context.Context, cm *sqlutil.Connections) (tables.SendToDevice, error) {
+	t := &sendToDeviceTable{
+		cm:                             cm,
+		insertSendToDeviceMessageSQL:   insertSendToDeviceMessageSQL,
+		selectSendToDeviceMessagesSQL:  selectSendToDeviceMessagesSQL,
+		deleteSendToDeviceMessagesSQL:  deleteSendToDeviceMessagesSQL,
+		selectMaxSendToDeviceIDSQL:     selectMaxSendToDeviceIDSQL,
 	}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "syncapi: drop sent_by_token",
-		Up:      deltas.UpRemoveSendToDeviceSentColumn,
+
+	// Perform the migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "syncapi_send_to_device_table_schema_001",
+		Patch:       sendToDeviceSchema,
+		RevertPatch: sendToDeviceSchemaRevert,
 	})
-	err = m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertSendToDeviceMessageStmt, insertSendToDeviceMessageSQL},
-		{&s.selectSendToDeviceMessagesStmt, selectSendToDeviceMessagesSQL},
-		{&s.deleteSendToDeviceMessagesStmt, deleteSendToDeviceMessagesSQL},
-		{&s.selectMaxSendToDeviceIDStmt, selectMaxSendToDeviceIDSQL},
-	}.Prepare(db)
+
+	return t, nil
 }
 
-func (s *sendToDeviceStatements) InsertSendToDeviceMessage(
-	ctx context.Context, txn *sql.Tx, userID, deviceID, content string,
+// InsertSendToDeviceMessage adds a new send-to-device message
+func (t *sendToDeviceTable) InsertSendToDeviceMessage(
+	ctx context.Context, userID, deviceID, content string,
 ) (pos types.StreamPosition, err error) {
-	err = sqlutil.TxStmt(txn, s.insertSendToDeviceMessageStmt).QueryRowContext(ctx, userID, deviceID, content).Scan(&pos)
+	db := t.cm.Connection(ctx, false)
+	row := db.Raw(t.insertSendToDeviceMessageSQL, userID, deviceID, content).Row()
+	err = row.Scan(&pos)
 	return
 }
 
-func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string, from, to types.StreamPosition,
+// SelectSendToDeviceMessages retrieves send-to-device messages
+func (t *sendToDeviceTable) SelectSendToDeviceMessages(
+	ctx context.Context, userID, deviceID string, from, to types.StreamPosition,
 ) (lastPos types.StreamPosition, events []types.SendToDeviceEvent, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectSendToDeviceMessagesStmt).QueryContext(ctx, userID, deviceID, from, to)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectSendToDeviceMessagesSQL, userID, deviceID, from, to).Rows()
 	if err != nil {
 		return
 	}
@@ -138,19 +158,22 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 	return lastPos, events, rows.Err()
 }
 
-func (s *sendToDeviceStatements) DeleteSendToDeviceMessages(
-	ctx context.Context, txn *sql.Tx, userID, deviceID string, pos types.StreamPosition,
+// DeleteSendToDeviceMessages removes send-to-device messages
+func (t *sendToDeviceTable) DeleteSendToDeviceMessages(
+	ctx context.Context, userID, deviceID string, pos types.StreamPosition,
 ) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.deleteSendToDeviceMessagesStmt).ExecContext(ctx, userID, deviceID, pos)
-	return
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.deleteSendToDeviceMessagesSQL, userID, deviceID, pos).Error
 }
 
-func (s *sendToDeviceStatements) SelectMaxSendToDeviceMessageID(
-	ctx context.Context, txn *sql.Tx,
+// SelectMaxSendToDeviceMessageID retrieves the maximum send-to-device message ID
+func (t *sendToDeviceTable) SelectMaxSendToDeviceMessageID(
+	ctx context.Context,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxSendToDeviceIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectMaxSendToDeviceIDSQL).Row()
+	err = row.Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}

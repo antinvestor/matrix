@@ -24,8 +24,10 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/pitabwire/frame"
 )
 
+// Schema for filter table creation
 const filterSchema = `
 -- Stores data about filters
 CREATE TABLE IF NOT EXISTS syncapi_filter (
@@ -42,40 +44,67 @@ CREATE TABLE IF NOT EXISTS syncapi_filter (
 CREATE INDEX IF NOT EXISTS syncapi_filter_localpart ON syncapi_filter(localpart);
 `
 
-const selectFilterSQL = "" +
-	"SELECT filter FROM syncapi_filter WHERE localpart = $1 AND id = $2"
+// Revert schema for filter table
+const filterSchemaRevert = `
+DROP INDEX IF EXISTS syncapi_filter_localpart;
+DROP TABLE IF EXISTS syncapi_filter;
+`
 
-const selectFilterIDByContentSQL = "" +
-	"SELECT id FROM syncapi_filter WHERE localpart = $1 AND filter = $2"
+// SQL query to select a filter
+const selectFilterSQL = `
+SELECT filter FROM syncapi_filter WHERE localpart = $1 AND id = $2
+`
 
-const insertFilterSQL = "" +
-	"INSERT INTO syncapi_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETURNING id"
+// SQL query to select a filter ID by content
+const selectFilterIDByContentSQL = `
+SELECT id FROM syncapi_filter WHERE localpart = $1 AND filter = $2
+`
 
-type filterStatements struct {
-	selectFilterStmt            *sql.Stmt
-	selectFilterIDByContentStmt *sql.Stmt
-	insertFilterStmt            *sql.Stmt
+// SQL query to insert a filter
+const insertFilterSQL = `
+INSERT INTO syncapi_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETURNING id
+`
+
+// filterTable implements the tables.Filter interface
+type filterTable struct {
+	cm                        *sqlutil.Connections
+	selectFilterSQL           string
+	selectFilterIDByContentSQL string
+	insertFilterSQL           string
 }
 
-func NewPostgresFilterTable(ctx context.Context, db *sql.DB) (tables.Filter, error) {
-	_, err := db.Exec(filterSchema)
+// NewPostgresFilterTable creates a new filter table
+func NewPostgresFilterTable(ctx context.Context, cm *sqlutil.Connections) (tables.Filter, error) {
+	t := &filterTable{
+		cm:                        cm,
+		selectFilterSQL:           selectFilterSQL,
+		selectFilterIDByContentSQL: selectFilterIDByContentSQL,
+		insertFilterSQL:           insertFilterSQL,
+	}
+
+	// Perform the migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "syncapi_filter_table_schema_001",
+		Patch:       filterSchema,
+		RevertPatch: filterSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	s := &filterStatements{}
-	return s, sqlutil.StatementList{
-		{&s.selectFilterStmt, selectFilterSQL},
-		{&s.selectFilterIDByContentStmt, selectFilterIDByContentSQL},
-		{&s.insertFilterStmt, insertFilterSQL},
-	}.Prepare(db)
+
+	return t, nil
 }
 
-func (s *filterStatements) SelectFilter(
-	ctx context.Context, txn *sql.Tx, target *synctypes.Filter, localpart string, filterID string,
+// SelectFilter fetches a filter by its ID and localpart
+func (t *filterTable) SelectFilter(
+	ctx context.Context, target *synctypes.Filter, localpart string, filterID string,
 ) error {
 	// Retrieve filter from database (stored as canonical JSON)
 	var filterData []byte
-	err := sqlutil.TxStmt(txn, s.selectFilterStmt).QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
+	db := t.cm.Connection(ctx, true)
+	
+	row := db.Raw(t.selectFilterSQL, localpart, filterID).Row()
+	err := row.Scan(&filterData)
 	if err != nil {
 		return err
 	}
@@ -87,8 +116,9 @@ func (s *filterStatements) SelectFilter(
 	return nil
 }
 
-func (s *filterStatements) InsertFilter(
-	ctx context.Context, txn *sql.Tx, filter *synctypes.Filter, localpart string,
+// InsertFilter stores a new filter in the database
+func (t *filterTable) InsertFilter(
+	ctx context.Context, filter *synctypes.Filter, localpart string,
 ) (filterID string, err error) {
 	var existingFilterID string
 
@@ -104,24 +134,25 @@ func (s *filterStatements) InsertFilter(
 		return "", err
 	}
 
+	db := t.cm.Connection(ctx, false)
+
 	// Check if filter already exists in the database using its localpart and content
 	//
 	// This can result in a race condition when two clients try to insert the
 	// same filter and localpart at the same time, however this is not a
 	// problem as both calls will result in the same filterID
-	err = sqlutil.TxStmt(txn, s.selectFilterIDByContentStmt).QueryRowContext(
-		ctx, localpart, filterJSON,
-	).Scan(&existingFilterID)
+	row := db.Raw(t.selectFilterIDByContentSQL, localpart, filterJSON).Row()
+	err = row.Scan(&existingFilterID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
 	// If it does, return the existing ID
 	if existingFilterID != "" {
-		return existingFilterID, err
+		return existingFilterID, nil
 	}
 
 	// Otherwise insert the filter and return the new ID
-	err = sqlutil.TxStmt(txn, s.insertFilterStmt).QueryRowContext(ctx, filterJSON, localpart).
-		Scan(&filterID)
+	row = db.Raw(t.insertFilterSQL, filterJSON, localpart).Row()
+	err = row.Scan(&filterID)
 	return
 }
