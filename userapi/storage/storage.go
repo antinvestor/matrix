@@ -43,7 +43,7 @@ func NewUserDatabase(
 	loginTokenLifetime time.Duration,
 	serverNoticesLocalpart string,
 ) (UserDatabase, error) {
-	if !dbProperties.ConnectionString.IsPostgres() {
+	if !cm.DS().IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type")
 	}
 	pgUserDb, err := postgres.NewDatabase(ctx, cm, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
@@ -67,7 +67,7 @@ func NewUserDatabase(
 // and sets postgres connection parameters.
 func NewKeyDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
 	switch {
-	case dbProperties.ConnectionString.IsPostgres():
+	case cm.DS().IsPostgres():
 		return postgres.NewKeyDatabase(ctx, cm, dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")

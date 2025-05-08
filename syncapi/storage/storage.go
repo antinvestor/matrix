@@ -26,7 +26,7 @@ import (
 // NewSyncServerDatasource opens a database connection.
 func NewSyncServerDatasource(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
-	case dbProperties.ConnectionString.IsPostgres():
+	case cm.DS().IsPostgres():
 		return postgres.NewDatabase(ctx, cm, dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")

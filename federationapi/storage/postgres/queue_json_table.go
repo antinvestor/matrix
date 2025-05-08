@@ -16,13 +16,15 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
+// Schema for the queue JSON table
 const queueJSONSchema = `
 -- The federationsender_queue_json table contains event contents that
 -- we failed to send. 
@@ -38,69 +40,86 @@ CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_json_json_nid_idx
     ON federationsender_queue_json (json_nid);
 `
 
+// Schema revert for the queue JSON table
+const queueJSONSchemaRevert = `
+DROP TABLE IF EXISTS federationsender_queue_json;
+`
+
+// SQL for inserting JSON
 const insertJSONSQL = "" +
 	"INSERT INTO federationsender_queue_json (json_body)" +
 	" VALUES ($1)" +
 	" RETURNING json_nid"
 
+// SQL for deleting JSON
 const deleteJSONSQL = "" +
 	"DELETE FROM federationsender_queue_json WHERE json_nid = ANY($1)"
 
+// SQL for selecting JSON
 const selectJSONSQL = "" +
 	"SELECT json_nid, json_body FROM federationsender_queue_json" +
 	" WHERE json_nid = ANY($1)"
 
-type queueJSONStatements struct {
-	db             *sql.DB
-	insertJSONStmt *sql.Stmt
-	deleteJSONStmt *sql.Stmt
-	selectJSONStmt *sql.Stmt
+// queueJSONTable stores JSON for federation queue
+type queueJSONTable struct {
+	cm *sqlutil.Connections
+	// SQL query string fields, initialized at construction
+	insertJSONSQL string
+	deleteJSONSQL string
+	selectJSONSQL string
 }
 
-func NewPostgresQueueJSONTable(ctx context.Context, db *sql.DB) (s *queueJSONStatements, err error) {
-	s = &queueJSONStatements{
-		db: db,
+// NewPostgresQueueJSONTable creates a new postgres queue JSON table
+func NewPostgresQueueJSONTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationQueueJSON, error) {
+	s := &queueJSONTable{
+		cm:            cm,
+		insertJSONSQL: insertJSONSQL,
+		deleteJSONSQL: deleteJSONSQL,
+		selectJSONSQL: selectJSONSQL,
 	}
-	_, err = s.db.Exec(queueJSONSchema)
+
+	// Perform schema migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "federationapi_queue_json_table_schema_001",
+		Patch:       queueJSONSchema,
+		RevertPatch: queueJSONSchemaRevert,
+	})
 	if err != nil {
-		return
+		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertJSONStmt, insertJSONSQL},
-		{&s.deleteJSONStmt, deleteJSONSQL},
-		{&s.selectJSONStmt, selectJSONSQL},
-	}.Prepare(db)
+
+	return s, nil
 }
 
-func (s *queueJSONStatements) InsertQueueJSON(
-	ctx context.Context, txn *sql.Tx, json string,
-) (int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
+// InsertQueueJSON inserts JSON into the queue
+func (s *queueJSONTable) InsertQueueJSON(ctx context.Context, json string) (int64, error) {
 	var lastid int64
-	if err := stmt.QueryRowContext(ctx, json).Scan(&lastid); err != nil {
+
+	db := s.cm.Connection(ctx, false)
+	row := db.Raw(s.insertJSONSQL, json).Row()
+	if err := row.Scan(&lastid); err != nil {
 		return 0, err
 	}
 	return lastid, nil
 }
 
-func (s *queueJSONStatements) DeleteQueueJSON(
-	ctx context.Context, txn *sql.Tx, nids []int64,
-) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteJSONStmt)
-	_, err := stmt.ExecContext(ctx, pq.Int64Array(nids))
-	return err
+// DeleteQueueJSON deletes JSON from the queue
+func (s *queueJSONTable) DeleteQueueJSON(ctx context.Context, nids []int64) error {
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.deleteJSONSQL, pq.Int64Array(nids)).Error
 }
 
-func (s *queueJSONStatements) SelectQueueJSON(
-	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
-) (map[int64][]byte, error) {
+// SelectQueueJSON gets JSON from the queue
+func (s *queueJSONTable) SelectQueueJSON(ctx context.Context, jsonNIDs []int64) (map[int64][]byte, error) {
 	blobs := map[int64][]byte{}
-	stmt := sqlutil.TxStmt(txn, s.selectJSONStmt)
-	rows, err := stmt.QueryContext(ctx, pq.Int64Array(jsonNIDs))
+
+	db := s.cm.Connection(ctx, true)
+	rows, err := db.Raw(s.selectJSONSQL, pq.Int64Array(jsonNIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJSON: rows.close() failed")
+
 	for rows.Next() {
 		var nid int64
 		var blob []byte
@@ -109,5 +128,6 @@ func (s *queueJSONStatements) SelectQueueJSON(
 		}
 		blobs[nid] = blob
 	}
+
 	return blobs, rows.Err()
 }

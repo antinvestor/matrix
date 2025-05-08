@@ -16,8 +16,6 @@ package tables
 
 import (
 	"context"
-	"database/sql"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/types"
@@ -41,7 +39,6 @@ type FederationQueueEDUs interface {
 	SelectQueueEDUServerNames(ctx context.Context) ([]spec.ServerName, error)
 	SelectExpiredEDUs(ctx context.Context, expiredBefore spec.Timestamp) ([]int64, error)
 	DeleteExpiredEDUs(ctx context.Context, expiredBefore spec.Timestamp) error
-	Prepare() error
 }
 
 type FederationQueueJSON interface {
@@ -67,7 +64,6 @@ type FederationJoinedHosts interface {
 	InsertJoinedHosts(ctx context.Context, roomID, eventID string, serverName spec.ServerName) error
 	DeleteJoinedHosts(ctx context.Context, eventIDs []string) error
 	DeleteJoinedHostsForRoom(ctx context.Context, roomID string) error
-	SelectJoinedHostsWithTx(ctx context.Context, roomID string) ([]types.JoinedHost, error)
 	SelectJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
 	SelectAllJoinedHosts(ctx context.Context) ([]spec.ServerName, error)
 	SelectJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludingBlacklisted bool) ([]spec.ServerName, error)
