@@ -26,74 +26,58 @@ CREATE TABLE IF NOT EXISTS userapi_openid_tokens (
 );
 `
 
-// SQL query constants for OpenID token operations
-const (
-	// insertOpenIDTokenSQL inserts a new OpenID token
-	insertOpenIDTokenSQL = "INSERT INTO userapi_openid_tokens(token, localpart, server_name, token_expires_at_ms) VALUES ($1, $2, $3, $4)"
+const insertOpenIDTokenSQL = "" +
+	"INSERT INTO userapi_openid_tokens(token, localpart, server_name, token_expires_at_ms) VALUES ($1, $2, $3, $4)"
 
-	// selectOpenIDTokenSQL selects an OpenID token by token value
-	selectOpenIDTokenSQL = "SELECT localpart, server_name, token_expires_at_ms FROM userapi_openid_tokens WHERE token = $1"
-)
+const selectOpenIDTokenSQL = "" +
+	"SELECT localpart, server_name, token_expires_at_ms FROM userapi_openid_tokens WHERE token = $1"
 
-type openIDTable struct {
-	// cm is the connection manager for the database
-	cm         *sqlutil.Connections
-	serverName spec.ServerName
-
-	// SQL queries stored as fields for better maintainability
-	// insertOpenIDTokenSQL inserts a new OpenID token
-	insertOpenIDTokenSQL string
-
-	// selectOpenIDTokenSQL selects an OpenID token by token value
-	selectOpenIDTokenSQL string
+type openIDTokenStatements struct {
+	insertTokenStmt *sql.Stmt
+	selectTokenStmt *sql.Stmt
+	serverName      spec.ServerName
 }
 
-func NewPostgresOpenIDTable(cm *sqlutil.Connections, serverName spec.ServerName) (tables.OpenIDTable, error) {
-	// Initialize schema
-	db := cm.Connection(context.Background(), false)
-	if err := db.Exec(openIDTokenSchema).Error; err != nil {
+func NewPostgresOpenIDTable(db *sql.DB, serverName spec.ServerName) (tables.OpenIDTable, error) {
+	s := &openIDTokenStatements{
+		serverName: serverName,
+	}
+	_, err := db.Exec(openIDTokenSchema)
+	if err != nil {
 		return nil, err
 	}
-
-	// Initialize table with SQL statements
-	t := &openIDTable{
-		cm:                   cm,
-		insertOpenIDTokenSQL: insertOpenIDTokenSQL,
-		selectOpenIDTokenSQL: selectOpenIDTokenSQL,
-		serverName:           serverName,
-	}
-
-	return t, nil
+	return s, sqlutil.StatementList{
+		{&s.insertTokenStmt, insertOpenIDTokenSQL},
+		{&s.selectTokenStmt, selectOpenIDTokenSQL},
+	}.Prepare(db)
 }
 
-// insertToken inserts a new OpenID Connect token to the Cm.
+// insertToken inserts a new OpenID Connect token to the DB.
 // Returns new token, otherwise returns error if the token already exists.
-func (t *openIDTable) InsertOpenIDToken(
+func (s *openIDTokenStatements) InsertOpenIDToken(
 	ctx context.Context,
+	txn *sql.Tx,
 	token, localpart string, serverName spec.ServerName,
 	expiresAtMS int64,
 ) (err error) {
-	db := t.cm.Connection(ctx, false)
-
-	return db.Exec(t.insertOpenIDTokenSQL, token, localpart, serverName, expiresAtMS).Error
+	stmt := sqlutil.TxStmt(txn, s.insertTokenStmt)
+	_, err = stmt.ExecContext(ctx, token, localpart, serverName, expiresAtMS)
+	return
 }
 
-// selectOpenIDTokenAtrributes gets the attributes associated with an OpenID token from the Cm
+// selectOpenIDTokenAtrributes gets the attributes associated with an OpenID token from the DB
 // Returns the existing token's attributes, or err if no token is found
-func (t *openIDTable) SelectOpenIDTokenAtrributes(
+func (s *openIDTokenStatements) SelectOpenIDTokenAtrributes(
 	ctx context.Context,
 	token string,
 ) (*api.OpenIDTokenAttributes, error) {
-	// Get read-only database connection
-	db := t.cm.Connection(ctx, true)
-
 	var openIDTokenAttrs api.OpenIDTokenAttributes
 	var localpart string
 	var serverName spec.ServerName
-
-	row := db.Raw(t.selectOpenIDTokenSQL, token).Row()
-	err := row.Scan(&localpart, &serverName, &openIDTokenAttrs.ExpiresAtMS)
-
+	err := s.selectTokenStmt.QueryRowContext(ctx, token).Scan(
+		&localpart, &serverName,
+		&openIDTokenAttrs.ExpiresAtMS,
+	)
 	openIDTokenAttrs.UserID = fmt.Sprintf("@%s:%s", localpart, serverName)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {

@@ -39,134 +39,102 @@ CREATE TABLE IF NOT EXISTS roomserver_room_aliases (
 CREATE INDEX IF NOT EXISTS roomserver_room_id_idx ON roomserver_room_aliases(room_id);
 `
 
-// SQL query constants for room aliases operations
-const (
-	// insertRoomAliasSQL inserts a new room alias
-	insertRoomAliasSQL = "INSERT INTO roomserver_room_aliases (alias, room_id, creator_id) VALUES ($1, $2, $3)"
+const insertRoomAliasSQL = "" +
+	"INSERT INTO roomserver_room_aliases (alias, room_id, creator_id) VALUES ($1, $2, $3)"
 
-	// selectRoomIDFromAliasSQL gets the room ID for a given alias
-	selectRoomIDFromAliasSQL = "SELECT room_id FROM roomserver_room_aliases WHERE alias = $1"
+const selectRoomIDFromAliasSQL = "" +
+	"SELECT room_id FROM roomserver_room_aliases WHERE alias = $1"
 
-	// selectAliasesFromRoomIDSQL gets all aliases for a given room ID
-	selectAliasesFromRoomIDSQL = "SELECT alias FROM roomserver_room_aliases WHERE room_id = $1"
+const selectAliasesFromRoomIDSQL = "" +
+	"SELECT alias FROM roomserver_room_aliases WHERE room_id = $1"
 
-	// selectCreatorIDFromAliasSQL gets the creator ID for a given alias
-	selectCreatorIDFromAliasSQL = "SELECT creator_id FROM roomserver_room_aliases WHERE alias = $1"
+const selectCreatorIDFromAliasSQL = "" +
+	"SELECT creator_id FROM roomserver_room_aliases WHERE alias = $1"
 
-	// deleteRoomAliasSQL removes a room alias
-	deleteRoomAliasSQL = "DELETE FROM roomserver_room_aliases WHERE alias = $1"
-)
+const deleteRoomAliasSQL = "" +
+	"DELETE FROM roomserver_room_aliases WHERE alias = $1"
 
-// roomAliasesStatements implements tables.RoomAliases interface
 type roomAliasesStatements struct {
-	cm *sqlutil.Connections
-
-	// SQL statements stored as struct fields
-	insertRoomAliasStmt          string
-	selectRoomIDFromAliasStmt    string
-	selectAliasesFromRoomIDStmt  string
-	selectCreatorIDFromAliasStmt string
-	deleteRoomAliasStmt          string
+	insertRoomAliasStmt          *sql.Stmt
+	selectRoomIDFromAliasStmt    *sql.Stmt
+	selectAliasesFromRoomIDStmt  *sql.Stmt
+	selectCreatorIDFromAliasStmt *sql.Stmt
+	deleteRoomAliasStmt          *sql.Stmt
 }
 
-// NewPostgresRoomAliasesTable creates a new PostgreSQL room aliases table and prepares all statements
-func NewPostgresRoomAliasesTable(ctx context.Context, cm *sqlutil.Connections) (tables.RoomAliases, error) {
-	// Create the table first
-	if err := cm.Writer.ExecSQL(ctx, roomAliasesSchema); err != nil {
-		return nil, err
-	}
-
-	// Initialize the table
-	s := &roomAliasesStatements{
-		cm: cm,
-
-		// Initialize SQL statement fields with the constants
-		insertRoomAliasStmt:          insertRoomAliasSQL,
-		selectRoomIDFromAliasStmt:    selectRoomIDFromAliasSQL,
-		selectAliasesFromRoomIDStmt:  selectAliasesFromRoomIDSQL,
-		selectCreatorIDFromAliasStmt: selectCreatorIDFromAliasSQL,
-		deleteRoomAliasStmt:          deleteRoomAliasSQL,
-	}
-
-	return s, nil
+func CreateRoomAliasesTable(ctx context.Context, db *sql.DB) error {
+	_, err := db.Exec(roomAliasesSchema)
+	return err
 }
 
-// InsertRoomAlias inserts a new room alias into the database
+func PrepareRoomAliasesTable(ctx context.Context, db *sql.DB) (tables.RoomAliases, error) {
+	s := &roomAliasesStatements{}
+
+	return s, sqlutil.StatementList{
+		{&s.insertRoomAliasStmt, insertRoomAliasSQL},
+		{&s.selectRoomIDFromAliasStmt, selectRoomIDFromAliasSQL},
+		{&s.selectAliasesFromRoomIDStmt, selectAliasesFromRoomIDSQL},
+		{&s.selectCreatorIDFromAliasStmt, selectCreatorIDFromAliasSQL},
+		{&s.deleteRoomAliasStmt, deleteRoomAliasSQL},
+	}.Prepare(db)
+}
+
 func (s *roomAliasesStatements) InsertRoomAlias(
-	ctx context.Context,
-	alias string, roomID string, creatorUserID string,
+	ctx context.Context, txn *sql.Tx, alias string, roomID string, creatorUserID string,
 ) (err error) {
-	// Get database connection
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(s.insertRoomAliasStmt, alias, roomID, creatorUserID).Error
+	stmt := sqlutil.TxStmt(txn, s.insertRoomAliasStmt)
+	_, err = stmt.ExecContext(ctx, alias, roomID, creatorUserID)
+	return
 }
 
-// SelectRoomIDFromAlias looks up the room ID associated with a particular alias
 func (s *roomAliasesStatements) SelectRoomIDFromAlias(
-	ctx context.Context,
-	alias string,
+	ctx context.Context, txn *sql.Tx, alias string,
 ) (roomID string, err error) {
-	// Get database connection
-	db := s.cm.Connection(ctx, true)
-
-	row := db.Raw(s.selectRoomIDFromAliasStmt, alias).Row()
-	err = row.Scan(&roomID)
+	stmt := sqlutil.TxStmt(txn, s.selectRoomIDFromAliasStmt)
+	err = stmt.QueryRowContext(ctx, alias).Scan(&roomID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	return
 }
 
-// SelectAliasesFromRoomID looks up the aliases associated with a particular room ID
 func (s *roomAliasesStatements) SelectAliasesFromRoomID(
-	ctx context.Context,
-	roomID string,
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) ([]string, error) {
-	// Get database connection
-	db := s.cm.Connection(ctx, true)
-
-	rows, err := db.Raw(s.selectAliasesFromRoomIDStmt, roomID).Rows()
+	stmt := sqlutil.TxStmt(txn, s.selectAliasesFromRoomIDStmt)
+	rows, err := stmt.QueryContext(ctx, roomID)
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectAliasesFromRoomID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectAliasesFromRoomID: rows.close() failed")
 
 	var aliases []string
+	var alias string
 	for rows.Next() {
-		var alias string
 		if err = rows.Scan(&alias); err != nil {
 			return nil, err
 		}
+
 		aliases = append(aliases, alias)
 	}
-
 	return aliases, rows.Err()
 }
 
-// SelectCreatorIDFromAlias looks up the creator ID associated with a particular alias
 func (s *roomAliasesStatements) SelectCreatorIDFromAlias(
-	ctx context.Context,
-	alias string,
+	ctx context.Context, txn *sql.Tx, alias string,
 ) (creatorID string, err error) {
-	// Get database connection
-	db := s.cm.Connection(ctx, true)
-
-	row := db.Raw(s.selectCreatorIDFromAliasStmt, alias).Row()
-	err = row.Scan(&creatorID)
+	stmt := sqlutil.TxStmt(txn, s.selectCreatorIDFromAliasStmt)
+	err = stmt.QueryRowContext(ctx, alias).Scan(&creatorID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	return
 }
 
-// DeleteRoomAlias removes a room alias
 func (s *roomAliasesStatements) DeleteRoomAlias(
-	ctx context.Context,
-	alias string,
+	ctx context.Context, txn *sql.Tx, alias string,
 ) (err error) {
-	// Get database connection
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(s.deleteRoomAliasStmt, alias).Error
+	stmt := sqlutil.TxStmt(txn, s.deleteRoomAliasStmt)
+	_, err = stmt.ExecContext(ctx, alias)
+	return
 }

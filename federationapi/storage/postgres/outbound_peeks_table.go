@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -39,108 +38,74 @@ CREATE TABLE IF NOT EXISTS federationsender_outbound_peeks (
 );
 `
 
-// SQL query string constants
-const (
-	// insertOutboundPeekSQL inserts a new outbound peek record with creation timestamp
-	insertOutboundPeekSQL = "" +
-		"INSERT INTO federationsender_outbound_peeks (room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5, $6)"
+const insertOutboundPeekSQL = "" +
+	"INSERT INTO federationsender_outbound_peeks (room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5, $6)"
 
-	// selectOutboundPeekSQL retrieves a specific outbound peek by room, server and peek ID
-	selectOutboundPeekSQL = "" +
-		"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
+const selectOutboundPeekSQL = "" +
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
-	// selectOutboundPeeksSQL retrieves all outbound peeks for a room, ordered by creation timestamp
-	selectOutboundPeeksSQL = "" +
-		"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1 ORDER BY creation_ts"
+const selectOutboundPeeksSQL = "" +
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1 ORDER BY creation_ts"
 
-	// renewOutboundPeekSQL updates the renewed timestamp and renewal interval for a peek
-	renewOutboundPeekSQL = "" +
-		"UPDATE federationsender_outbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
+const renewOutboundPeekSQL = "" +
+	"UPDATE federationsender_outbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
 
-	// deleteOutboundPeekSQL removes a specific outbound peek entry
-	deleteOutboundPeekSQL = "" +
-		"DELETE FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
+const deleteOutboundPeekSQL = "" +
+	"DELETE FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
-	// deleteOutboundPeeksSQL removes all outbound peeks for a room
-	deleteOutboundPeeksSQL = "" +
-		"DELETE FROM federationsender_outbound_peeks WHERE room_id = $1"
-)
+const deleteOutboundPeeksSQL = "" +
+	"DELETE FROM federationsender_outbound_peeks WHERE room_id = $1"
 
-// outboundPeeksTable contains the postgres-specific implementation
-type outboundPeeksTable struct {
-	cm *sqlutil.Connections
-
-	insertOutboundPeekStmt  string
-	selectOutboundPeekStmt  string
-	selectOutboundPeeksStmt string
-	renewOutboundPeekStmt   string
-	deleteOutboundPeekStmt  string
-	deleteOutboundPeeksStmt string
+type outboundPeeksStatements struct {
+	db                      *sql.DB
+	insertOutboundPeekStmt  *sql.Stmt
+	selectOutboundPeekStmt  *sql.Stmt
+	selectOutboundPeeksStmt *sql.Stmt
+	renewOutboundPeekStmt   *sql.Stmt
+	deleteOutboundPeekStmt  *sql.Stmt
+	deleteOutboundPeeksStmt *sql.Stmt
 }
 
-// NewPostgresOutboundPeeksTable creates a new postgres outbound peeks table and prepares all statements
-func NewPostgresOutboundPeeksTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationOutboundPeeks, error) {
-	// Initialize schema using GORM
-	gormDB := cm.Connection(ctx, false)
-	if err := gormDB.Exec(outboundPeeksSchema).Error; err != nil {
-		return nil, err
+func NewPostgresOutboundPeeksTable(ctx context.Context, db *sql.DB) (s *outboundPeeksStatements, err error) {
+	s = &outboundPeeksStatements{
+		db: db,
 	}
-	
-	s := &outboundPeeksTable{
-		cm: cm,
-		insertOutboundPeekStmt:  insertOutboundPeekSQL,
-		selectOutboundPeekStmt:  selectOutboundPeekSQL,
-		selectOutboundPeeksStmt: selectOutboundPeeksSQL,
-		renewOutboundPeekStmt:   renewOutboundPeekSQL,
-		deleteOutboundPeekStmt:  deleteOutboundPeekSQL,
-		deleteOutboundPeeksStmt: deleteOutboundPeeksSQL,
+	_, err = db.Exec(outboundPeeksSchema)
+	if err != nil {
+		return
 	}
 
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertOutboundPeekStmt, insertOutboundPeekSQL},
+		{&s.selectOutboundPeekStmt, selectOutboundPeekSQL},
+		{&s.selectOutboundPeeksStmt, selectOutboundPeeksSQL},
+		{&s.renewOutboundPeekStmt, renewOutboundPeekSQL},
+		{&s.deleteOutboundPeeksStmt, deleteOutboundPeeksSQL},
+		{&s.deleteOutboundPeekStmt, deleteOutboundPeekSQL},
+	}.Prepare(db)
 }
 
-// InsertOutboundPeek adds a new outbound peek record
-func (s *outboundPeeksTable) InsertOutboundPeek(
-	ctx context.Context, serverName spec.ServerName, roomID, peekID string, renewalInterval int64,
+func (s *outboundPeeksStatements) InsertOutboundPeek(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string, renewalInterval int64,
 ) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	
-	// Get writable database connection
-	db := s.cm.Connection(ctx, false)
-	
-	return db.Exec(
-		s.insertOutboundPeekStmt,
-		roomID, serverName, peekID, nowMilli, nowMilli, renewalInterval,
-	).Error
+	stmt := sqlutil.TxStmt(txn, s.insertOutboundPeekStmt)
+	_, err = stmt.ExecContext(ctx, roomID, serverName, peekID, nowMilli, nowMilli, renewalInterval)
+	return
 }
 
-// RenewOutboundPeek updates the renewal timestamp and interval for an existing peek
-func (s *outboundPeeksTable) RenewOutboundPeek(
-	ctx context.Context, serverName spec.ServerName, roomID, peekID string, renewalInterval int64,
+func (s *outboundPeeksStatements) RenewOutboundPeek(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string, renewalInterval int64,
 ) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	
-	// Get writable database connection
-	db := s.cm.Connection(ctx, false)
-	
-	return db.Exec(
-		s.renewOutboundPeekStmt,
-		nowMilli, renewalInterval, roomID, serverName, peekID,
-	).Error
+	_, err = sqlutil.TxStmt(txn, s.renewOutboundPeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
+	return
 }
 
-// SelectOutboundPeek retrieves a specific outbound peek
-func (s *outboundPeeksTable) SelectOutboundPeek(
-	ctx context.Context, serverName spec.ServerName, roomID, peekID string,
+func (s *outboundPeeksStatements) SelectOutboundPeek(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string,
 ) (*types.OutboundPeek, error) {
-	// Get read-only database connection
-	db := s.cm.Connection(ctx, true)
-	
-	row := db.Raw(
-		s.selectOutboundPeekStmt,
-		roomID, serverName, peekID,
-	).Row()
-	
+	row := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryRowContext(ctx, roomID)
 	outboundPeek := types.OutboundPeek{}
 	err := row.Scan(
 		&outboundPeek.RoomID,
@@ -159,16 +124,12 @@ func (s *outboundPeeksTable) SelectOutboundPeek(
 	return &outboundPeek, nil
 }
 
-// SelectOutboundPeeks retrieves all outbound peeks for a room
-func (s *outboundPeeksTable) SelectOutboundPeeks(
-	ctx context.Context, roomID string,
+func (s *outboundPeeksStatements) SelectOutboundPeeks(
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) (outboundPeeks []types.OutboundPeek, err error) {
-	// Get read-only database connection
-	db := s.cm.Connection(ctx, true)
-	
-	rows, err := db.Raw(s.selectOutboundPeeksStmt, roomID).Rows()
+	rows, err := sqlutil.TxStmt(txn, s.selectOutboundPeeksStmt).QueryContext(ctx, roomID)
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectOutboundPeeks: rows.close() failed")
 
@@ -182,7 +143,7 @@ func (s *outboundPeeksTable) SelectOutboundPeeks(
 			&outboundPeek.RenewedTimestamp,
 			&outboundPeek.RenewalInterval,
 		); err != nil {
-			return nil, err
+			return
 		}
 		outboundPeeks = append(outboundPeeks, outboundPeek)
 	}
@@ -190,22 +151,16 @@ func (s *outboundPeeksTable) SelectOutboundPeeks(
 	return outboundPeeks, rows.Err()
 }
 
-// DeleteOutboundPeek removes a specific outbound peek
-func (s *outboundPeeksTable) DeleteOutboundPeek(
-	ctx context.Context, serverName spec.ServerName, roomID, peekID string,
+func (s *outboundPeeksStatements) DeleteOutboundPeek(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string,
 ) (err error) {
-	// Get writable database connection
-	db := s.cm.Connection(ctx, false)
-	
-	return db.Exec(s.deleteOutboundPeekStmt, roomID, serverName, peekID).Error
+	_, err = sqlutil.TxStmt(txn, s.deleteOutboundPeekStmt).ExecContext(ctx, roomID, serverName, peekID)
+	return
 }
 
-// DeleteOutboundPeeks removes all outbound peeks for a room
-func (s *outboundPeeksTable) DeleteOutboundPeeks(
-	ctx context.Context, roomID string,
+func (s *outboundPeeksStatements) DeleteOutboundPeeks(
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) (err error) {
-	// Get writable database connection
-	db := s.cm.Connection(ctx, false)
-	
-	return db.Exec(s.deleteOutboundPeeksStmt, roomID).Error
+	_, err = sqlutil.TxStmt(txn, s.deleteOutboundPeeksStmt).ExecContext(ctx, roomID)
+	return
 }

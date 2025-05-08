@@ -53,89 +53,76 @@ CREATE TABLE IF NOT EXISTS userapi_accounts (
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_accounts_idx ON userapi_accounts(localpart, server_name);
 `
 
-// SQL query constants for accounts operations
-const (
-	// insertAccountSQL creates a new account
-	insertAccountSQL = "INSERT INTO userapi_accounts(localpart, server_name, created_ts, password_hash, appservice_id, account_type) VALUES ($1, $2, $3, $4, $5, $6)"
+const insertAccountSQL = "" +
+	"INSERT INTO userapi_accounts(localpart, server_name, created_ts, password_hash, appservice_id, account_type) VALUES ($1, $2, $3, $4, $5, $6)"
 
-	// updatePasswordSQL updates the password hash for an account
-	updatePasswordSQL = "UPDATE userapi_accounts SET password_hash = $1 WHERE localpart = $2 AND server_name = $3"
+const updatePasswordSQL = "" +
+	"UPDATE userapi_accounts SET password_hash = $1 WHERE localpart = $2 AND server_name = $3"
 
-	// deactivateAccountSQL marks an account as deactivated
-	deactivateAccountSQL = "UPDATE userapi_accounts SET is_deactivated = TRUE WHERE localpart = $1 AND server_name = $2"
+const deactivateAccountSQL = "" +
+	"UPDATE userapi_accounts SET is_deactivated = TRUE WHERE localpart = $1 AND server_name = $2"
 
-	// selectAccountByLocalpartSQL retrieves account details by localpart
-	selectAccountByLocalpartSQL = "SELECT localpart, server_name, appservice_id, account_type FROM userapi_accounts WHERE localpart = $1 AND server_name = $2"
+const selectAccountByLocalpartSQL = "" +
+	"SELECT localpart, server_name, appservice_id, account_type FROM userapi_accounts WHERE localpart = $1 AND server_name = $2"
 
-	// selectPasswordHashSQL retrieves password hash for an active account
-	selectPasswordHashSQL = "SELECT password_hash FROM userapi_accounts WHERE localpart = $1 AND server_name = $2 AND is_deactivated = FALSE"
+const selectPasswordHashSQL = "" +
+	"SELECT password_hash FROM userapi_accounts WHERE localpart = $1 AND server_name = $2 AND is_deactivated = FALSE"
 
-	// selectNewNumericLocalpartSQL finds the highest numeric localpart to generate a new one
-	selectNewNumericLocalpartSQL = "SELECT COALESCE(MAX(localpart::bigint), 0) FROM userapi_accounts WHERE localpart ~ '^[0-9]{1,}$' AND server_name = $1"
-)
+const selectNewNumericLocalpartSQL = "" +
+	"SELECT COALESCE(MAX(localpart::bigint), 0) FROM userapi_accounts WHERE localpart ~ '^[0-9]{1,}$' AND server_name = $1"
 
-type accountsTable struct {
-	cm                     *sqlutil.Connections
-	serverName             spec.ServerName
-	
-	// SQL statements directly as fields
-	insertAccountStmt             string
-	updatePasswordStmt            string
-	deactivateAccountStmt         string
-	selectAccountByLocalpartStmt  string
-	selectPasswordHashStmt        string
-	selectNewNumericLocalpartStmt string
+type accountsStatements struct {
+	insertAccountStmt             *sql.Stmt
+	updatePasswordStmt            *sql.Stmt
+	deactivateAccountStmt         *sql.Stmt
+	selectAccountByLocalpartStmt  *sql.Stmt
+	selectPasswordHashStmt        *sql.Stmt
+	selectNewNumericLocalpartStmt *sql.Stmt
+	serverName                    spec.ServerName
 }
 
-func NewPostgresAccountsTable(ctx context.Context, cm *sqlutil.Connections, serverName spec.ServerName) (tables.AccountsTable, error) {
-	// Initialize schema
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(accountsSchema).Error; err != nil {
-		return nil, err
+func NewPostgresAccountsTable(ctx context.Context, db *sql.DB, serverName spec.ServerName) (tables.AccountsTable, error) {
+	s := &accountsStatements{
+		serverName: serverName,
 	}
-	
-	// Run migrations
-	m := sqlutil.NewMigrator(db.DB())
-	err := m.Up(ctx)
+	_, err := db.Exec(accountsSchema)
 	if err != nil {
 		return nil, err
 	}
-
-	// Initialize table with SQL statements
-	t := &accountsTable{
-		cm:         cm,
-		serverName: serverName,
-		insertAccountStmt:             insertAccountSQL,
-		updatePasswordStmt:            updatePasswordSQL,
-		deactivateAccountStmt:         deactivateAccountSQL,
-		selectAccountByLocalpartStmt:  selectAccountByLocalpartSQL,
-		selectPasswordHashStmt:        selectPasswordHashSQL,
-		selectNewNumericLocalpartStmt: selectNewNumericLocalpartSQL,
+	m := sqlutil.NewMigrator(db)
+	err = m.Up(ctx)
+	if err != nil {
+		return nil, err
 	}
-	
-	return t, nil
+	return s, sqlutil.StatementList{
+		{&s.insertAccountStmt, insertAccountSQL},
+		{&s.updatePasswordStmt, updatePasswordSQL},
+		{&s.deactivateAccountStmt, deactivateAccountSQL},
+		{&s.selectAccountByLocalpartStmt, selectAccountByLocalpartSQL},
+		{&s.selectPasswordHashStmt, selectPasswordHashSQL},
+		{&s.selectNewNumericLocalpartStmt, selectNewNumericLocalpartSQL},
+	}.Prepare(db)
 }
 
 // insertAccount creates a new account. 'hash' should be the password hash for this account. If it is missing,
 // this account will be passwordless. Returns an error if this account already exists. Returns the account
 // on success.
-func (t *accountsTable) InsertAccount(
-	ctx context.Context,
+func (s *accountsStatements) InsertAccount(
+	ctx context.Context, txn *sql.Tx,
 	localpart string, serverName spec.ServerName,
 	hash, appserviceID string, accountType api.AccountType,
 ) (*api.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
-	
-	db := t.cm.Connection(ctx, false)
+	stmt := sqlutil.TxStmt(txn, s.insertAccountStmt)
 
 	var err error
 	if accountType != api.AccountTypeAppService {
-		err = db.Exec(t.insertAccountStmt, localpart, serverName, createdTimeMS, hash, nil, accountType).Error
+		_, err = stmt.ExecContext(ctx, localpart, serverName, createdTimeMS, hash, nil, accountType)
 	} else {
-		err = db.Exec(t.insertAccountStmt, localpart, serverName, createdTimeMS, hash, appserviceID, accountType).Error
+		_, err = stmt.ExecContext(ctx, localpart, serverName, createdTimeMS, hash, appserviceID, accountType)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("insertAccountSQL: %w", err)
+		return nil, fmt.Errorf("insertAccountStmt: %w", err)
 	}
 
 	return &api.Account{
@@ -147,39 +134,36 @@ func (t *accountsTable) InsertAccount(
 	}, nil
 }
 
-func (t *accountsTable) UpdatePassword(
+func (s *accountsStatements) UpdatePassword(
 	ctx context.Context, localpart string, serverName spec.ServerName,
 	passwordHash string,
 ) (err error) {
-	db := t.cm.Connection(ctx, false)
-	return db.Exec(t.updatePasswordStmt, passwordHash, localpart, serverName).Error
-}
-
-func (t *accountsTable) DeactivateAccount(
-	ctx context.Context, localpart string, serverName spec.ServerName,
-) (err error) {
-	db := t.cm.Connection(ctx, false)
-	return db.Exec(t.deactivateAccountStmt, localpart, serverName).Error
-}
-
-func (t *accountsTable) SelectPasswordHash(
-	ctx context.Context, localpart string, serverName spec.ServerName,
-) (hash string, err error) {
-	db := t.cm.Connection(ctx, true)
-	row := db.Raw(t.selectPasswordHashStmt, localpart, serverName).Row()
-	err = row.Scan(&hash)
+	_, err = s.updatePasswordStmt.ExecContext(ctx, passwordHash, localpart, serverName)
 	return
 }
 
-func (t *accountsTable) SelectAccountByLocalpart(
+func (s *accountsStatements) DeactivateAccount(
+	ctx context.Context, localpart string, serverName spec.ServerName,
+) (err error) {
+	_, err = s.deactivateAccountStmt.ExecContext(ctx, localpart, serverName)
+	return
+}
+
+func (s *accountsStatements) SelectPasswordHash(
+	ctx context.Context, localpart string, serverName spec.ServerName,
+) (hash string, err error) {
+	err = s.selectPasswordHashStmt.QueryRowContext(ctx, localpart, serverName).Scan(&hash)
+	return
+}
+
+func (s *accountsStatements) SelectAccountByLocalpart(
 	ctx context.Context, localpart string, serverName spec.ServerName,
 ) (*api.Account, error) {
 	var appserviceIDPtr sql.NullString
 	var acc api.Account
 
-	db := t.cm.Connection(ctx, true)
-	row := db.Raw(t.selectAccountByLocalpartStmt, localpart, serverName).Row()
-	err := row.Scan(&acc.Localpart, &acc.ServerName, &appserviceIDPtr, &acc.AccountType)
+	stmt := s.selectAccountByLocalpartStmt
+	err := stmt.QueryRowContext(ctx, localpart, serverName).Scan(&acc.Localpart, &acc.ServerName, &appserviceIDPtr, &acc.AccountType)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			log.WithError(err).Error("Unable to retrieve user from the db")
@@ -194,13 +178,13 @@ func (t *accountsTable) SelectAccountByLocalpart(
 	return &acc, nil
 }
 
-func (t *accountsTable) SelectNewNumericLocalpart(
-	ctx context.Context, serverName spec.ServerName,
+func (s *accountsStatements) SelectNewNumericLocalpart(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) (id int64, err error) {
-	db := t.cm.Connection(ctx, true)
-	row := db.Raw(t.selectNewNumericLocalpartStmt, serverName).Row()
-	if err = row.Scan(&id); err != nil {
-		return 0, fmt.Errorf("SelectNewNumericLocalpart: %w", err)
+	stmt := s.selectNewNumericLocalpartStmt
+	if txn != nil {
+		stmt = sqlutil.TxStmt(txn, stmt)
 	}
-	return id + 1, nil
+	err = stmt.QueryRowContext(ctx, serverName).Scan(&id)
+	return id + 1, err
 }

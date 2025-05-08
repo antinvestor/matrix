@@ -18,8 +18,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"github.com/lib/pq"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -31,141 +29,63 @@ const eventJSONSchema = `
 -- Stores the JSON for each event. This kept separate from the main events
 -- table to keep the rows in the main events table small.
 CREATE TABLE IF NOT EXISTS roomserver_event_json (
-    -- Local numeric event ID for the event.
+    -- Local numeric ID for the event.
     event_nid BIGINT NOT NULL PRIMARY KEY,
     -- The JSON for the event.
     -- Stored as TEXT because this should be valid UTF-8.
-    -- Not stored as JSON because we want to preserve the exact string formatting.
+    -- Not stored as a JSONB because we always just pull the entire event
+    -- so there is no point in postgres parsing it.
+    -- Not stored as JSON because we already validate the JSON in the server
+    -- so there is no point in postgres validating it.
+    -- TODO: Should we be compressing the events with Snappy or DEFLATE?
     event_json TEXT NOT NULL
 );
 `
 
-// SQL query constants for event JSON operations
-const (
-	// Insert a new event JSON entry
-	insertEventJSONSQL = "" +
-		"INSERT INTO roomserver_event_json (event_nid, event_json)" +
-		" VALUES ($1, $2)" +
-		" ON CONFLICT DO NOTHING"
+const insertEventJSONSQL = "" +
+	"INSERT INTO roomserver_event_json (event_nid, event_json) VALUES ($1, $2)" +
+	" ON CONFLICT (event_nid) DO UPDATE SET event_json=$2"
 
-	// Select the JSON for a single event by its NID
-	selectEventJSONSQL = "" +
-		"SELECT event_json FROM roomserver_event_json WHERE event_nid = $1"
+// Bulk event JSON lookup by numeric event ID.
+// Sort by the numeric event ID.
+// This means that we can use binary search to lookup by numeric event ID.
+const bulkSelectEventJSONSQL = "" +
+	"SELECT event_nid, event_json FROM roomserver_event_json" +
+	" WHERE event_nid = ANY($1)" +
+	" ORDER BY event_nid ASC"
 
-	// Select the JSON for multiple events by their NIDs
-	bulkSelectEventJSONSQL = "" +
-		"SELECT event_nid, event_json FROM roomserver_event_json WHERE event_nid = ANY($1)"
-
-	// Delete an event JSON entry by its NID
-	deleteEventJSONSQL = "" +
-		"DELETE FROM roomserver_event_json WHERE event_nid = $1"
-
-	// Delete multiple event JSON entries by their NIDs
-	deleteMultipleEventJSONSQL = "" +
-		"DELETE FROM roomserver_event_json WHERE event_nid = ANY($1)"
-)
-
-// eventJSONTable implements tables.EventJSON
-type eventJSONTable struct {
-	cm *sqlutil.Connections
-
-	// SQL statements stored as struct fields
-	insertEventJSONStmt         string
-	selectEventJSONStmt         string
-	bulkSelectEventJSONStmt     string
-	deleteEventJSONStmt         string
-	deleteMultipleEventJSONStmt string
+type eventJSONStatements struct {
+	insertEventJSONStmt     *sql.Stmt
+	bulkSelectEventJSONStmt *sql.Stmt
 }
 
-// NewPostgresEventJSONTable creates a new PostgreSQL event JSON table
-func NewPostgresEventJSONTable(ctx context.Context, cm *sqlutil.Connections) (tables.EventJSON, error) {
-	// Create the table first
-	if err := cm.Writer.ExecSQL(ctx, eventJSONSchema); err != nil {
-		return nil, err
-	}
-
-	// Initialize the table struct with SQL statements
-	s := &eventJSONTable{
-		cm: cm,
-
-		// Initialize SQL statement fields with the constants
-		insertEventJSONStmt:         insertEventJSONSQL,
-		selectEventJSONStmt:         selectEventJSONSQL,
-		bulkSelectEventJSONStmt:     bulkSelectEventJSONSQL,
-		deleteEventJSONStmt:         deleteEventJSONSQL,
-		deleteMultipleEventJSONStmt: deleteMultipleEventJSONSQL,
-	}
-
-	return s, nil
+func CreateEventJSONTable(ctx context.Context, db *sql.DB) error {
+	_, err := db.Exec(eventJSONSchema)
+	return err
 }
 
-// InsertEventJSON implements tables.EventJSON
-func (s *eventJSONTable) InsertEventJSON(
-	ctx context.Context, eventNID types.EventNID, eventJSON []byte,
+func PrepareEventJSONTable(ctx context.Context, db *sql.DB) (tables.EventJSON, error) {
+	s := &eventJSONStatements{}
+
+	return s, sqlutil.StatementList{
+		{&s.insertEventJSONStmt, insertEventJSONSQL},
+		{&s.bulkSelectEventJSONStmt, bulkSelectEventJSONSQL},
+	}.Prepare(db)
+}
+
+func (s *eventJSONStatements) InsertEventJSON(
+	ctx context.Context, txn *sql.Tx, eventNID types.EventNID, eventJSON []byte,
 ) error {
-	db := s.cm.Connection(ctx, false)
-	return db.Exec(s.insertEventJSONStmt, int64(eventNID), string(eventJSON)).Error
+	stmt := sqlutil.TxStmt(txn, s.insertEventJSONStmt)
+	_, err := stmt.ExecContext(ctx, int64(eventNID), eventJSON)
+	return err
 }
 
-// BulkInsertEventJSON implements tables.EventJSON
-func (s *eventJSONTable) BulkInsertEventJSON(
-	ctx context.Context, eventNIDs []types.EventNID, eventJSONs [][]byte,
-) error {
-	if len(eventNIDs) == 0 {
-		return nil
-	}
-
-	return sqlutil.WithTransaction(ctx, s.cm, func(ctx context.Context) error {
-
-		var err error
-		db := s.cm.Connection(ctx, false)
-
-		for i := range eventNIDs {
-			if err = db.Exec(s.insertEventJSONStmt, int64(eventNIDs[i]), string(eventJSONs[i])).Error; err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-
-}
-
-// SelectEventJSON implements tables.EventJSON
-func (s *eventJSONTable) SelectEventJSON(
-	ctx context.Context, eventNID types.EventNID,
-) ([]byte, error) {
-	db := s.cm.Connection(ctx, true)
-	var eventJSON string
-
-	if err := db.Raw(s.selectEventJSONStmt, int64(eventNID)).Row().Scan(&eventJSON); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return []byte(eventJSON), nil
-}
-
-// BulkSelectEventJSON implements tables.EventJSON
-func (s *eventJSONTable) BulkSelectEventJSON(
-	ctx context.Context, eventNIDs []types.EventNID,
+func (s *eventJSONStatements) BulkSelectEventJSON(
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 ) ([]tables.EventJSONPair, error) {
-	if len(eventNIDs) == 0 {
-		return nil, nil
-	}
-
-	db := s.cm.Connection(ctx, true)
-
-	// Convert event NIDs to int64s for the query
-	eventNIDInt64s := make([]int64, len(eventNIDs))
-	for i := range eventNIDs {
-		eventNIDInt64s[i] = int64(eventNIDs[i])
-	}
-
-	// Execute query
-	rows, err := db.Raw(s.bulkSelectEventJSONStmt, pq.Int64Array(eventNIDInt64s)).Rows()
+	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventJSONStmt)
+	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}

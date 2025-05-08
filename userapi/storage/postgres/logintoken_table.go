@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -45,89 +46,84 @@ CREATE TABLE IF NOT EXISTS userapi_login_tokens (
 CREATE INDEX IF NOT EXISTS userapi_login_tokens_expiration_idx ON userapi_login_tokens(token_expires_at);
 `
 
-// SQL query constants for login token operations
-const (
-	// insertLoginTokenSQL inserts a new login token
-	insertLoginTokenSQL = "INSERT INTO userapi_login_tokens(token, token_expires_at, user_id, extra_data) VALUES ($1, $2, $3, $4)"
+const insertLoginTokenSQL = "" +
+	"INSERT INTO userapi_login_tokens(token, token_expires_at, user_id, extra_data) VALUES ($1, $2, $3, $4)"
 
-	// deleteLoginTokenSQL deletes a login token by token value or expiration
-	deleteLoginTokenSQL = "DELETE FROM userapi_login_tokens WHERE token = $1 OR token_expires_at <= $2"
+const deleteLoginTokenSQL = "" +
+	"DELETE FROM userapi_login_tokens WHERE token = $1 OR token_expires_at <= $2"
 
-	// selectLoginTokenSQL selects a login token by token value that hasn't expired
-	selectLoginTokenSQL = "SELECT user_id, extra_data FROM userapi_login_tokens WHERE token = $1 AND token_expires_at > $2"
-)
+const selectLoginTokenSQL = "" +
+	"SELECT user_id, extra_data FROM userapi_login_tokens WHERE token = $1 AND token_expires_at > $2"
 
-type loginTokenTable struct {
-	cm *sqlutil.Connections
-	
-	insertTokenStmt string
-	deleteTokenStmt string
-	selectTokenStmt string
+type loginTokenStatements struct {
+	insertStmt *sql.Stmt
+	deleteStmt *sql.Stmt
+	selectStmt *sql.Stmt
 }
 
-func NewPostgresLoginTokenTable(ctx context.Context, cm *sqlutil.Connections) (tables.LoginTokenTable, error) {
-	// Initialize schema
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(loginTokenSchema).Error; err != nil {
+func NewPostgresLoginTokenTable(ctx context.Context, db *sql.DB) (tables.LoginTokenTable, error) {
+	s := &loginTokenStatements{}
+	_, err := db.Exec(loginTokenSchema)
+	if err != nil {
 		return nil, err
 	}
-
-	// Initialize table with SQL statements
-	t := &loginTokenTable{
-		cm:              cm,
-		insertTokenStmt: insertLoginTokenSQL,
-		deleteTokenStmt: deleteLoginTokenSQL,
-		selectTokenStmt: selectLoginTokenSQL,
-	}
-
-	return t, nil
+	return s, sqlutil.StatementList{
+		{&s.insertStmt, insertLoginTokenSQL},
+		{&s.deleteStmt, deleteLoginTokenSQL},
+		{&s.selectStmt, selectLoginTokenSQL},
+	}.Prepare(db)
 }
 
 // InsertLoginToken insert adds an already generated token to the database.
-func (t *loginTokenTable) InsertLoginToken(ctx context.Context, metadata *api.LoginTokenMetadata, data *api.LoginTokenData) error {
-	db := t.cm.Connection(ctx, false)
+func (s *loginTokenStatements) InsertLoginToken(ctx context.Context, txn *sql.Tx, metadata *api.LoginTokenMetadata, data *api.LoginTokenData) error {
 
 	extraData, err := json.Marshal(data.SSOToken)
 	if err != nil {
 		return err
 	}
 
-	return db.Exec(t.insertTokenStmt, metadata.Token, metadata.Expiration.UTC(), data.UserID, extraData).Error
+	stmt := sqlutil.TxStmt(txn, s.insertStmt)
+	_, err = stmt.ExecContext(ctx, metadata.Token, metadata.Expiration.UTC(), data.UserID, extraData)
+	return err
 }
 
 // DeleteLoginToken removes the named token.
 //
 // As a simple way to garbage-collect stale tokens, we also remove all expired tokens.
 // The userapi_login_tokens_expiration_idx index should make that efficient.
-func (t *loginTokenTable) DeleteLoginToken(ctx context.Context, token string) error {
-	db := t.cm.Connection(ctx, false)
-
-	// Delete this specific token and all expired tokens
-	return db.Exec(t.deleteTokenStmt, token, time.Now().UTC()).Error
+func (s *loginTokenStatements) DeleteLoginToken(ctx context.Context, txn *sql.Tx, token string) error {
+	stmt := sqlutil.TxStmt(txn, s.deleteStmt)
+	res, err := stmt.ExecContext(ctx, token, time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n > 1 {
+		util.GetLogger(ctx).WithField("num_deleted", n).Infof("Deleted %d login tokens (%d likely additional expired token)", n, n-1)
+	}
+	return nil
 }
 
 // SelectLoginToken returns the data associated with the given token. May return sql.ErrNoRows.
-func (t *loginTokenTable) SelectLoginToken(ctx context.Context, token string) (*api.LoginTokenData, error) {
-	db := t.cm.Connection(ctx, true)
-
-	var userID string
-	var extraDataBytes []byte
-
-	row := db.Raw(t.selectTokenStmt, token, time.Now().UTC()).Row()
-	err := row.Scan(&userID, &extraDataBytes)
+func (s *loginTokenStatements) SelectLoginToken(ctx context.Context, token string) (*api.LoginTokenData, error) {
+	var (
+		data      api.LoginTokenData
+		extraData []byte
+	)
+	err := s.selectStmt.QueryRowContext(ctx, token, time.Now().UTC()).Scan(&data.UserID, &extraData)
 	if err != nil {
 		return nil, err
 	}
 
-	var oauthToken oauth2.Token
-	if len(extraDataBytes) > 0 {
-		if err = json.Unmarshal(extraDataBytes, &oauthToken); err != nil {
+	if len(extraData) > 0 && string(extraData) != "null" {
+
+		ssoToken := &oauth2.Token{}
+
+		err = json.Unmarshal(extraData, ssoToken)
+		if err != nil {
 			return nil, err
 		}
+		data.SSOToken = ssoToken
 	}
 
-	return &api.LoginTokenData{
-		UserID:   userID,
-		SSOToken: &oauthToken,
-	}, nil
+	return &data, nil
 }

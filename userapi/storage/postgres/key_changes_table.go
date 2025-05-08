@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
@@ -35,49 +36,40 @@ CREATE TABLE IF NOT EXISTS keyserver_key_changes (
 );
 `
 
-// SQL query constants for key changes operations
-const (
-	upsertKeyChangeSQL = "INSERT INTO keyserver_key_changes (user_id)" +
-		" VALUES ($1)" +
-		" ON CONFLICT ON CONSTRAINT keyserver_key_changes_unique_per_user" +
-		" DO UPDATE SET change_id = nextval('keyserver_key_changes_seq')" +
-		" RETURNING change_id"
+// Replace based on user ID. We don't care how many times the user's keys have changed, only that they
+// have changed, hence we can just keep bumping the change ID for this user.
+const upsertKeyChangeSQL = "" +
+	"INSERT INTO keyserver_key_changes (user_id)" +
+	" VALUES ($1)" +
+	" ON CONFLICT ON CONSTRAINT keyserver_key_changes_unique_per_user" +
+	" DO UPDATE SET change_id = nextval('keyserver_key_changes_seq')" +
+	" RETURNING change_id"
 
-	selectKeyChangesSQL = "SELECT user_id, change_id FROM keyserver_key_changes WHERE change_id > $1 AND change_id <= $2"
-)
+const selectKeyChangesSQL = "" +
+	"SELECT user_id, change_id FROM keyserver_key_changes WHERE change_id > $1 AND change_id <= $2"
 
-type keyChangesTable struct {
-	cm *sqlutil.Connections
-	
-	upsertKeyChangeStmt  string
-	selectKeyChangesStmt string
+type keyChangesStatements struct {
+	db                   *sql.DB
+	upsertKeyChangeStmt  *sql.Stmt
+	selectKeyChangesStmt *sql.Stmt
 }
 
-func NewPostgresKeyChangesTable(ctx context.Context, cm *sqlutil.Connections) (tables.KeyChanges, error) {
-	// Initialize schema
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(keyChangesSchema).Error; err != nil {
-		return nil, err
+func NewPostgresKeyChangesTable(ctx context.Context, db *sql.DB) (tables.KeyChanges, error) {
+	s := &keyChangesStatements{
+		db: db,
+	}
+	_, err := db.Exec(keyChangesSchema)
+	if err != nil {
+		return s, err
 	}
 
-	// Initialize migration
-	sqlDB, err := db.DB()
-	if err != nil {
+	if err = executeMigration(ctx, db); err != nil {
 		return nil, err
 	}
-	
-	if err = executeMigration(ctx, sqlDB); err != nil {
-		return nil, err
-	}
-	
-	// Initialize table with SQL statements
-	t := &keyChangesTable{
-		cm:                  cm,
-		upsertKeyChangeStmt: upsertKeyChangeSQL,
-		selectKeyChangesStmt: selectKeyChangesSQL,
-	}
-	
-	return t, nil
+	return s, sqlutil.StatementList{
+		{&s.upsertKeyChangeStmt, upsertKeyChangeSQL},
+		{&s.selectKeyChangesStmt, selectKeyChangesSQL},
+	}.Prepare(db)
 }
 
 func executeMigration(ctx context.Context, db *sql.DB) error {
@@ -89,48 +81,48 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 	var cName string
 	err := db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'keyserver_key_changes' AND column_name = 'partition'").Scan(&cName)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
+			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
+				return fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
+			}
 			return nil
 		}
-		return fmt.Errorf("failed to check for column: %w", err)
+		return err
 	}
-	
-	// If we are here, it means the column exists and we need to drop it
 	m := sqlutil.NewMigrator(db)
-	m.AddMigrations([]sqlutil.Migration{
-		{
-			Version: migrationName,
-			Up:      deltas.UpKeyChangesRefactor,
-		},
+	m.AddMigrations(sqlutil.Migration{
+		Version: migrationName,
+		Up:      deltas.UpRefactorKeyChanges,
 	})
+
 	return m.Up(ctx)
 }
 
-func (t *keyChangesTable) InsertKeyChange(ctx context.Context, userID string) (changeID int64, err error) {
-	db := t.cm.Connection(ctx, false)
-	err = db.Raw(t.upsertKeyChangeStmt, userID).Row().Scan(&changeID)
+func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, userID string) (changeID int64, err error) {
+	err = s.upsertKeyChangeStmt.QueryRowContext(ctx, userID).Scan(&changeID)
 	return
 }
 
-func (t *keyChangesTable) SelectKeyChanges(
+func (s *keyChangesStatements) SelectKeyChanges(
 	ctx context.Context, fromOffset, toOffset int64,
 ) (userIDs []string, latestOffset int64, err error) {
-	db := t.cm.Connection(ctx, true)
-	rows, err := db.Raw(t.selectKeyChangesStmt, fromOffset, toOffset).Rows()
+	latestOffset = fromOffset
+	rows, err := s.selectKeyChangesStmt.QueryContext(ctx, fromOffset, toOffset)
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "selectKeyChangesStmt: rows.close() failed")
 	for rows.Next() {
 		var userID string
 		var offset int64
 		if err = rows.Scan(&userID, &offset); err != nil {
 			return nil, 0, err
 		}
-		userIDs = append(userIDs, userID)
 		if offset > latestOffset {
 			latestOffset = offset
 		}
+		userIDs = append(userIDs, userID)
 	}
-	return userIDs, latestOffset, rows.Err()
+	err = rows.Err()
+	return
 }

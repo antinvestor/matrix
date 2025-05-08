@@ -27,7 +27,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-	"gorm.io/gorm"
 )
 
 var staleDeviceListsSchema = `
@@ -42,63 +41,63 @@ CREATE TABLE IF NOT EXISTS keyserver_stale_device_lists (
 CREATE INDEX IF NOT EXISTS keyserver_stale_device_lists_idx ON keyserver_stale_device_lists (domain, is_stale);
 `
 
-type staleDeviceListsTable struct {
-	cm *sqlutil.Connections
+const upsertStaleDeviceListSQL = "" +
+	"INSERT INTO keyserver_stale_device_lists (user_id, domain, is_stale, ts_added_secs)" +
+	" VALUES ($1, $2, $3, $4)" +
+	" ON CONFLICT (user_id)" +
+	" DO UPDATE SET is_stale = $3, ts_added_secs = $4"
 
-	upsertStaleDeviceListStmt             string
-	selectStaleDeviceListsWithDomainsStmt string
-	selectStaleDeviceListsStmt            string
-	deleteStaleDeviceListsStmt            string
+const selectStaleDeviceListsWithDomainsSQL = "" +
+	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2 ORDER BY ts_added_secs DESC"
+
+const selectStaleDeviceListsSQL = "" +
+	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 ORDER BY ts_added_secs DESC"
+
+const deleteStaleDevicesSQL = "" +
+	"DELETE FROM keyserver_stale_device_lists WHERE user_id = ANY($1)"
+
+type staleDeviceListsStatements struct {
+	upsertStaleDeviceListStmt             *sql.Stmt
+	selectStaleDeviceListsWithDomainsStmt *sql.Stmt
+	selectStaleDeviceListsStmt            *sql.Stmt
+	deleteStaleDeviceListsStmt            *sql.Stmt
 }
 
-func NewPostgresStaleDeviceListsTable(ctx context.Context, cm *sqlutil.Connections) (tables.StaleDeviceLists, error) {
-	// Initialize schema
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(staleDeviceListsSchema).Error; err != nil {
+func NewPostgresStaleDeviceListsTable(ctx context.Context, db *sql.DB) (tables.StaleDeviceLists, error) {
+	s := &staleDeviceListsStatements{}
+	_, err := db.Exec(staleDeviceListsSchema)
+	if err != nil {
 		return nil, err
 	}
-
-	// Initialize table with SQL statements
-	t := &staleDeviceListsTable{
-		cm: cm,
-		upsertStaleDeviceListStmt: "INSERT INTO keyserver_stale_device_lists (user_id, domain, is_stale, ts_added_secs)" +
-			" VALUES ($1, $2, $3, $4)" +
-			" ON CONFLICT (user_id)" +
-			" DO UPDATE SET is_stale = $3, ts_added_secs = $4",
-		selectStaleDeviceListsWithDomainsStmt: "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2 ORDER BY ts_added_secs DESC",
-		selectStaleDeviceListsStmt:            "SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 ORDER BY ts_added_secs DESC",
-		deleteStaleDeviceListsStmt:            "DELETE FROM keyserver_stale_device_lists WHERE user_id = ANY($1)",
-	}
-
-	return t, nil
+	return s, sqlutil.StatementList{
+		{&s.upsertStaleDeviceListStmt, upsertStaleDeviceListSQL},
+		{&s.selectStaleDeviceListsStmt, selectStaleDeviceListsSQL},
+		{&s.selectStaleDeviceListsWithDomainsStmt, selectStaleDeviceListsWithDomainsSQL},
+		{&s.deleteStaleDeviceListsStmt, deleteStaleDevicesSQL},
+	}.Prepare(db)
 }
 
-func (s *staleDeviceListsTable) InsertStaleDeviceList(ctx context.Context, userID string, isStale bool) error {
+func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, userID string, isStale bool) error {
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return err
 	}
-
-	db := s.cm.Connection(ctx, false)
-	err = db.Exec(s.upsertStaleDeviceListStmt, userID, string(domain), isStale, spec.AsTimestamp(time.Now())).Error
+	_, err = s.upsertStaleDeviceListStmt.ExecContext(ctx, userID, string(domain), isStale, spec.AsTimestamp(time.Now()))
 	return err
 }
 
-func (s *staleDeviceListsTable) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []spec.ServerName) ([]string, error) {
-	db := s.cm.Connection(ctx, true)
-
+func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []spec.ServerName) ([]string, error) {
 	// we only query for 1 domain or all domains so optimise for those use cases
 	if len(domains) == 0 {
-		rows, err := db.Raw(s.selectStaleDeviceListsStmt, true).Rows()
+		rows, err := s.selectStaleDeviceListsStmt.QueryContext(ctx, true)
 		if err != nil {
 			return nil, err
 		}
 		return rowsToUserIDs(ctx, rows)
 	}
-
 	var result []string
 	for _, domain := range domains {
-		rows, err := db.Raw(s.selectStaleDeviceListsWithDomainsStmt, true, string(domain)).Rows()
+		rows, err := s.selectStaleDeviceListsWithDomainsStmt.QueryContext(ctx, true, string(domain))
 		if err != nil {
 			return nil, err
 		}
@@ -112,12 +111,12 @@ func (s *staleDeviceListsTable) SelectUserIDsWithStaleDeviceLists(ctx context.Co
 }
 
 // DeleteStaleDeviceLists removes users from stale device lists
-func (s *staleDeviceListsTable) DeleteStaleDeviceLists(
-	ctx context.Context, userIDs []string,
+func (s *staleDeviceListsStatements) DeleteStaleDeviceLists(
+	ctx context.Context, txn *sql.Tx, userIDs []string,
 ) error {
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(s.deleteStaleDeviceListsStmt, pq.Array(userIDs)).Error
+	stmt := sqlutil.TxStmt(txn, s.deleteStaleDeviceListsStmt)
+	_, err := stmt.ExecContext(ctx, pq.Array(userIDs))
+	return err
 }
 
 func rowsToUserIDs(ctx context.Context, rows *sql.Rows) (result []string, err error) {

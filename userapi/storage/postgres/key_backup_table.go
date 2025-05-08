@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
@@ -40,161 +41,126 @@ CREATE UNIQUE INDEX IF NOT EXISTS userapi_key_backups_idx ON userapi_key_backups
 CREATE INDEX IF NOT EXISTS userapi_key_backups_versions_idx ON userapi_key_backups(user_id, version);
 `
 
-// SQL query constants for key backup operations
-const (
-	// insertBackupKeySQL inserts a new backup key
-	insertBackupKeySQL = "INSERT INTO userapi_key_backups(user_id, room_id, session_id, version, first_message_index, forwarded_count, is_verified, session_data) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
+const insertBackupKeySQL = "" +
+	"INSERT INTO userapi_key_backups(user_id, room_id, session_id, version, first_message_index, forwarded_count, is_verified, session_data) " +
+	"VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
 
-	// updateBackupKeySQL updates an existing backup key
-	updateBackupKeySQL = "UPDATE userapi_key_backups SET first_message_index=$1, forwarded_count=$2, is_verified=$3, session_data=$4 " +
-		"WHERE user_id=$5 AND room_id=$6 AND session_id=$7 AND version=$8"
+const updateBackupKeySQL = "" +
+	"UPDATE userapi_key_backups SET first_message_index=$1, forwarded_count=$2, is_verified=$3, session_data=$4 " +
+	"WHERE user_id=$5 AND room_id=$6 AND session_id=$7 AND version=$8"
 
-	// countKeysSQL counts the number of keys for a user and version
-	countKeysSQL = "SELECT COUNT(*) FROM userapi_key_backups WHERE user_id = $1 AND version = $2"
+const countKeysSQL = "" +
+	"SELECT COUNT(*) FROM userapi_key_backups WHERE user_id = $1 AND version = $2"
 
-	// selectBackupKeysSQL retrieves all keys for a user and version
-	selectBackupKeysSQL = "SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM userapi_key_backups " +
-		"WHERE user_id = $1 AND version = $2"
+const selectBackupKeysSQL = "" +
+	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM userapi_key_backups " +
+	"WHERE user_id = $1 AND version = $2"
 
-	// selectKeysByRoomIDSQL retrieves keys for a user, version, and room ID
-	selectKeysByRoomIDSQL = "SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM userapi_key_backups " +
-		"WHERE user_id = $1 AND version = $2 AND room_id = $3"
+const selectKeysByRoomIDSQL = "" +
+	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM userapi_key_backups " +
+	"WHERE user_id = $1 AND version = $2 AND room_id = $3"
 
-	// selectKeysByRoomIDAndSessionIDSQL retrieves keys for a user, version, room ID, and session ID
-	selectKeysByRoomIDAndSessionIDSQL = "SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM userapi_key_backups " +
-		"WHERE user_id = $1 AND version = $2 AND room_id = $3 AND session_id = $4"
-)
+const selectKeysByRoomIDAndSessionIDSQL = "" +
+	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM userapi_key_backups " +
+	"WHERE user_id = $1 AND version = $2 AND room_id = $3 AND session_id = $4"
 
-type keyBackupTable struct {
-	cm *sqlutil.Connections
-
-	// SQL queries stored as fields for better maintainability
-	insertBackupKeyStmt                string
-	updateBackupKeyStmt                string
-	countKeysStmt                      string
-	selectBackupKeysStmt               string
-	selectKeysByRoomIDStmt             string
-	selectKeysByRoomIDAndSessionIDStmt string
+type keyBackupStatements struct {
+	insertBackupKeyStmt                *sql.Stmt
+	updateBackupKeyStmt                *sql.Stmt
+	countKeysStmt                      *sql.Stmt
+	selectKeysStmt                     *sql.Stmt
+	selectKeysByRoomIDStmt             *sql.Stmt
+	selectKeysByRoomIDAndSessionIDStmt *sql.Stmt
 }
 
-func NewPostgresKeyBackupTable(ctx context.Context, cm *sqlutil.Connections) (tables.KeyBackupTable, error) {
-	// Initialize schema
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(keyBackupTableSchema).Error; err != nil {
+func NewPostgresKeyBackupTable(ctx context.Context, db *sql.DB) (tables.KeyBackupTable, error) {
+	s := &keyBackupStatements{}
+	_, err := db.Exec(keyBackupTableSchema)
+	if err != nil {
 		return nil, err
 	}
-
-	// Initialize table with SQL statements
-	t := &keyBackupTable{
-		cm:                                 cm,
-		insertBackupKeyStmt:                insertBackupKeySQL,
-		updateBackupKeyStmt:                updateBackupKeySQL,
-		countKeysStmt:                      countKeysSQL,
-		selectBackupKeysStmt:               selectBackupKeysSQL,
-		selectKeysByRoomIDStmt:             selectKeysByRoomIDSQL,
-		selectKeysByRoomIDAndSessionIDStmt: selectKeysByRoomIDAndSessionIDSQL,
-	}
-
-	return t, nil
+	return s, sqlutil.StatementList{
+		{&s.insertBackupKeyStmt, insertBackupKeySQL},
+		{&s.updateBackupKeyStmt, updateBackupKeySQL},
+		{&s.countKeysStmt, countKeysSQL},
+		{&s.selectKeysStmt, selectBackupKeysSQL},
+		{&s.selectKeysByRoomIDStmt, selectKeysByRoomIDSQL},
+		{&s.selectKeysByRoomIDAndSessionIDStmt, selectKeysByRoomIDAndSessionIDSQL},
+	}.Prepare(db)
 }
 
-func (t *keyBackupTable) CountKeys(
-	ctx context.Context, userID, version string,
+func (s keyBackupStatements) CountKeys(
+	ctx context.Context, txn *sql.Tx, userID, version string,
 ) (count int64, err error) {
-	db := t.cm.Connection(ctx, true)
-
-	row := db.Raw(t.countKeysStmt, userID, version).Row()
-	err = row.Scan(&count)
+	err = txn.Stmt(s.countKeysStmt).QueryRowContext(ctx, userID, version).Scan(&count)
 	return
 }
 
-func (t *keyBackupTable) InsertBackupKey(
-	ctx context.Context, userID, version string, key api.InternalKeyBackupSession,
+func (s *keyBackupStatements) InsertBackupKey(
+	ctx context.Context, txn *sql.Tx, userID, version string, key api.InternalKeyBackupSession,
 ) (err error) {
-	db := t.cm.Connection(ctx, false)
-
-	return db.Exec(
-		t.insertBackupKeyStmt,
-		userID, key.RoomID, key.SessionID, version, key.FirstMessageIndex, key.ForwardedCount, key.IsVerified, string(key.SessionData),
-	).Error
+	_, err = txn.Stmt(s.insertBackupKeyStmt).ExecContext(
+		ctx, userID, key.RoomID, key.SessionID, version, key.FirstMessageIndex, key.ForwardedCount, key.IsVerified, string(key.SessionData),
+	)
+	return
 }
 
-func (t *keyBackupTable) UpdateBackupKey(
-	ctx context.Context, userID, version string, key api.InternalKeyBackupSession,
+func (s *keyBackupStatements) UpdateBackupKey(
+	ctx context.Context, txn *sql.Tx, userID, version string, key api.InternalKeyBackupSession,
 ) (err error) {
-	db := t.cm.Connection(ctx, false)
-
-	return db.Exec(
-		t.updateBackupKeyStmt,
-		key.FirstMessageIndex, key.ForwardedCount, key.IsVerified, string(key.SessionData), userID, key.RoomID, key.SessionID, version,
-	).Error
+	_, err = txn.Stmt(s.updateBackupKeyStmt).ExecContext(
+		ctx, key.FirstMessageIndex, key.ForwardedCount, key.IsVerified, string(key.SessionData), userID, key.RoomID, key.SessionID, version,
+	)
+	return
 }
 
-func (t *keyBackupTable) SelectKeys(
-	ctx context.Context, userID, version string,
+func (s *keyBackupStatements) SelectKeys(
+	ctx context.Context, txn *sql.Tx, userID, version string,
 ) (map[string]map[string]api.KeyBackupSession, error) {
-	db := t.cm.Connection(ctx, true)
-
-	rows, err := db.Raw(t.selectBackupKeysStmt, userID, version).Rows()
+	rows, err := txn.Stmt(s.selectKeysStmt).QueryContext(ctx, userID, version)
 	if err != nil {
 		return nil, err
 	}
-	return unpackKeys(rows)
+	return unpackKeys(ctx, rows)
 }
 
-func (t *keyBackupTable) SelectKeysByRoomID(
-	ctx context.Context, userID, version, roomID string,
+func (s *keyBackupStatements) SelectKeysByRoomID(
+	ctx context.Context, txn *sql.Tx, userID, version, roomID string,
 ) (map[string]map[string]api.KeyBackupSession, error) {
-	db := t.cm.Connection(ctx, true)
-
-	rows, err := db.Raw(t.selectKeysByRoomIDStmt, userID, version, roomID).Rows()
+	rows, err := txn.Stmt(s.selectKeysByRoomIDStmt).QueryContext(ctx, userID, version, roomID)
 	if err != nil {
 		return nil, err
 	}
-	return unpackKeys(rows)
+	return unpackKeys(ctx, rows)
 }
 
-func (t *keyBackupTable) SelectKeysByRoomIDAndSessionID(
-	ctx context.Context, userID, version, roomID, sessionID string,
+func (s *keyBackupStatements) SelectKeysByRoomIDAndSessionID(
+	ctx context.Context, txn *sql.Tx, userID, version, roomID, sessionID string,
 ) (map[string]map[string]api.KeyBackupSession, error) {
-	db := t.cm.Connection(ctx, true)
-
-	rows, err := db.Raw(t.selectKeysByRoomIDAndSessionIDStmt, userID, version, roomID, sessionID).Rows()
+	rows, err := txn.Stmt(s.selectKeysByRoomIDAndSessionIDStmt).QueryContext(ctx, userID, version, roomID, sessionID)
 	if err != nil {
 		return nil, err
 	}
-	return unpackKeys(rows)
+	return unpackKeys(ctx, rows)
 }
 
-func unpackKeys(rows *sql.Rows) (map[string]map[string]api.KeyBackupSession, error) {
+func unpackKeys(ctx context.Context, rows *sql.Rows) (map[string]map[string]api.KeyBackupSession, error) {
 	result := make(map[string]map[string]api.KeyBackupSession)
-	defer rows.Close()
-
+	defer internal.CloseAndLogIfError(ctx, rows, "selectKeysStmt.Close failed")
 	for rows.Next() {
-		var (
-			roomID            string
-			sessionID         string
-			firstMessageIndex int
-			forwardedCount    int
-			isVerified        bool
-			sessionData       string
-		)
-		if err := rows.Scan(&roomID, &sessionID, &firstMessageIndex, &forwardedCount, &isVerified, &sessionData); err != nil {
+		var key api.InternalKeyBackupSession
+		// room_id, session_id, first_message_index, forwarded_count, is_verified, session_data
+		var sessionDataStr string
+		if err := rows.Scan(&key.RoomID, &key.SessionID, &key.FirstMessageIndex, &key.ForwardedCount, &key.IsVerified, &sessionDataStr); err != nil {
 			return nil, err
 		}
-
-		if _, ok := result[roomID]; !ok {
-			result[roomID] = make(map[string]api.KeyBackupSession)
+		key.SessionData = json.RawMessage(sessionDataStr)
+		roomData := result[key.RoomID]
+		if roomData == nil {
+			roomData = make(map[string]api.KeyBackupSession)
 		}
-
-		result[roomID][sessionID] = api.KeyBackupSession{
-			FirstMessageIndex: firstMessageIndex,
-			ForwardedCount:    forwardedCount,
-			IsVerified:        isVerified,
-			SessionData:       json.RawMessage(sessionData),
-		}
+		roomData[key.SessionID] = key.KeyBackupSession
+		result[key.RoomID] = roomData
 	}
-
 	return result, rows.Err()
 }

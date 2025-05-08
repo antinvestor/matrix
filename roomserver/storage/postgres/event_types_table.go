@@ -53,193 +53,103 @@ CREATE SEQUENCE IF NOT EXISTS roomserver_event_type_nid_seq START 65536;
 CREATE TABLE IF NOT EXISTS roomserver_event_types (
     -- Local numeric ID for the event type.
     event_type_nid BIGINT PRIMARY KEY DEFAULT nextval('roomserver_event_type_nid_seq'),
-    -- The string event type.
+    -- The string event_type.
     event_type TEXT NOT NULL CONSTRAINT roomserver_event_type_unique UNIQUE
 );
+INSERT INTO roomserver_event_types (event_type_nid, event_type) VALUES
+    (1, 'm.room.create'),
+    (2, 'm.room.power_levels'),
+    (3, 'm.room.join_rules'),
+    (4, 'm.room.third_party_invite'),
+    (5, 'm.room.member'),
+    (6, 'm.room.redaction'),
+    (7, 'm.room.history_visibility') ON CONFLICT DO NOTHING;
 `
 
-// SQL query constants for event types operations
-const (
-	// insertEventTypeNIDSQL inserts a new event type into the table
-	insertEventTypeNIDSQL = "" +
-		"INSERT INTO roomserver_event_types (event_type)" +
-		" VALUES ($1)" +
-		" ON CONFLICT ON CONSTRAINT roomserver_event_type_unique" +
-		" DO NOTHING" +
-		" RETURNING event_type_nid"
+// Assign a new numeric event type ID.
+// The usual case is that the event type is not in the database.
+// In that case the ID will be assigned using the next value from the sequence.
+// We use `RETURNING` to tell postgres to return the assigned ID.
+// But it's possible that the type was added in a query that raced with us.
+// This will result in a conflict on the event_type_unique constraint, in this
+// case we do nothing. Postgresql won't return a row in that case so we rely on
+// the caller catching the sql.ErrNoRows error and running a select to get the row.
+// We could get postgresql to return the row on a conflict by updating the row
+// but it doesn't seem like a good idea to modify the rows just to make postgresql
+// return it. Modifying the rows will cause postgres to assign a new tuple for the
+// row even though the data doesn't change resulting in unncesssary modifications
+// to the indexes.
+const insertEventTypeNIDSQL = "" +
+	"INSERT INTO roomserver_event_types (event_type) VALUES ($1)" +
+	" ON CONFLICT ON CONSTRAINT roomserver_event_type_unique" +
+	" DO NOTHING RETURNING (event_type_nid)"
 
-	// selectEventTypeNIDSQL selects an event type NID from its type string
-	selectEventTypeNIDSQL = "" +
-		"SELECT event_type_nid FROM roomserver_event_types" +
-		" WHERE event_type = $1"
+const selectEventTypeNIDSQL = "" +
+	"SELECT event_type_nid FROM roomserver_event_types WHERE event_type = $1"
 
-	// bulkSelectEventTypeNIDSQL selects event type NIDs from an array of type strings
-	bulkSelectEventTypeNIDSQL = "" +
-		"SELECT event_type, event_type_nid FROM roomserver_event_types" +
-		" WHERE event_type = ANY($1)"
+// Bulk lookup from string event type to numeric ID for that event type.
+// Takes an array of strings as the query parameter.
+const bulkSelectEventTypeNIDSQL = "" +
+	"SELECT event_type, event_type_nid FROM roomserver_event_types" +
+	" WHERE event_type = ANY($1)"
 
-	// bulkSelectEventTypeSQL selects event types from an array of type NIDs
-	bulkSelectEventTypeSQL = "" +
-		"SELECT event_type_nid, event_type FROM roomserver_event_types" +
-		" WHERE event_type_nid = ANY($1)"
-)
-
-type eventTypesStatements struct {
-	cm *sqlutil.Connections
-
-	// SQL statements stored as struct fields
-	insertEventTypeNIDStmt     string
-	selectEventTypeNIDStmt     string
-	bulkSelectEventTypeNIDStmt string
-	bulkSelectEventTypeStmt    string
+type eventTypeStatements struct {
+	insertEventTypeNIDStmt     *sql.Stmt
+	selectEventTypeNIDStmt     *sql.Stmt
+	bulkSelectEventTypeNIDStmt *sql.Stmt
 }
 
-// NewPostgresEventTypesTable creates a new PostgreSQL event types table and prepares all statements
-func NewPostgresEventTypesTable(ctx context.Context, cm *sqlutil.Connections) (tables.EventTypes, error) {
-	// Create the table first
-	if err := cm.Writer.ExecSQL(ctx, eventTypesSchema); err != nil {
-		return nil, err
-	}
-
-	// Initialize the statements
-	s := &eventTypesStatements{
-		cm: cm,
-
-		// Initialize SQL statement fields with the constants
-		insertEventTypeNIDStmt:     insertEventTypeNIDSQL,
-		selectEventTypeNIDStmt:     selectEventTypeNIDSQL,
-		bulkSelectEventTypeNIDStmt: bulkSelectEventTypeNIDSQL,
-		bulkSelectEventTypeStmt:    bulkSelectEventTypeSQL,
-	}
-
-	return s, nil
+func CreateEventTypesTable(ctx context.Context, db *sql.DB) error {
+	_, err := db.Exec(eventTypesSchema)
+	return err
 }
 
-// InsertEventTypeNID implements tables.EventTypes
-func (s *eventTypesStatements) InsertEventTypeNID(
-	ctx context.Context, eventType string,
+func PrepareEventTypesTable(ctx context.Context, db *sql.DB) (tables.EventTypes, error) {
+	s := &eventTypeStatements{}
+
+	return s, sqlutil.StatementList{
+		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
+		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
+		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
+	}.Prepare(db)
+}
+
+func (s *eventTypeStatements) InsertEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
-	// Get database connection
-	var db *sql.Conn
-	var err error
-
-	if txn != nil {
-		// Use existing transaction.
-		var eventTypeNID int64
-		err = txn.QueryRowContext(ctx, s.insertEventTypeNIDStmt, eventType).Scan(&eventTypeNID)
-		if err == sql.ErrNoRows {
-			// We didn't insert a new event type so we need to look up what
-			// the existing NID is.
-			err = txn.QueryRowContext(ctx, s.selectEventTypeNIDStmt, eventType).Scan(&eventTypeNID)
-		}
-		return types.EventTypeNID(eventTypeNID), err
-	}
-
-	// Acquire a new connection, since we're not using a transaction.
-	if db, err = s.cm.Writer.GetSQLConn(ctx); err != nil {
-		return 0, err
-	}
-	defer internal.CloseAndLogIfError(ctx, db, "InsertEventTypeNID: failed to close connection")
-
-	// Execute the insertion
 	var eventTypeNID int64
-	err = db.QueryRowContext(ctx, s.insertEventTypeNIDStmt, eventType).Scan(&eventTypeNID)
-	if err == sql.ErrNoRows {
-		// We didn't insert a new event type so we need to look up what
-		// the existing NID is.
-		err = db.QueryRowContext(ctx, s.selectEventTypeNIDStmt, eventType).Scan(&eventTypeNID)
-	}
+	stmt := sqlutil.TxStmt(txn, s.insertEventTypeNIDStmt)
+	err := stmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-// SelectEventTypeNID implements tables.EventTypes
-func (s *eventTypesStatements) SelectEventTypeNID(
-	ctx context.Context, eventType string,
+func (s *eventTypeStatements) SelectEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
-	// Get database connection
 	var eventTypeNID int64
-	var err error
-
-	db := s.cm.Connection(ctx, true)
-	err = db.Raw(s.selectEventTypeNIDStmt, eventType).Row().Scan(&eventTypeNID)
+	stmt := sqlutil.TxStmt(txn, s.selectEventTypeNIDStmt)
+	err := stmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-// BulkSelectEventTypeNID implements tables.EventTypes
-func (s *eventTypesStatements) BulkSelectEventTypeNID(
-	ctx context.Context, eventTypes []string,
+func (s *eventTypeStatements) BulkSelectEventTypeNID(
+	ctx context.Context, txn *sql.Tx, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
-	if len(eventTypes) == 0 {
-		return nil, nil
-	}
-
-	// Get database connection
-	var err error
-	var rows *sql.Rows
-
-	db := s.cm.Connection(ctx, true)
-	rows, err = db.Raw(s.bulkSelectEventTypeNIDStmt, pq.StringArray(eventTypes)).Rows()
-
+	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventTypeNIDStmt)
+	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventTypes))
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectEventTypeNID: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventTypeNID: rows.close() failed")
 
-	// Create result map
 	result := make(map[string]types.EventTypeNID, len(eventTypes))
 	var eventType string
 	var eventTypeNID int64
-
-	// Process rows
 	for rows.Next() {
-		if err = rows.Scan(&eventType, &eventTypeNID); err != nil {
+		if err := rows.Scan(&eventType, &eventTypeNID); err != nil {
 			return nil, err
 		}
 		result[eventType] = types.EventTypeNID(eventTypeNID)
 	}
-
-	return result, rows.Err()
-}
-
-// BulkSelectEventType implements tables.EventTypes
-func (s *eventTypesStatements) BulkSelectEventType(
-	ctx context.Context, nids []types.EventTypeNID,
-) (map[types.EventTypeNID]string, error) {
-	if len(nids) == 0 {
-		return nil, nil
-	}
-
-	// Convert nids to int64 array
-	eventTypeNIDs := make([]int64, len(nids))
-	for i := range nids {
-		eventTypeNIDs[i] = int64(nids[i])
-	}
-
-	// Get database connection
-	var err error
-	var rows *sql.Rows
-
-	// Use a new connection since we're not in a transaction.
-	db := s.cm.Connection(ctx, true)
-	rows, err = db.Raw(s.bulkSelectEventTypeStmt, pq.Int64Array(eventTypeNIDs)).Rows()
-
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectEventType: rows.close() failed")
-
-	// Create result map
-	result := make(map[types.EventTypeNID]string, len(nids))
-	var eventTypeNID int64
-	var eventType string
-
-	// Process rows
-	for rows.Next() {
-		if err = rows.Scan(&eventTypeNID, &eventType); err != nil {
-			return nil, err
-		}
-		result[types.EventTypeNID(eventTypeNID)] = eventType
-	}
-
 	return result, rows.Err()
 }

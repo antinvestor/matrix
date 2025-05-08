@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/lib/pq"
 
@@ -25,6 +26,27 @@ import (
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
 )
+
+func NewPostgresNotificationDataTable(ctx context.Context, db *sql.DB) (tables.NotificationData, error) {
+	_, err := db.Exec(notificationDataSchema)
+	if err != nil {
+		return nil, err
+	}
+	r := &notificationDataStatements{}
+	return r, sqlutil.StatementList{
+		{&r.upsertRoomUnreadCounts, upsertRoomUnreadNotificationCountsSQL},
+		{&r.selectUserUnreadCountsForRooms, selectUserUnreadNotificationsForRooms},
+		{&r.selectMaxID, selectMaxNotificationIDSQL},
+		{&r.purgeNotificationData, purgeNotificationDataSQL},
+	}.Prepare(db)
+}
+
+type notificationDataStatements struct {
+	upsertRoomUnreadCounts         *sql.Stmt
+	selectUserUnreadCountsForRooms *sql.Stmt
+	selectMaxID                    *sql.Stmt
+	purgeNotificationData          *sql.Stmt
+}
 
 const notificationDataSchema = `
 CREATE TABLE IF NOT EXISTS syncapi_notification_data (
@@ -53,50 +75,15 @@ const selectMaxNotificationIDSQL = `SELECT CASE COUNT(*) WHEN 0 THEN 0 ELSE MAX(
 const purgeNotificationDataSQL = "" +
 	"DELETE FROM syncapi_notification_data WHERE room_id = $1"
 
-type notificationDataTable struct {
-	cm                                    *sqlutil.Connections
-	upsertRoomUnreadNotificationCountsSQL string
-	selectUserUnreadNotificationsForRoomsSQL string
-	selectMaxNotificationIDSQL            string
-	purgeNotificationDataSQL              string
-}
-
-func NewPostgresNotificationDataTable(ctx context.Context, cm *sqlutil.Connections) (tables.NotificationData, error) {
-	// Create the table first
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(notificationDataSchema).Error; err != nil {
-		return nil, err
-	}
-	
-	// Initialize the table with SQL statements
-	r := &notificationDataTable{
-		cm:                                    cm,
-		upsertRoomUnreadNotificationCountsSQL: upsertRoomUnreadNotificationCountsSQL,
-		selectUserUnreadNotificationsForRoomsSQL: selectUserUnreadNotificationsForRooms,
-		selectMaxNotificationIDSQL:            selectMaxNotificationIDSQL,
-		purgeNotificationDataSQL:              purgeNotificationDataSQL,
-	}
-	return r, nil
-}
-
-func (r *notificationDataTable) UpsertRoomUnreadCounts(
-	ctx context.Context, userID, roomID string, notificationCount, highlightCount int,
-) (pos types.StreamPosition, err error) {
-	// Get database connection
-	db := r.cm.Connection(ctx, false)
-	
-	row := db.Raw(r.upsertRoomUnreadNotificationCountsSQL, userID, roomID, notificationCount, highlightCount).Row()
-	err = row.Scan(&pos)
+func (r *notificationDataStatements) UpsertRoomUnreadCounts(ctx context.Context, txn *sql.Tx, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
+	err = sqlutil.TxStmt(txn, r.upsertRoomUnreadCounts).QueryRowContext(ctx, userID, roomID, notificationCount, highlightCount).Scan(&pos)
 	return
 }
 
-func (r *notificationDataTable) SelectUserUnreadCountsForRooms(
-	ctx context.Context, userID string, roomIDs []string,
+func (r *notificationDataStatements) SelectUserUnreadCountsForRooms(
+	ctx context.Context, txn *sql.Tx, userID string, roomIDs []string,
 ) (map[string]*eventutil.NotificationData, error) {
-	// Get database connection
-	db := r.cm.Connection(ctx, true)
-	
-	rows, err := db.Raw(r.selectUserUnreadNotificationsForRoomsSQL, userID, pq.Array(roomIDs)).Rows()
+	rows, err := sqlutil.TxStmt(txn, r.selectUserUnreadCountsForRooms).QueryContext(ctx, userID, pq.Array(roomIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -119,20 +106,15 @@ func (r *notificationDataTable) SelectUserUnreadCountsForRooms(
 	return roomCounts, rows.Err()
 }
 
-func (r *notificationDataTable) SelectMaxID(ctx context.Context) (int64, error) {
-	// Get database connection
-	db := r.cm.Connection(ctx, true)
-	
+func (r *notificationDataStatements) SelectMaxID(ctx context.Context, txn *sql.Tx) (int64, error) {
 	var id int64
-	err := db.Raw(r.selectMaxNotificationIDSQL).Scan(&id).Error
+	err := sqlutil.TxStmt(txn, r.selectMaxID).QueryRowContext(ctx).Scan(&id)
 	return id, err
 }
 
-func (r *notificationDataTable) PurgeNotificationData(
-	ctx context.Context, roomID string,
+func (s *notificationDataStatements) PurgeNotificationData(
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	// Get database connection
-	db := r.cm.Connection(ctx, false)
-	
-	return db.Exec(r.purgeNotificationDataSQL, roomID).Error
+	_, err := sqlutil.TxStmt(txn, s.purgeNotificationData).ExecContext(ctx, roomID)
+	return err
 }

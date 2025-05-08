@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 
 	// Import the postgres database driver.
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -30,7 +31,7 @@ import (
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	shared.Database
-	db     *sqlutil.Connections
+	db     *sql.DB
 	writer sqlutil.Writer
 }
 
@@ -38,90 +39,72 @@ type SyncServerDatasource struct {
 func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
-	
-	// Use the connection manager for database operations
-	d.db = cm
-	
-	// Initialize all database tables with the connection manager
-	accountData, err := NewPostgresAccountDataTable(ctx, cm)
+	if d.db, d.writer, err = cm.Connection(ctx, dbProperties); err != nil {
+		return nil, err
+	}
+	accountData, err := NewPostgresAccountDataTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	events, err := NewPostgresEventsTable(ctx, cm)
+	events, err := NewPostgresEventsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	currState, err := NewPostgresCurrentRoomStateTable(ctx, cm)
+	currState, err := NewPostgresCurrentRoomStateTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	invites, err := NewPostgresInvitesTable(ctx, cm)
+	invites, err := NewPostgresInvitesTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	peeks, err := NewPostgresPeeksTable(ctx, cm)
+	peeks, err := NewPostgresPeeksTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	topology, err := NewPostgresTopologyTable(ctx, cm)
+	topology, err := NewPostgresTopologyTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	backwardExtremities, err := NewPostgresBackwardsExtremitiesTable(ctx, cm)
+	backwardExtremities, err := NewPostgresBackwardsExtremitiesTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	sendToDevice, err := NewPostgresSendToDeviceTable(ctx, cm)
+	sendToDevice, err := NewPostgresSendToDeviceTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	filter, err := NewPostgresFilterTable(ctx, cm)
+	filter, err := NewPostgresFilterTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	receipts, err := NewPostgresReceiptsTable(ctx, cm)
+	receipts, err := NewPostgresReceiptsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	memberships, err := NewPostgresMembershipsTable(ctx, cm)
+	memberships, err := NewPostgresMembershipsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	notificationData, err := NewPostgresNotificationDataTable(ctx, cm)
+	notificationData, err := NewPostgresNotificationDataTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	ignores, err := NewPostgresIgnoresTable(ctx, cm)
+	ignores, err := NewPostgresIgnoresTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	presence, err := NewPostgresPresenceTable(ctx, cm)
+	presence, err := NewPostgresPresenceTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-	
-	relations, err := NewPostgresRelationsTable(ctx, cm)
+	relations, err := NewPostgresRelationsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
 
 	// apply migrations which need multiple tables
-	// Get a regular database connection for migrations
-	dbConn := cm.Connection(ctx, false)
-	m := sqlutil.NewMigrator(dbConn.DB())
+	m := sqlutil.NewMigrator(d.db)
 	m.AddMigrations(
 		sqlutil.Migration{
 			Version: "syncapi: set history visibility for existing events",

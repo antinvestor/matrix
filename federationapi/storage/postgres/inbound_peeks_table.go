@@ -21,116 +21,96 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"gorm.io/gorm"
 )
 
 const inboundPeeksSchema = `
 CREATE TABLE IF NOT EXISTS federationsender_inbound_peeks (
-	origin TEXT NOT NULL,
 	room_id TEXT NOT NULL,
+	server_name TEXT NOT NULL,
 	peek_id TEXT NOT NULL,
-	creation_ts BIGINT NOT NULL,
-	renewed_ts BIGINT NOT NULL,
-	renewal_interval BIGINT NOT NULL,
-	UNIQUE (origin, room_id, peek_id)
+    creation_ts BIGINT NOT NULL,
+    renewed_ts BIGINT NOT NULL,
+    renewal_interval BIGINT NOT NULL,
+	UNIQUE (room_id, server_name, peek_id)
 );
 `
 
-// inboundPeeksTable contains the postgres-specific implementation
-type inboundPeeksTable struct {
-	cm *sqlutil.Connections
+const insertInboundPeekSQL = "" +
+	"INSERT INTO federationsender_inbound_peeks (room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5, $6)"
 
-	// insertInboundPeekSQL inserts a new inbound peek record with creation timestamp
-	insertInboundPeekSQL string
+const selectInboundPeekSQL = "" +
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
-	// selectInboundPeekSQL retrieves a specific inbound peek by origin, room, and peek ID
-	selectInboundPeekSQL string
+const selectInboundPeeksSQL = "" +
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE room_id = $1 ORDER by creation_ts"
 
-	// selectInboundPeekForRoomSQL retrieves all inbound peeks for a given room
-	selectInboundPeekForRoomSQL string
+const renewInboundPeekSQL = "" +
+	"UPDATE federationsender_inbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
 
-	// selectExpiredInboundPeeksSQL retrieves all inbound peeks that have expired based on renewal time and interval
-	selectExpiredInboundPeeksSQL string
+const deleteInboundPeekSQL = "" +
+	"DELETE FROM federationsender_inbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
-	// renewInboundPeekSQL updates the renewed timestamp and renewal interval for a peek
-	renewInboundPeekSQL string
+const deleteInboundPeeksSQL = "" +
+	"DELETE FROM federationsender_inbound_peeks WHERE room_id = $1"
 
-	// deleteInboundPeekSQL removes a specific inbound peek
-	deleteInboundPeekSQL string
-
-	// deleteInboundPeeksSQL removes all inbound peeks for a given room
-	deleteInboundPeeksSQL string
+type inboundPeeksStatements struct {
+	db                     *sql.DB
+	insertInboundPeekStmt  *sql.Stmt
+	selectInboundPeekStmt  *sql.Stmt
+	selectInboundPeeksStmt *sql.Stmt
+	renewInboundPeekStmt   *sql.Stmt
+	deleteInboundPeekStmt  *sql.Stmt
+	deleteInboundPeeksStmt *sql.Stmt
 }
 
-// NewPostgresInboundPeeksTable creates a new postgres inbound peeks table and prepares all statements
-func NewPostgresInboundPeeksTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationInboundPeeks, error) {
-	// Initialize schema using GORM
-	gormDB := cm.Connection(ctx, false)
-	if err := gormDB.Exec(inboundPeeksSchema).Error; err != nil {
-		return nil, err
+func NewPostgresInboundPeeksTable(ctx context.Context, db *sql.DB) (s *inboundPeeksStatements, err error) {
+	s = &inboundPeeksStatements{
+		db: db,
+	}
+	_, err = db.Exec(inboundPeeksSchema)
+	if err != nil {
+		return
 	}
 
-	s := &inboundPeeksTable{
-		cm:                           cm,
-		insertInboundPeekSQL:         "INSERT INTO federationsender_inbound_peeks (origin, room_id, peek_id, creation_ts, renewed_ts, renewal_interval) VALUES ($1, $2, $3, $4, $5, $6)",
-		selectInboundPeekSQL:         "SELECT origin, room_id, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE origin = $1 AND room_id = $2 AND peek_id = $3",
-		selectInboundPeekForRoomSQL:  "SELECT origin, room_id, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE room_id = $1 ORDER BY creation_ts ASC",
-		selectExpiredInboundPeeksSQL: "SELECT origin, room_id, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE (renewed_ts + renewal_interval) <= $1",
-		renewInboundPeekSQL:          "UPDATE federationsender_inbound_peeks SET renewed_ts = $1, renewal_interval = $2 WHERE origin = $3 AND room_id = $4 AND peek_id = $5",
-		deleteInboundPeekSQL:         "DELETE FROM federationsender_inbound_peeks WHERE origin = $1 AND room_id = $2 AND peek_id = $3",
-		deleteInboundPeeksSQL:        "DELETE FROM federationsender_inbound_peeks WHERE room_id = $1",
-	}
-
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertInboundPeekStmt, insertInboundPeekSQL},
+		{&s.selectInboundPeekStmt, selectInboundPeekSQL},
+		{&s.selectInboundPeekStmt, selectInboundPeekSQL},
+		{&s.selectInboundPeeksStmt, selectInboundPeeksSQL},
+		{&s.renewInboundPeekStmt, renewInboundPeekSQL},
+		{&s.deleteInboundPeeksStmt, deleteInboundPeeksSQL},
+		{&s.deleteInboundPeekStmt, deleteInboundPeekSQL},
+	}.Prepare(db)
 }
 
-// InsertInboundPeek creates a new inbound peek record
-func (s *inboundPeeksTable) InsertInboundPeek(
-	ctx context.Context,
-	serverName spec.ServerName, roomID, peekID string,
-	renewalInterval int64,
-) error {
+func (s *inboundPeeksStatements) InsertInboundPeek(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string, renewalInterval int64,
+) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	db := s.cm.Connection(ctx, false)
-	return db.Exec(
-		s.insertInboundPeekSQL,
-		serverName, roomID, peekID, nowMilli, nowMilli, renewalInterval,
-	).Error
+	stmt := sqlutil.TxStmt(txn, s.insertInboundPeekStmt)
+	_, err = stmt.ExecContext(ctx, roomID, serverName, peekID, nowMilli, nowMilli, renewalInterval)
+	return
 }
 
-// RenewInboundPeek updates an existing inbound peek's renewal timestamp and interval
-func (s *inboundPeeksTable) RenewInboundPeek(
-	ctx context.Context,
-	serverName spec.ServerName, roomID, peekID string,
-	renewalInterval int64,
-) error {
+func (s *inboundPeeksStatements) RenewInboundPeek(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string, renewalInterval int64,
+) (err error) {
 	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	db := s.cm.Connection(ctx, false)
-	return db.Exec(
-		s.renewInboundPeekSQL,
-		nowMilli, renewalInterval, serverName, roomID, peekID,
-	).Error
+	_, err = sqlutil.TxStmt(txn, s.renewInboundPeekStmt).ExecContext(ctx, nowMilli, renewalInterval, roomID, serverName, peekID)
+	return
 }
 
-// SelectInboundPeek retrieves a specific inbound peek
-func (s *inboundPeeksTable) SelectInboundPeek(
-	ctx context.Context,
-	serverName spec.ServerName, roomID, peekID string,
+func (s *inboundPeeksStatements) SelectInboundPeek(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string,
 ) (*types.InboundPeek, error) {
-	db := s.cm.Connection(ctx, true)
-	row := db.Raw(
-		s.selectInboundPeekSQL,
-		serverName, roomID, peekID,
-	).Row()
-
+	row := sqlutil.TxStmt(txn, s.selectInboundPeeksStmt).QueryRowContext(ctx, roomID)
 	inboundPeek := types.InboundPeek{}
 	err := row.Scan(
-		&inboundPeek.ServerName,
 		&inboundPeek.RoomID,
+		&inboundPeek.ServerName,
 		&inboundPeek.PeekID,
 		&inboundPeek.CreationTimestamp,
 		&inboundPeek.RenewedTimestamp,
@@ -145,94 +125,43 @@ func (s *inboundPeeksTable) SelectInboundPeek(
 	return &inboundPeek, nil
 }
 
-// SelectInboundPeeksInRoom retrieves all inbound peeks for a room
-func (s *inboundPeeksTable) SelectInboundPeeksInRoom(
-	ctx context.Context,
-	roomID string,
-) ([]types.InboundPeek, error) {
-	db := s.cm.Connection(ctx, true)
-	rows, err := db.Raw(
-		s.selectInboundPeekForRoomSQL,
-		roomID,
-	).Rows()
+func (s *inboundPeeksStatements) SelectInboundPeeks(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (inboundPeeks []types.InboundPeek, err error) {
+	rows, err := sqlutil.TxStmt(txn, s.selectInboundPeeksStmt).QueryContext(ctx, roomID)
 	if err != nil {
-		return nil, err
+		return
 	}
-	defer rows.Close() // nolint:errcheck
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectInboundPeeks: rows.close() failed")
 
-	var result []types.InboundPeek
 	for rows.Next() {
 		inboundPeek := types.InboundPeek{}
 		if err = rows.Scan(
-			&inboundPeek.ServerName,
 			&inboundPeek.RoomID,
+			&inboundPeek.ServerName,
 			&inboundPeek.PeekID,
 			&inboundPeek.CreationTimestamp,
 			&inboundPeek.RenewedTimestamp,
 			&inboundPeek.RenewalInterval,
 		); err != nil {
-			return nil, err
+			return
 		}
-		result = append(result, inboundPeek)
+		inboundPeeks = append(inboundPeeks, inboundPeek)
 	}
 
-	return result, rows.Err()
+	return inboundPeeks, rows.Err()
 }
 
-// SelectExpiredInboundPeeks retrieves all inbound peeks that have expired
-func (s *inboundPeeksTable) SelectExpiredInboundPeeks(
-	ctx context.Context,
-) ([]types.InboundPeek, error) {
-	nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
-	db := s.cm.Connection(ctx, true)
-	rows, err := db.Raw(
-		s.selectExpiredInboundPeeksSQL,
-		nowMilli,
-	).Rows()
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close() // nolint:errcheck
-
-	var result []types.InboundPeek
-	for rows.Next() {
-		inboundPeek := types.InboundPeek{}
-		if err = rows.Scan(
-			&inboundPeek.ServerName,
-			&inboundPeek.RoomID,
-			&inboundPeek.PeekID,
-			&inboundPeek.CreationTimestamp,
-			&inboundPeek.RenewedTimestamp,
-			&inboundPeek.RenewalInterval,
-		); err != nil {
-			return nil, err
-		}
-		result = append(result, inboundPeek)
-	}
-
-	return result, rows.Err()
+func (s *inboundPeeksStatements) DeleteInboundPeek(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName, roomID, peekID string,
+) (err error) {
+	_, err = sqlutil.TxStmt(txn, s.deleteInboundPeekStmt).ExecContext(ctx, roomID, serverName, peekID)
+	return
 }
 
-// DeleteInboundPeek removes a specific inbound peek
-func (s *inboundPeeksTable) DeleteInboundPeek(
-	ctx context.Context,
-	serverName spec.ServerName, roomID, peekID string,
-) error {
-	db := s.cm.Connection(ctx, false)
-	return db.Exec(
-		s.deleteInboundPeekSQL,
-		serverName, roomID, peekID,
-	).Error
-}
-
-// DeleteInboundPeeks removes all inbound peeks for a room
-func (s *inboundPeeksTable) DeleteInboundPeeks(
-	ctx context.Context,
-	roomID string,
-) error {
-	db := s.cm.Connection(ctx, false)
-	return db.Exec(
-		s.deleteInboundPeeksSQL,
-		roomID,
-	).Error
+func (s *inboundPeeksStatements) DeleteInboundPeeks(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (err error) {
+	_, err = sqlutil.TxStmt(txn, s.deleteInboundPeeksStmt).ExecContext(ctx, roomID)
+	return
 }

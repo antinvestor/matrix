@@ -16,8 +16,9 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
-	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -76,81 +77,67 @@ const selectMembersSQL = `
 		AND ($4::text IS NULL OR t.membership <> $4)
 `
 
-type membershipsTable struct {
-	cm                        *sqlutil.Connections
-	upsertMembershipSQL       string
-	selectMembershipCountSQL  string
-	selectMembershipBeforeSQL string
-	purgeMembershipsSQL       string
-	selectMembersSQL          string
+type membershipsStatements struct {
+	upsertMembershipStmt        *sql.Stmt
+	selectMembershipCountStmt   *sql.Stmt
+	selectMembershipForUserStmt *sql.Stmt
+	purgeMembershipsStmt        *sql.Stmt
+	selectMembersStmt           *sql.Stmt
 }
 
-func NewPostgresMembershipsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Memberships, error) {
-	// Create the table first
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(membershipsSchema).Error; err != nil {
+func NewPostgresMembershipsTable(ctx context.Context, db *sql.DB) (tables.Memberships, error) {
+	s := &membershipsStatements{}
+	_, err := db.Exec(membershipsSchema)
+	if err != nil {
 		return nil, err
 	}
-
-	// Initialize the table with SQL statements
-	s := &membershipsTable{
-		cm:                        cm,
-		upsertMembershipSQL:       upsertMembershipSQL,
-		selectMembershipCountSQL:  selectMembershipCountSQL,
-		selectMembershipBeforeSQL: selectMembershipBeforeSQL,
-		purgeMembershipsSQL:       purgeMembershipsSQL,
-		selectMembersSQL:          selectMembersSQL,
-	}
-
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.upsertMembershipStmt, upsertMembershipSQL},
+		{&s.selectMembershipCountStmt, selectMembershipCountSQL},
+		{&s.selectMembershipForUserStmt, selectMembershipBeforeSQL},
+		{&s.purgeMembershipsStmt, purgeMembershipsSQL},
+		{&s.selectMembersStmt, selectMembersSQL},
+	}.Prepare(db)
 }
 
-func (s *membershipsTable) UpsertMembership(
-	ctx context.Context, event *rstypes.HeaderedEvent,
+func (s *membershipsStatements) UpsertMembership(
+	ctx context.Context, txn *sql.Tx, event *rstypes.HeaderedEvent,
 	streamPos, topologicalPos types.StreamPosition,
 ) error {
-	// Get database connection
-	db := s.cm.Connection(ctx, false)
-
 	membership, err := event.Membership()
 	if err != nil {
 		return fmt.Errorf("event.Membership: %w", err)
 	}
-
-	return db.Exec(
-		s.upsertMembershipSQL,
+	_, err = sqlutil.TxStmt(txn, s.upsertMembershipStmt).ExecContext(
+		ctx,
 		event.RoomID().String(),
 		event.StateKeyResolved,
 		membership,
 		event.EventID(),
 		streamPos,
 		topologicalPos,
-	).Error
+	)
+	return err
 }
 
-func (s *membershipsTable) SelectMembershipCount(
-	ctx context.Context, roomID, membership string, pos types.StreamPosition,
+func (s *membershipsStatements) SelectMembershipCount(
+	ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition,
 ) (count int, err error) {
-	// Get database connection
-	db := s.cm.Connection(ctx, true)
-
-	err = db.Raw(s.selectMembershipCountSQL, roomID, pos, membership).Scan(&count).Error
+	stmt := sqlutil.TxStmt(txn, s.selectMembershipCountStmt)
+	err = stmt.QueryRowContext(ctx, roomID, pos, membership).Scan(&count)
 	return
 }
 
 // SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
 // returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
 // string as the membership.
-func (s *membershipsTable) SelectMembershipForUser(
-	ctx context.Context, roomID, userID string, pos int64,
+func (s *membershipsStatements) SelectMembershipForUser(
+	ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64,
 ) (membership string, topologyPos int64, err error) {
-	// Get database connection
-	db := s.cm.Connection(ctx, true)
-
-	row := db.Raw(s.selectMembershipBeforeSQL, roomID, userID, pos).Row()
-	err = row.Scan(&membership, &topologyPos)
+	stmt := sqlutil.TxStmt(txn, s.selectMembershipForUserStmt)
+	err = stmt.QueryRowContext(ctx, roomID, userID, pos).Scan(&membership, &topologyPos)
 	if err != nil {
-		if frame.DBErrorIsRecordNotFound(err) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return "leave", 0, nil
 		}
 		return "", 0, err
@@ -158,30 +145,27 @@ func (s *membershipsTable) SelectMembershipForUser(
 	return membership, topologyPos, nil
 }
 
-func (s *membershipsTable) PurgeMemberships(
-	ctx context.Context, roomID string,
+func (s *membershipsStatements) PurgeMemberships(
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	// Get database connection
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(s.purgeMembershipsSQL, roomID).Error
+	_, err := sqlutil.TxStmt(txn, s.purgeMembershipsStmt).ExecContext(ctx, roomID)
+	return err
 }
 
-func (s *membershipsTable) SelectMemberships(
-	ctx context.Context,
+func (s *membershipsStatements) SelectMemberships(
+	ctx context.Context, txn *sql.Tx,
 	roomID string, pos types.TopologyToken,
 	membership, notMembership *string,
 ) (eventIDs []string, err error) {
-	// Get database connection
-	db := s.cm.Connection(ctx, true)
-
-	rows, err := db.Raw(s.selectMembersSQL, roomID, pos.Depth, membership, notMembership).Rows()
+	stmt := sqlutil.TxStmt(txn, s.selectMembersStmt)
+	rows, err := stmt.QueryContext(ctx, roomID, pos.Depth, membership, notMembership)
 	if err != nil {
 		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectMemberships: failed to close rows")
-
-	var eventID string
+	var (
+		eventID string
+	)
 	for rows.Next() {
 		if err = rows.Scan(&eventID); err != nil {
 			return

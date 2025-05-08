@@ -12,12 +12,11 @@ import (
 
 func TestUpDropEventReferenceSHAPrevEvents(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
+	ctx := testrig.NewContext(t)
 	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
 	defer closeRig()
 
-	db, err := sqlutil.Open(&cfg.Global.DatabaseOptions, sqlutil.NewDefaultWriter())
+	db, err := sqlutil.Open(&cfg.Global.DatabaseOptions, sqlutil.NewDummyWriter())
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 	defer db.Close()

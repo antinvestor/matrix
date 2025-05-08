@@ -16,12 +16,10 @@ package postgres
 
 import (
 	"context"
-	"errors"
+	"database/sql"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"gorm.io/gorm"
 )
 
 const assumedOfflineSchema = `
@@ -31,108 +29,79 @@ CREATE TABLE IF NOT EXISTS federationsender_assumed_offline(
 );
 `
 
-// SQL query string constants
-const (
-	// insertAssumedOfflineSQL inserts a server name into the assumed offline list with conflict handling
-	insertAssumedOfflineSQL = "" +
-		"INSERT INTO federationsender_assumed_offline (server_name) VALUES ($1)" +
-		" ON CONFLICT DO NOTHING"
+const insertAssumedOfflineSQL = "" +
+	"INSERT INTO federationsender_assumed_offline (server_name) VALUES ($1)" +
+	" ON CONFLICT DO NOTHING"
 
-	// selectAssumedOfflineSQL checks if a server is in the assumed offline list
-	selectAssumedOfflineSQL = "" +
-		"SELECT server_name FROM federationsender_assumed_offline WHERE server_name = $1"
+const selectAssumedOfflineSQL = "" +
+	"SELECT server_name FROM federationsender_assumed_offline WHERE server_name = $1"
 
-	// deleteAssumedOfflineSQL removes a server from the assumed offline list
-	deleteAssumedOfflineSQL = "" +
-		"DELETE FROM federationsender_assumed_offline WHERE server_name = $1"
+const deleteAssumedOfflineSQL = "" +
+	"DELETE FROM federationsender_assumed_offline WHERE server_name = $1"
 
-	// deleteAllAssumedOfflineSQL removes all servers from the assumed offline list
-	deleteAllAssumedOfflineSQL = "" +
-		"TRUNCATE federationsender_assumed_offline"
-)
+const deleteAllAssumedOfflineSQL = "" +
+	"TRUNCATE federationsender_assumed_offline"
 
-// assumedOfflineTable contains the postgres-specific implementation
-type assumedOfflineTable struct {
-	cm *sqlutil.Connections
-
-	// SQL queries stored as fields for better maintainability
-	// insertAssumedOfflineSQL inserts a server name into the assumed offline list with conflict handling
-	insertAssumedOfflineSQL string
-	
-	// selectAssumedOfflineSQL checks if a server is in the assumed offline list
-	selectAssumedOfflineSQL string
-	
-	// deleteAssumedOfflineSQL removes a server from the assumed offline list
-	deleteAssumedOfflineSQL string
-	
-	// deleteAllAssumedOfflineSQL removes all servers from the assumed offline list
-	deleteAllAssumedOfflineSQL string
+type assumedOfflineStatements struct {
+	db                          *sql.DB
+	insertAssumedOfflineStmt    *sql.Stmt
+	selectAssumedOfflineStmt    *sql.Stmt
+	deleteAssumedOfflineStmt    *sql.Stmt
+	deleteAllAssumedOfflineStmt *sql.Stmt
 }
 
-// NewPostgresAssumedOfflineTable creates a new postgres assumed offline table
-func NewPostgresAssumedOfflineTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationAssumedOffline, error) {
-	// Initialize schema using GORM
-	gormDB := cm.Connection(ctx, false)
-	if err := gormDB.Exec(assumedOfflineSchema).Error; err != nil {
-		return nil, err
+func NewPostgresAssumedOfflineTable(ctx context.Context, db *sql.DB) (s *assumedOfflineStatements, err error) {
+	s = &assumedOfflineStatements{
+		db: db,
+	}
+	_, err = db.Exec(assumedOfflineSchema)
+	if err != nil {
+		return
 	}
 
-	s := &assumedOfflineTable{
-		cm: cm,
-		insertAssumedOfflineSQL:    insertAssumedOfflineSQL,
-		selectAssumedOfflineSQL:    selectAssumedOfflineSQL,
-		deleteAssumedOfflineSQL:    deleteAssumedOfflineSQL,
-		deleteAllAssumedOfflineSQL: deleteAllAssumedOfflineSQL,
-	}
-
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertAssumedOfflineStmt, insertAssumedOfflineSQL},
+		{&s.selectAssumedOfflineStmt, selectAssumedOfflineSQL},
+		{&s.deleteAssumedOfflineStmt, deleteAssumedOfflineSQL},
+		{&s.deleteAllAssumedOfflineStmt, deleteAllAssumedOfflineSQL},
+	}.Prepare(db)
 }
 
-// InsertAssumedOffline adds a server to the assumed offline list
-func (s *assumedOfflineTable) InsertAssumedOffline(
-	ctx context.Context, serverName spec.ServerName,
+func (s *assumedOfflineStatements) InsertAssumedOffline(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) error {
-	// Get writable database connection
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(s.insertAssumedOfflineSQL, serverName).Error
+	stmt := sqlutil.TxStmt(txn, s.insertAssumedOfflineStmt)
+	_, err := stmt.ExecContext(ctx, serverName)
+	return err
 }
 
-// SelectAssumedOffline checks if a server is in the assumed offline list
-func (s *assumedOfflineTable) SelectAssumedOffline(
-	ctx context.Context, serverName spec.ServerName,
+func (s *assumedOfflineStatements) SelectAssumedOffline(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) (bool, error) {
-	// Get read-only database connection
-	db := s.cm.Connection(ctx, true)
-
-	var result string
-	err := db.Raw(s.selectAssumedOfflineSQL, serverName).Scan(&result).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
-	}
+	stmt := sqlutil.TxStmt(txn, s.selectAssumedOfflineStmt)
+	res, err := stmt.QueryContext(ctx, serverName)
 	if err != nil {
 		return false, err
 	}
-	// If we found a record, the server is assumed offline
-	return result != "", nil
+	defer res.Close() // nolint:errcheck
+	// The query will return the server name if the server is assume offline, and
+	// will return no rows if not. By calling Next, we find out if a row was
+	// returned or not - we don't care about the value itself.
+	return res.Next(), nil
 }
 
-// DeleteAssumedOffline removes a server from the assumed offline list
-func (s *assumedOfflineTable) DeleteAssumedOffline(
-	ctx context.Context, serverName spec.ServerName,
+func (s *assumedOfflineStatements) DeleteAssumedOffline(
+	ctx context.Context, txn *sql.Tx, serverName spec.ServerName,
 ) error {
-	// Get writable database connection
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(s.deleteAssumedOfflineSQL, serverName).Error
+	stmt := sqlutil.TxStmt(txn, s.deleteAssumedOfflineStmt)
+	_, err := stmt.ExecContext(ctx, serverName)
+	return err
 }
 
-// DeleteAllAssumedOffline removes all servers from the assumed offline list
-func (s *assumedOfflineTable) DeleteAllAssumedOffline(
-	ctx context.Context,
+func (s *assumedOfflineStatements) DeleteAllAssumedOffline(
+	ctx context.Context, txn *sql.Tx,
 ) error {
-	// Get writable database connection
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(s.deleteAllAssumedOfflineSQL).Error
+	stmt := sqlutil.TxStmt(txn, s.deleteAllAssumedOfflineStmt)
+	_, err := stmt.ExecContext(ctx)
+	return err
 }

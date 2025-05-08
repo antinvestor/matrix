@@ -17,10 +17,10 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/lib/pq"
@@ -50,69 +50,49 @@ CREATE TABLE IF NOT EXISTS keydb_server_keys (
 CREATE INDEX IF NOT EXISTS keydb_server_name_and_key_id ON keydb_server_keys (server_name_and_key_id);
 `
 
-// SQL query string constants
-const (
-	// bulkSelectServerSigningKeysSQL retrieves multiple server keys by server name and key ID
-	bulkSelectServerSigningKeysSQL = "" +
-		"SELECT server_name, server_key_id, valid_until_ts, expired_ts, " +
-		"   server_key FROM keydb_server_keys" +
-		" WHERE server_name_and_key_id = ANY($1)"
+const bulkSelectServerSigningKeysSQL = "" +
+	"SELECT server_name, server_key_id, valid_until_ts, expired_ts, " +
+	"   server_key FROM keydb_server_keys" +
+	" WHERE server_name_and_key_id = ANY($1)"
 
-	// upsertServerSigningKeysSQL inserts or updates server key information
-	upsertServerSigningKeysSQL = "" +
-		"INSERT INTO keydb_server_keys (server_name, server_key_id," +
-		" server_name_and_key_id, valid_until_ts, expired_ts, server_key)" +
-		" VALUES ($1, $2, $3, $4, $5, $6)" +
-		" ON CONFLICT ON CONSTRAINT keydb_server_keys_unique" +
-		" DO UPDATE SET valid_until_ts = $4, expired_ts = $5, server_key = $6"
-)
+const upsertServerSigningKeysSQL = "" +
+	"INSERT INTO keydb_server_keys (server_name, server_key_id," +
+	" server_name_and_key_id, valid_until_ts, expired_ts, server_key)" +
+	" VALUES ($1, $2, $3, $4, $5, $6)" +
+	" ON CONFLICT ON CONSTRAINT keydb_server_keys_unique" +
+	" DO UPDATE SET valid_until_ts = $4, expired_ts = $5, server_key = $6"
 
-// serverSigningKeyTable contains the postgres-specific implementation
-type serverSigningKeyTable struct {
-	cm                       *sqlutil.Connections
-	bulkSelectServerKeysStmt string
-	upsertServerKeysStmt     string
+type serverSigningKeyStatements struct {
+	bulkSelectServerKeysStmt *sql.Stmt
+	upsertServerKeysStmt     *sql.Stmt
 }
 
-// NewPostgresServerSigningKeysTable creates a new postgres server signing keys table
-func NewPostgresServerSigningKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.ServerSigningKeys, error) {
-	// Initialize schema using GORM
-	gormDB := cm.Connection(ctx, false)
-	if err := gormDB.Exec(serverSigningKeysSchema).Error; err != nil {
-		return nil, err
+func NewPostgresServerSigningKeysTable(ctx context.Context, db *sql.DB) (s *serverSigningKeyStatements, err error) {
+	s = &serverSigningKeyStatements{}
+	_, err = db.Exec(serverSigningKeysSchema)
+	if err != nil {
+		return
 	}
-
-	s := &serverSigningKeyTable{
-		cm:                       cm,
-		bulkSelectServerKeysStmt: bulkSelectServerSigningKeysSQL,
-		upsertServerKeysStmt:     upsertServerSigningKeysSQL,
-	}
-
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.bulkSelectServerKeysStmt, bulkSelectServerSigningKeysSQL},
+		{&s.upsertServerKeysStmt, upsertServerSigningKeysSQL},
+	}.Prepare(db)
 }
 
-// BulkSelectServerKeys retrieves multiple server keys in a single query
-func (s *serverSigningKeyTable) BulkSelectServerKeys(
-	ctx context.Context,
+func (s *serverSigningKeyStatements) BulkSelectServerKeys(
+	ctx context.Context, txn *sql.Tx,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	var nameAndKeyIDs []string
 	for request := range requests {
 		nameAndKeyIDs = append(nameAndKeyIDs, nameAndKeyID(request))
 	}
-
-	// Get read-only database connection
-	db := s.cm.Connection(ctx, true)
-
-	rows, err := db.Raw(
-		s.bulkSelectServerKeysStmt,
-		pq.StringArray(nameAndKeyIDs),
-	).Rows()
+	stmt := s.bulkSelectServerKeysStmt
+	rows, err := stmt.QueryContext(ctx, pq.StringArray(nameAndKeyIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectServerKeys: rows.close() failed")
-
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectServerKeys: rows.close() failed")
 	results := map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult{}
 
 	var serverName string
@@ -142,24 +122,22 @@ func (s *serverSigningKeyTable) BulkSelectServerKeys(
 	return results, rows.Err()
 }
 
-// UpsertServerKeys inserts or updates a server key
-func (s *serverSigningKeyTable) UpsertServerKeys(
-	ctx context.Context,
+func (s *serverSigningKeyStatements) UpsertServerKeys(
+	ctx context.Context, txn *sql.Tx,
 	request gomatrixserverlib.PublicKeyLookupRequest,
 	key gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	// Get writable database connection
-	db := s.cm.Connection(ctx, false)
-
-	return db.Exec(
-		s.upsertServerKeysStmt,
+	stmt := sqlutil.TxStmt(txn, s.upsertServerKeysStmt)
+	_, err := stmt.ExecContext(
+		ctx,
 		string(request.ServerName),
 		string(request.KeyID),
 		nameAndKeyID(request),
 		key.ValidUntilTS,
 		key.ExpiredTS,
 		key.Key.Encode(),
-	).Error
+	)
+	return err
 }
 
 func nameAndKeyID(request gomatrixserverlib.PublicKeyLookupRequest) string {

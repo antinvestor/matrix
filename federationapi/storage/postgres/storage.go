@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -30,75 +31,65 @@ import (
 // Database stores information needed by the federation sender
 type Database struct {
 	shared.Database
-	Cm     *sqlutil.Connections
+	db     *sql.DB
 	writer sqlutil.Writer
 }
 
 // NewDatabase opens a new database
-func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
+func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
 	var d Database
 	var err error
-
-	blacklist, err := NewPostgresBlacklistTable(ctx, cm)
+	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
+		return nil, err
+	}
+	blacklist, err := NewPostgresBlacklistTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-
-	joinedHosts, err := NewPostgresJoinedHostsTable(ctx, cm)
+	joinedHosts, err := NewPostgresJoinedHostsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-
-	queuePDUs, err := NewPostgresQueuePDUsTable(ctx, cm)
+	queuePDUs, err := NewPostgresQueuePDUsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-
-	queueEDUs, err := NewPostgresQueueEDUsTable(ctx, cm)
+	queueEDUs, err := NewPostgresQueueEDUsTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-
-	queueJSON, err := NewPostgresQueueJSONTable(ctx, cm)
+	queueJSON, err := NewPostgresQueueJSONTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-
-	assumedOffline, err := NewPostgresAssumedOfflineTable(ctx, cm)
+	assumedOffline, err := NewPostgresAssumedOfflineTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-
-	relayServers, err := NewPostgresRelayServersTable(ctx, cm)
+	relayServers, err := NewPostgresRelayServersTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-
-	inboundPeeks, err := NewPostgresInboundPeeksTable(ctx, cm)
+	inboundPeeks, err := NewPostgresInboundPeeksTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-
-	outboundPeeks, err := NewPostgresOutboundPeeksTable(ctx, cm)
+	outboundPeeks, err := NewPostgresOutboundPeeksTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-
-	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, cm)
+	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, d.db)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotaryServerKeysTable: %s", err)
 	}
-
-	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, cm)
+	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, d.db)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotaryServerKeysMetadataTable: %s", err)
 	}
-
-	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, cm)
+	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, d.db)
 	if err != nil {
 		return nil, err
 	}
-
 	m := sqlutil.NewMigrator(d.db)
 	m.AddMigrations(sqlutil.Migration{
 		Version: "federationsender: drop federationsender_rooms",
@@ -108,13 +99,11 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbProperties *con
 	if err != nil {
 		return nil, err
 	}
-
 	if err = queueEDUs.Prepare(); err != nil {
 		return nil, err
 	}
-
 	d.Database = shared.Database{
-		Cm:                       cm,
+		DB:                       d.db,
 		IsLocalServerName:        isLocalServerName,
 		Cache:                    cache,
 		Writer:                   d.writer,

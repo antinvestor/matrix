@@ -16,9 +16,9 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -51,40 +51,31 @@ const selectFilterIDByContentSQL = "" +
 const insertFilterSQL = "" +
 	"INSERT INTO syncapi_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETURNING id"
 
-type filterTable struct {
-	cm                         *sqlutil.Connections
-	selectFilterSQL            string
-	selectFilterIDByContentSQL string
-	insertFilterSQL            string
+type filterStatements struct {
+	selectFilterStmt            *sql.Stmt
+	selectFilterIDByContentStmt *sql.Stmt
+	insertFilterStmt            *sql.Stmt
 }
 
-func NewPostgresFilterTable(ctx context.Context, cm *sqlutil.Connections) (tables.Filter, error) {
-	// Create the table first
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(filterSchema).Error; err != nil {
+func NewPostgresFilterTable(ctx context.Context, db *sql.DB) (tables.Filter, error) {
+	_, err := db.Exec(filterSchema)
+	if err != nil {
 		return nil, err
 	}
-	
-	// Initialize the table with SQL statements
-	s := &filterTable{
-		cm:                         cm,
-		selectFilterSQL:            selectFilterSQL,
-		selectFilterIDByContentSQL: selectFilterIDByContentSQL,
-		insertFilterSQL:            insertFilterSQL,
-	}
-	
-	return s, nil
+	s := &filterStatements{}
+	return s, sqlutil.StatementList{
+		{&s.selectFilterStmt, selectFilterSQL},
+		{&s.selectFilterIDByContentStmt, selectFilterIDByContentSQL},
+		{&s.insertFilterStmt, insertFilterSQL},
+	}.Prepare(db)
 }
 
-func (s *filterTable) SelectFilter(
-	ctx context.Context, target *synctypes.Filter, localpart string, filterID string,
+func (s *filterStatements) SelectFilter(
+	ctx context.Context, txn *sql.Tx, target *synctypes.Filter, localpart string, filterID string,
 ) error {
-	// Get database connection
-	db := s.cm.Connection(ctx, true)
-	
 	// Retrieve filter from database (stored as canonical JSON)
 	var filterData []byte
-	err := db.Raw(s.selectFilterSQL, localpart, filterID).Scan(&filterData).Error
+	err := sqlutil.TxStmt(txn, s.selectFilterStmt).QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
 	if err != nil {
 		return err
 	}
@@ -96,12 +87,9 @@ func (s *filterTable) SelectFilter(
 	return nil
 }
 
-func (s *filterTable) InsertFilter(
-	ctx context.Context, filter *synctypes.Filter, localpart string,
+func (s *filterStatements) InsertFilter(
+	ctx context.Context, txn *sql.Tx, filter *synctypes.Filter, localpart string,
 ) (filterID string, err error) {
-	// Get database connection
-	db := s.cm.Connection(ctx, false)
-	
 	var existingFilterID string
 
 	// Serialise json
@@ -121,16 +109,19 @@ func (s *filterTable) InsertFilter(
 	// This can result in a race condition when two clients try to insert the
 	// same filter and localpart at the same time, however this is not a
 	// problem as both calls will result in the same filterID
-	err = db.Raw(s.selectFilterIDByContentSQL, localpart, filterJSON).Scan(&existingFilterID).Error
-	if err != nil && !frame.DBErrorIsRecordNotFound(err) {
+	err = sqlutil.TxStmt(txn, s.selectFilterIDByContentStmt).QueryRowContext(
+		ctx, localpart, filterJSON,
+	).Scan(&existingFilterID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
 	// If it does, return the existing ID
 	if existingFilterID != "" {
-		return existingFilterID, nil
+		return existingFilterID, err
 	}
 
 	// Otherwise insert the filter and return the new ID
-	err = db.Raw(s.insertFilterSQL, filterJSON, localpart).Scan(&filterID).Error
+	err = sqlutil.TxStmt(txn, s.insertFilterStmt).QueryRowContext(ctx, filterJSON, localpart).
+		Scan(&filterID)
 	return
 }

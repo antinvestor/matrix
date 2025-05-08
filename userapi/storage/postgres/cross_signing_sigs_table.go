@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -39,65 +40,54 @@ CREATE TABLE IF NOT EXISTS keyserver_cross_signing_sigs (
 CREATE INDEX IF NOT EXISTS keyserver_cross_signing_sigs_idx ON keyserver_cross_signing_sigs (origin_user_id, target_user_id, target_key_id);
 `
 
-// SQL query constants for cross-signing signatures operations
-const (
-	selectCrossSigningSigsForTargetSQL = "SELECT origin_user_id, origin_key_id, signature FROM keyserver_cross_signing_sigs" +
-		" WHERE (origin_user_id = $1 OR origin_user_id = $2) AND target_user_id = $2 AND target_key_id = $3"
+const selectCrossSigningSigsForTargetSQL = "" +
+	"SELECT origin_user_id, origin_key_id, signature FROM keyserver_cross_signing_sigs" +
+	" WHERE (origin_user_id = $1 OR origin_user_id = $2) AND target_user_id = $2 AND target_key_id = $3"
 
-	upsertCrossSigningSigsForTargetSQL = "INSERT INTO keyserver_cross_signing_sigs (origin_user_id, origin_key_id, target_user_id, target_key_id, signature)" +
-		" VALUES($1, $2, $3, $4, $5)" +
-		" ON CONFLICT (origin_user_id, origin_key_id, target_user_id, target_key_id) DO UPDATE SET signature = $5"
+const upsertCrossSigningSigsForTargetSQL = "" +
+	"INSERT INTO keyserver_cross_signing_sigs (origin_user_id, origin_key_id, target_user_id, target_key_id, signature)" +
+	" VALUES($1, $2, $3, $4, $5)" +
+	" ON CONFLICT (origin_user_id, origin_key_id, target_user_id, target_key_id) DO UPDATE SET signature = $5"
 
-	deleteCrossSigningSigsForTargetSQL = "DELETE FROM keyserver_cross_signing_sigs WHERE target_user_id=$1 AND target_key_id=$2"
-)
+const deleteCrossSigningSigsForTargetSQL = "" +
+	"DELETE FROM keyserver_cross_signing_sigs WHERE target_user_id=$1 AND target_key_id=$2"
 
-type crossSigningSigsTable struct {
-	cm                                  *sqlutil.Connections
-	selectCrossSigningSigsForTargetStmt string
-	upsertCrossSigningSigsForTargetStmt string
-	deleteCrossSigningSigsForTargetStmt string
+type crossSigningSigsStatements struct {
+	db                                  *sql.DB
+	selectCrossSigningSigsForTargetStmt *sql.Stmt
+	upsertCrossSigningSigsForTargetStmt *sql.Stmt
+	deleteCrossSigningSigsForTargetStmt *sql.Stmt
 }
 
-func NewPostgresCrossSigningSigsTable(ctx context.Context, cm *sqlutil.Connections) (tables.CrossSigningSigs, error) {
-	// Initialize schema
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(crossSigningSigsSchema).Error; err != nil {
-		return nil, err
+func NewPostgresCrossSigningSigsTable(ctx context.Context, db *sql.DB) (tables.CrossSigningSigs, error) {
+	s := &crossSigningSigsStatements{
+		db: db,
 	}
-
-	// Get SQL Cm for migrations
-	sqlDB, err := db.DB()
+	_, err := db.Exec(crossSigningSigsSchema)
 	if err != nil {
 		return nil, err
 	}
 
-	m := sqlutil.NewMigrator(sqlDB)
+	m := sqlutil.NewMigrator(db)
 	if err = m.Up(ctx); err != nil {
 		return nil, err
 	}
 
-	// Initialize table with SQL statements
-	t := &crossSigningSigsTable{
-		cm:                                  cm,
-		selectCrossSigningSigsForTargetStmt: selectCrossSigningSigsForTargetSQL,
-		upsertCrossSigningSigsForTargetStmt: upsertCrossSigningSigsForTargetSQL,
-		deleteCrossSigningSigsForTargetStmt: deleteCrossSigningSigsForTargetSQL,
-	}
-
-	return t, nil
+	return s, sqlutil.StatementList{
+		{&s.selectCrossSigningSigsForTargetStmt, selectCrossSigningSigsForTargetSQL},
+		{&s.upsertCrossSigningSigsForTargetStmt, upsertCrossSigningSigsForTargetSQL},
+		{&s.deleteCrossSigningSigsForTargetStmt, deleteCrossSigningSigsForTargetSQL},
+	}.Prepare(db)
 }
 
-func (s *crossSigningSigsTable) SelectCrossSigningSigsForTarget(
-	ctx context.Context, originUserID, targetUserID string, targetKeyID gomatrixserverlib.KeyID,
+func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
+	ctx context.Context, txn *sql.Tx, originUserID, targetUserID string, targetKeyID gomatrixserverlib.KeyID,
 ) (r types.CrossSigningSigMap, err error) {
-	db := s.cm.Connection(ctx, true)
-
-	rows, err := db.Raw(s.selectCrossSigningSigsForTargetStmt, originUserID, targetUserID, targetKeyID).Rows()
+	rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningSigsForTargetStmt).QueryContext(ctx, originUserID, targetUserID, targetKeyID)
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningSigsForTarget: rows.close() failed")
-
+	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningSigsForTargetStmt: rows.close() failed")
 	r = types.CrossSigningSigMap{}
 	for rows.Next() {
 		var userID string
@@ -115,31 +105,24 @@ func (s *crossSigningSigsTable) SelectCrossSigningSigsForTarget(
 	return
 }
 
-func (s *crossSigningSigsTable) UpsertCrossSigningSigsForTarget(
-	ctx context.Context,
+func (s *crossSigningSigsStatements) UpsertCrossSigningSigsForTarget(
+	ctx context.Context, txn *sql.Tx,
 	originUserID string, originKeyID gomatrixserverlib.KeyID,
 	targetUserID string, targetKeyID gomatrixserverlib.KeyID,
 	signature spec.Base64Bytes,
 ) error {
-	db := s.cm.Connection(ctx, false)
-
-	err := db.Exec(s.upsertCrossSigningSigsForTargetStmt,
-		originUserID, originKeyID, targetUserID, targetKeyID, signature).Error
-	if err != nil {
-		return fmt.Errorf("failed to upsert cross signing signatures: %w", err)
+	if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningSigsForTargetStmt).ExecContext(ctx, originUserID, originKeyID, targetUserID, targetKeyID, signature); err != nil {
+		return fmt.Errorf("s.upsertCrossSigningSigsForTargetStmt: %w", err)
 	}
 	return nil
 }
 
-func (s *crossSigningSigsTable) DeleteCrossSigningSigsForTarget(
-	ctx context.Context,
+func (s *crossSigningSigsStatements) DeleteCrossSigningSigsForTarget(
+	ctx context.Context, txn *sql.Tx,
 	targetUserID string, targetKeyID gomatrixserverlib.KeyID,
 ) error {
-	db := s.cm.Connection(ctx, false)
-
-	err := db.Exec(s.deleteCrossSigningSigsForTargetStmt, targetUserID, targetKeyID).Error
-	if err != nil {
-		return fmt.Errorf("failed to delete cross signing signatures: %w", err)
+	if _, err := sqlutil.TxStmt(txn, s.deleteCrossSigningSigsForTargetStmt).ExecContext(ctx, targetUserID, targetKeyID); err != nil {
+		return fmt.Errorf("s.deleteCrossSigningSigsForTargetStmt: %w", err)
 	}
 	return nil
 }

@@ -74,119 +74,107 @@ CREATE TABLE IF NOT EXISTS userapi_devices (
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_device_localpart_id_idx ON userapi_devices(localpart, server_name, device_id);
 `
 
-// SQL query constants for device operations
-const (
-	// insertDeviceSQL inserts a new device with provided details
-	insertDeviceSQL = "INSERT INTO userapi_devices(device_id, localpart, server_name, access_token, extra_data, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING session_id"
-	
-	// selectDeviceByTokenSQL selects device information by access token
-	selectDeviceByTokenSQL = "SELECT session_id, device_id, localpart, server_name FROM userapi_devices WHERE access_token = $1"
-	
-	// selectDeviceByIDSQL selects device details by user and device ID
-	selectDeviceByIDSQL = "SELECT display_name, last_seen_ts, ip FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id = $3"
-	
-	// selectDevicesByLocalpartSQL selects all devices for a user except the specified device ID
-	selectDevicesByLocalpartSQL = "SELECT device_id, display_name, last_seen_ts, ip, user_agent, session_id FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id != $3 ORDER BY last_seen_ts DESC"
-	
-	// updateDeviceNameSQL updates device display name
-	updateDeviceNameSQL = "UPDATE userapi_devices SET display_name = $1 WHERE localpart = $2 AND server_name = $3 AND device_id = $4"
-	
-	// deleteDeviceSQL deletes a specific device
-	deleteDeviceSQL = "DELETE FROM userapi_devices WHERE device_id = $1 AND localpart = $2 AND server_name = $3"
-	
-	// deleteDevicesByLocalpartSQL deletes all devices for a user except the specified device ID
-	deleteDevicesByLocalpartSQL = "DELETE FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id != $3"
-	
-	// deleteDevicesSQL deletes multiple devices by IDs
-	deleteDevicesSQL = "DELETE FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id = ANY($3)"
-	
-	// selectDevicesByIDSQL selects devices by multiple device IDs
-	selectDevicesByIDSQL = "SELECT device_id, localpart, server_name, display_name, last_seen_ts, session_id FROM userapi_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
-	
-	// updateDeviceLastSeenSQL updates device last seen timestamp and related info
-	updateDeviceLastSeenSQL = "UPDATE userapi_devices SET last_seen_ts = $1, ip = $2, user_agent = $3 WHERE localpart = $4 AND server_name = $5 AND device_id = $6"
-)
+const insertDeviceSQL = "" +
+	"INSERT INTO userapi_devices(device_id, localpart, server_name, access_token, extra_data, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
+	" RETURNING session_id"
 
-type devicesTable struct {
-	cm         *sqlutil.Connections
-	serverName spec.ServerName
-	
-	// SQL queries stored as direct fields for better maintainability
-	insertDeviceStmt             string
-	selectDeviceByTokenStmt      string
-	selectDeviceByIDStmt         string
-	selectDevicesByLocalpartStmt string
-	updateDeviceNameStmt         string
-	deleteDeviceStmt             string
-	deleteDevicesByLocalpartStmt string
-	deleteDevicesStmt            string
-	selectDevicesByIDStmt        string
-	updateDeviceLastSeenStmt     string
+const selectDeviceByTokenSQL = "" +
+	"SELECT session_id, device_id, localpart, server_name FROM userapi_devices WHERE access_token = $1"
+
+const selectDeviceByIDSQL = "" +
+	"SELECT display_name, last_seen_ts, ip FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id = $3"
+
+const selectDevicesByLocalpartSQL = "" +
+	"SELECT device_id, display_name, last_seen_ts, ip, user_agent, session_id FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id != $3 ORDER BY last_seen_ts DESC"
+
+const updateDeviceNameSQL = "" +
+	"UPDATE userapi_devices SET display_name = $1 WHERE localpart = $2 AND server_name = $3 AND device_id = $4"
+
+const deleteDeviceSQL = "" +
+	"DELETE FROM userapi_devices WHERE device_id = $1 AND localpart = $2 AND server_name = $3"
+
+const deleteDevicesByLocalpartSQL = "" +
+	"DELETE FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id != $3"
+
+const deleteDevicesSQL = "" +
+	"DELETE FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id = ANY($3)"
+
+const selectDevicesByIDSQL = "" +
+	"SELECT device_id, localpart, server_name, display_name, last_seen_ts, session_id FROM userapi_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
+
+const updateDeviceLastSeen = "" +
+	"UPDATE userapi_devices SET last_seen_ts = $1, ip = $2, user_agent = $3 WHERE localpart = $4 AND server_name = $5 AND device_id = $6"
+
+type devicesStatements struct {
+	insertDeviceStmt             *sql.Stmt
+	selectDeviceByTokenStmt      *sql.Stmt
+	selectDeviceByIDStmt         *sql.Stmt
+	selectDevicesByLocalpartStmt *sql.Stmt
+	selectDevicesByIDStmt        *sql.Stmt
+	updateDeviceNameStmt         *sql.Stmt
+	updateDeviceLastSeenStmt     *sql.Stmt
+	deleteDeviceStmt             *sql.Stmt
+	deleteDevicesByLocalpartStmt *sql.Stmt
+	deleteDevicesStmt            *sql.Stmt
+	serverName                   spec.ServerName
 }
 
-func NewPostgresDevicesTable(ctx context.Context, cm *sqlutil.Connections, serverName spec.ServerName) (tables.DevicesTable, error) {
-	// Initialize schema
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(devicesSchema).Error; err != nil {
-		return nil, err
-	}
-
-	// Initialize migrator
-	m := sqlutil.NewMigrator(db.DB())
-	if err := m.Up(ctx); err != nil {
-		return nil, err
-	}
-
-	// Initialize table with SQL statements
-	t := &devicesTable{
-		cm:         cm,
+func NewPostgresDevicesTable(ctx context.Context, db *sql.DB, serverName spec.ServerName) (tables.DevicesTable, error) {
+	s := &devicesStatements{
 		serverName: serverName,
-		insertDeviceStmt:             insertDeviceSQL,
-		selectDeviceByTokenStmt:      selectDeviceByTokenSQL,
-		selectDeviceByIDStmt:         selectDeviceByIDSQL,
-		selectDevicesByLocalpartStmt: selectDevicesByLocalpartSQL,
-		updateDeviceNameStmt:         updateDeviceNameSQL,
-		deleteDeviceStmt:             deleteDeviceSQL,
-		deleteDevicesByLocalpartStmt: deleteDevicesByLocalpartSQL,
-		deleteDevicesStmt:            deleteDevicesSQL,
-		selectDevicesByIDStmt:        selectDevicesByIDSQL,
-		updateDeviceLastSeenStmt:     updateDeviceLastSeenSQL,
 	}
-
-	return t, nil
+	_, err := db.Exec(devicesSchema)
+	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrator(db)
+	err = m.Up(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s, sqlutil.StatementList{
+		{&s.insertDeviceStmt, insertDeviceSQL},
+		{&s.selectDeviceByTokenStmt, selectDeviceByTokenSQL},
+		{&s.selectDeviceByIDStmt, selectDeviceByIDSQL},
+		{&s.selectDevicesByLocalpartStmt, selectDevicesByLocalpartSQL},
+		{&s.updateDeviceNameStmt, updateDeviceNameSQL},
+		{&s.deleteDeviceStmt, deleteDeviceSQL},
+		{&s.deleteDevicesByLocalpartStmt, deleteDevicesByLocalpartSQL},
+		{&s.deleteDevicesStmt, deleteDevicesSQL},
+		{&s.selectDevicesByIDStmt, selectDevicesByIDSQL},
+		{&s.updateDeviceLastSeenStmt, updateDeviceLastSeen},
+	}.Prepare(db)
 }
 
 // InsertDevice creates a new device. Returns an error if any device with the same access token already exists.
 // Returns an error if the user already has a device with the given device ID.
 // Returns the device on success.
-func (t *devicesTable) InsertDevice(
-	ctx context.Context, id string,
+func (s *devicesStatements) InsertDevice(
+	ctx context.Context, txn *sql.Tx, id string,
 	localpart string, serverName spec.ServerName,
 	accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
 
-	extraDataJson, err := json.Marshal(extraData)
+	extraDataJson, err := json.Marshal(&extraData)
 	if err != nil {
-		return nil, fmt.Errorf("insertDevice: %w", err)
+		return nil, fmt.Errorf("insertDeviceStmt: %w", err)
 	}
 
-	db := t.cm.Connection(ctx, false)
-
-	row := db.Raw(t.insertDeviceStmt, id, localpart, serverName, accessToken, extraDataJson, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Row()
-	if err := row.Scan(&sessionID); err != nil {
-		return nil, fmt.Errorf("insertDevice: %w", err)
+	stmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
+	if err := stmt.QueryRowContext(ctx, id, localpart, serverName, accessToken, extraDataJson, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Scan(&sessionID); err != nil {
+		return nil, fmt.Errorf("insertDeviceStmt: %w", err)
 	}
-
 	dev := &api.Device{
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, serverName),
 		AccessToken: accessToken,
-		SessionID:   sessionID,
-		LastSeenTS:  createdTimeMS,
-		LastSeenIP:  ipAddr,
-		UserAgent:   userAgent,
+
+		SessionID:  sessionID,
+		LastSeenTS: createdTimeMS,
+		LastSeenIP: ipAddr,
+		UserAgent:  userAgent,
 	}
 	if displayName != nil {
 		dev.DisplayName = *displayName
@@ -194,223 +182,176 @@ func (t *devicesTable) InsertDevice(
 	return dev, nil
 }
 
-// insertDeviceWithSessionID creates a new device. Returns an error if any device with the same access token already exists.
-// Returns an error if the user already has a device with the given device ID.
-// Returns the device on success. This method differs from InsertDevice in that it allows for the session ID to be specified
-// This should only be used in exceptional circumstances, like recreating devices from other servers.
-func (t *devicesTable) InsertDeviceWithSessionID(
-	ctx context.Context, id string,
+func (s *devicesStatements) InsertDeviceWithSessionID(ctx context.Context, txn *sql.Tx, id,
 	localpart string, serverName spec.ServerName,
-	accessToken string, sessionID int64, displayName *string, ipAddr, userAgent string,
+	accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
+	sessionID int64,
 ) (*api.Device, error) {
-	// Reuse the old session ID since we're recreating this device.
-	createdTimeMS := time.Now().UnixNano() / 1000000
-
-	db := t.cm.Connection(ctx, false)
-
-	err := db.Exec("INSERT INTO userapi_devices(device_id, localpart, server_name, access_token, created_ts, display_name, session_id, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-		id, localpart, serverName, accessToken, createdTimeMS, displayName, sessionID, createdTimeMS, ipAddr, userAgent).Error
-	if err != nil {
-		return nil, fmt.Errorf("insertDeviceWithSessionID: %w", err)
-	}
-
-	dev := &api.Device{
-		ID:          id,
-		UserID:      userutil.MakeUserID(localpart, serverName),
-		AccessToken: accessToken,
-		SessionID:   sessionID,
-		LastSeenTS:  createdTimeMS,
-		LastSeenIP:  ipAddr,
-		UserAgent:   userAgent,
-	}
-	if displayName != nil {
-		dev.DisplayName = *displayName
-	}
-	return dev, nil
+	return s.InsertDevice(ctx, txn, id, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
 }
 
-// DeleteDevice removes a single device by id and user localpart.
-func (t *devicesTable) DeleteDevice(
-	ctx context.Context, id string,
+// deleteDevice removes a single device by id and user localpart.
+func (s *devicesStatements) DeleteDevice(
+	ctx context.Context, txn *sql.Tx, id string,
 	localpart string, serverName spec.ServerName,
 ) error {
-	db := t.cm.Connection(ctx, false)
-	
-	return db.Exec(t.deleteDeviceStmt, id, localpart, serverName).Error
+	stmt := sqlutil.TxStmt(txn, s.deleteDeviceStmt)
+	_, err := stmt.ExecContext(ctx, id, localpart, serverName)
+	return err
 }
 
 // deleteDevices removes a single or multiple devices by ids and user localpart.
 // Returns an error if the execution failed.
-func (t *devicesTable) DeleteDevices(
-	ctx context.Context,
+func (s *devicesStatements) DeleteDevices(
+	ctx context.Context, txn *sql.Tx,
 	localpart string, serverName spec.ServerName,
 	devices []string,
 ) error {
-	db := t.cm.Connection(ctx, false)
-	
-	return db.Exec(t.deleteDevicesStmt, localpart, serverName, pq.Array(devices)).Error
+	stmt := sqlutil.TxStmt(txn, s.deleteDevicesStmt)
+	_, err := stmt.ExecContext(ctx, localpart, serverName, pq.Array(devices))
+	return err
 }
 
 // deleteDevicesByLocalpart removes all devices for the
 // given user localpart.
-func (t *devicesTable) DeleteDevicesByLocalpart(
-	ctx context.Context,
+func (s *devicesStatements) DeleteDevicesByLocalpart(
+	ctx context.Context, txn *sql.Tx,
 	localpart string, serverName spec.ServerName,
 	exceptDeviceID string,
 ) error {
-	db := t.cm.Connection(ctx, false)
-	
-	return db.Exec(t.deleteDevicesByLocalpartStmt, localpart, serverName, exceptDeviceID).Error
+	stmt := sqlutil.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
+	_, err := stmt.ExecContext(ctx, localpart, serverName, exceptDeviceID)
+	return err
 }
 
-func (t *devicesTable) UpdateDeviceName(
-	ctx context.Context,
+func (s *devicesStatements) UpdateDeviceName(
+	ctx context.Context, txn *sql.Tx,
 	localpart string, serverName spec.ServerName,
 	deviceID string, displayName *string,
 ) error {
-	db := t.cm.Connection(ctx, false)
-	
-	return db.Exec(t.updateDeviceNameStmt, displayName, localpart, serverName, deviceID).Error
+	stmt := sqlutil.TxStmt(txn, s.updateDeviceNameStmt)
+	_, err := stmt.ExecContext(ctx, displayName, localpart, serverName, deviceID)
+	return err
 }
 
-func (t *devicesTable) SelectDeviceByToken(
+func (s *devicesStatements) SelectDeviceByToken(
 	ctx context.Context, accessToken string,
 ) (*api.Device, error) {
 	var dev api.Device
 	var localpart string
-	var serverName string
-	
-	db := t.cm.Connection(ctx, true)
-	
-	row := db.Raw(t.selectDeviceByTokenStmt, accessToken).Row()
-	if err := row.Scan(&dev.SessionID, &dev.ID, &localpart, &serverName); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("selectDeviceByToken: %w", err)
+	var serverName spec.ServerName
+	stmt := s.selectDeviceByTokenStmt
+	err := stmt.QueryRowContext(ctx, accessToken).Scan(&dev.SessionID, &dev.ID, &localpart, &serverName)
+	if err == nil {
+		dev.UserID = userutil.MakeUserID(localpart, serverName)
+		dev.AccessToken = accessToken
 	}
-	
-	dev.UserID = userutil.MakeUserID(localpart, spec.ServerName(serverName))
-	dev.AccessToken = accessToken
-	
-	return &dev, nil
+	return &dev, err
 }
 
 // selectDeviceByID retrieves a device from the database with the given user
 // localpart and deviceID
-func (t *devicesTable) SelectDeviceByID(
+func (s *devicesStatements) SelectDeviceByID(
 	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 	deviceID string,
 ) (*api.Device, error) {
 	var dev api.Device
-	var displayname sql.NullString
-	var ipAddr, userAgent sql.NullString
-	
-	db := t.cm.Connection(ctx, true)
-	
-	row := db.Raw(t.selectDeviceByIDStmt, localpart, serverName, deviceID).Row()
-	if err := row.Scan(&displayname, &dev.LastSeenTS, &ipAddr); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("selectDeviceByID: %w", err)
-	}
-	
-	dev.ID = deviceID
-	dev.UserID = userutil.MakeUserID(localpart, serverName)
-	
-	if displayname.Valid {
-		dev.DisplayName = displayname.String
-	}
-	if ipAddr.Valid {
-		dev.LastSeenIP = ipAddr.String
-	}
-	if userAgent.Valid {
-		dev.UserAgent = userAgent.String
-	}
-	
-	return &dev, nil
-}
-
-func (t *devicesTable) SelectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
-	db := t.cm.Connection(ctx, true)
-	
-	rows, err := db.Raw(t.selectDevicesByIDStmt, pq.Array(deviceIDs)).Rows()
-	if err != nil {
-		return nil, fmt.Errorf("selectDevicesByID: %w", err)
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByID: rows.close() failed")
-	
-	var devices []api.Device
-	var sessionID int64
-	for rows.Next() {
-		var dev api.Device
-		var localpart, serverName string
-		var displayName sql.NullString
-		
-		if err := rows.Scan(&dev.ID, &localpart, &serverName, &displayName, &dev.LastSeenTS, &sessionID); err != nil {
-			return nil, fmt.Errorf("selectDevicesByID: %w", err)
-		}
-		
-		dev.UserID = userutil.MakeUserID(localpart, spec.ServerName(serverName))
+	var displayName, ip sql.NullString
+	var lastseenTS sql.NullInt64
+	stmt := s.selectDeviceByIDStmt
+	err := stmt.QueryRowContext(ctx, localpart, serverName, deviceID).Scan(&displayName, &lastseenTS, &ip)
+	if err == nil {
+		dev.ID = deviceID
+		dev.UserID = userutil.MakeUserID(localpart, serverName)
 		if displayName.Valid {
 			dev.DisplayName = displayName.String
 		}
-		
+		if lastseenTS.Valid {
+			dev.LastSeenTS = lastseenTS.Int64
+		}
+		if ip.Valid {
+			dev.LastSeenIP = ip.String
+		}
+	}
+	return &dev, err
+}
+
+func (s *devicesStatements) SelectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
+	rows, err := s.selectDevicesByIDStmt.QueryContext(ctx, pq.StringArray(deviceIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByID: rows.close() failed")
+	var devices []api.Device
+	var dev api.Device
+	var localpart string
+	var serverName spec.ServerName
+	var lastseents sql.NullInt64
+	var displayName sql.NullString
+	for rows.Next() {
+		if err := rows.Scan(&dev.ID, &localpart, &serverName, &displayName, &lastseents, &dev.SessionID); err != nil {
+			return nil, err
+		}
+		if displayName.Valid {
+			dev.DisplayName = displayName.String
+		}
+		if lastseents.Valid {
+			dev.LastSeenTS = lastseents.Int64
+		}
+		dev.UserID = userutil.MakeUserID(localpart, serverName)
 		devices = append(devices, dev)
 	}
-	
 	return devices, rows.Err()
 }
 
-func (t *devicesTable) SelectDevicesByLocalpart(
-	ctx context.Context,
+func (s *devicesStatements) SelectDevicesByLocalpart(
+	ctx context.Context, txn *sql.Tx,
 	localpart string, serverName spec.ServerName,
 	exceptDeviceID string,
 ) ([]api.Device, error) {
-	db := t.cm.Connection(ctx, true)
-	
-	rows, err := db.Raw(t.selectDevicesByLocalpartStmt, localpart, serverName, exceptDeviceID).Rows()
+	devices := []api.Device{}
+	rows, err := sqlutil.TxStmt(txn, s.selectDevicesByLocalpartStmt).QueryContext(ctx, localpart, serverName, exceptDeviceID)
+
 	if err != nil {
-		return nil, fmt.Errorf("selectDevicesByLocalpart: %w", err)
+		return devices, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByLocalpart: rows.close() failed")
-	
-	var devices []api.Device
-	var sessionID int64
+
+	var dev api.Device
+	var lastseents sql.NullInt64
+	var id, displayname, ip, useragent sql.NullString
 	for rows.Next() {
-		var dev api.Device
-		var displayName sql.NullString
-		var ipAddr, userAgent sql.NullString
-		
-		if err := rows.Scan(&dev.ID, &displayName, &dev.LastSeenTS, &ipAddr, &userAgent, &sessionID); err != nil {
-			return nil, fmt.Errorf("selectDevicesByLocalpart: %w", err)
+		err = rows.Scan(&id, &displayname, &lastseents, &ip, &useragent, &dev.SessionID)
+		if err != nil {
+			return devices, err
 		}
-		
+		if id.Valid {
+			dev.ID = id.String
+		}
+		if displayname.Valid {
+			dev.DisplayName = displayname.String
+		}
+		if lastseents.Valid {
+			dev.LastSeenTS = lastseents.Int64
+		}
+		if ip.Valid {
+			dev.LastSeenIP = ip.String
+		}
+		if useragent.Valid {
+			dev.UserAgent = useragent.String
+		}
+
 		dev.UserID = userutil.MakeUserID(localpart, serverName)
-		dev.SessionID = sessionID
-		
-		if displayName.Valid {
-			dev.DisplayName = displayName.String
-		}
-		if ipAddr.Valid {
-			dev.LastSeenIP = ipAddr.String
-		}
-		if userAgent.Valid {
-			dev.UserAgent = userAgent.String
-		}
-		
 		devices = append(devices, dev)
 	}
-	
+
 	return devices, rows.Err()
 }
 
-func (t *devicesTable) UpdateDeviceLastSeen(ctx context.Context, localpart string, serverName spec.ServerName, deviceID, ipAddr, userAgent string) error {
-	lastSeenTimeMS := time.Now().UnixNano() / 1000000
-	
-	db := t.cm.Connection(ctx, false)
-	
-	return db.Exec(t.updateDeviceLastSeenStmt, lastSeenTimeMS, ipAddr, userAgent, localpart, serverName, deviceID).Error
+func (s *devicesStatements) UpdateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart string, serverName spec.ServerName, deviceID, ipAddr, userAgent string) error {
+	lastSeenTs := time.Now().UnixNano() / 1000000
+	stmt := sqlutil.TxStmt(txn, s.updateDeviceLastSeenStmt)
+	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, userAgent, localpart, serverName, deviceID)
+	return err
 }

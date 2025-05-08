@@ -9,7 +9,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implie
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
@@ -37,12 +37,28 @@ type Database struct {
 }
 
 // Open a postgres database.
-func Open(ctx context.Context, cm *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
+func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
+	var err error
+	db, writer, err := conMan.Connection(ctx, dbProperties)
+	if err != nil {
+		return nil, fmt.Errorf("sqlutil.Open: %w", err)
+	}
+
+	// Create the tables.
+	if err = d.create(ctx, db); err != nil {
+		return nil, err
+	}
+
+	// Special case, since this migration uses several tables, so it needs to
+	// be sure that all tables are created first.
+	if err = executeMigration(ctx, db); err != nil {
+		return nil, err
+	}
 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
-	if err := d.prepare(ctx, cm, cache); err != nil {
+	if err = d.prepare(ctx, db, writer, cache); err != nil {
 		return nil, err
 	}
 
@@ -75,93 +91,128 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 	return m.Up(ctx)
 }
 
-func (d *Database) prepare(ctx context.Context, cm *sqlutil.Connections, cache caching.RoomServerCaches) error {
-	// Use the new constructor method for eventStateKeys
-	eventStateKeys, err := NewPostgresEventStateKeysTable(ctx, cm)
+func (d *Database) create(ctx context.Context, db *sql.DB) error {
+	if err := CreateEventStateKeysTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateEventTypesTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateEventJSONTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateEventsTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateRoomsTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateStateBlockTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateStateSnapshotTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreatePrevEventsTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateRoomAliasesTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateInvitesTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateMembershipTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreatePublishedTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateRedactionsTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateUserRoomKeysTable(ctx, db); err != nil {
+		return err
+	}
+	if err := CreateReportedEventsTable(ctx, db); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Database) prepare(ctx context.Context, db *sql.DB, writer sqlutil.Writer, cache caching.RoomServerCaches) error {
+	eventStateKeys, err := PrepareEventStateKeysTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for eventTypes
-	eventTypes, err := NewPostgresEventTypesTable(ctx, cm)
+	eventTypes, err := PrepareEventTypesTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for eventJSON
-	eventJSON, err := NewPostgresEventJSONTable(ctx, cm)
+	eventJSON, err := PrepareEventJSONTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for events
-	events, err := NewPostgresEventsTable(ctx, cm)
+	events, err := PrepareEventsTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for rooms
-	rooms, err := NewPostgresRoomsTable(ctx, cm)
+	rooms, err := PrepareRoomsTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for stateBlock
-	stateBlock, err := NewPostgresStateBlockTable(ctx, cm)
+	stateBlock, err := PrepareStateBlockTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for stateSnapshot
-	stateSnapshot, err := NewPostgresStateSnapshotsTable(ctx, cm)
+	stateSnapshot, err := PrepareStateSnapshotTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for prevEvents
-	prevEvents, err := NewPostgresPreviousEventsTable(ctx, cm)
+	prevEvents, err := PreparePrevEventsTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for roomAliases
-	roomAliases, err := NewPostgresRoomAliasesTable(ctx, cm)
+	roomAliases, err := PrepareRoomAliasesTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new consolidated constructor method for invites
-	invites, err := NewPostgresInvitesTable(ctx, cm)
+	invites, err := PrepareInvitesTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for membership
-	membership, err := NewPostgresMembershipTable(ctx, cm)
+	membership, err := PrepareMembershipTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for published
-	published, err := NewPostgresPublishedTable(ctx, cm)
+	published, err := PreparePublishedTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for redactions
-	redactions, err := NewPostgresRedactionsTable(ctx, cm)
+	redactions, err := PrepareRedactionsTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	purge, err := NewPostgresqlPurgeStatements(cm)
+	purge, err := PreparePurgeStatements(db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for userRoomKeys
-	userRoomKeys, err := NewPostgresUserRoomKeysTable(ctx, cm)
+	userRoomKeys, err := PrepareUserRoomKeysTable(ctx, db)
 	if err != nil {
 		return err
 	}
-	// Use the new constructor method for reportedEvents
-	reportedEvents, err := NewPostgresReportedEventsTable(ctx, cm)
+	reportedEvents, err := PrepareReportedEventsTable(ctx, db)
 	if err != nil {
 		return err
 	}
 
 	d.Database = shared.Database{
-		Cm: cm,
+		DB: db,
 		EventDatabase: shared.EventDatabase{
-			Cm:                  cm,
+			DB:                  db,
 			Cache:               cache,
-			Writer:              cm.Writer(),
+			Writer:              writer,
 			EventsTable:         events,
 			EventJSONTable:      eventJSON,
 			EventTypesTable:     eventTypes,
@@ -171,7 +222,7 @@ func (d *Database) prepare(ctx context.Context, cm *sqlutil.Connections, cache c
 			ReportedEventsTable: reportedEvents,
 		},
 		Cache:              cache,
-		Writer:             cm.Writer(),
+		Writer:             writer,
 		RoomsTable:         rooms,
 		StateBlockTable:    stateBlock,
 		StateSnapshotTable: stateSnapshot,

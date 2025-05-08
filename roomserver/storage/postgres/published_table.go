@@ -25,8 +25,8 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 )
 
-// Schema for the published table
-const publishedSchema = `-- Stores which rooms are published in the room directory
+const publishedSchema = `
+-- Stores which rooms are published in the room directory
 CREATE TABLE IF NOT EXISTS roomserver_published (
     -- The room ID of the room
     room_id TEXT NOT NULL,
@@ -37,54 +37,35 @@ CREATE TABLE IF NOT EXISTS roomserver_published (
     -- Whether it is published or not
     published BOOLEAN NOT NULL DEFAULT false,
     PRIMARY KEY (room_id, appservice_id, network_id)
-);`
+);
+`
 
-// SQL query constants for published operations
-const (
-	// upsertPublishedSQL inserts or updates a record for a room's published status
-	upsertPublishedSQL = `INSERT INTO roomserver_published (room_id, appservice_id, network_id, published) VALUES ($1, $2, $3, $4) ON CONFLICT (room_id, appservice_id, network_id) DO UPDATE SET published=$4`
+const upsertPublishedSQL = "" +
+	"INSERT INTO roomserver_published (room_id, appservice_id, network_id, published) VALUES ($1, $2, $3, $4) " +
+	"ON CONFLICT (room_id, appservice_id, network_id) DO UPDATE SET published=$4"
 
-	// selectAllPublishedSQL selects all published rooms, optionally filtering by network
-	selectAllPublishedSQL = `SELECT room_id FROM roomserver_published WHERE published = $1 AND CASE WHEN $2 THEN 1=1 ELSE network_id = '' END ORDER BY room_id ASC`
+const selectAllPublishedSQL = "" +
+	"SELECT room_id FROM roomserver_published WHERE published = $1 AND CASE WHEN $2 THEN 1=1 ELSE network_id = '' END ORDER BY room_id ASC"
 
-	// selectPublishedSQL checks if a specific room is published
-	selectPublishedSQL = `SELECT published FROM roomserver_published WHERE room_id = $1`
+const selectNetworkPublishedSQL = "" +
+	"SELECT room_id FROM roomserver_published WHERE published = $1 AND network_id = $2 ORDER BY room_id ASC"
 
-	// selectNetworkPublishedSQL selects all published rooms for a specific network
-	selectNetworkPublishedSQL = `SELECT room_id FROM roomserver_published WHERE published = $1 AND network_id = $2 ORDER BY room_id ASC`
-)
+const selectPublishedSQL = "" +
+	"SELECT published FROM roomserver_published WHERE room_id = $1"
 
-// publishedStatements contains all the SQL statements for published operations
 type publishedStatements struct {
-	cm *sqlutil.Connections
-	
-	// SQL statements stored as struct fields
-	upsertPublishedStmt       string
-	selectAllPublishedStmt    string
-	selectPublishedStmt       string
-	selectNetworkPublishedStmt string
+	upsertPublishedStmt        *sql.Stmt
+	selectAllPublishedStmt     *sql.Stmt
+	selectPublishedStmt        *sql.Stmt
+	selectNetworkPublishedStmt *sql.Stmt
 }
 
-// NewPostgresPublishedTable creates a new PostgreSQL published table
-func NewPostgresPublishedTable(ctx context.Context, cm *sqlutil.Connections) (tables.Published, error) {
-	// Create the table
-	db := cm.Connection(ctx, false)
-	if err := db.Exec(publishedSchema).Error; err != nil {
-		return nil, err
+func CreatePublishedTable(ctx context.Context, db *sql.DB) error {
+	_, err := db.Exec(publishedSchema)
+	if err != nil {
+		return err
 	}
-
-	s := &publishedStatements{
-		cm: cm,
-		
-		// Initialize SQL statement fields with the constants
-		upsertPublishedStmt:       upsertPublishedSQL,
-		selectAllPublishedStmt:    selectAllPublishedSQL,
-		selectPublishedStmt:       selectPublishedSQL,
-		selectNetworkPublishedStmt: selectNetworkPublishedSQL,
-	}
-
-	// Run migrations
-	m := sqlutil.NewMigrator(cm.Writer.DB)
+	m := sqlutil.NewMigrator(db)
 	m.AddMigrations([]sqlutil.Migration{
 		{
 			Version: "roomserver: published appservice",
@@ -95,62 +76,65 @@ func NewPostgresPublishedTable(ctx context.Context, cm *sqlutil.Connections) (ta
 			Up:      deltas.UpPulishedAppservicePrimaryKey,
 		},
 	}...)
-	if err := m.Up(ctx); err != nil {
-		return nil, err
-	}
-
-	return s, nil
+	return m.Up(ctx)
 }
 
-// UpsertRoomPublished updates or inserts the published status for a room
+func PreparePublishedTable(ctx context.Context, db *sql.DB) (tables.Published, error) {
+	s := &publishedStatements{}
+
+	return s, sqlutil.StatementList{
+		{&s.upsertPublishedStmt, upsertPublishedSQL},
+		{&s.selectAllPublishedStmt, selectAllPublishedSQL},
+		{&s.selectPublishedStmt, selectPublishedSQL},
+		{&s.selectNetworkPublishedStmt, selectNetworkPublishedSQL},
+	}.Prepare(db)
+}
+
 func (s *publishedStatements) UpsertRoomPublished(
-	ctx context.Context, roomID, appserviceID, networkID string, published bool,
+	ctx context.Context, txn *sql.Tx, roomID, appserviceID, networkID string, published bool,
 ) (err error) {
-	db := s.cm.Connection(ctx, false)
-	return db.Exec(s.upsertPublishedStmt, roomID, appserviceID, networkID, published).Error
+	stmt := sqlutil.TxStmt(txn, s.upsertPublishedStmt)
+	_, err = stmt.ExecContext(ctx, roomID, appserviceID, networkID, published)
+	return
 }
 
-// SelectPublishedFromRoomID checks if a room is published
 func (s *publishedStatements) SelectPublishedFromRoomID(
-	ctx context.Context, roomID string,
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) (published bool, err error) {
-	db := s.cm.Connection(ctx, true)
-	err = db.Raw(s.selectPublishedStmt, roomID).Scan(&published).Error
-	if errors.Is(err, internal.ErrNoRows) {
+	stmt := sqlutil.TxStmt(txn, s.selectPublishedStmt)
+	err = stmt.QueryRowContext(ctx, roomID).Scan(&published)
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	return
 }
 
-// SelectAllPublishedRooms retrieves all published rooms, optionally filtered by network
 func (s *publishedStatements) SelectAllPublishedRooms(
-	ctx context.Context, networkID string, published, includeAllNetworks bool,
+	ctx context.Context, txn *sql.Tx, networkID string, published, includeAllNetworks bool,
 ) ([]string, error) {
-	db := s.cm.Connection(ctx, true)
-
 	var rows *sql.Rows
 	var err error
 	if networkID != "" {
-		// Select rooms that are published for a specific network
-		rows, err = db.Raw(s.selectNetworkPublishedStmt, published, networkID).Rows()
+		stmt := sqlutil.TxStmt(txn, s.selectNetworkPublishedStmt)
+		rows, err = stmt.QueryContext(ctx, published, networkID)
 	} else {
-		// Select rooms that are published across all networks
-		rows, err = db.Raw(s.selectAllPublishedStmt, published, includeAllNetworks).Rows()
-	}
+		stmt := sqlutil.TxStmt(txn, s.selectAllPublishedStmt)
+		rows, err = stmt.QueryContext(ctx, published, includeAllNetworks)
 
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectAllPublishedRooms: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectAllPublishedStmt: rows.close() failed")
 
 	var roomIDs []string
+	var roomID string
 	for rows.Next() {
-		var roomID string
 		if err = rows.Scan(&roomID); err != nil {
 			return nil, err
 		}
+
 		roomIDs = append(roomIDs, roomID)
 	}
-
 	return roomIDs, rows.Err()
 }
