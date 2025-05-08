@@ -28,8 +28,7 @@ import (
 // Database stores information needed by the federation sender
 type Database struct {
 	shared.Database
-	writer sqlutil.Writer
-	cm     *sqlutil.Connections
+	cm *sqlutil.Connections
 }
 
 // NewDatabase opens a new database
@@ -87,7 +86,6 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.Fed
 	}
 
 	d.Database = shared.Database{
-		Writer:                   d.writer,
 		IsLocalServerName:        isLocalServerName,
 		Cache:                    cache,
 		FederationJoinedHosts:    joinedHosts,

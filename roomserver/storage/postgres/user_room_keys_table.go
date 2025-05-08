@@ -17,7 +17,6 @@ package postgres
 import (
 	"context"
 	"crypto/ed25519"
-	"database/sql"
 	"errors"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -26,9 +25,13 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
+	"gorm.io/gorm"
 )
 
-const userRoomKeysSchema = `
+// SQL queries for user room keys table
+const (
+	userRoomKeysSchema = `
 CREATE TABLE IF NOT EXISTS roomserver_user_room_keys (     
     user_nid    INTEGER NOT NULL,
     room_nid    INTEGER NOT NULL,
@@ -38,96 +41,137 @@ CREATE TABLE IF NOT EXISTS roomserver_user_room_keys (
 );
 `
 
-const insertUserRoomPrivateKeySQL = `
+	userRoomKeysSchemaRevert = "DROP TABLE IF EXISTS roomserver_user_room_keys;"
+
+	insertUserRoomPrivateKeySQL = `
 	INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_key, pseudo_id_pub_key) VALUES ($1, $2, $3, $4)
 	ON CONFLICT ON CONSTRAINT roomserver_user_room_keys_pk DO UPDATE SET pseudo_id_key = roomserver_user_room_keys.pseudo_id_key
 	RETURNING (pseudo_id_key)
 `
 
-const insertUserRoomPublicKeySQL = `
+	insertUserRoomPublicKeySQL = `
 	INSERT INTO roomserver_user_room_keys (user_nid, room_nid, pseudo_id_pub_key) VALUES ($1, $2, $3)
 	ON CONFLICT ON CONSTRAINT roomserver_user_room_keys_pk DO UPDATE SET pseudo_id_pub_key = $3
 	RETURNING (pseudo_id_pub_key)
 `
 
-const selectUserRoomKeySQL = `SELECT pseudo_id_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
+	selectUserRoomKeySQL = `SELECT pseudo_id_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
 
-const selectUserRoomPublicKeySQL = `SELECT pseudo_id_pub_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
+	selectUserRoomPublicKeySQL = `SELECT pseudo_id_pub_key FROM roomserver_user_room_keys WHERE user_nid = $1 AND room_nid = $2`
 
-const selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE room_nid = ANY($1) AND pseudo_id_pub_key = ANY($2)`
+	selectUserNIDsSQL = `SELECT user_nid, room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE room_nid = ANY($1) AND pseudo_id_pub_key = ANY($2)`
 
-const selectAllUserRoomPublicKeyForUserSQL = `SELECT room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE user_nid = $1`
+	selectAllUserRoomPublicKeyForUserSQL = `SELECT room_nid, pseudo_id_pub_key FROM roomserver_user_room_keys WHERE user_nid = $1`
+)
 
+// userRoomKeysStatements holds the SQL queries for user room keys
 type userRoomKeysStatements struct {
-	insertUserRoomPrivateKeyStmt       *sql.Stmt
-	insertUserRoomPublicKeyStmt        *sql.Stmt
-	selectUserRoomKeyStmt              *sql.Stmt
-	selectUserRoomPublicKeyStmt        *sql.Stmt
-	selectUserNIDsStmt                 *sql.Stmt
-	selectAllUserRoomPublicKeysForUser *sql.Stmt
+	cm *sqlutil.Connections
+
+	// SQL query string fields
+	insertUserRoomPrivateKeySQL          string
+	insertUserRoomPublicKeySQL           string
+	selectUserRoomKeySQL                 string
+	selectUserRoomPublicKeySQL           string
+	selectUserNIDsSQL                    string
+	selectAllUserRoomPublicKeyForUserSQL string
 }
 
-func CreateUserRoomKeysTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(userRoomKeysSchema)
-	return err
+// NewPostgresUserRoomKeysTable creates a new instance of the user room keys table.
+// It creates the table if it doesn't exist and applies any necessary migrations.
+func NewPostgresUserRoomKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.UserRoomKeys, error) {
+	s := &userRoomKeysStatements{
+		cm: cm,
+
+		insertUserRoomPrivateKeySQL:          insertUserRoomPrivateKeySQL,
+		insertUserRoomPublicKeySQL:           insertUserRoomPublicKeySQL,
+		selectUserRoomKeySQL:                 selectUserRoomKeySQL,
+		selectUserRoomPublicKeySQL:           selectUserRoomPublicKeySQL,
+		selectUserNIDsSQL:                    selectUserNIDsSQL,
+		selectAllUserRoomPublicKeyForUserSQL: selectAllUserRoomPublicKeyForUserSQL,
+	}
+
+	// Create the table if it doesn't exist using migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "roomserver_user_room_keys_schema_001",
+		Patch:       userRoomKeysSchema,
+		RevertPatch: userRoomKeysSchemaRevert,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return s, nil
 }
 
-func PrepareUserRoomKeysTable(ctx context.Context, db *sql.DB) (tables.UserRoomKeys, error) {
-	s := &userRoomKeysStatements{}
-	return s, sqlutil.StatementList{
-		{&s.insertUserRoomPrivateKeyStmt, insertUserRoomPrivateKeySQL},
-		{&s.insertUserRoomPublicKeyStmt, insertUserRoomPublicKeySQL},
-		{&s.selectUserRoomKeyStmt, selectUserRoomKeySQL},
-		{&s.selectUserRoomPublicKeyStmt, selectUserRoomPublicKeySQL},
-		{&s.selectUserNIDsStmt, selectUserNIDsSQL},
-		{&s.selectAllUserRoomPublicKeysForUser, selectAllUserRoomPublicKeyForUserSQL},
-	}.Prepare(db)
-}
+// InsertUserRoomPrivatePublicKey inserts a user's private and public key for a room.
+func (s *userRoomKeysStatements) InsertUserRoomPrivatePublicKey(
+	ctx context.Context,
+	userNID types.EventStateKeyNID,
+	roomNID types.RoomNID,
+	key ed25519.PrivateKey,
+) (result ed25519.PrivateKey, err error) {
+	db := s.cm.Connection(ctx, false)
 
-func (s *userRoomKeysStatements) InsertUserRoomPrivatePublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PrivateKey) (result ed25519.PrivateKey, err error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.insertUserRoomPrivateKeyStmt)
-	err = stmt.QueryRowContext(ctx, userNID, roomNID, key, key.Public()).Scan(&result)
+	row := db.Raw(s.insertUserRoomPrivateKeySQL, userNID, roomNID, key, key.Public()).Row()
+	err = row.Scan(&result)
 	return result, err
 }
 
-func (s *userRoomKeysStatements) InsertUserRoomPublicKey(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomNID types.RoomNID, key ed25519.PublicKey) (result ed25519.PublicKey, err error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.insertUserRoomPublicKeyStmt)
-	err = stmt.QueryRowContext(ctx, userNID, roomNID, key).Scan(&result)
+// InsertUserRoomPublicKey inserts a user's public key for a room.
+func (s *userRoomKeysStatements) InsertUserRoomPublicKey(
+	ctx context.Context,
+	userNID types.EventStateKeyNID,
+	roomNID types.RoomNID,
+	key ed25519.PublicKey,
+) (result ed25519.PublicKey, err error) {
+	db := s.cm.Connection(ctx, false)
+
+	row := db.Raw(s.insertUserRoomPublicKeySQL, userNID, roomNID, key).Row()
+	err = row.Scan(&result)
 	return result, err
 }
 
+// SelectUserRoomPrivateKey retrieves a user's private key for a room.
 func (s *userRoomKeysStatements) SelectUserRoomPrivateKey(
 	ctx context.Context,
-	txn *sql.Tx,
 	userNID types.EventStateKeyNID,
 	roomNID types.RoomNID,
 ) (ed25519.PrivateKey, error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserRoomKeyStmt)
+	db := s.cm.Connection(ctx, true)
+
 	var result ed25519.PrivateKey
-	err := stmt.QueryRowContext(ctx, userNID, roomNID).Scan(&result)
-	if errors.Is(err, sql.ErrNoRows) {
+	row := db.Raw(s.selectUserRoomKeySQL, userNID, roomNID).Row()
+	err := row.Scan(&result)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	return result, err
 }
 
+// SelectUserRoomPublicKey retrieves a user's public key for a room.
 func (s *userRoomKeysStatements) SelectUserRoomPublicKey(
 	ctx context.Context,
-	txn *sql.Tx,
 	userNID types.EventStateKeyNID,
 	roomNID types.RoomNID,
 ) (ed25519.PublicKey, error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserRoomPublicKeyStmt)
+	db := s.cm.Connection(ctx, true)
+
 	var result ed25519.PublicKey
-	err := stmt.QueryRowContext(ctx, userNID, roomNID).Scan(&result)
-	if errors.Is(err, sql.ErrNoRows) {
+	row := db.Raw(s.selectUserRoomPublicKeySQL, userNID, roomNID).Row()
+	err := row.Scan(&result)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	return result, err
 }
 
-func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sql.Tx, senderKeys map[types.RoomNID][]ed25519.PublicKey) (map[string]types.UserRoomKeyPair, error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectUserNIDsStmt)
+// BulkSelectUserNIDs retrieves user NIDs for given room NIDs and sender keys.
+func (s *userRoomKeysStatements) BulkSelectUserNIDs(
+	ctx context.Context,
+	senderKeys map[types.RoomNID][]ed25519.PublicKey,
+) (map[string]types.UserRoomKeyPair, error) {
+	db := s.cm.Connection(ctx, true)
 
 	roomNIDs := make([]types.RoomNID, 0, len(senderKeys))
 	var senders [][]byte
@@ -137,7 +181,8 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 			senders = append(senders, key)
 		}
 	}
-	rows, err := stmt.QueryContext(ctx, pq.Array(roomNIDs), pq.Array(senders))
+
+	rows, err := db.Raw(s.selectUserNIDsSQL, pq.Array(roomNIDs), pq.Array(senders)).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -155,11 +200,15 @@ func (s *userRoomKeysStatements) BulkSelectUserNIDs(ctx context.Context, txn *sq
 	return result, rows.Err()
 }
 
-func (s *userRoomKeysStatements) SelectAllPublicKeysForUser(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID) (map[types.RoomNID]ed25519.PublicKey, error) {
-	stmt := sqlutil.TxStmtContext(ctx, txn, s.selectAllUserRoomPublicKeysForUser)
+// SelectAllPublicKeysForUser retrieves all public keys for a user.
+func (s *userRoomKeysStatements) SelectAllPublicKeysForUser(
+	ctx context.Context,
+	userNID types.EventStateKeyNID,
+) (map[types.RoomNID]ed25519.PublicKey, error) {
+	db := s.cm.Connection(ctx, true)
 
-	rows, err := stmt.QueryContext(ctx, userNID)
-	if errors.Is(err, sql.ErrNoRows) {
+	rows, err := db.Raw(s.selectAllUserRoomPublicKeyForUserSQL, userNID).Rows()
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if err != nil {

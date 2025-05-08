@@ -186,7 +186,7 @@ func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOpti
 	}
 
 	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: conStr})
-	db, err := storage.Open(ctx, cm, &config.DatabaseOptions{ConnectionString: conStr}, caches)
+	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{ConnectionString: conStr}, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}

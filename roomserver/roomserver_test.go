@@ -267,7 +267,7 @@ func TestPurgeRoom(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		db, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, caches)
+		db, err := storage.NewDatabase(ctx, cm, &cfg.RoomServer.Database, caches)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -564,7 +564,7 @@ func TestRedaction(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		db, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, caches)
+		db, err := storage.NewDatabase(ctx, cm, &cfg.RoomServer.Database, caches)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1268,7 +1268,7 @@ func TestNewServerACLs(t *testing.T) {
 		err = api.SendEvents(ctx, rsAPI, api.KindNew, roomWithoutACL.Events(), "test", "test", "test", nil, false)
 		assert.NoError(t, err)
 
-		db, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, caches)
+		db, err := storage.NewDatabase(ctx, cm, &cfg.RoomServer.Database, caches)
 		assert.NoError(t, err)
 		// create new server ACLs and verify server is banned/not banned
 		serverACLs := acls.NewServerACLs(ctx, db)

@@ -40,7 +40,13 @@ func NewInternalAPI(
 	caches caching.RoomServerCaches,
 	enableMetrics bool,
 ) api.RoomserverInternalAPI {
-	roomserverDB, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, caches)
+
+	roomserverCm, err := cm.FromOptions(ctx, &cfg.RoomServer.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("could not obtain connection manager for roomserver")
+	}
+
+	roomserverDB, err := storage.NewDatabase(ctx, roomserverCm, caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}

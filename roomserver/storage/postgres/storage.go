@@ -9,7 +9,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implie
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
@@ -17,18 +17,12 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-	"fmt"
-
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 
 	"github.com/antinvestor/matrix/internal/caching"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/roomserver/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 // A Database is used to store room events and stream offsets.
@@ -36,185 +30,82 @@ type Database struct {
 	shared.Database
 }
 
-// Open a postgres database.
-func Open(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
+// NewDatabase a postgres database.
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
-	var err error
-	db, writer, err := conMan.Connection(ctx, dbProperties)
-	if err != nil {
-		return nil, fmt.Errorf("sqlutil.Open: %w", err)
-	}
+	d.Cm = cm
 
-	// Create the tables.
-	if err = d.create(ctx, db); err != nil {
+	eventsJSON, err := NewPostgresEventJSONTable(ctx, cm)
+	if err != nil {
 		return nil, err
 	}
-
-	// Special case, since this migration uses several tables, so it needs to
-	// be sure that all tables are created first.
-	if err = executeMigration(ctx, db); err != nil {
+	invites, err := NewPostgresInvitesTable(ctx, cm)
+	if err != nil {
 		return nil, err
 	}
-
-	// Then prepare the statements. Now that the migrations have run, any columns referred
-	// to in the database code should now exist.
-	if err = d.prepare(ctx, db, writer, cache); err != nil {
+	membership, err := NewPostgresMembershipTable(ctx, cm)
+	if err != nil {
 		return nil, err
 	}
-
-	return &d, nil
-}
-
-func executeMigration(ctx context.Context, db *sql.DB) error {
-	// TODO: Remove when we are sure we are not having goose artefacts in the db
-	// This forces an error, which indicates the migration is already applied, since the
-	// column event_nid was removed from the table
-	migrationName := "roomserver: state blocks refactor"
-
-	var cName string
-	err := db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'roomserver_state_block' AND column_name = 'event_nid'").Scan(&cName)
+	published, err := NewPostgresPublishedTable(ctx, cm)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
-			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
-				return fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
-			}
-			return nil
-		}
-		return err
+		return nil, err
 	}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: migrationName,
-		Up:      deltas.UpStateBlocksRefactor,
-	})
-
-	return m.Up(ctx)
-}
-
-func (d *Database) create(ctx context.Context, db *sql.DB) error {
-	if err := CreateEventStateKeysTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateEventTypesTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateEventJSONTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateEventsTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateRoomsTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateStateBlockTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateStateSnapshotTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreatePrevEventsTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateRoomAliasesTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateInvitesTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateMembershipTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreatePublishedTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateRedactionsTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateUserRoomKeysTable(ctx, db); err != nil {
-		return err
-	}
-	if err := CreateReportedEventsTable(ctx, db); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (d *Database) prepare(ctx context.Context, db *sql.DB, writer sqlutil.Writer, cache caching.RoomServerCaches) error {
-	eventStateKeys, err := PrepareEventStateKeysTable(ctx, db)
+	redactions, err := NewPostgresRedactionsTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	eventTypes, err := PrepareEventTypesTable(ctx, db)
+	roomAliases, err := NewPostgresRoomAliasesTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	eventJSON, err := PrepareEventJSONTable(ctx, db)
+	prevEvents, err := NewPostgresPreviousEventsTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	events, err := PrepareEventsTable(ctx, db)
+	eventStateKeys, err := NewPostgresEventStateKeysTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	rooms, err := PrepareRoomsTable(ctx, db)
+	eventTypes, err := NewPostgresEventTypesTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	stateBlock, err := PrepareStateBlockTable(ctx, db)
+	rooms, err := NewPostgresRoomsTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	stateSnapshot, err := PrepareStateSnapshotTable(ctx, db)
+	events, err := NewPostgresEventsTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	prevEvents, err := PreparePrevEventsTable(ctx, db)
+	stateBlock, err := NewPostgresStateBlockTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	roomAliases, err := PrepareRoomAliasesTable(ctx, db)
+	stateSnapshot, err := NewPostgresStateSnapshotTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	invites, err := PrepareInvitesTable(ctx, db)
+	purge, err := NewPostgresPurgeTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	membership, err := PrepareMembershipTable(ctx, db)
+	userRoomKeys, err := NewPostgresUserRoomKeysTable(ctx, cm)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	published, err := PreparePublishedTable(ctx, db)
+	reportedEvents, err := NewPostgresReportedEventsTable(ctx, cm)
 	if err != nil {
-		return err
-	}
-	redactions, err := PrepareRedactionsTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	purge, err := PreparePurgeStatements(db)
-	if err != nil {
-		return err
-	}
-	userRoomKeys, err := PrepareUserRoomKeysTable(ctx, db)
-	if err != nil {
-		return err
-	}
-	reportedEvents, err := PrepareReportedEventsTable(ctx, db)
-	if err != nil {
-		return err
+		return nil, err
 	}
 
 	d.Database = shared.Database{
-		DB: db,
 		EventDatabase: shared.EventDatabase{
-			DB:                  db,
+			Cm:                  cm,
 			Cache:               cache,
-			Writer:              writer,
 			EventsTable:         events,
-			EventJSONTable:      eventJSON,
+			EventJSONTable:      eventsJSON,
 			EventTypesTable:     eventTypes,
 			EventStateKeysTable: eventStateKeys,
 			PrevEventsTable:     prevEvents,
@@ -222,7 +113,6 @@ func (d *Database) prepare(ctx context.Context, db *sql.DB, writer sqlutil.Write
 			ReportedEventsTable: reportedEvents,
 		},
 		Cache:              cache,
-		Writer:             writer,
 		RoomsTable:         rooms,
 		StateBlockTable:    stateBlock,
 		StateSnapshotTable: stateSnapshot,
@@ -233,5 +123,5 @@ func (d *Database) prepare(ctx context.Context, db *sql.DB, writer sqlutil.Write
 		Purge:              purge,
 		UserRoomKeyTable:   userRoomKeys,
 	}
-	return nil
+	return &d, nil
 }

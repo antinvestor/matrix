@@ -17,15 +17,16 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
+// Schema for the event types table
 const eventTypesSchema = `
 -- Numeric versions of the event "type"s. Event types tend to be taken from a
 -- small internal pool. Assigning each a numeric ID should reduce the amount of
@@ -66,7 +67,10 @@ INSERT INTO roomserver_event_types (event_type_nid, event_type) VALUES
     (7, 'm.room.history_visibility') ON CONFLICT DO NOTHING;
 `
 
-// Assign a new numeric event type ID.
+// Schema revert script for migration purposes
+const eventTypesSchemaRevert = `DROP TABLE IF EXISTS roomserver_event_types;`
+
+// SQL for inserting a new event type and returning its numeric ID
 // The usual case is that the event type is not in the database.
 // In that case the ID will be assigned using the next value from the sequence.
 // We use `RETURNING` to tell postgres to return the assigned ID.
@@ -74,69 +78,84 @@ INSERT INTO roomserver_event_types (event_type_nid, event_type) VALUES
 // This will result in a conflict on the event_type_unique constraint, in this
 // case we do nothing. Postgresql won't return a row in that case so we rely on
 // the caller catching the sql.ErrNoRows error and running a select to get the row.
-// We could get postgresql to return the row on a conflict by updating the row
-// but it doesn't seem like a good idea to modify the rows just to make postgresql
-// return it. Modifying the rows will cause postgres to assign a new tuple for the
-// row even though the data doesn't change resulting in unncesssary modifications
-// to the indexes.
 const insertEventTypeNIDSQL = "" +
 	"INSERT INTO roomserver_event_types (event_type) VALUES ($1)" +
 	" ON CONFLICT ON CONSTRAINT roomserver_event_type_unique" +
 	" DO NOTHING RETURNING (event_type_nid)"
 
+// SQL to select a numeric ID for an event type
 const selectEventTypeNIDSQL = "" +
 	"SELECT event_type_nid FROM roomserver_event_types WHERE event_type = $1"
 
-// Bulk lookup from string event type to numeric ID for that event type.
+// SQL to bulk select numeric IDs for event types
 // Takes an array of strings as the query parameter.
 const bulkSelectEventTypeNIDSQL = "" +
 	"SELECT event_type, event_type_nid FROM roomserver_event_types" +
 	" WHERE event_type = ANY($1)"
 
-type eventTypeStatements struct {
-	insertEventTypeNIDStmt     *sql.Stmt
-	selectEventTypeNIDStmt     *sql.Stmt
-	bulkSelectEventTypeNIDStmt *sql.Stmt
+// eventTypesTable implements the tables.EventTypes interface using GORM
+type eventTypesTable struct {
+	cm *sqlutil.Connections
+
+	// SQL query strings loaded from constants
+	insertEventTypeNIDSQL     string
+	selectEventTypeNIDSQL     string
+	bulkSelectEventTypeNIDSQL string
 }
 
-func CreateEventTypesTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(eventTypesSchema)
-	return err
+// NewPostgresEventTypesTable creates a new event types table
+func NewPostgresEventTypesTable(ctx context.Context, cm *sqlutil.Connections) (tables.EventTypes, error) {
+	// Create the table if it doesn't exist using migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "roomserver_event_types_table_schema_001",
+		Patch:       eventTypesSchema,
+		RevertPatch: eventTypesSchemaRevert,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize the table struct with just the connection manager
+	t := &eventTypesTable{
+		cm: cm,
+
+		// Initialize SQL query strings from constants
+		insertEventTypeNIDSQL:     insertEventTypeNIDSQL,
+		selectEventTypeNIDSQL:     selectEventTypeNIDSQL,
+		bulkSelectEventTypeNIDSQL: bulkSelectEventTypeNIDSQL,
+	}
+
+	return t, nil
 }
 
-func PrepareEventTypesTable(ctx context.Context, db *sql.DB) (tables.EventTypes, error) {
-	s := &eventTypeStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
-		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
-		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
-	}.Prepare(db)
-}
-
-func (s *eventTypeStatements) InsertEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventType string,
+func (t *eventTypesTable) InsertEventTypeNID(
+	ctx context.Context, eventType string,
 ) (types.EventTypeNID, error) {
+	db := t.cm.Connection(ctx, false)
+
 	var eventTypeNID int64
-	stmt := sqlutil.TxStmt(txn, s.insertEventTypeNIDStmt)
-	err := stmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	row := db.Raw(t.insertEventTypeNIDSQL, eventType).Row()
+	err := row.Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) SelectEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventType string,
+func (t *eventTypesTable) SelectEventTypeNID(
+	ctx context.Context, eventType string,
 ) (types.EventTypeNID, error) {
+	db := t.cm.Connection(ctx, true)
+
 	var eventTypeNID int64
-	stmt := sqlutil.TxStmt(txn, s.selectEventTypeNIDStmt)
-	err := stmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID)
+	row := db.Raw(t.selectEventTypeNIDSQL, eventType).Row()
+	err := row.Scan(&eventTypeNID)
 	return types.EventTypeNID(eventTypeNID), err
 }
 
-func (s *eventTypeStatements) BulkSelectEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventTypes []string,
+func (t *eventTypesTable) BulkSelectEventTypeNID(
+	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventTypeNIDStmt)
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventTypes))
+	db := t.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(t.bulkSelectEventTypeNIDSQL, pq.StringArray(eventTypes)).Rows()
 	if err != nil {
 		return nil, err
 	}

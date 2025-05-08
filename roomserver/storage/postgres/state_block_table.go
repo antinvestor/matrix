@@ -17,7 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal"
@@ -25,10 +24,12 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
-const stateDataSchema = `
+// SQL schema for the state block table
+const stateBlockSchema = `
 -- The state data map.
 -- Designed to give enough information to run the state resolution algorithm
 -- without hitting the database in the internal case.
@@ -51,6 +52,14 @@ CREATE TABLE IF NOT EXISTS roomserver_state_block (
 );
 `
 
+// SQL query to revert the state block table schema
+const stateBlockSchemaRevert = `
+DROP TABLE IF EXISTS roomserver_state_block;
+DROP SEQUENCE IF EXISTS roomserver_state_block_nid_seq;
+`
+
+// SQL queries for the state block table
+
 // Insert a new state block. If we conflict on the hash column then
 // we must perform an update so that the RETURNING statement returns the
 // ID of the row that we conflicted with, so that we can then refer to
@@ -61,55 +70,89 @@ const insertStateDataSQL = "" +
 	" ON CONFLICT (state_block_hash) DO UPDATE SET event_nids=$2" +
 	" RETURNING state_block_nid"
 
+// Bulk select state block entries by their state block NIDs.
+// Sorting by state_block_nid means we can use binary search over the result
+// to lookup the event NIDs for a state block NID.
 const bulkSelectStateBlockEntriesSQL = "" +
 	"SELECT state_block_nid, event_nids" +
-	" FROM roomserver_state_block WHERE state_block_nid = ANY($1) ORDER BY state_block_nid ASC"
+	" FROM roomserver_state_block" +
+	" WHERE state_block_nid = ANY($1)" +
+	" ORDER BY state_block_nid ASC"
 
+// stateBlockStatements holds prepared SQL statements for the state block table.
 type stateBlockStatements struct {
-	insertStateDataStmt             *sql.Stmt
-	bulkSelectStateBlockEntriesStmt *sql.Stmt
+	cm *sqlutil.Connections
+
+	// SQL query string fields
+	insertStateDataSQL             string
+	bulkSelectStateBlockEntriesSQL string
 }
 
-func CreateStateBlockTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(stateDataSchema)
-	return err
+// NewPostgresStateBlockTable creates a new instance of the state block table.
+// If the table does not exist, it will be created.
+func NewPostgresStateBlockTable(ctx context.Context, cm *sqlutil.Connections) (tables.StateBlock, error) {
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "roomserver_state_block_schema_001",
+		Patch:       stateBlockSchema,
+		RevertPatch: stateBlockSchemaRevert,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s := &stateBlockStatements{
+		cm: cm,
+
+		insertStateDataSQL:             insertStateDataSQL,
+		bulkSelectStateBlockEntriesSQL: bulkSelectStateBlockEntriesSQL,
+	}
+
+	return s, nil
 }
 
-func PrepareStateBlockTable(ctx context.Context, db *sql.DB) (tables.StateBlock, error) {
-	s := &stateBlockStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertStateDataStmt, insertStateDataSQL},
-		{&s.bulkSelectStateBlockEntriesStmt, bulkSelectStateBlockEntriesSQL},
-	}.Prepare(db)
-}
-
+// BulkInsertStateData inserts a block of state data. Returns a state block ID.
 func (s *stateBlockStatements) BulkInsertStateData(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
 	entries types.StateEntries,
 ) (id types.StateBlockNID, err error) {
+	// Sort and deduplicate the entries
 	entries = entries[:util.SortAndUnique(entries)]
+
+	// Convert state entries to event NIDs
 	nids := make(types.EventNIDs, entries.Len())
 	for i := range entries {
 		nids[i] = entries[i].EventNID
 	}
-	stmt := sqlutil.TxStmt(txn, s.insertStateDataStmt)
-	err = stmt.QueryRowContext(
-		ctx, nids.Hash(), eventNIDsAsArray(nids),
-	).Scan(&id)
+
+	// Get a connection
+	db := s.cm.Connection(ctx, false)
+
+	// Insert the state data
+	err = db.Raw(s.insertStateDataSQL, nids.Hash(), pq.Array(nids)).Row().Scan(&id)
 	return
 }
 
+// BulkSelectStateBlockEntries retrieves multiple state block entries by their state block NIDs.
 func (s *stateBlockStatements) BulkSelectStateBlockEntries(
-	ctx context.Context, txn *sql.Tx, stateBlockNIDs types.StateBlockNIDs,
+	ctx context.Context, stateBlockNIDs types.StateBlockNIDs,
 ) ([][]types.EventNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateBlockEntriesStmt)
-	rows, err := stmt.QueryContext(ctx, stateBlockNIDsAsArray(stateBlockNIDs))
+	// Convert state block NIDs to int64 array
+	nids := make([]int64, len(stateBlockNIDs))
+	for i := range stateBlockNIDs {
+		nids[i] = int64(stateBlockNIDs[i])
+	}
+
+	// Get a connection
+	db := s.cm.Connection(ctx, true)
+
+	// Execute the query
+	rows, err := db.Raw(s.bulkSelectStateBlockEntriesSQL, pq.Array(nids)).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockEntries: rows.close() failed")
 
+	// Process the results
 	results := make([][]types.EventNID, len(stateBlockNIDs))
 	i := 0
 	var stateBlockNID types.StateBlockNID
@@ -131,12 +174,4 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 		return nil, fmt.Errorf("storage: state data NIDs missing from the database (%d != %d)", i, len(stateBlockNIDs))
 	}
 	return results, err
-}
-
-func stateBlockNIDsAsArray(stateBlockNIDs []types.StateBlockNID) pq.Int64Array {
-	nids := make([]int64, len(stateBlockNIDs))
-	for i := range stateBlockNIDs {
-		nids[i] = int64(stateBlockNIDs[i])
-	}
-	return nids
 }

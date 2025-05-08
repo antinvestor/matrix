@@ -21,10 +21,12 @@ import (
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/roomserver/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
+	"github.com/pitabwire/frame"
+	"gorm.io/gorm"
 )
 
+// Schema for the published table
 const publishedSchema = `
 -- Stores which rooms are published in the room directory
 CREATE TABLE IF NOT EXISTS roomserver_published (
@@ -40,87 +42,96 @@ CREATE TABLE IF NOT EXISTS roomserver_published (
 );
 `
 
+// Schema revert script for migration purposes
+const publishedSchemaRevert = `DROP TABLE IF EXISTS roomserver_published;`
+
+// SQL to insert or update a published room record
 const upsertPublishedSQL = "" +
 	"INSERT INTO roomserver_published (room_id, appservice_id, network_id, published) VALUES ($1, $2, $3, $4) " +
 	"ON CONFLICT (room_id, appservice_id, network_id) DO UPDATE SET published=$4"
 
-const selectAllPublishedSQL = "" +
+// SQL to select all published rooms
+var selectAllPublishedSQL = "" +
 	"SELECT room_id FROM roomserver_published WHERE published = $1 AND CASE WHEN $2 THEN 1=1 ELSE network_id = '' END ORDER BY room_id ASC"
 
+// SQL to select all published rooms for a specific network
 const selectNetworkPublishedSQL = "" +
 	"SELECT room_id FROM roomserver_published WHERE published = $1 AND network_id = $2 ORDER BY room_id ASC"
 
+// SQL to check if a room is published
 const selectPublishedSQL = "" +
 	"SELECT published FROM roomserver_published WHERE room_id = $1"
 
-type publishedStatements struct {
-	upsertPublishedStmt        *sql.Stmt
-	selectAllPublishedStmt     *sql.Stmt
-	selectPublishedStmt        *sql.Stmt
-	selectNetworkPublishedStmt *sql.Stmt
+// publishedTable implements the tables.Published interface using GORM
+type publishedTable struct {
+	cm *sqlutil.Connections
+
+	// SQL query strings loaded from constants
+	upsertPublishedSQL        string
+	selectAllPublishedSQL     string
+	selectPublishedSQL        string
+	selectNetworkPublishedSQL string
 }
 
-func CreatePublishedTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(publishedSchema)
+// NewPostgresPublishedTable creates a new published table
+func NewPostgresPublishedTable(ctx context.Context, cm *sqlutil.Connections) (tables.Published, error) {
+	// Create the table if it doesn't exist using migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "roomserver_published_table_schema_001",
+		Patch:       publishedSchema,
+		RevertPatch: publishedSchemaRevert,
+	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations([]sqlutil.Migration{
-		{
-			Version: "roomserver: published appservice",
-			Up:      deltas.UpPulishedAppservice,
-		},
-		{
-			Version: "roomserver: published appservice pkey",
-			Up:      deltas.UpPulishedAppservicePrimaryKey,
-		},
-	}...)
-	return m.Up(ctx)
+
+	// Initialize the table struct with just the connection manager
+	t := &publishedTable{
+		cm: cm,
+
+		// Initialize SQL query strings from constants
+		upsertPublishedSQL:        upsertPublishedSQL,
+		selectAllPublishedSQL:     selectAllPublishedSQL,
+		selectPublishedSQL:        selectPublishedSQL,
+		selectNetworkPublishedSQL: selectNetworkPublishedSQL,
+	}
+
+	return t, nil
 }
 
-func PreparePublishedTable(ctx context.Context, db *sql.DB) (tables.Published, error) {
-	s := &publishedStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.upsertPublishedStmt, upsertPublishedSQL},
-		{&s.selectAllPublishedStmt, selectAllPublishedSQL},
-		{&s.selectPublishedStmt, selectPublishedSQL},
-		{&s.selectNetworkPublishedStmt, selectNetworkPublishedSQL},
-	}.Prepare(db)
-}
-
-func (s *publishedStatements) UpsertRoomPublished(
-	ctx context.Context, txn *sql.Tx, roomID, appserviceID, networkID string, published bool,
+func (t *publishedTable) UpsertRoomPublished(
+	ctx context.Context, roomID, appserviceID, networkID string, published bool,
 ) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.upsertPublishedStmt)
-	_, err = stmt.ExecContext(ctx, roomID, appserviceID, networkID, published)
-	return
+	db := t.cm.Connection(ctx, false)
+
+	result := db.Exec(t.upsertPublishedSQL, roomID, appserviceID, networkID, published)
+	return result.Error
 }
 
-func (s *publishedStatements) SelectPublishedFromRoomID(
-	ctx context.Context, txn *sql.Tx, roomID string,
+func (t *publishedTable) SelectPublishedFromRoomID(
+	ctx context.Context, roomID string,
 ) (published bool, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectPublishedStmt)
-	err = stmt.QueryRowContext(ctx, roomID).Scan(&published)
-	if errors.Is(err, sql.ErrNoRows) {
+	db := t.cm.Connection(ctx, true)
+
+	row := db.Raw(t.selectPublishedSQL, roomID).Row()
+	err = row.Scan(&published)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return false, nil
 	}
 	return
 }
 
-func (s *publishedStatements) SelectAllPublishedRooms(
-	ctx context.Context, txn *sql.Tx, networkID string, published, includeAllNetworks bool,
+func (t *publishedTable) SelectAllPublishedRooms(
+	ctx context.Context, networkID string, published, includeAllNetworks bool,
 ) ([]string, error) {
+	db := t.cm.Connection(ctx, true)
+
 	var rows *sql.Rows
 	var err error
 	if networkID != "" {
-		stmt := sqlutil.TxStmt(txn, s.selectNetworkPublishedStmt)
-		rows, err = stmt.QueryContext(ctx, published, networkID)
+		rows, err = db.Raw(t.selectNetworkPublishedSQL, published, networkID).Rows()
 	} else {
-		stmt := sqlutil.TxStmt(txn, s.selectAllPublishedStmt)
-		rows, err = stmt.QueryContext(ctx, published, includeAllNetworks)
-
+		rows, err = db.Raw(t.selectAllPublishedSQL, published, includeAllNetworks).Rows()
 	}
 	if err != nil {
 		return nil, err

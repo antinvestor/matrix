@@ -82,7 +82,7 @@ func main() {
 	}
 
 	fmt.Println("Opening database")
-	roomserverDB, err := storage.Open(ctx, cm, &dbOpts, caches)
+	roomserverDB, err := storage.NewDatabase(ctx, cm, &dbOpts, caches)
 	if err != nil {
 		panic(err)
 	}
