@@ -29,8 +29,10 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
+	"github.com/pitabwire/frame"
 )
 
+// userDailyVisitsSchema defines the schema for user daily visits
 const userDailyVisitsSchema = `
 CREATE TABLE IF NOT EXISTS userapi_daily_visits (
     localpart TEXT NOT NULL,
@@ -45,6 +47,15 @@ CREATE INDEX IF NOT EXISTS userapi_daily_visits_timestamp_idx ON userapi_daily_v
 CREATE INDEX IF NOT EXISTS userapi_daily_visits_localpart_timestamp_idx ON userapi_daily_visits(localpart, timestamp);
 `
 
+// userDailyVisitsSchemaRevert defines how to revert the user daily visits schema
+const userDailyVisitsSchemaRevert = `
+DROP INDEX IF EXISTS userapi_daily_visits_localpart_timestamp_idx;
+DROP INDEX IF EXISTS userapi_daily_visits_timestamp_idx;
+DROP INDEX IF EXISTS userapi_daily_visits_localpart_device_timestamp_idx;
+DROP TABLE IF EXISTS userapi_daily_visits;
+`
+
+// messagesDailySchema defines the schema for daily message statistics
 const messagesDailySchema = `
 CREATE TABLE IF NOT EXISTS userapi_daily_stats (
 	timestamp BIGINT NOT NULL,
@@ -59,6 +70,12 @@ CREATE TABLE IF NOT EXISTS userapi_daily_stats (
 );
 `
 
+// messagesDailySchemaRevert defines how to revert the daily message statistics schema
+const messagesDailySchemaRevert = `
+DROP TABLE IF EXISTS userapi_daily_stats;
+`
+
+// SQL query constants
 const upsertDailyMessagesSQL = `
 	INSERT INTO userapi_daily_stats AS u (timestamp, server_name, messages, sent_messages, e2ee_messages, sent_e2ee_messages, active_rooms, active_e2ee_rooms)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT ON CONSTRAINT daily_stats_unique
@@ -191,53 +208,66 @@ ON CONFLICT (localpart, device_id, timestamp) DO NOTHING
 
 const queryDBEngineVersion = "SHOW server_version;"
 
-type statsStatements struct {
-	serverName                    spec.ServerName
-	lastUpdate                    time.Time
-	countUsersLastSeenAfterStmt   *sql.Stmt
-	countR30UsersStmt             *sql.Stmt
-	countR30UsersV2Stmt           *sql.Stmt
-	updateUserDailyVisitsStmt     *sql.Stmt
-	countUserByAccountTypeStmt    *sql.Stmt
-	countRegisteredUserByTypeStmt *sql.Stmt
-	dbEngineVersionStmt           *sql.Stmt
-	upsertMessagesStmt            *sql.Stmt
-	selectDailyMessagesStmt       *sql.Stmt
+type statsTable struct {
+	cm                        *sqlutil.Connections
+	serverName                spec.ServerName
+	lastUpdate                time.Time
+	countUsersLastSeenAfter   string
+	countR30Users             string
+	countR30UsersV2           string
+	updateUserDailyVisits     string
+	countUserByAccountType    string
+	countRegisteredUserByType string
+	dbEngineVersion           string
+	upsertMessages            string
+	selectDailyMessages       string
 }
 
-func NewPostgresStatsTable(ctx context.Context, db *sql.DB, serverName spec.ServerName) (tables.StatsTable, error) {
-	s := &statsStatements{
-		serverName: serverName,
-		lastUpdate: time.Now(),
+func NewPostgresStatsTable(ctx context.Context, cm *sqlutil.Connections, serverName spec.ServerName) (tables.StatsTable, error) {
+	// Perform schema migrations first
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "userapi_daily_visits_table_schema_001",
+		Patch:       userDailyVisitsSchema,
+		RevertPatch: userDailyVisitsSchemaRevert,
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	_, err := db.Exec(userDailyVisitsSchema)
+	err = cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "userapi_daily_stats_table_schema_001",
+		Patch:       messagesDailySchema,
+		RevertPatch: messagesDailySchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	_, err = db.Exec(messagesDailySchema)
-	if err != nil {
-		return nil, err
+
+	// Create table implementation after migrations are successful
+	s := &statsTable{
+		cm:                        cm,
+		serverName:                serverName,
+		lastUpdate:                time.Now(),
+		countUsersLastSeenAfter:   countUsersLastSeenAfterSQL,
+		countR30Users:             countR30UsersSQL,
+		countR30UsersV2:           countR30UsersV2SQL,
+		updateUserDailyVisits:     updateUserDailyVisitsSQL,
+		countUserByAccountType:    countUserByAccountTypeSQL,
+		countRegisteredUserByType: countRegisteredUserByTypeStmt,
+		dbEngineVersion:           queryDBEngineVersion,
+		upsertMessages:            upsertDailyMessagesSQL,
+		selectDailyMessages:       selectDailyMessagesSQL,
 	}
+
 	go s.startTimers(ctx)
-	return s, sqlutil.StatementList{
-		{&s.countUsersLastSeenAfterStmt, countUsersLastSeenAfterSQL},
-		{&s.countR30UsersStmt, countR30UsersSQL},
-		{&s.countR30UsersV2Stmt, countR30UsersV2SQL},
-		{&s.updateUserDailyVisitsStmt, updateUserDailyVisitsSQL},
-		{&s.countUserByAccountTypeStmt, countUserByAccountTypeSQL},
-		{&s.countRegisteredUserByTypeStmt, countRegisteredUserByTypeStmt},
-		{&s.dbEngineVersionStmt, queryDBEngineVersion},
-		{&s.upsertMessagesStmt, upsertDailyMessagesSQL},
-		{&s.selectDailyMessagesStmt, selectDailyMessagesSQL},
-	}.Prepare(db)
+	return s, nil
 }
 
-func (s *statsStatements) startTimers(ctx context.Context) {
+func (s *statsTable) startTimers(ctx context.Context) {
 	var updateStatsFunc func()
 	updateStatsFunc = func() {
 		logrus.Infof("Executing UpdateUserDailyVisits")
-		if err := s.UpdateUserDailyVisits(ctx, nil, time.Now(), s.lastUpdate); err != nil {
+		if err := s.UpdateUserDailyVisits(ctx, time.Now(), s.lastUpdate); err != nil {
 			logrus.WithError(err).Error("failed to update daily user visits")
 		}
 		time.AfterFunc(time.Hour*3, updateStatsFunc)
@@ -245,36 +275,34 @@ func (s *statsStatements) startTimers(ctx context.Context) {
 	time.AfterFunc(time.Minute*5, updateStatsFunc)
 }
 
-func (s *statsStatements) allUsers(ctx context.Context, txn *sql.Tx) (result int64, err error) {
-	stmt := sqlutil.TxStmt(txn, s.countUserByAccountTypeStmt)
-	err = stmt.QueryRowContext(ctx,
+func (s *statsTable) allUsers(ctx context.Context) (result int64, err error) {
+	db := s.cm.Connection(ctx, true)
+	err = db.Raw(s.countUserByAccountType,
 		pq.Int64Array{
 			int64(api.AccountTypeUser),
-			int64(api.AccountTypeGuest),
 			int64(api.AccountTypeAdmin),
+			int64(api.AccountTypeGuest),
 			int64(api.AccountTypeAppService),
-		},
-	).Scan(&result)
+		}).Scan(&result).Error
 	return
 }
 
-func (s *statsStatements) nonBridgedUsers(ctx context.Context, txn *sql.Tx) (result int64, err error) {
-	stmt := sqlutil.TxStmt(txn, s.countUserByAccountTypeStmt)
-	err = stmt.QueryRowContext(ctx,
+func (s *statsTable) nonBridgedUsers(ctx context.Context) (result int64, err error) {
+	db := s.cm.Connection(ctx, true)
+	err = db.Raw(s.countUserByAccountType,
 		pq.Int64Array{
 			int64(api.AccountTypeUser),
-			int64(api.AccountTypeGuest),
 			int64(api.AccountTypeAdmin),
-		},
-	).Scan(&result)
+			int64(api.AccountTypeGuest),
+		}).Scan(&result).Error
 	return
 }
 
-func (s *statsStatements) registeredUserByType(ctx context.Context, txn *sql.Tx) (map[string]int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.countRegisteredUserByTypeStmt)
-	registeredAfter := time.Now().AddDate(0, 0, -30)
+func (s *statsTable) registeredUserByType(ctx context.Context) (map[string]int64, error) {
+	db := s.cm.Connection(ctx, true)
 
-	rows, err := stmt.QueryContext(ctx,
+	registeredAfter := time.Now().AddDate(0, 0, -30)
+	rows, err := db.Raw(s.countRegisteredUserByType,
 		pq.Int64Array{
 			int64(api.AccountTypeUser),
 			int64(api.AccountTypeAdmin),
@@ -282,15 +310,18 @@ func (s *statsStatements) registeredUserByType(ctx context.Context, txn *sql.Tx)
 		},
 		api.AccountTypeGuest,
 		spec.AsTimestamp(registeredAfter),
-	)
+	).Rows()
 	if err != nil {
+		if !frame.DBErrorIsRecordNotFound(err) {
+			logrus.Error("Failed to get registered users: ", err)
+		}
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "RegisteredUserByType: failed to close rows")
+	defer internal.CloseAndLogIfError(ctx, rows, "registeredUserByType: rows.close() failed")
 
 	var userType string
 	var count int64
-	var result = make(map[string]int64)
+	result := make(map[string]int64)
 	for rows.Next() {
 		if err = rows.Scan(&userType, &count); err != nil {
 			return nil, err
@@ -301,55 +332,49 @@ func (s *statsStatements) registeredUserByType(ctx context.Context, txn *sql.Tx)
 	return result, rows.Err()
 }
 
-func (s *statsStatements) dailyUsers(ctx context.Context, txn *sql.Tx) (result int64, err error) {
-	stmt := sqlutil.TxStmt(txn, s.countUsersLastSeenAfterStmt)
+func (s *statsTable) dailyUsers(ctx context.Context) (result int64, err error) {
 	lastSeenAfter := time.Now().AddDate(0, 0, -1)
-	err = stmt.QueryRowContext(ctx,
-		spec.AsTimestamp(lastSeenAfter),
-	).Scan(&result)
+	db := s.cm.Connection(ctx, true)
+	row := db.Raw(s.countUsersLastSeenAfter, spec.AsTimestamp(lastSeenAfter)).Row()
+	err = row.Scan(&result)
 	return
 }
 
-func (s *statsStatements) monthlyUsers(ctx context.Context, txn *sql.Tx) (result int64, err error) {
-	stmt := sqlutil.TxStmt(txn, s.countUsersLastSeenAfterStmt)
+func (s *statsTable) monthlyUsers(ctx context.Context) (result int64, err error) {
 	lastSeenAfter := time.Now().AddDate(0, 0, -30)
-	err = stmt.QueryRowContext(ctx,
-		spec.AsTimestamp(lastSeenAfter),
-	).Scan(&result)
+	db := s.cm.Connection(ctx, true)
+	row := db.Raw(s.countUsersLastSeenAfter, spec.AsTimestamp(lastSeenAfter)).Row()
+	err = row.Scan(&result)
 	return
 }
 
-/*
-R30Users counts the number of 30 day retained users, defined as:
-- Users who have created their accounts more than 30 days ago
-- Where last seen at most 30 days ago
-- Where account creation and last_seen are > 30 days apart
-*/
-func (s *statsStatements) r30Users(ctx context.Context, txn *sql.Tx) (map[string]int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.countR30UsersStmt)
+// R30Users counts the number of 30 day retained users, defined as:
+// - Users who have created their accounts more than 30 days ago
+// - Where last seen at most 30 days ago
+// - Where account creation and last_seen are > 30 days apart
+func (s *statsTable) r30Users(ctx context.Context) (map[string]int64, error) {
+	db := s.cm.Connection(ctx, true)
+
 	lastSeenAfter := time.Now().AddDate(0, 0, -30)
 	diff := time.Hour * 24 * 30
 
-	rows, err := stmt.QueryContext(ctx,
-		spec.AsTimestamp(lastSeenAfter),
-		diff.Milliseconds(),
-	)
+	rows, err := db.Raw(s.countR30Users, spec.AsTimestamp(lastSeenAfter), diff.Milliseconds()).Rows()
+
 	if err != nil {
+		if !frame.DBErrorIsRecordNotFound(err) {
+			logrus.Error("Failed to get r30 users: ", err)
+		}
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "R30Users: failed to close rows")
+	defer internal.CloseAndLogIfError(ctx, rows, "r30Users: rows.close() failed")
 
 	var platform string
 	var count int64
-	var result = make(map[string]int64)
+	result := make(map[string]int64)
 	for rows.Next() {
 		if err = rows.Scan(&platform, &count); err != nil {
 			return nil, err
 		}
-		if platform == "unknown" {
-			continue
-		}
-		result["all"] += count
 		result[platform] = count
 	}
 
@@ -361,21 +386,21 @@ R30UsersV2 counts the number of 30 day retained users, defined as users that:
 - Appear more than once in the past 60 days
 - Have more than 30 days between the most and least recent appearances that occurred in the past 60 days.
 */
-func (s *statsStatements) r30UsersV2(ctx context.Context, txn *sql.Tx) (map[string]int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.countR30UsersV2Stmt)
+func (s *statsTable) r30UsersV2(ctx context.Context) (map[string]int64, error) {
 	sixtyDaysAgo := time.Now().AddDate(0, 0, -60)
 	diff := time.Hour * 24 * 30
 	tomorrow := time.Now().Add(time.Hour * 24)
 
-	rows, err := stmt.QueryContext(ctx,
+	db := s.cm.Connection(ctx, true)
+	rows, err := db.Raw(s.countR30UsersV2,
 		spec.AsTimestamp(sixtyDaysAgo),
 		spec.AsTimestamp(tomorrow),
 		diff.Milliseconds(),
-	)
+	).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "R30UsersV2: failed to close rows")
+	defer internal.CloseAndLogIfError(ctx, rows, "r30UsersV2: rows.close() failed")
 
 	var platform string
 	var count int64
@@ -403,7 +428,7 @@ func (s *statsStatements) r30UsersV2(ctx context.Context, txn *sql.Tx) (map[stri
 // UserStatistics collects some information about users on this instance.
 // Returns the stats itself as well as the database engine version and type.
 // On error, returns the stats collected up to the error.
-func (s *statsStatements) UserStatistics(ctx context.Context, txn *sql.Tx) (*types.UserStatistics, *types.DatabaseEngine, error) {
+func (s *statsTable) UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error) {
 	var (
 		stats = &types.UserStatistics{
 			R30UsersV2: map[string]int64{
@@ -419,87 +444,88 @@ func (s *statsStatements) UserStatistics(ctx context.Context, txn *sql.Tx) (*typ
 		dbEngine = &types.DatabaseEngine{Engine: "Postgres", Version: "unknown"}
 		err      error
 	)
-	stats.AllUsers, err = s.allUsers(ctx, txn)
+	stats.AllUsers, err = s.allUsers(ctx)
 	if err != nil {
 		return stats, dbEngine, err
 	}
-	stats.DailyUsers, err = s.dailyUsers(ctx, txn)
+	stats.DailyUsers, err = s.dailyUsers(ctx)
 	if err != nil {
 		return stats, dbEngine, err
 	}
-	stats.MonthlyUsers, err = s.monthlyUsers(ctx, txn)
+	stats.MonthlyUsers, err = s.monthlyUsers(ctx)
 	if err != nil {
 		return stats, dbEngine, err
 	}
-	stats.R30Users, err = s.r30Users(ctx, txn)
+	stats.R30Users, err = s.r30Users(ctx)
 	if err != nil {
 		return stats, dbEngine, err
 	}
-	stats.R30UsersV2, err = s.r30UsersV2(ctx, txn)
+	stats.R30UsersV2, err = s.r30UsersV2(ctx)
 	if err != nil {
 		return stats, dbEngine, err
 	}
-	stats.NonBridgedUsers, err = s.nonBridgedUsers(ctx, txn)
+	stats.NonBridgedUsers, err = s.nonBridgedUsers(ctx)
 	if err != nil {
 		return stats, dbEngine, err
 	}
-	stats.RegisteredUsersByType, err = s.registeredUserByType(ctx, txn)
+	stats.RegisteredUsersByType, err = s.registeredUserByType(ctx)
 	if err != nil {
 		return stats, dbEngine, err
 	}
 
-	stmt := sqlutil.TxStmt(txn, s.dbEngineVersionStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&dbEngine.Version)
+	db := s.cm.Connection(ctx, true)
+	row := db.Raw(s.dbEngineVersion).Row()
+	err = row.Scan(&dbEngine.Version)
 	return stats, dbEngine, err
 }
 
-func (s *statsStatements) UpdateUserDailyVisits(
-	ctx context.Context, txn *sql.Tx,
+func (s *statsTable) UpdateUserDailyVisits(
+	ctx context.Context,
 	startTime, lastUpdate time.Time,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.updateUserDailyVisitsStmt)
 	startTime = startTime.Truncate(time.Hour * 24)
 
 	// edge case
 	if startTime.After(s.lastUpdate) {
 		startTime = startTime.AddDate(0, 0, -1)
 	}
-	_, err := stmt.ExecContext(ctx,
-		spec.AsTimestamp(startTime),
+
+	db := s.cm.Connection(ctx, false)
+	err := db.Exec(s.updateUserDailyVisits, spec.AsTimestamp(startTime),
 		spec.AsTimestamp(lastUpdate),
 		spec.AsTimestamp(time.Now()),
-	)
+	).Error
 	if err == nil {
 		s.lastUpdate = time.Now()
 	}
 	return err
 }
 
-func (s *statsStatements) UpsertDailyStats(
-	ctx context.Context, txn *sql.Tx,
+func (s *statsTable) UpsertDailyStats(
+	ctx context.Context,
 	serverName spec.ServerName, stats types.MessageStats,
 	activeRooms, activeE2EERooms int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.upsertMessagesStmt)
+	db := s.cm.Connection(ctx, false)
 	timestamp := time.Now().Truncate(time.Hour * 24)
-	_, err := stmt.ExecContext(ctx,
+	err := db.Exec(s.upsertMessages,
 		spec.AsTimestamp(timestamp),
 		serverName,
 		stats.Messages, stats.SentMessages, stats.MessagesE2EE, stats.SentMessagesE2EE,
 		activeRooms, activeE2EERooms,
-	)
+	).Error
 	return err
 }
 
-func (s *statsStatements) DailyRoomsMessages(
-	ctx context.Context, txn *sql.Tx,
+func (s *statsTable) DailyRoomsMessages(
+	ctx context.Context,
 	serverName spec.ServerName,
 ) (msgStats types.MessageStats, activeRooms, activeE2EERooms int64, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectDailyMessagesStmt)
 	timestamp := time.Now().Truncate(time.Hour * 24)
 
-	err = stmt.QueryRowContext(ctx, serverName, spec.AsTimestamp(timestamp)).
-		Scan(&msgStats.Messages, &msgStats.SentMessages, &msgStats.MessagesE2EE, &msgStats.SentMessagesE2EE, &activeRooms, &activeE2EERooms)
+	db := s.cm.Connection(ctx, true)
+	row := db.Raw(s.selectDailyMessages, serverName, spec.AsTimestamp(timestamp)).Row()
+	err = row.Scan(&msgStats.Messages, &msgStats.SentMessages, &msgStats.MessagesE2EE, &msgStats.SentMessagesE2EE, &activeRooms, &activeE2EERooms)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return msgStats, 0, 0, err
 	}

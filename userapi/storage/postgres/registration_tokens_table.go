@@ -3,16 +3,17 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/pitabwire/frame"
 	"golang.org/x/exp/constraints"
 )
 
+// registrationTokensSchema defines the schema for registration tokens storage
 const registrationTokensSchema = `
 CREATE TABLE IF NOT EXISTS userapi_registration_tokens (
 	token TEXT PRIMARY KEY,
@@ -23,6 +24,12 @@ CREATE TABLE IF NOT EXISTS userapi_registration_tokens (
 );
 `
 
+// registrationTokensSchemaRevert defines the revert operation for the registration tokens schema
+const registrationTokensSchemaRevert = `
+DROP TABLE IF EXISTS userapi_registration_tokens;
+`
+
+// SQL query constants
 const selectTokenSQL = "" +
 	"SELECT token FROM userapi_registration_tokens WHERE token = $1"
 
@@ -56,45 +63,59 @@ const updateTokenUsesAllowedSQL = "" +
 const updateTokenExpiryTimeSQL = "" +
 	"UPDATE userapi_registration_tokens SET expiry_time = $2 WHERE token = $1"
 
-type registrationTokenStatements struct {
-	selectTokenStatement                         *sql.Stmt
-	insertTokenStatement                         *sql.Stmt
-	listAllTokensStatement                       *sql.Stmt
-	listValidTokensStatement                     *sql.Stmt
-	listInvalidTokenStatement                    *sql.Stmt
-	getTokenStatement                            *sql.Stmt
-	deleteTokenStatement                         *sql.Stmt
-	updateTokenUsesAllowedAndExpiryTimeStatement *sql.Stmt
-	updateTokenUsesAllowedStatement              *sql.Stmt
-	updateTokenExpiryTimeStatement               *sql.Stmt
+// registrationTokenTable represents a registration tokens table
+type registrationTokenTable struct {
+	cm                                  *sqlutil.Connections
+	selectToken                         string
+	insertToken                         string
+	listAllTokens                       string
+	listValidTokens                     string
+	listInvalidTokens                   string
+	getToken                            string
+	deleteToken                         string
+	updateTokenUsesAllowedAndExpiryTime string
+	updateTokenUsesAllowed              string
+	updateTokenExpiryTime               string
 }
 
-func NewPostgresRegistrationTokensTable(ctx context.Context, db *sql.DB) (tables.RegistrationTokensTable, error) {
-	s := &registrationTokenStatements{}
-	_, err := db.Exec(registrationTokensSchema)
+// NewPostgresRegistrationTokensTable creates a new postgres registration tokens table
+func NewPostgresRegistrationTokensTable(ctx context.Context, cm *sqlutil.Connections) (tables.RegistrationTokensTable, error) {
+	// Perform schema migration first
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "userapi_registration_tokens_table_schema_001",
+		Patch:       registrationTokensSchema,
+		RevertPatch: registrationTokensSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.selectTokenStatement, selectTokenSQL},
-		{&s.insertTokenStatement, insertTokenSQL},
-		{&s.listAllTokensStatement, listAllTokensSQL},
-		{&s.listValidTokensStatement, listValidTokensSQL},
-		{&s.listInvalidTokenStatement, listInvalidTokensSQL},
-		{&s.getTokenStatement, getTokenSQL},
-		{&s.deleteTokenStatement, deleteTokenSQL},
-		{&s.updateTokenUsesAllowedAndExpiryTimeStatement, updateTokenUsesAllowedAndExpiryTimeSQL},
-		{&s.updateTokenUsesAllowedStatement, updateTokenUsesAllowedSQL},
-		{&s.updateTokenExpiryTimeStatement, updateTokenExpiryTimeSQL},
-	}.Prepare(db)
+
+	// Create table implementation after migration is successful
+	s := &registrationTokenTable{
+		cm:                                  cm,
+		selectToken:                         selectTokenSQL,
+		insertToken:                         insertTokenSQL,
+		listAllTokens:                       listAllTokensSQL,
+		listValidTokens:                     listValidTokensSQL,
+		listInvalidTokens:                   listInvalidTokensSQL,
+		getToken:                            getTokenSQL,
+		deleteToken:                         deleteTokenSQL,
+		updateTokenUsesAllowedAndExpiryTime: updateTokenUsesAllowedAndExpiryTimeSQL,
+		updateTokenUsesAllowed:              updateTokenUsesAllowedSQL,
+		updateTokenExpiryTime:               updateTokenExpiryTimeSQL,
+	}
+
+	return s, nil
 }
 
-func (s *registrationTokenStatements) RegistrationTokenExists(ctx context.Context, tx *sql.Tx, token string) (bool, error) {
+// RegistrationTokenExists checks if a registration token exists in the database
+func (s *registrationTokenTable) RegistrationTokenExists(ctx context.Context, token string) (bool, error) {
 	var existingToken string
-	stmt := sqlutil.TxStmt(tx, s.selectTokenStatement)
-	err := stmt.QueryRowContext(ctx, token).Scan(&existingToken)
+	db := s.cm.Connection(ctx, true)
+	row := db.Raw(s.selectToken, token).Row()
+	err := row.Scan(&existingToken)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if frame.DBErrorIsRecordNotFound(err) {
 			return false, nil
 		}
 		return false, err
@@ -102,15 +123,16 @@ func (s *registrationTokenStatements) RegistrationTokenExists(ctx context.Contex
 	return true, nil
 }
 
-func (s *registrationTokenStatements) InsertRegistrationToken(ctx context.Context, tx *sql.Tx, registrationToken *api.RegistrationToken) (bool, error) {
-	stmt := sqlutil.TxStmt(tx, s.insertTokenStatement)
-	_, err := stmt.ExecContext(
-		ctx,
+// InsertRegistrationToken inserts a new registration token into the database
+func (s *registrationTokenTable) InsertRegistrationToken(ctx context.Context, registrationToken *api.RegistrationToken) (bool, error) {
+	db := s.cm.Connection(ctx, false)
+	err := db.Exec(
+		s.insertToken,
 		*registrationToken.Token,
 		getInsertValue(registrationToken.UsesAllowed),
 		getInsertValue(registrationToken.ExpiryTime),
 		*registrationToken.Pending,
-		*registrationToken.Completed)
+		*registrationToken.Completed).Error
 	if err != nil {
 		return false, err
 	}
@@ -124,23 +146,23 @@ func getInsertValue[t constraints.Integer](in *t) any {
 	return *in
 }
 
-func (s *registrationTokenStatements) ListRegistrationTokens(ctx context.Context, tx *sql.Tx, returnAll bool, valid bool) ([]api.RegistrationToken, error) {
-	var stmt *sql.Stmt
+// ListRegistrationTokens lists all registration tokens in the database
+func (s *registrationTokenTable) ListRegistrationTokens(ctx context.Context, returnAll bool, valid bool) ([]api.RegistrationToken, error) {
 	var tokens []api.RegistrationToken
 	var tokenString string
 	var pending, completed, usesAllowed *int32
 	var expiryTime *int64
 	var rows *sql.Rows
 	var err error
+
+	db := s.cm.Connection(ctx, true)
+
 	if returnAll {
-		stmt = sqlutil.TxStmt(tx, s.listAllTokensStatement)
-		rows, err = stmt.QueryContext(ctx)
+		rows, err = db.Raw(s.listAllTokens).Rows()
 	} else if valid {
-		stmt = sqlutil.TxStmt(tx, s.listValidTokensStatement)
-		rows, err = stmt.QueryContext(ctx, time.Now().UnixNano()/int64(time.Millisecond))
+		rows, err = db.Raw(s.listValidTokens, time.Now().UnixNano()/int64(time.Millisecond)).Rows()
 	} else {
-		stmt = sqlutil.TxStmt(tx, s.listInvalidTokenStatement)
-		rows, err = stmt.QueryContext(ctx, time.Now().UnixNano()/int64(time.Millisecond))
+		rows, err = db.Raw(s.listInvalidTokens, time.Now().UnixNano()/int64(time.Millisecond)).Rows()
 	}
 	if err != nil {
 		return tokens, err
@@ -169,11 +191,13 @@ func (s *registrationTokenStatements) ListRegistrationTokens(ctx context.Context
 	return tokens, rows.Err()
 }
 
-func (s *registrationTokenStatements) GetRegistrationToken(ctx context.Context, tx *sql.Tx, tokenString string) (*api.RegistrationToken, error) {
-	stmt := sqlutil.TxStmt(tx, s.getTokenStatement)
+// GetRegistrationToken retrieves a registration token from the database
+func (s *registrationTokenTable) GetRegistrationToken(ctx context.Context, tokenString string) (*api.RegistrationToken, error) {
+	db := s.cm.Connection(ctx, true)
 	var pending, completed, usesAllowed *int32
 	var expiryTime *int64
-	err := stmt.QueryRowContext(ctx, tokenString).Scan(&pending, &completed, &usesAllowed, &expiryTime)
+	row := db.Raw(s.getToken, tokenString).Row()
+	err := row.Scan(&pending, &completed, &usesAllowed, &expiryTime)
 	if err != nil {
 		return nil, err
 	}
@@ -187,37 +211,39 @@ func (s *registrationTokenStatements) GetRegistrationToken(ctx context.Context, 
 	return &token, nil
 }
 
-func (s *registrationTokenStatements) DeleteRegistrationToken(ctx context.Context, tx *sql.Tx, tokenString string) error {
-	stmt := sqlutil.TxStmt(tx, s.deleteTokenStatement)
-	_, err := stmt.ExecContext(ctx, tokenString)
+// DeleteRegistrationToken deletes a registration token from the database
+func (s *registrationTokenTable) DeleteRegistrationToken(ctx context.Context, tokenString string) error {
+	db := s.cm.Connection(ctx, false)
+	err := db.Exec(s.deleteToken, tokenString).Error
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *registrationTokenStatements) UpdateRegistrationToken(ctx context.Context, tx *sql.Tx, tokenString string, newAttributes map[string]interface{}) (*api.RegistrationToken, error) {
-	var stmt *sql.Stmt
+// UpdateRegistrationToken updates a registration token in the database
+func (s *registrationTokenTable) UpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (*api.RegistrationToken, error) {
+	db := s.cm.Connection(ctx, false)
+
 	usesAllowed, usesAllowedPresent := newAttributes["usesAllowed"]
 	expiryTime, expiryTimePresent := newAttributes["expiryTime"]
+
 	if usesAllowedPresent && expiryTimePresent {
-		stmt = sqlutil.TxStmt(tx, s.updateTokenUsesAllowedAndExpiryTimeStatement)
-		_, err := stmt.ExecContext(ctx, tokenString, usesAllowed, expiryTime)
+		err := db.Exec(s.updateTokenUsesAllowedAndExpiryTime, tokenString, usesAllowed, expiryTime).Error
 		if err != nil {
 			return nil, err
 		}
 	} else if usesAllowedPresent {
-		stmt = sqlutil.TxStmt(tx, s.updateTokenUsesAllowedStatement)
-		_, err := stmt.ExecContext(ctx, tokenString, usesAllowed)
+		err := db.Exec(s.updateTokenUsesAllowed, tokenString, usesAllowed).Error
 		if err != nil {
 			return nil, err
 		}
 	} else if expiryTimePresent {
-		stmt = sqlutil.TxStmt(tx, s.updateTokenExpiryTimeStatement)
-		_, err := stmt.ExecContext(ctx, tokenString, expiryTime)
+		err := db.Exec(s.updateTokenExpiryTime, tokenString, expiryTime).Error
 		if err != nil {
 			return nil, err
 		}
 	}
-	return s.GetRegistrationToken(ctx, tx, tokenString)
+
+	return s.GetRegistrationToken(ctx, tokenString)
 }

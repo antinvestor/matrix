@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 
 	"github.com/sirupsen/logrus"
@@ -26,9 +25,10 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/pitabwire/frame"
 )
 
-// See https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-pushers
+// pushersSchema defines the schema for pushers storage
 const pushersSchema = `
 CREATE TABLE IF NOT EXISTS userapi_pushers (
 	id BIGSERIAL PRIMARY KEY,
@@ -57,6 +57,15 @@ CREATE INDEX IF NOT EXISTS userapi_pusher_localpart_idx ON userapi_pushers(local
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_pusher_app_id_pushkey_localpart_idx ON userapi_pushers(app_id, pushkey, localpart, server_name);
 `
 
+// pushersSchemaRevert defines the revert operation for the pushers schema
+const pushersSchemaRevert = `
+DROP INDEX IF EXISTS userapi_pusher_app_id_pushkey_localpart_idx;
+DROP INDEX IF EXISTS userapi_pusher_localpart_idx;
+DROP INDEX IF EXISTS userapi_pusher_app_id_pushkey_idx;
+DROP TABLE IF EXISTS userapi_pushers;
+`
+
+// SQL query constants
 const insertPusherSQL = "" +
 	"INSERT INTO userapi_pushers (localpart, server_name, session_id, pushkey, pushkey_ts_ms, kind, app_id, app_display_name, device_display_name, profile_tag, lang, data)" +
 	"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)" +
@@ -71,45 +80,60 @@ const deletePusherSQL = "" +
 const deletePushersByAppIdAndPushKeySQL = "" +
 	"DELETE FROM userapi_pushers WHERE app_id = $1 AND pushkey = $2"
 
-func NewPostgresPusherTable(ctx context.Context, db *sql.DB) (tables.PusherTable, error) {
-	s := &pushersStatements{}
-	_, err := db.Exec(pushersSchema)
+// pushersTable represents a pushers table for user data
+type pushersTable struct {
+	cm                             *sqlutil.Connections
+	insertPusher                   string
+	selectPushers                  string
+	deletePusher                   string
+	deletePushersByAppIdAndPushKey string
+}
+
+// NewPostgresPusherTable creates a new postgres pusher table
+func NewPostgresPusherTable(ctx context.Context, cm *sqlutil.Connections) (tables.PusherTable, error) {
+	// Perform schema migration first
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "userapi_pushers_table_schema_001",
+		Patch:       pushersSchema,
+		RevertPatch: pushersSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertPusherStmt, insertPusherSQL},
-		{&s.selectPushersStmt, selectPushersSQL},
-		{&s.deletePusherStmt, deletePusherSQL},
-		{&s.deletePushersByAppIdAndPushKeyStmt, deletePushersByAppIdAndPushKeySQL},
-	}.Prepare(db)
+
+	// Create table implementation after migration is successful
+	s := &pushersTable{
+		cm:                             cm,
+		insertPusher:                   insertPusherSQL,
+		selectPushers:                  selectPushersSQL,
+		deletePusher:                   deletePusherSQL,
+		deletePushersByAppIdAndPushKey: deletePushersByAppIdAndPushKeySQL,
+	}
+
+	return s, nil
 }
 
-type pushersStatements struct {
-	insertPusherStmt                   *sql.Stmt
-	selectPushersStmt                  *sql.Stmt
-	deletePusherStmt                   *sql.Stmt
-	deletePushersByAppIdAndPushKeyStmt *sql.Stmt
-}
-
-// insertPusher creates a new pusher.
+// InsertPusher creates a new pusher.
 // Returns an error if the user already has a pusher with the given pusher pushkey.
 // Returns nil error success.
-func (s *pushersStatements) InsertPusher(
-	ctx context.Context, txn *sql.Tx, session_id int64,
+func (s *pushersTable) InsertPusher(
+	ctx context.Context, session_id int64,
 	pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data,
 	localpart string, serverName spec.ServerName,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.insertPusherStmt).ExecContext(ctx, localpart, serverName, session_id, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
-	return err
+	db := s.cm.Connection(ctx, false)
+	res := db.Exec(s.insertPusher, localpart, serverName, session_id, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
+	return res.Error
 }
 
-func (s *pushersStatements) SelectPushers(
-	ctx context.Context, txn *sql.Tx,
+// SelectPushers returns all pushers for the given user.
+func (s *pushersTable) SelectPushers(
+	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 ) ([]api.Pusher, error) {
 	pushers := []api.Pusher{}
-	rows, err := sqlutil.TxStmt(txn, s.selectPushersStmt).QueryContext(ctx, localpart, serverName)
+	db := s.cm.Connection(ctx, true)
+	rows, err := db.Raw(s.selectPushers, localpart, serverName).Rows()
 
 	if err != nil {
 		return pushers, err
@@ -144,18 +168,21 @@ func (s *pushersStatements) SelectPushers(
 	return pushers, rows.Err()
 }
 
-// deletePusher removes a single pusher by pushkey and user localpart.
-func (s *pushersStatements) DeletePusher(
-	ctx context.Context, txn *sql.Tx, appid, pushkey,
+// DeletePusher removes a single pusher by pushkey and user localpart.
+func (s *pushersTable) DeletePusher(
+	ctx context.Context, appid, pushkey,
 	localpart string, serverName spec.ServerName,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.deletePusherStmt).ExecContext(ctx, appid, pushkey, localpart, serverName)
-	return err
+	db := s.cm.Connection(ctx, false)
+	res := db.Exec(s.deletePusher, appid, pushkey, localpart, serverName)
+	return res.Error
 }
 
-func (s *pushersStatements) DeletePushers(
-	ctx context.Context, txn *sql.Tx, appid, pushkey string,
+// DeletePushers removes all pushers matching the given app ID and pushkey.
+func (s *pushersTable) DeletePushers(
+	ctx context.Context, appid, pushkey string,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.deletePushersByAppIdAndPushKeyStmt).ExecContext(ctx, appid, pushkey)
-	return err
+	db := s.cm.Connection(ctx, false)
+	res := db.Exec(s.deletePushersByAppIdAndPushKey, appid, pushkey)
+	return res.Error
 }

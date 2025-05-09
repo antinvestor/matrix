@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -25,9 +24,11 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
+	"github.com/pitabwire/frame"
 )
 
-var crossSigningKeysSchema = `
+// crossSigningKeysSchema defines the schema for the cross signing keys table.
+const crossSigningKeysSchema = `
 CREATE TABLE IF NOT EXISTS keyserver_cross_signing_keys (
     user_id TEXT NOT NULL,
 	key_type SMALLINT NOT NULL,
@@ -36,43 +37,61 @@ CREATE TABLE IF NOT EXISTS keyserver_cross_signing_keys (
 );
 `
 
+// crossSigningKeysSchemaRevert defines how to revert the cross signing keys table schema.
+const crossSigningKeysSchemaRevert = `
+DROP TABLE IF EXISTS keyserver_cross_signing_keys;
+`
+
+// selectCrossSigningKeysForUserSQL is used to retrieve cross signing keys for a specific user.
 const selectCrossSigningKeysForUserSQL = "" +
 	"SELECT key_type, key_data FROM keyserver_cross_signing_keys" +
 	" WHERE user_id = $1"
 
+// upsertCrossSigningKeysForUserSQL is used to insert or update cross signing keys for a specific user.
 const upsertCrossSigningKeysForUserSQL = "" +
 	"INSERT INTO keyserver_cross_signing_keys (user_id, key_type, key_data)" +
 	" VALUES($1, $2, $3)" +
 	" ON CONFLICT (user_id, key_type) DO UPDATE SET key_data = $3"
 
-type crossSigningKeysStatements struct {
-	db                                *sql.DB
-	selectCrossSigningKeysForUserStmt *sql.Stmt
-	upsertCrossSigningKeysForUserStmt *sql.Stmt
+type crossSigningKeysTable struct {
+	cm                               *sqlutil.Connections
+	selectCrossSigningKeysForUserSQL string
+	upsertCrossSigningKeysForUserSQL string
 }
 
-func NewPostgresCrossSigningKeysTable(ctx context.Context, db *sql.DB) (tables.CrossSigningKeys, error) {
-	s := &crossSigningKeysStatements{
-		db: db,
-	}
-	_, err := db.Exec(crossSigningKeysSchema)
+// NewPostgresCrossSigningKeysTable creates a new postgres cross signing keys table.
+func NewPostgresCrossSigningKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.CrossSigningKeys, error) {
+
+	// Perform schema migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "keyserver_cross_signing_keys_table_schema_001",
+		Patch:       crossSigningKeysSchema,
+		RevertPatch: crossSigningKeysSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.selectCrossSigningKeysForUserStmt, selectCrossSigningKeysForUserSQL},
-		{&s.upsertCrossSigningKeysForUserStmt, upsertCrossSigningKeysForUserSQL},
-	}.Prepare(db)
+
+	t := &crossSigningKeysTable{
+		cm:                               cm,
+		selectCrossSigningKeysForUserSQL: selectCrossSigningKeysForUserSQL,
+		upsertCrossSigningKeysForUserSQL: upsertCrossSigningKeysForUserSQL,
+	}
+
+	return t, nil
 }
 
-func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
-	ctx context.Context, txn *sql.Tx, userID string,
+// SelectCrossSigningKeysForUser retrieves cross signing keys for a specific user.
+func (t *crossSigningKeysTable) SelectCrossSigningKeysForUser(
+	ctx context.Context, userID string,
 ) (r types.CrossSigningKeyMap, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningKeysForUserStmt).QueryContext(ctx, userID)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectCrossSigningKeysForUserSQL, userID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningKeysForUserStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningKeysForUser: rows.close() failed")
+
 	r = types.CrossSigningKeyMap{}
 	for rows.Next() {
 		var keyTypeInt int16
@@ -90,15 +109,18 @@ func (s *crossSigningKeysStatements) SelectCrossSigningKeysForUser(
 	return
 }
 
-func (s *crossSigningKeysStatements) UpsertCrossSigningKeysForUser(
-	ctx context.Context, txn *sql.Tx, userID string, keyType fclient.CrossSigningKeyPurpose, keyData spec.Base64Bytes,
+// UpsertCrossSigningKeysForUser inserts or updates cross signing keys for a specific user.
+func (t *crossSigningKeysTable) UpsertCrossSigningKeysForUser(
+	ctx context.Context, userID string, keyType fclient.CrossSigningKeyPurpose, keyData spec.Base64Bytes,
 ) error {
 	keyTypeInt, ok := types.KeyTypePurposeToInt[keyType]
 	if !ok {
 		return fmt.Errorf("unknown key purpose %q", keyType)
 	}
-	if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningKeysForUserStmt).ExecContext(ctx, userID, keyTypeInt, keyData); err != nil {
-		return fmt.Errorf("s.upsertCrossSigningKeysForUserStmt: %w", err)
+
+	db := t.cm.Connection(ctx, false)
+	if err := db.Exec(t.upsertCrossSigningKeysForUserSQL, userID, keyTypeInt, keyData).Error; err != nil {
+		return fmt.Errorf("failed to upsert cross signing keys: %w", err)
 	}
 	return nil
 }

@@ -24,8 +24,10 @@ import (
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/pitabwire/frame"
 )
 
+// accountDataSchema defines the schema for account data table.
 const accountDataSchema = `
 -- Stores data about accounts data.
 CREATE TABLE IF NOT EXISTS userapi_account_datas (
@@ -43,53 +45,73 @@ CREATE TABLE IF NOT EXISTS userapi_account_datas (
 CREATE UNIQUE INDEX IF NOT EXISTS userapi_account_datas_idx ON userapi_account_datas(localpart, server_name, room_id, type);
 `
 
+// accountDataSchemaRevert defines the revert operation for account data schema.
+const accountDataSchemaRevert = `
+DROP TABLE IF EXISTS userapi_account_datas;
+`
+
+// insertAccountDataSQL is used to insert or update account data.
 const insertAccountDataSQL = `
 	INSERT INTO userapi_account_datas(localpart, server_name, room_id, type, content) VALUES($1, $2, $3, $4, $5)
 	ON CONFLICT (localpart, server_name, room_id, type) DO UPDATE SET content = EXCLUDED.content
 `
 
+// selectAccountDataSQL is used to retrieve all account data for a user.
 const selectAccountDataSQL = "" +
 	"SELECT room_id, type, content FROM userapi_account_datas WHERE localpart = $1 AND server_name = $2"
 
+// selectAccountDataByTypeSQL is used to retrieve account data of a specific type for a user.
 const selectAccountDataByTypeSQL = "" +
 	"SELECT content FROM userapi_account_datas WHERE localpart = $1 AND server_name = $2 AND room_id = $3 AND type = $4"
 
-type accountDataStatements struct {
-	insertAccountDataStmt       *sql.Stmt
-	selectAccountDataStmt       *sql.Stmt
-	selectAccountDataByTypeStmt *sql.Stmt
+// accountDataTable represents the account data table in the database.
+type accountDataTable struct {
+	cm                         *sqlutil.Connections
+	insertAccountDataSQL       string
+	selectAccountDataSQL       string
+	selectAccountDataByTypeSQL string
 }
 
-func NewPostgresAccountDataTable(ctx context.Context, db *sql.DB) (tables.AccountDataTable, error) {
-	s := &accountDataStatements{}
-	_, err := db.Exec(accountDataSchema)
+// NewPostgresAccountDataTable creates a new account data table object.
+func NewPostgresAccountDataTable(ctx context.Context, cm *sqlutil.Connections) (tables.AccountDataTable, error) {
+	t := &accountDataTable{
+		cm:                         cm,
+		insertAccountDataSQL:       insertAccountDataSQL,
+		selectAccountDataSQL:       selectAccountDataSQL,
+		selectAccountDataByTypeSQL: selectAccountDataByTypeSQL,
+	}
+
+	// Perform schema migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "userapi_account_datas_table_schema_001",
+		Patch:       accountDataSchema,
+		RevertPatch: accountDataSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertAccountDataStmt, insertAccountDataSQL},
-		{&s.selectAccountDataStmt, selectAccountDataSQL},
-		{&s.selectAccountDataByTypeStmt, selectAccountDataByTypeSQL},
-	}.Prepare(db)
+
+	return t, nil
 }
 
-func (s *accountDataStatements) InsertAccountData(
-	ctx context.Context, txn *sql.Tx,
+// InsertAccountData inserts a new account data entry for a user.
+func (t *accountDataTable) InsertAccountData(
+	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 	roomID, dataType string, content json.RawMessage,
 ) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.insertAccountDataStmt)
+	db := t.cm.Connection(ctx, false)
 	// Empty/nil json.RawMessage is not interpreted as "nil", so use *json.RawMessage
 	// when passing the data to trigger "NOT NULL" constraint
 	var data *json.RawMessage
 	if len(content) > 0 {
 		data = &content
 	}
-	_, err = stmt.ExecContext(ctx, localpart, serverName, roomID, dataType, data)
-	return
+	return db.Exec(t.insertAccountDataSQL, localpart, serverName, roomID, dataType, data).Error
 }
 
-func (s *accountDataStatements) SelectAccountData(
+// SelectAccountData retrieves all account data for a user.
+func (t *accountDataTable) SelectAccountData(
 	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 ) (
@@ -97,7 +119,8 @@ func (s *accountDataStatements) SelectAccountData(
 	/* rooms */ map[string]map[string]json.RawMessage,
 	error,
 ) {
-	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart, serverName)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectAccountDataSQL, localpart, serverName).Rows()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -128,14 +151,16 @@ func (s *accountDataStatements) SelectAccountData(
 	return global, rooms, rows.Err()
 }
 
-func (s *accountDataStatements) SelectAccountDataByType(
+// SelectAccountDataByType retrieves account data of a specific type for a user.
+func (t *accountDataTable) SelectAccountDataByType(
 	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 	roomID, dataType string,
 ) (data json.RawMessage, err error) {
 	var bytes []byte
-	stmt := s.selectAccountDataByTypeStmt
-	if err = stmt.QueryRowContext(ctx, localpart, serverName, roomID, dataType).Scan(&bytes); err != nil {
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectAccountDataByTypeSQL, localpart, serverName, roomID, dataType).Row()
+	if err = row.Scan(&bytes); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}

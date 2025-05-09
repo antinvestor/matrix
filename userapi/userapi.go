@@ -61,11 +61,14 @@ func NewInternalAPI(
 
 	pgClient := pushgateway.NewHTTPClient(dendriteCfg.UserAPI.PushGatewayDisableTLSValidation)
 
+	userapiCm, err := cm.FromOptions(ctx, &dendriteCfg.UserAPI.AccountDatabase)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to obtain accounts db connection manager")
+	}
 	db, err := storage.NewUserDatabase(
 		ctx,
 		profileCli,
-		cm,
-		&dendriteCfg.UserAPI.AccountDatabase,
+		userapiCm,
 		dendriteCfg.Global.ServerName,
 		dendriteCfg.UserAPI.BCryptCost,
 		dendriteCfg.UserAPI.OpenIDTokenLifetimeMS,
@@ -76,7 +79,11 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
-	keyDB, err := storage.NewKeyDatabase(ctx, cm, &dendriteCfg.KeyServer.Database)
+	keyCm, err := cm.FromOptions(ctx, &dendriteCfg.KeyServer.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to obtain key db connection manager")
+	}
+	keyDB, err := storage.NewKeyDatabase(ctx, keyCm)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key db")
 	}

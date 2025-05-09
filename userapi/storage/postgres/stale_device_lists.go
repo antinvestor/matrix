@@ -27,9 +27,11 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/pitabwire/frame"
 )
 
-var staleDeviceListsSchema = `
+// staleDeviceListsSchema defines the schema for the stale device lists table.
+const staleDeviceListsSchema = `
 -- Stores whether a user's device lists are stale or not.
 CREATE TABLE IF NOT EXISTS keyserver_stale_device_lists (
     user_id TEXT PRIMARY KEY NOT NULL,
@@ -41,63 +43,87 @@ CREATE TABLE IF NOT EXISTS keyserver_stale_device_lists (
 CREATE INDEX IF NOT EXISTS keyserver_stale_device_lists_idx ON keyserver_stale_device_lists (domain, is_stale);
 `
 
+// staleDeviceListsSchemaRevert defines how to revert the stale device lists table schema.
+const staleDeviceListsSchemaRevert = `
+DROP TABLE IF EXISTS keyserver_stale_device_lists;
+`
+
+// upsertStaleDeviceListSQL is used to insert or update a stale device list entry.
 const upsertStaleDeviceListSQL = "" +
 	"INSERT INTO keyserver_stale_device_lists (user_id, domain, is_stale, ts_added_secs)" +
 	" VALUES ($1, $2, $3, $4)" +
 	" ON CONFLICT (user_id)" +
 	" DO UPDATE SET is_stale = $3, ts_added_secs = $4"
 
+// selectStaleDeviceListsWithDomainsSQL is used to retrieve stale device lists for a specific domain.
 const selectStaleDeviceListsWithDomainsSQL = "" +
 	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2 ORDER BY ts_added_secs DESC"
 
+// selectStaleDeviceListsSQL is used to retrieve all stale device lists.
 const selectStaleDeviceListsSQL = "" +
 	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 ORDER BY ts_added_secs DESC"
 
+// deleteStaleDevicesSQL is used to delete stale device lists for the given user IDs.
 const deleteStaleDevicesSQL = "" +
 	"DELETE FROM keyserver_stale_device_lists WHERE user_id = ANY($1)"
 
-type staleDeviceListsStatements struct {
-	upsertStaleDeviceListStmt             *sql.Stmt
-	selectStaleDeviceListsWithDomainsStmt *sql.Stmt
-	selectStaleDeviceListsStmt            *sql.Stmt
-	deleteStaleDeviceListsStmt            *sql.Stmt
+type staleDeviceListsTable struct {
+	cm                                   *sqlutil.Connections
+	upsertStaleDeviceListSQL             string
+	selectStaleDeviceListsWithDomainsSQL string
+	selectStaleDeviceListsSQL            string
+	deleteStaleDevicesSQL                string
 }
 
-func NewPostgresStaleDeviceListsTable(ctx context.Context, db *sql.DB) (tables.StaleDeviceLists, error) {
-	s := &staleDeviceListsStatements{}
-	_, err := db.Exec(staleDeviceListsSchema)
+// NewPostgresStaleDeviceListsTable creates a new postgres stale device lists table.
+func NewPostgresStaleDeviceListsTable(ctx context.Context, cm *sqlutil.Connections) (tables.StaleDeviceLists, error) {
+	t := &staleDeviceListsTable{
+		cm:                                   cm,
+		upsertStaleDeviceListSQL:             upsertStaleDeviceListSQL,
+		selectStaleDeviceListsWithDomainsSQL: selectStaleDeviceListsWithDomainsSQL,
+		selectStaleDeviceListsSQL:            selectStaleDeviceListsSQL,
+		deleteStaleDevicesSQL:                deleteStaleDevicesSQL,
+	}
+
+	// Perform schema migration
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "keyserver_stale_device_lists_table_schema_001",
+		Patch:       staleDeviceListsSchema,
+		RevertPatch: staleDeviceListsSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.upsertStaleDeviceListStmt, upsertStaleDeviceListSQL},
-		{&s.selectStaleDeviceListsStmt, selectStaleDeviceListsSQL},
-		{&s.selectStaleDeviceListsWithDomainsStmt, selectStaleDeviceListsWithDomainsSQL},
-		{&s.deleteStaleDeviceListsStmt, deleteStaleDevicesSQL},
-	}.Prepare(db)
+
+	return t, nil
 }
 
-func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, userID string, isStale bool) error {
+// InsertStaleDeviceList inserts a stale device list entry for the given user ID.
+func (t *staleDeviceListsTable) InsertStaleDeviceList(ctx context.Context, userID string, isStale bool) error {
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return err
 	}
-	_, err = s.upsertStaleDeviceListStmt.ExecContext(ctx, userID, string(domain), isStale, spec.AsTimestamp(time.Now()))
-	return err
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.upsertStaleDeviceListSQL, userID, string(domain), isStale, spec.AsTimestamp(time.Now())).Error
 }
 
-func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []spec.ServerName) ([]string, error) {
+// SelectUserIDsWithStaleDeviceLists retrieves user IDs with stale device lists.
+func (t *staleDeviceListsTable) SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []spec.ServerName) ([]string, error) {
+	db := t.cm.Connection(ctx, true)
+
 	// we only query for 1 domain or all domains so optimise for those use cases
 	if len(domains) == 0 {
-		rows, err := s.selectStaleDeviceListsStmt.QueryContext(ctx, true)
+		rows, err := db.Raw(t.selectStaleDeviceListsSQL, true).Rows()
 		if err != nil {
 			return nil, err
 		}
 		return rowsToUserIDs(ctx, rows)
 	}
+
 	var result []string
 	for _, domain := range domains {
-		rows, err := s.selectStaleDeviceListsWithDomainsStmt.QueryContext(ctx, true, string(domain))
+		rows, err := db.Raw(t.selectStaleDeviceListsWithDomainsSQL, true, string(domain)).Rows()
 		if err != nil {
 			return nil, err
 		}
@@ -110,15 +136,15 @@ func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx conte
 	return result, nil
 }
 
-// DeleteStaleDeviceLists removes users from stale device lists
-func (s *staleDeviceListsStatements) DeleteStaleDeviceLists(
-	ctx context.Context, txn *sql.Tx, userIDs []string,
+// DeleteStaleDeviceLists removes users from stale device lists.
+func (t *staleDeviceListsTable) DeleteStaleDeviceLists(
+	ctx context.Context, userIDs []string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteStaleDeviceListsStmt)
-	_, err := stmt.ExecContext(ctx, pq.Array(userIDs))
-	return err
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.deleteStaleDevicesSQL, pq.Array(userIDs)).Error
 }
 
+// rowsToUserIDs converts SQL rows to a slice of user IDs.
 func rowsToUserIDs(ctx context.Context, rows *sql.Rows) (result []string, err error) {
 	defer internal.CloseAndLogIfError(ctx, rows, "closing rowsToUserIDs failed")
 	for rows.Next() {
