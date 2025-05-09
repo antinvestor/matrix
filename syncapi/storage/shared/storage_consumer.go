@@ -143,7 +143,7 @@ func (d *Database) SearchEvents(ctx context.Context, searchTerm string, roomIDs 
 }
 
 func (d *Database) ExcludeEventsFromSearchIndex(ctx context.Context, eventIDs []string) error {
-	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		return d.OutputEvents.ExcludeEventsFromSearchIndex(ctx, eventIDs)
 	})
 }
@@ -154,7 +154,7 @@ func (d *Database) ExcludeEventsFromSearchIndex(ctx context.Context, eventIDs []
 func (d *Database) AddInviteEvent(
 	ctx context.Context, inviteEvent *rstypes.HeaderedEvent,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	_ = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		sp, err = d.Invites.InsertInviteEvent(ctx, inviteEvent)
 		return err
 	})
@@ -166,7 +166,7 @@ func (d *Database) AddInviteEvent(
 func (d *Database) RetireInviteEvent(
 	ctx context.Context, inviteEventID string,
 ) (sp types.StreamPosition, err error) {
-	_ = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	_ = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		sp, err = d.Invites.DeleteInviteEvent(ctx, inviteEventID)
 		return err
 	})
@@ -179,7 +179,7 @@ func (d *Database) RetireInviteEvent(
 func (d *Database) AddPeek(
 	ctx context.Context, roomID, userID, deviceID string,
 ) (sp types.StreamPosition, err error) {
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		sp, err = d.Peeks.InsertPeek(ctx, roomID, userID, deviceID)
 		return err
 	})
@@ -192,7 +192,7 @@ func (d *Database) AddPeek(
 func (d *Database) DeletePeek(
 	ctx context.Context, roomID, userID, deviceID string,
 ) (sp types.StreamPosition, err error) {
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		sp, err = d.Peeks.DeletePeek(ctx, roomID, userID, deviceID)
 		return err
 	})
@@ -209,7 +209,7 @@ func (d *Database) DeletePeek(
 func (d *Database) DeletePeeks(
 	ctx context.Context, roomID, userID string,
 ) (sp types.StreamPosition, err error) {
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		sp, err = d.Peeks.DeletePeeks(ctx, roomID, userID)
 		return err
 	})
@@ -229,7 +229,7 @@ func (d *Database) DeletePeeks(
 func (d *Database) UpsertAccountData(
 	ctx context.Context, userID, roomID, dataType string,
 ) (sp types.StreamPosition, err error) {
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		sp, err = d.AccountData.InsertAccountData(ctx, userID, roomID, dataType)
 		return err
 	})
@@ -279,7 +279,7 @@ func (d *Database) WriteEvent(
 	transactionID *api.TransactionID, excludeFromSync bool,
 	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (pduPosition types.StreamPosition, returnErr error) {
-	returnErr = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	returnErr = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		var err error
 		ev.Visibility = historyVisibility
 		pos, err := d.OutputEvents.InsertEvent(
@@ -362,7 +362,7 @@ func (d *Database) PutFilter(
 ) (string, error) {
 	var filterID string
 	var err error
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		filterID, err = d.Filter.InsertFilter(ctx, filter, localpart)
 		return err
 	})
@@ -385,7 +385,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 
 	newEvent := &rstypes.HeaderedEvent{PDU: eventToRedact}
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		return d.OutputEvents.UpdateEventJSON(ctx, newEvent)
 	})
 	return err
@@ -492,7 +492,7 @@ func (d *Database) StoreNewSendForDeviceMessage(
 	}
 	// Delegate the database write task to the SendToDeviceWriter. It'll guarantee
 	// that we don't lock the table for writes in more than one place.
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		newPos, err = d.SendToDevice.InsertSendToDeviceMessage(
 			ctx, userID, deviceID, string(j),
 		)
@@ -508,7 +508,7 @@ func (d *Database) CleanSendToDeviceUpdates(
 	ctx context.Context,
 	userID, deviceID string, before types.StreamPosition,
 ) (err error) {
-	if err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	if err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		return d.SendToDevice.DeleteSendToDeviceMessages(ctx, userID, deviceID, before)
 	}); err != nil {
 		logrus.WithError(err).Errorf("Failed to clean up old send-to-device messages for user %q device %q", userID, deviceID)
@@ -545,7 +545,7 @@ func getMembershipFromEvent(ctx context.Context, ev gomatrixserverlib.PDU, userI
 
 // StoreReceipt stores user receipts
 func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp spec.Timestamp) (pos types.StreamPosition, err error) {
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		pos, err = d.Receipts.UpsertReceipt(ctx, roomId, receiptType, userId, eventId, timestamp)
 		return err
 	})
@@ -553,7 +553,7 @@ func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId
 }
 
 func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		pos, err = d.NotificationData.UpsertRoomUnreadCounts(ctx, userID, roomID, notificationCount, highlightCount)
 		return err
 	})
@@ -576,7 +576,7 @@ func (d *Database) IgnoresForUser(ctx context.Context, userID string) (*types.Ig
 }
 
 func (d *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
-	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		return d.Ignores.UpsertIgnores(ctx, userID, ignores)
 	})
 }
@@ -584,7 +584,7 @@ func (d *Database) UpdateIgnoresForUser(ctx context.Context, userID string, igno
 func (d *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS spec.Timestamp, fromSync bool) (types.StreamPosition, error) {
 	var pos types.StreamPosition
 	var err error
-	_ = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	_ = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		pos, err = d.Presence.UpsertPresence(ctx, userID, statusMsg, presence, lastActiveTS, fromSync)
 		return nil
 	})
@@ -625,7 +625,7 @@ func (d *Database) UpdateRelations(ctx context.Context, event *rstypes.HeaderedE
 	case content.Relations.RelationType == "":
 		return nil
 	default:
-		return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+		return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 			return d.Relations.InsertRelation(
 				ctx, event.RoomID().String(), content.Relations.EventID,
 				event.EventID(), event.Type(), content.Relations.RelationType,
@@ -635,7 +635,7 @@ func (d *Database) UpdateRelations(ctx context.Context, event *rstypes.HeaderedE
 }
 
 func (d *Database) RedactRelations(ctx context.Context, roomID, redactedEventID string) error {
-	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		return d.Relations.DeleteRelation(ctx, roomID, redactedEventID)
 	})
 }

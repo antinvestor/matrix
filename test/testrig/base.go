@@ -27,25 +27,25 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func NewService(t *testing.T) (context.Context, *frame.Service) {
+func newService(t *testing.T) (context.Context, *frame.Service) {
 	ctx := t.Context()
 	opts := []frame.Option{frame.NoopDriver()}
 	return frame.NewServiceWithContext(ctx, "Test Srv", opts...)
 }
 
-func NewServiceWithoutT() (context.Context, *frame.Service) {
+func newServiceWithoutT() (context.Context, *frame.Service) {
 	opts := []frame.Option{frame.NoopDriver()}
 	return frame.NewService("Test Srv", opts...)
 }
 
-func CreateConfig(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (*config.Matrix, func(ctx context.Context)) {
+func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.Dendrite, func(ctx context.Context), error) {
 
 	defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx, testOpts)
 	if err != nil {
-		t.Fatalf("Could not create default connections %s", err)
+		return nil, nil, err
 	}
 
-	var cfg config.Matrix
+	var cfg config.Dendrite
 	cfg.Defaults(defaultOpts)
 	cfg.FederationAPI.KeyPerspectives = nil
 
@@ -68,19 +68,21 @@ func CreateConfig(ctx context.Context, t *testing.T, testOpts test.DependancyOpt
 
 	return &cfg, func(ctx context.Context) {
 		closeDSConns(ctx)
-	}
+	}, nil
 }
 
-func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *frame.Service, *config.Matrix) {
+func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *frame.Service, *config.Dendrite) {
 
 	opts := test.DependancyOption{}
 	if len(testOpts) > 0 {
 		opts = testOpts[0]
 	}
 
-	ctx, srv := NewService(t)
-	cfg, clearConfig := CreateConfig(ctx, t, opts)
-
+	ctx, srv := newService(t)
+	cfg, clearConfig, err := CreateConfig(ctx, opts)
+	if err != nil {
+		t.Fatalf("Could not create default connections %s", err)
+	}
 	srv.AddCleanupMethod(clearConfig)
 
 	scfg := cfg.Global
@@ -90,4 +92,28 @@ func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *fr
 	srv.Init(srvOpts...)
 
 	return ctx, srv, cfg
+}
+
+func InitWithoutT(testOpts ...test.DependancyOption) (context.Context, *frame.Service, *config.Dendrite, error) {
+
+	opts := test.DependancyOption{}
+	if len(testOpts) > 0 {
+		opts = testOpts[0]
+	}
+
+	ctx, srv := newServiceWithoutT()
+	cfg, clearConfig, err := CreateConfig(ctx, opts)
+	if err != nil {
+		return ctx, nil, nil, err
+	}
+
+	srv.AddCleanupMethod(clearConfig)
+
+	scfg := cfg.Global
+
+	srvOpts := []frame.Option{frame.Config(&scfg), frame.Datastore(ctx)}
+
+	srv.Init(srvOpts...)
+
+	return ctx, srv, cfg, nil
 }

@@ -137,11 +137,9 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 
 	ctx, svc, cfg := testrig.Init(t, testOpts)
 	defer svc.Stop(ctx)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
 
 	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
@@ -243,11 +241,9 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 
 	ctx, svc, cfg := testrig.Init(t, testOpts)
 	defer svc.Stop(ctx)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
 
 	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
@@ -395,11 +391,9 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 
 	ctx, svc, cfg := testrig.Init(t, testOpts)
 	defer svc.Stop(ctx)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
 
 	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
@@ -495,11 +489,9 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 
 	ctx, svc, cfg := testrig.Init(t, testOpts)
 	defer svc.Stop(ctx)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
 
 	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
@@ -619,12 +611,10 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
 
 		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -896,11 +886,9 @@ func TestGetMembership(t *testing.T) {
 
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := caching.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -976,11 +964,9 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 
 	ctx, svc, cfg := testrig.Init(t, testOpts)
 	defer svc.Stop(ctx)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
 
 	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
@@ -1203,11 +1189,9 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 
 	ctx, svc, cfg := testrig.Init(t, testOpts)
 	defer svc.Stop(ctx)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
 
 	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
@@ -1347,14 +1331,12 @@ func TestUpdateRelations(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		t.Cleanup(closeRig)
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 
-		db, err := storage.NewSyncServerDatabase(ctx, cm, &cfg.SyncAPI.Database)
+		db, err := storage.NewSyncServerDatabase(ctx, cm)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1387,14 +1369,12 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	routers := httputil.NewRouters()
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, cfg := testrig.Init(t)
 	defer svc.Stop(ctx)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
 
 	cfg.SyncAPI.Fulltext.Enabled = true
 
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)

@@ -44,7 +44,7 @@ func (t *testFedClient) LookupRoomAlias(ctx context.Context, origin, s spec.Serv
 
 func TestPerformWakeupServers(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryFederationDatabase()
 
@@ -98,8 +98,9 @@ func TestPerformWakeupServers(t *testing.T) {
 
 func TestQueryRelayServers(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
+
 	testDB := test.NewInMemoryFederationDatabase()
 
 	server := spec.ServerName("wakeup")
@@ -142,7 +143,7 @@ func TestQueryRelayServers(t *testing.T) {
 
 func TestRemoveRelayServers(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	testDB := test.NewInMemoryFederationDatabase()
@@ -191,7 +192,7 @@ func TestRemoveRelayServers(t *testing.T) {
 
 func TestPerformDirectoryLookup(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	testDB := test.NewInMemoryFederationDatabase()
@@ -230,7 +231,7 @@ func TestPerformDirectoryLookup(t *testing.T) {
 
 func TestPerformDirectoryLookupRelaying(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	testDB := test.NewInMemoryFederationDatabase()

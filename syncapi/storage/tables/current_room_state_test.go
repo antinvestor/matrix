@@ -2,15 +2,14 @@ package tables_test
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
@@ -18,41 +17,33 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func newCurrentRoomStateTable(t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, *sql.DB, func()) {
+func newCurrentRoomStateTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, *sqlutil.Connections) {
 	t.Helper()
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
+
+	cm := sqlutil.NewConnectionManager(svc)
 
 	var tab tables.CurrentRoomState
-	tab, err = postgres.NewPostgresCurrentRoomStateTable(ctx, db)
+	tab, err := postgres.NewPostgresCurrentRoomStateTable(ctx, cm)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
-	return tab, db, closeDb
+	return tab, cm
 }
 
 func TestCurrentRoomStateTable(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
+
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, closeDb := newCurrentRoomStateTable(t, testOpts)
-		defer closeDb()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		tab, cm := newCurrentRoomStateTable(ctx, svc, t, testOpts)
+
 		events := room.CurrentState()
-		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
+		err := sqlutil.WithTransaction(ctx, cm, func(ctx context.Context) error {
 			for i, ev := range events {
 				ev.StateKeyResolved = ev.StateKey()
 				userID, err := spec.NewUserID(string(ev.SenderID()), true)
@@ -88,7 +79,7 @@ func TestCurrentRoomStateTable(t *testing.T) {
 				}
 			}
 
-			testCurrentState(t, ctx, txn, tab, room)
+			testCurrentState(ctx, t, tab, room)
 
 			return nil
 		})
@@ -98,7 +89,7 @@ func TestCurrentRoomStateTable(t *testing.T) {
 	})
 }
 
-func testCurrentState(t *testing.T, ctx context.Context, tab tables.CurrentRoomState, room *test.Room) {
+func testCurrentState(ctx context.Context, t *testing.T, tab tables.CurrentRoomState, room *test.Room) {
 	t.Run("test currentState", func(t *testing.T) {
 		// returns the complete state of the room with a default filter
 		filter := synctypes.DefaultStateFilter()

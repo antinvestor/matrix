@@ -81,21 +81,21 @@ SELECT MAX(id) FROM syncapi_send_to_device
 
 // sendToDeviceTable implements tables.SendToDevice
 type sendToDeviceTable struct {
-	cm                             *sqlutil.Connections
-	insertSendToDeviceMessageSQL   string
-	selectSendToDeviceMessagesSQL  string
-	deleteSendToDeviceMessagesSQL  string
-	selectMaxSendToDeviceIDSQL     string
+	cm                            *sqlutil.Connections
+	insertSendToDeviceMessageSQL  string
+	selectSendToDeviceMessagesSQL string
+	deleteSendToDeviceMessagesSQL string
+	selectMaxSendToDeviceIDSQL    string
 }
 
 // NewPostgresSendToDeviceTable creates a new send-to-device table
 func NewPostgresSendToDeviceTable(ctx context.Context, cm *sqlutil.Connections) (tables.SendToDevice, error) {
 	t := &sendToDeviceTable{
-		cm:                             cm,
-		insertSendToDeviceMessageSQL:   insertSendToDeviceMessageSQL,
-		selectSendToDeviceMessagesSQL:  selectSendToDeviceMessagesSQL,
-		deleteSendToDeviceMessagesSQL:  deleteSendToDeviceMessagesSQL,
-		selectMaxSendToDeviceIDSQL:     selectMaxSendToDeviceIDSQL,
+		cm:                            cm,
+		insertSendToDeviceMessageSQL:  insertSendToDeviceMessageSQL,
+		selectSendToDeviceMessagesSQL: selectSendToDeviceMessagesSQL,
+		deleteSendToDeviceMessagesSQL: deleteSendToDeviceMessagesSQL,
+		selectMaxSendToDeviceIDSQL:    selectMaxSendToDeviceIDSQL,
 	}
 
 	// Perform the migration

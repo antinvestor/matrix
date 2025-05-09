@@ -143,7 +143,7 @@ func (s *queuePDUTable) SelectQueuePDUReferenceJSONCount(
 	db := s.cm.Connection(ctx, true)
 	err := db.Raw(s.selectQueuePDUReferenceJSONCountSQL, jsonNID).Scan(&count).Error
 	if err != nil {
-		if frame.DBErrorIsRecordNotFound(err) {
+		if sqlutil.ErrorIsNoRows(err) {
 			// It's acceptable for there to be no rows referencing a given
 			// JSON NID but it's not an error condition. Just return as if
 			// there's a zero count.

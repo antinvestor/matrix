@@ -169,7 +169,7 @@ func main() {
 	httpClient := basepkg.CreateClient(cfg, dnsCache)
 
 	// prepare required dependencies
-	cm := sqlutil.NewConnectionManager(ctx, globalCfg.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(service)
 	routers := httputil.NewRouters()
 
 	globalCfg.Cache.EnablePrometheus = caching.EnableMetrics

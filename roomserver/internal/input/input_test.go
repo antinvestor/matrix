@@ -21,9 +21,8 @@ func TestSingleTransactionOnInput(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+
+		cm := sqlutil.NewConnectionManager(svc)
 
 		natsInstance := &jetstream.NATSInstance{}
 		js, jc := natsInstance.Prepare(ctx, &cfg.Global.JetStream)

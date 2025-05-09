@@ -80,7 +80,7 @@ func (s *mockDB) SelectMembershipForUser(ctx context.Context, roomID string, use
 //
 // This also aims to emulate "Only see history_visibility changes on bounadries" in sytest/tests/30rooms/30history-visibility.pl
 func Test_ApplyHistoryVisbility_Boundaries(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	roomID := "!roomid:domain"

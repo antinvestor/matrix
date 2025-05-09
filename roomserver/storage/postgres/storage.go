@@ -33,7 +33,6 @@ type Database struct {
 // NewDatabase a postgres database.
 func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
-	d.Cm = cm
 
 	eventsJSON, err := NewPostgresEventJSONTable(ctx, cm)
 	if err != nil {
@@ -112,6 +111,7 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.Roo
 			RedactionsTable:     redactions,
 			ReportedEventsTable: reportedEvents,
 		},
+		Cm:                 cm,
 		Cache:              cache,
 		RoomsTable:         rooms,
 		StateBlockTable:    stateBlock,

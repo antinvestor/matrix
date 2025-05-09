@@ -1,13 +1,13 @@
 package internal
 
 import (
+	"github.com/antinvestor/matrix/test"
 	"net/http"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
 
-	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -229,15 +229,6 @@ func TestValidateApplicationServiceRequest(t *testing.T) {
 		},
 	}
 
-	// Set up a config
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
-
-	cfg.Global.ServerName = "localhost"
-	cfg.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService, fakeApplicationServiceOverlap}
-
 	tests := []struct {
 		name      string
 		localpart string
@@ -305,16 +296,27 @@ func TestValidateApplicationServiceRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotASID, gotResp := ValidateApplicationServiceRequest(&cfg.ClientAPI, tt.localpart, tt.asToken)
-			if tt.wantError && gotResp == nil {
-				t.Error("expected an error, but succeeded")
-			}
-			if !tt.wantError && gotResp != nil {
-				t.Errorf("expected success, but returned error: %v", *gotResp)
-			}
-			if gotASID != tt.wantASID {
-				t.Errorf("returned '%s', but expected '%s'", gotASID, tt.wantASID)
-			}
+
+			test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+
+				// Set up a config
+				ctx, svc, cfg := testrig.Init(t, testOpts)
+				defer svc.Stop(ctx)
+
+				cfg.Global.ServerName = "localhost"
+				cfg.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService, fakeApplicationServiceOverlap}
+
+				gotASID, gotResp := ValidateApplicationServiceRequest(&cfg.ClientAPI, tt.localpart, tt.asToken)
+				if tt.wantError && gotResp == nil {
+					t.Error("expected an error, but succeeded")
+				}
+				if !tt.wantError && gotResp != nil {
+					t.Errorf("expected success, but returned error: %v", *gotResp)
+				}
+				if gotASID != tt.wantASID {
+					t.Errorf("returned '%s', but expected '%s'", gotASID, tt.wantASID)
+				}
+			})
 		})
 	}
 }

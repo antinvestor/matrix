@@ -66,11 +66,15 @@ func clearCache(ctx context.Context, redisUriStr string) error {
 	return client.FlushDB(ctx).Err()
 }
 
-// PrepareRedisDataSourceConnection Prepare a redis connection string for testing.
+// PrepareCacheConnection Prepare a redis connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareRedisDataSourceConnection(ctx context.Context) (connStr config.DataSource, close func(), err error) {
+func PrepareCacheConnection(ctx context.Context, testOpts DependancyOption) (connStr config.DataSource, close func(ctx context.Context), err error) {
+
+	if testOpts.Cache() != DefaultCache {
+		return "", func(ctx context.Context) {}, fmt.Errorf(" %s is unsupported, only redis is the usable cache", testOpts.Cache())
+	}
 
 	redisUriStr := os.Getenv("TESTING_CACHE_URI")
 	if redisUriStr == "" {
@@ -79,7 +83,7 @@ func PrepareRedisDataSourceConnection(ctx context.Context) (connStr config.DataS
 
 	parsedUri, err := url.Parse(redisUriStr)
 	if err != nil {
-		return "", func() {}, err
+		return "", func(ctx context.Context) {}, err
 	}
 
 	newDb := rand.IntN(10000)
@@ -87,7 +91,7 @@ func PrepareRedisDataSourceConnection(ctx context.Context) (connStr config.DataS
 	parsedUri.Path = fmt.Sprintf("/%d", newDb)
 	redisUriStr = parsedUri.String()
 
-	return config.DataSource(redisUriStr), func() {
+	return config.DataSource(redisUriStr), func(ctx context.Context) {
 		_ = clearCache(ctx, redisUriStr)
 	}, nil
 }

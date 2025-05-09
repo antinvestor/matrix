@@ -132,8 +132,9 @@ func TestRequestPool_updatePresence(t *testing.T) {
 	}
 	db := dummyDB{}
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
+
 	go rp.cleanPresence(ctx, db, time.Millisecond*50)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

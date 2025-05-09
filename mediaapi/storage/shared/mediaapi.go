@@ -35,7 +35,7 @@ type Database struct {
 // StoreMediaMetadata inserts the metadata about the uploaded media into the database.
 // Returns an error if the combination of MediaID and Origin are not unique in the table.
 func (d *Database) StoreMediaMetadata(ctx context.Context, mediaMetadata *types.MediaMetadata) error {
-	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		return d.MediaRepository.InsertMedia(ctx, mediaMetadata)
 	})
 }
@@ -65,7 +65,7 @@ func (d *Database) GetMediaMetadataByHash(ctx context.Context, mediaHash types.B
 // StoreThumbnail inserts the metadata about the thumbnail into the database.
 // Returns an error if the combination of MediaID and Origin are not unique in the table.
 func (d *Database) StoreThumbnail(ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata) error {
-	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		return d.Thumbnails.InsertThumbnail(ctx, thumbnailMetadata)
 	})
 }

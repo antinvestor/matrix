@@ -3,6 +3,7 @@ package consumers
 import (
 	"context"
 	"crypto/ed25519"
+	"github.com/pitabwire/frame"
 	"reflect"
 	"sync"
 	"testing"
@@ -21,27 +22,20 @@ import (
 
 	"github.com/antinvestor/matrix/internal/pushrules"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/storage"
 	userAPITypes "github.com/antinvestor/matrix/userapi/types"
 )
 
-func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.UserDatabase, func()) {
+func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.UserDatabase {
 	t.Helper()
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewUserDatabase(ctx, nil, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, "", 4, 0, 0, "")
+
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewUserDatabase(ctx, nil, cm, "", 4, 0, 0, "")
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
-	return db, closeDb
+	return db
 }
 
 func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
@@ -62,10 +56,10 @@ func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, _ spec
 func Test_evaluatePushRules(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
 		consumer := OutputRoomEventConsumer{db: db, rsAPI: &FakeUserRoomserverAPI{}}
 
 		testCases := []struct {
@@ -158,10 +152,8 @@ func TestLocalRoomMembers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		natsInstance := &jetstream.NATSInstance{}
 
 		caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -170,7 +162,7 @@ func TestLocalRoomMembers(t *testing.T) {
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		db, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+		db, err := storage.NewUserDatabase(ctx, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 		assert.NoError(t, err)
 
 		err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
@@ -267,10 +259,9 @@ func TestMessageStats(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -311,11 +302,10 @@ func TestMessageStats(t *testing.T) {
 func BenchmarkLocalRoomMembers(b *testing.B) {
 	t := &testing.T{}
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, cfg := testrig.Init(t)
 	defer svc.Stop(ctx)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+
+	cm := sqlutil.NewConnectionManager(svc)
 	natsInstance := &jetstream.NATSInstance{}
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
@@ -323,7 +313,7 @@ func BenchmarkLocalRoomMembers(b *testing.B) {
 	}
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
-	db, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+	db, err := storage.NewUserDatabase(ctx, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 	assert.NoError(b, err)
 
 	consumer := OutputRoomEventConsumer{db: db, rsAPI: rsAPI, serverName: "test", cfg: &cfg.UserAPI}

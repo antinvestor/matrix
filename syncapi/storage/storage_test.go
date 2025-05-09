@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 	"math"
 	"testing"
 
@@ -13,7 +15,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -22,25 +23,16 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-var ctx = context.Background()
-
-func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewSyncServerDatabase(ctx, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	})
+func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.Database {
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewSyncServerDatabase(ctx, cm)
 	if err != nil {
 		t.Fatalf("NewSyncServerDatabase returned %s", err)
 	}
-	return db, closeDb
+	return db
 }
 
-func MustWriteEvents(t *testing.T, db storage.Database, events []*rstypes.HeaderedEvent) (positions []types.StreamPosition) {
+func MustWriteEvents(ctx context.Context, t *testing.T, db storage.Database, events []*rstypes.HeaderedEvent) (positions []types.StreamPosition) {
 	for _, ev := range events {
 		var addStateEvents []*rstypes.HeaderedEvent
 		var addStateEventIDs []string
@@ -64,13 +56,18 @@ func TestWriteEvents(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
-		MustWriteEvents(t, db, r.Events())
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
+		MustWriteEvents(ctx, t, db, r.Events())
 	})
 }
 
-func WithSnapshot(t *testing.T, db storage.Database, f func(snapshot storage.DatabaseTransaction)) {
+func WithSnapshot(ctx context.Context, t *testing.T, db storage.Database, f func(snapshot storage.DatabaseTransaction)) {
+
 	snapshot, err := db.NewDatabaseSnapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -84,23 +81,26 @@ func WithSnapshot(t *testing.T, db storage.Database, f func(snapshot storage.Dat
 // These tests assert basic functionality of RecentEvents for PDUs
 func TestRecentEventsPDU(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
 		alice := test.NewUser(t)
 		// dummy room to make sure SQL queries are filtering on room ID
-		MustWriteEvents(t, db, test.NewRoom(t, alice).Events())
+		MustWriteEvents(ctx, t, db, test.NewRoom(t, alice).Events())
 
 		// actual test room
 		r := test.NewRoom(t, alice)
 		r.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hi"})
 		events := r.Events()
-		positions := MustWriteEvents(t, db, events)
+		positions := MustWriteEvents(ctx, t, db, events)
 
 		// dummy room to make sure SQL queries are filtering on room ID
-		MustWriteEvents(t, db, test.NewRoom(t, alice).Events())
+		MustWriteEvents(ctx, t, db, test.NewRoom(t, alice).Events())
 
 		var latest types.StreamPosition
-		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
+		WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 			var err error
 			if latest, err = snapshot.MaxStreamPositionForPDUs(ctx); err != nil {
 				t.Fatal("failed to get MaxStreamPositionForPDUs: %w", err)
@@ -166,7 +166,7 @@ func TestRecentEventsPDU(t *testing.T) {
 				var gotEvents map[string]types.RecentEvents
 				var limited bool
 				filter.Limit = tc.Limit
-				WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
+				WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 					var err error
 					gotEvents, err = snapshot.RecentEvents(ctx, []string{r.ID}, types.Range{
 						From: tc.From,
@@ -199,17 +199,20 @@ func TestRecentEventsPDU(t *testing.T) {
 // The purpose of this test is to ensure that backfill does indeed go backwards, using a topology token
 func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
 		for i := 0; i < 10; i++ {
 			r.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("hi %d", i)})
 		}
 		events := r.Events()
-		_ = MustWriteEvents(t, db, events)
+		_ = MustWriteEvents(ctx, t, db, events)
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
+		WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 			from := types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
 			t.Logf("max topo pos = %+v", from)
 			// head towards the beginning of time
@@ -233,17 +236,20 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 // all events.
 func TestGetEventsInRangeWithTopologyTokenNoEventsForFilter(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
 		for i := 0; i < 10; i++ {
 			r.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("hi %d", i)})
 		}
 		events := r.Events()
-		_ = MustWriteEvents(t, db, events)
+		_ = MustWriteEvents(ctx, t, db, events)
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
+		WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 			from := types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
 			t.Logf("max topo pos = %+v", from)
 			// head towards the beginning of time
@@ -319,15 +325,17 @@ func TestStreamToTopologicalPosition(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
 
 		txn, err := db.NewDatabaseTransaction(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer txn.Rollback()
-		MustWriteEvents(t, db, r.Events())
+		MustWriteEvents(ctx, t, db, r.Events())
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -393,7 +401,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 		Sender:  testUserIDA,
 		Depth:   depth + 1,
 	}))
-	MustWriteEvents(t, db, events)
+	MustWriteEvents(ctx, t, db, events)
 	fromLatest, err := db.EventPositionInTopology(ctx, events[len(events)-1].EventID())
 	if err != nil {
 		t.Fatalf("failed to get EventPositionInTopology: %s", err)
@@ -472,8 +480,8 @@ func TestGetEventsInTopologicalRangeMultiRoom(t *testing.T) {
 	roomB := "!room_b:" + string(testOrigin)
 	eventsA := makeEvents(roomA)
 	eventsB := makeEvents(roomB)
-	MustWriteEvents(t, db, eventsA)
-	MustWriteEvents(t, db, eventsB)
+	MustWriteEvents(ctx, t, db, eventsA)
+	MustWriteEvents(ctx, t, db, eventsB)
 	from, err := db.MaxTopologicalPosition(ctx, roomB)
 	if err != nil {
 		t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
@@ -511,7 +519,7 @@ func TestGetEventsInRangeWithEventsInsertedLikeBackfill(t *testing.T) {
 		Sender:   userC,
 		Depth:    int64(len(events) + 1),
 	})
-	MustWriteEvents(t, db, []*types.HeaderedEvent{joinEvent})
+	MustWriteEvents(ctx, t, db, []*types.HeaderedEvent{joinEvent})
 
 	// Sync will return this for the prev_batch
 	from := topologyTokenBefore(t, db, joinEvent.EventID())
@@ -525,7 +533,7 @@ func TestGetEventsInRangeWithEventsInsertedLikeBackfill(t *testing.T) {
 			start = 0
 		}
 		backfill := events[start:i]
-		MustWriteEvents(t, db, backfill)
+		MustWriteEvents(ctx, t, db, backfill)
 	}
 
 	// head towards the beginning of time
@@ -556,12 +564,15 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	bob := test.NewUser(t)
 	deviceID := "one"
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
 		// At this point there should be no messages. We haven't sent anything
 		// yet.
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
+		WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 			_, events, err := snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, 100)
 			if err != nil {
 				t.Fatal(err)
@@ -581,7 +592,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
+		WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 			// At this point we should get exactly one message. We're sending the sync position
 			// that we were given from the update and the send-to-device update will be updated
 			// in the database to reflect that this was the sync position we sent the message at.
@@ -611,7 +622,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 			return
 		}
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
+		WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 			// At this point we should now have no updates, because we've progressed the sync
 			// position. Therefore the update from before will not be sent again.
 			var events []types.SendToDeviceEvent
@@ -648,7 +659,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 			lastPos = streamPos
 		}
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
+		WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 			_, events, err := snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, lastPos)
 			if err != nil {
 				t.Fatalf("unable to get events: %v", err)
@@ -940,8 +951,10 @@ func TestRoomSummary(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -953,7 +966,7 @@ func TestRoomSummary(t *testing.T) {
 				}
 
 				// write the room before creating a transaction
-				MustWriteEvents(t, db, r.Events())
+				MustWriteEvents(ctx, t, db, r.Events())
 
 				transaction, err := db.NewDatabaseTransaction(ctx)
 				assert.NoError(t, err)
@@ -979,11 +992,13 @@ func TestRecentEvents(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		filter := synctypes.DefaultRoomEventFilter()
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		t.Cleanup(closeDb)
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		MustWriteEvents(t, db, room1.Events())
-		MustWriteEvents(t, db, room2.Events())
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
+		MustWriteEvents(ctx, t, db, room1.Events())
+		MustWriteEvents(ctx, t, db, room2.Events())
 
 		transaction, err := db.NewDatabaseTransaction(ctx)
 		assert.NoError(t, err)
@@ -1037,9 +1052,12 @@ func TestRedaction(t *testing.T) {
 	redactedEvent := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hi"})
 	redactionEvent := room.CreateEvent(t, alice, spec.MRoomRedaction, map[string]string{"redacts": redactedEvent.EventID()})
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		t.Cleanup(closeDb)
-		MustWriteEvents(t, db, room.Events())
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
+		MustWriteEvents(ctx, t, db, room.Events())
 
 		err := db.RedactEvent(ctx, redactedEvent.EventID(), redactionEvent, &FakeQuerier{})
 		if err != nil {

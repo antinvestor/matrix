@@ -105,7 +105,7 @@ func (s *blacklistTable) SelectBlacklist(
 	err := row.Scan(&result)
 	if err != nil {
 		// If the error is sql.ErrNoRows, that means the server is not blacklisted
-		if frame.DBErrorIsRecordNotFound(err) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return false, nil
 		}
 		return false, err

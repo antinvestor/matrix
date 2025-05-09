@@ -1,7 +1,9 @@
 package tables_test
 
 import (
+	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"sort"
 	"testing"
 
@@ -12,41 +14,30 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreatePublishedTable(t *testing.T, _ test.DependancyOption) (tab tables.Published, close func()) {
+func mustCreatePublishedTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) tables.Published {
 	t.Helper()
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	err = postgres.CreatePublishedTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PreparePublishedTable(ctx, db)
+	cm := sqlutil.NewConnectionManager(svc)
+	tab, err := postgres.NewPostgresPublishedTable(ctx, cm)
 
 	assert.NoError(t, err)
 
-	return tab, closeDb
+	return tab
 }
 
 func TestPublishedTable(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
+
 	alice := test.NewUser(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeFn := mustCreatePublishedTable(t, testOpts)
-		defer closeFn()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		tab := mustCreatePublishedTable(ctx, svc, t, testOpts)
 
 		// Publish some rooms
 		publishedRooms := []string{}
@@ -55,47 +46,47 @@ func TestPublishedTable(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			room := test.NewRoom(t, alice)
 			published := i%2 == 0
-			err := tab.UpsertRoomPublished(ctx, nil, room.ID, asID, nwID, published)
+			err := tab.UpsertRoomPublished(ctx, room.ID, asID, nwID, published)
 			assert.NoError(t, err)
 			if published {
 				publishedRooms = append(publishedRooms, room.ID)
 			}
-			publishedRes, err := tab.SelectPublishedFromRoomID(ctx, nil, room.ID)
+			publishedRes, err := tab.SelectPublishedFromRoomID(ctx, room.ID)
 			assert.NoError(t, err)
 			assert.Equal(t, published, publishedRes)
 		}
 		sort.Strings(publishedRooms)
 
 		// check that we get the expected published rooms
-		roomIDs, err := tab.SelectAllPublishedRooms(ctx, nil, "", true, true)
+		roomIDs, err := tab.SelectAllPublishedRooms(ctx, "", true, true)
 		assert.NoError(t, err)
 		assert.Equal(t, publishedRooms, roomIDs)
 
 		// test an actual upsert
 		room := test.NewRoom(t, alice)
-		err = tab.UpsertRoomPublished(ctx, nil, room.ID, asID, nwID, true)
+		err = tab.UpsertRoomPublished(ctx, room.ID, asID, nwID, true)
 		assert.NoError(t, err)
-		err = tab.UpsertRoomPublished(ctx, nil, room.ID, asID, nwID, false)
+		err = tab.UpsertRoomPublished(ctx, room.ID, asID, nwID, false)
 		assert.NoError(t, err)
 		// should now be false, due to the upsert
-		publishedRes, err := tab.SelectPublishedFromRoomID(ctx, nil, room.ID)
+		publishedRes, err := tab.SelectPublishedFromRoomID(ctx, room.ID)
 		assert.NoError(t, err)
 		assert.False(t, publishedRes, fmt.Sprintf("expected room %s to be unpublished", room.ID))
 
 		// network specific test
 		nwID = "irc"
 		room = test.NewRoom(t, alice)
-		err = tab.UpsertRoomPublished(ctx, nil, room.ID, asID, nwID, true)
+		err = tab.UpsertRoomPublished(ctx, room.ID, asID, nwID, true)
 		assert.NoError(t, err)
 		publishedRooms = append(publishedRooms, room.ID)
 		sort.Strings(publishedRooms)
 		// should only return the room for network "irc"
-		allNWPublished, err := tab.SelectAllPublishedRooms(ctx, nil, nwID, true, true)
+		allNWPublished, err := tab.SelectAllPublishedRooms(ctx, nwID, true, true)
 		assert.NoError(t, err)
 		assert.Equal(t, []string{room.ID}, allNWPublished)
 
 		// check that we still get all published rooms regardless networkID
-		roomIDs, err = tab.SelectAllPublishedRooms(ctx, nil, "", true, true)
+		roomIDs, err = tab.SelectAllPublishedRooms(ctx, "", true, true)
 		assert.NoError(t, err)
 		assert.Equal(t, publishedRooms, roomIDs)
 	})

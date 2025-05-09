@@ -140,7 +140,7 @@ func (s *outboundPeeksTable) SelectOutboundPeek(
 		&outboundPeek.RenewalInterval,
 	)
 	if err != nil {
-		if frame.DBErrorIsRecordNotFound(err) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil
 		}
 		return nil, err

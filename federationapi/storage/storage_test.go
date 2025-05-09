@@ -21,7 +21,7 @@ import (
 
 func mustCreateFederationDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
 
-	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
+	cacheConnStr, closeCache, err := test.PrepareCacheConnection(ctx)
 	if err != nil {
 		t.Fatalf("Could not create redis container %s", err)
 	}
@@ -32,7 +32,7 @@ func mustCreateFederationDatabase(ctx context.Context, t *testing.T, _ test.Depe
 		t.Fatalf("Could not create cache from options %s", err)
 	}
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -62,8 +62,8 @@ func TestExpireEDUs(t *testing.T) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
 
-		db, closeDb := mustCreateFederationDatabase(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateFederationDatabase(ctx, t, testOpts)
+
 		// insert some data
 		for i := 0; i < 100; i++ {
 			receipt, err := db.StoreJSON(ctx, "{}")
@@ -114,8 +114,8 @@ func TestOutboundPeeking(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
-		defer closeDB()
+		db := mustCreateFederationDatabase(ctx, t, testOpts)
+
 		peekID := util.RandomString(8)
 		var renewalInterval int64 = 1000
 
@@ -197,8 +197,8 @@ func TestInboundPeeking(t *testing.T) {
 	defer svc.Stop(ctx)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
-		defer closeDB()
+		db := mustCreateFederationDatabase(ctx, t, testOpts)
+
 		peekID := util.RandomString(8)
 		var renewalInterval int64 = 1000
 
@@ -280,8 +280,7 @@ func TestServersAssumedOffline(t *testing.T) {
 
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
-		defer closeDB()
+		db := mustCreateFederationDatabase(ctx, t, testOpts)
 
 		// Set server1 & server2 as assumed offline.
 		err := db.SetServerAssumedOffline(ctx, server1)
@@ -340,8 +339,7 @@ func TestRelayServersStored(t *testing.T) {
 
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDB := mustCreateFederationDatabase(ctx, t, testOpts)
-		defer closeDB()
+		db := mustCreateFederationDatabase(ctx, t, testOpts)
 
 		err := db.P2PAddRelayServersForServer(ctx, server, []spec.ServerName{relayServer1})
 		assert.Nil(t, err)

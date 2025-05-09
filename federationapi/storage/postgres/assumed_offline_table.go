@@ -104,7 +104,7 @@ func (s *assumedOfflineTable) SelectAssumedOffline(
 	err := row.Scan(&result)
 	if err != nil {
 		// If the error is sql.ErrNoRows, that means the server is not in the assumed offline list
-		if frame.DBErrorIsRecordNotFound(err) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return false, nil
 		}
 		return false, err

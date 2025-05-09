@@ -113,7 +113,7 @@ func (t *redactionsTable) SelectRedactionInfoByRedactionEventID(
 	info = &tables.RedactionInfo{}
 	row := db.Raw(t.selectRedactionInfoByRedactionEventIDSQL, redactionEventID).Row()
 	err = row.Scan(&info.RedactionEventID, &info.RedactsEventID, &info.Validated)
-	if frame.DBErrorIsRecordNotFound(err) {
+	if sqlutil.ErrorIsNoRows(err) {
 		info = nil
 		err = nil
 	}
@@ -128,7 +128,7 @@ func (t *redactionsTable) SelectRedactionInfoByEventBeingRedacted(
 	info = &tables.RedactionInfo{}
 	row := db.Raw(t.selectRedactionInfoByEventBeingRedactedSQL, eventID).Row()
 	err = row.Scan(&info.RedactionEventID, &info.RedactsEventID, &info.Validated)
-	if frame.DBErrorIsRecordNotFound(err) {
+	if sqlutil.ErrorIsNoRows(err) {
 		info = nil
 		err = nil
 	}

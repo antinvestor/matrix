@@ -63,7 +63,7 @@ func NewInternalAPI(
 
 	userapiCm, err := cm.FromOptions(ctx, &dendriteCfg.UserAPI.AccountDatabase)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to obtain accounts db connection manager")
+		logrus.WithError(err).Panicf("failed to obtain accounts db connection manager :%v", err)
 	}
 	db, err := storage.NewUserDatabase(
 		ctx,

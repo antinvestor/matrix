@@ -17,7 +17,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/antinvestor/matrix/internal/pushgateway"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
@@ -38,7 +37,8 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	// Create a test room, just used to provide events
@@ -86,16 +86,8 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		// Create Cm and Dendrite base
-		connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-		if err != nil {
-			t.Fatalf("failed to open database: %s", err)
-		}
-		defer closeDb()
-		cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-		db, err := storage.NewUserDatabase(ctx, nil, cm, &config.DatabaseOptions{
-			ConnectionString: connStr,
-		}, "test", bcrypt.MinCost, 0, 0, "")
+		cm := sqlutil.NewConnectionManager(svc)
+		db, err := storage.NewUserDatabase(ctx, nil, cm, "test", bcrypt.MinCost, 0, 0, "")
 		if err != nil {
 			t.Error(err)
 		}

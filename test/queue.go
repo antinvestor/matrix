@@ -16,6 +16,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 
@@ -28,11 +29,11 @@ import (
 //	return tcNats.Run(ctx, NatsImage)
 //}
 
-// PrepareNatsDataSourceConnection Prepare a nats connection string for testing.
+// PrepareQueueConnection Prepare a nats connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same connection, which will have data from previous tests
 // unless close() is called.
-//func PrepareNatsDataSourceConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
+//func PrepareQueueConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
 //
 //	container, err := setupNats(ctx)
 //	if err != nil {
@@ -54,11 +55,15 @@ import (
 //	}, nil
 //}
 
-// PrepareNatsDataSourceConnection Prepare a nats connection string for testing.
+// PrepareQueueConnection Prepare a nats connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareNatsDataSourceConnection(_ context.Context) (connStr config.DataSource, close func(), err error) {
+func PrepareQueueConnection(_ context.Context, testOpts DependancyOption) (connStr config.DataSource, close func(ctx context.Context), err error) {
+
+	if testOpts.Queue() != DefaultQueue {
+		return "", func(ctx context.Context) {}, fmt.Errorf(" %s is unsupported, only nats is the supported queue for now", testOpts.Queue())
+	}
 
 	natsUriStr := os.Getenv("TESTING_QUEUE_URI")
 	if natsUriStr == "" {
@@ -67,11 +72,11 @@ func PrepareNatsDataSourceConnection(_ context.Context) (connStr config.DataSour
 
 	parsedNatsUri, err := url.Parse(natsUriStr)
 	if err != nil {
-		return "", func() {}, err
+		return "", func(ctx context.Context) {}, err
 	}
 
 	natsUriStr = parsedNatsUri.String()
 
-	return config.DataSource(natsUriStr), func() {
+	return config.DataSource(natsUriStr), func(ctx context.Context) {
 	}, nil
 }

@@ -1,14 +1,14 @@
 package tables_test
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -16,42 +16,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTopologyTable(t *testing.T, _ test.DependancyOption) (tables.Topology, *sql.DB, func()) {
+func newTopologyTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (*sqlutil.Connections, tables.Topology) {
 	t.Helper()
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
-
+	cm := sqlutil.NewConnectionManager(svc)
 	var tab tables.Topology
-	tab, err = postgres.NewPostgresTopologyTable(ctx, db)
+	tab, err := postgres.NewPostgresTopologyTable(ctx, cm)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
-	return tab, db, closeDb
+	return cm, tab
 }
 
 func TestTopologyTable(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
+
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, closeDb := newTopologyTable(t, testOpts)
-		defer closeDb()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		cm, tab := newTopologyTable(ctx, svc, t, testOpts)
+
 		events := room.Events()
-		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
+		err := sqlutil.WithTransaction(ctx, cm, func(ctx context.Context) error {
 			var highestPos types.StreamPosition
 			for i, ev := range events {
 				topoPos, err := tab.InsertEventInTopology(ctx, ev, types.StreamPosition(i))

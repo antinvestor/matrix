@@ -17,14 +17,10 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/pitabwire/frame"
-	"gorm.io/gorm"
 )
 
 // Schema for the room aliases table
@@ -120,7 +116,7 @@ func (t *roomAliasesTable) SelectRoomIDFromAlias(
 
 	row := db.Raw(t.selectRoomIDFromAliasSQL, alias).Row()
 	err = row.Scan(&roomID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if sqlutil.ErrorIsNoRows(err) {
 		return "", nil
 	}
 	return
@@ -156,7 +152,7 @@ func (t *roomAliasesTable) SelectCreatorIDFromAlias(
 
 	row := db.Raw(t.selectCreatorIDFromAliasSQL, alias).Row()
 	err = row.Scan(&creatorID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if sqlutil.ErrorIsNoRows(err) {
 		return "", nil
 	}
 	return

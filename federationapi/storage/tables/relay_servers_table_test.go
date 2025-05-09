@@ -36,7 +36,7 @@ func mustCreateRelayServersTable(
 ) (database RelayServersDatabase, close func()) {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -75,8 +75,8 @@ func TestShouldInsertRelayServers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateRelayServersTable(ctx, t, testOpts)
+
 		expectedRelayServers := []spec.ServerName{server2, server3}
 
 		err := db.Table.InsertRelayServers(ctx, nil, server1, expectedRelayServers)
@@ -99,8 +99,8 @@ func TestShouldInsertRelayServersWithDuplicates(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateRelayServersTable(ctx, t, testOpts)
+
 		insertRelayServers := []spec.ServerName{server2, server2, server2, server3, server2}
 		expectedRelayServers := []spec.ServerName{server2, server3}
 
@@ -130,8 +130,7 @@ func TestShouldGetRelayServersUnknownDestination(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateRelayServersTable(ctx, t, testOpts)
 
 		// Query relay servers for a destination that doesn't exist in the table.
 		relayServers, err := db.Table.SelectRelayServers(ctx, nil, server1)
@@ -149,8 +148,8 @@ func TestShouldDeleteCorrectRelayServers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateRelayServersTable(ctx, t, testOpts)
+
 		relayServers1 := []spec.ServerName{server2, server3}
 		relayServers2 := []spec.ServerName{server1, server3, server4}
 
@@ -194,8 +193,8 @@ func TestShouldDeleteAllRelayServers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDb := mustCreateRelayServersTable(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateRelayServersTable(ctx, t, testOpts)
+
 		expectedRelayServers := []spec.ServerName{server2, server3}
 
 		err := db.Table.InsertRelayServers(ctx, nil, server1, expectedRelayServers)

@@ -42,19 +42,19 @@ const selectOpenIDTokenSQL = "" +
 	"SELECT localpart, server_name, token_expires_at_ms FROM userapi_openid_tokens WHERE token = $1"
 
 type openIDTable struct {
-	cm               *sqlutil.Connections
-	serverName       spec.ServerName
-	insertTokenSQL   string
-	selectTokenSQL   string
+	cm             *sqlutil.Connections
+	serverName     spec.ServerName
+	insertTokenSQL string
+	selectTokenSQL string
 }
 
 // NewPostgresOpenIDTable creates a new postgres openid table.
 func NewPostgresOpenIDTable(ctx context.Context, cm *sqlutil.Connections, serverName spec.ServerName) (tables.OpenIDTable, error) {
 	t := &openIDTable{
-		cm:               cm,
-		serverName:       serverName,
-		insertTokenSQL:   insertOpenIDTokenSQL,
-		selectTokenSQL:   selectOpenIDTokenSQL,
+		cm:             cm,
+		serverName:     serverName,
+		insertTokenSQL: insertOpenIDTokenSQL,
+		selectTokenSQL: selectOpenIDTokenSQL,
 	}
 
 	// Perform schema migration
@@ -91,11 +91,11 @@ func (t *openIDTable) SelectOpenIDTokenAtrributes(
 	var openIDTokenAttrs api.OpenIDTokenAttributes
 	var localpart string
 	var serverName spec.ServerName
-	
+
 	db := t.cm.Connection(ctx, true)
 	row := db.Raw(t.selectTokenSQL, token).Row()
 	err := row.Scan(&localpart, &serverName, &openIDTokenAttrs.ExpiresAtMS)
-	
+
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			log.WithError(err).Error("Unable to retrieve token from the db")

@@ -18,7 +18,7 @@ import (
 )
 
 func mustCreateServerKeyDB(ctx context.Context, t *testing.T, _ test.DependancyOption) (tables.FederationServerSigningKeys, func()) {
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}

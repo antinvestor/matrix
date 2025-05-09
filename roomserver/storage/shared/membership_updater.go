@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -11,6 +12,7 @@ import (
 
 type MembershipUpdater struct {
 	d             *Database
+	transaction   sqlutil.Transaction
 	roomNID       types.RoomNID
 	targetUserNID types.EventStateKeyNID
 	oldMembership tables.MembershipState
@@ -19,11 +21,11 @@ type MembershipUpdater struct {
 func NewMembershipUpdater(
 	ctx context.Context, d *Database, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
-) (*MembershipUpdater, error) {
+) (context.Context, *MembershipUpdater, error) {
 	var roomNID types.RoomNID
 	var targetUserNID types.EventStateKeyNID
 	var err error
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		roomNID, err = d.assignRoomNID(ctx, roomID, roomVersion)
 		if err != nil {
 			return err
@@ -35,7 +37,7 @@ func NewMembershipUpdater(
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return ctx, nil, err
 	}
 
 	return d.membershipUpdaterTxn(ctx, roomNID, targetUserNID, targetLocal)
@@ -46,25 +48,38 @@ func (d *Database) membershipUpdaterTxn(
 	roomNID types.RoomNID,
 	targetUserNID types.EventStateKeyNID,
 	targetLocal bool,
-) (*MembershipUpdater, error) {
-	err := d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+) (context.Context, *MembershipUpdater, error) {
+	err := d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		if err := d.MembershipTable.InsertMembership(ctx, roomNID, targetUserNID, targetLocal); err != nil {
 			return fmt.Errorf("d.MembershipTable.InsertMembership: %w", err)
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("u.d.Writer.Do: %w", err)
+		return ctx, nil, fmt.Errorf("u.d.Writer.Do: %w", err)
 	}
 
 	membership, err := d.MembershipTable.SelectMembershipForUpdate(ctx, roomNID, targetUserNID)
 	if err != nil {
-		return nil, err
+		return ctx, nil, err
 	}
 
-	return &MembershipUpdater{
-		d, roomNID, targetUserNID, membership,
+	ctx, transaction, err := d.Cm.BeginTx(ctx)
+	if err != nil {
+		return ctx, nil, err
+	}
+
+	return ctx, &MembershipUpdater{
+		d, transaction, roomNID, targetUserNID, membership,
 	}, nil
+}
+
+func (u *MembershipUpdater) Rollback() error {
+	return u.transaction.Rollback()
+}
+
+func (u *MembershipUpdater) Commit() error {
+	return u.transaction.Commit()
 }
 
 // IsInvite implements types.MembershipUpdater
@@ -97,7 +112,7 @@ func (u *MembershipUpdater) Delete(ctx context.Context) error {
 func (u *MembershipUpdater) Update(ctx context.Context, newMembership tables.MembershipState, event *types.Event) (bool, []string, error) {
 	var inserted bool    // Did the query result in a membership change?
 	var retired []string // Did we retire any updates in the process?
-	return inserted, retired, u.d.Writer.Do(ctx, u.d.Cm, func(ctx context.Context) error {
+	return inserted, retired, u.d.Cm.Writer().Do(ctx, u.d.Cm, func(ctx context.Context) error {
 		senderUserNID, err := u.d.assignStateKeyNID(ctx, string(event.SenderID()))
 		if err != nil {
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)

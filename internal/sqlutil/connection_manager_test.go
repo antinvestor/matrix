@@ -56,10 +56,18 @@ func TestConnectionManager(t *testing.T) {
 
 			// reuse existing connection
 			db2 := cm.Connection(ctx, true)
+
+			sqlDb1, err := db.DB()
+			assert.NoError(t, err)
+
+			sqlDb2, err := db2.DB()
+			assert.NoError(t, err)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(db, db2) {
+
+			//We check the underlaying database connection as gorm mutates quickly
+			if !reflect.DeepEqual(sqlDb1, sqlDb2) {
 				t.Fatalf("expected database connection to be reused")
 			}
 		})

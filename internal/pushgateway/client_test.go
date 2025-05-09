@@ -12,7 +12,7 @@ import (
 
 func TestNotify(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	wantResponse := NotifyResponse{

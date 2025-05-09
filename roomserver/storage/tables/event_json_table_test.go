@@ -3,6 +3,7 @@ package tables_test
 import (
 	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
@@ -11,43 +12,33 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateEventJSONTable(t *testing.T, _ test.DependancyOption) (tables.EventJSON, context.Context, func()) {
+func mustCreateEventJSONTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) tables.EventJSON {
 	t.Helper()
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
+
+	cm := sqlutil.NewConnectionManager(svc)
 	var tab tables.EventJSON
-	err = postgres.CreateEventJSONTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PrepareEventJSONTable(ctx, db)
-
+	tab, err := postgres.NewPostgresEventJSONTable(ctx, cm)
 	assert.NoError(t, err)
 
-	return tab, ctx, closeDb
+	return tab
 }
 
 func Test_EventJSONTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, ctx, closeDb := mustCreateEventJSONTable(t, testOpts)
-		defer closeDb()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		tab := mustCreateEventJSONTable(ctx, svc, t, testOpts)
 
 		// create some dummy data
 		for i := 0; i < 10; i++ {
 			err := tab.InsertEventJSON(
-				ctx, nil, types.EventNID(i),
+				ctx, types.EventNID(i),
 				[]byte(fmt.Sprintf(`{"value":%d"}`, i)),
 			)
 			assert.NoError(t, err)
@@ -83,7 +74,7 @@ func Test_EventJSONTable(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
 				// select a subset of the data
-				values, err := tab.BulkSelectEventJSON(ctx, nil, tc.args)
+				values, err := tab.BulkSelectEventJSON(ctx, tc.args)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.wantCount, len(values))
 				for i, v := range values {

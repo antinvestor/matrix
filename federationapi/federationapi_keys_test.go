@@ -2,7 +2,6 @@ package federationapi
 
 import (
 	"bytes"
-	"context"
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
@@ -13,8 +12,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/test/testrig"
-
-	"github.com/antinvestor/matrix/test"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -64,21 +61,16 @@ func TestMain(m *testing.M) {
 	// will use in our tests.
 	os.Exit(func() int {
 
-		ctx := context.TODO()
-
-		defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx)
+		ctx, svc, cfg, err := testrig.InitWithoutT()
 		if err != nil {
-			panic(fmt.Errorf("could not create default connections %s", err))
+			panic("couldn't initialize testrig: " + err.Error())
 		}
-		defer closeDSConns()
 
 		for _, s := range servers {
 
 			// Draw up just enough Dendrite config for the server key
 			// API to work.
 
-			cfg := &config.Dendrite{}
-			cfg.Defaults(defaultOpts)
 			cfg.Global.ServerName = s.name
 
 			// Generate a new key.
@@ -117,7 +109,7 @@ func TestMain(m *testing.M) {
 
 			// Finally, build the server key APIs.
 
-			cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+			cm := sqlutil.NewConnectionManager(svc)
 			s.api = NewInternalAPI(ctx, cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)
 		}
 
@@ -162,7 +154,7 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 func TestServersRequestOwnKeys(t *testing.T) {
 	// Each server will request its own keys. There's no reason
 	// for this to fail as each server should know its own keys.
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	for name, s := range servers {
@@ -190,7 +182,7 @@ func TestRenewalBehaviour(t *testing.T) {
 	// Server A will request Server C's key but their validity period
 	// is an hour in the past. We'll retrieve the key as, even though it's
 	// past its validity, it will be able to verify past events.
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	req := gomatrixserverlib.PublicKeyLookupRequest{

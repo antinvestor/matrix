@@ -249,12 +249,12 @@ func (r *Leaver) performFederatedRejectInvite(
 		util.GetLogger(ctx).WithError(err).Errorf("failed to get RoomInfo, still retiring invite event")
 	}
 
-	updater, err := r.DB.MembershipUpdater(ctx, req.RoomID, string(leaver), true, info.RoomVersion)
+	ctx, updater, err := r.DB.MembershipUpdater(ctx, req.RoomID, string(leaver), true, info.RoomVersion)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Errorf("failed to get MembershipUpdater, still retiring invite event")
 	}
 	if updater != nil {
-		if err = updater.Delete(); err != nil {
+		if err = updater.Delete(ctx); err != nil {
 			util.GetLogger(ctx).WithError(err).Errorf("failed to delete membership, still retiring invite event")
 			if err = updater.Rollback(); err != nil {
 				util.GetLogger(ctx).WithError(err).Errorf("failed to rollback deleting membership, still retiring invite event")

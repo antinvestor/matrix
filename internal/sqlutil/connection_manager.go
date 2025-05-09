@@ -78,9 +78,14 @@ func (c *Connections) FromOptions(ctx context.Context, opts *config.DatabaseOpti
 		return c, nil
 	}
 
+	if conn == nil {
+		c.service.L(ctx).Info("Reusing current connection manager, because old has no pool")
+		return c, nil
+	}
+
 	if conn.dbPool == nil {
 		c.service.L(ctx).Info("Reusing current connection manager, because old has no pool")
-		conn = c
+		return c, nil
 	}
 
 	return conn, nil

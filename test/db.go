@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/url"
@@ -25,6 +26,12 @@ import (
 	"testing"
 
 	"github.com/antinvestor/matrix/setup/config"
+)
+
+const (
+	DefaultDB    = "postgres"
+	DefaultCache = "redis"
+	DefaultQueue = "nats"
 )
 
 type DependancyOption struct {
@@ -35,16 +42,25 @@ type DependancyOption struct {
 }
 
 func (opt *DependancyOption) Name() string {
-	return "default"
+	return opt.name
 }
 func (opt *DependancyOption) Database() string {
-	return "postgres"
+	if opt.db == "" {
+		return DefaultDB
+	}
+	return opt.db
 }
 func (opt *DependancyOption) Cache() string {
-	return "redis"
+	if opt.cache == "" {
+		return DefaultCache
+	}
+	return opt.cache
 }
 func (opt *DependancyOption) Queue() string {
-	return "nats"
+	if opt.queue == "" {
+		return DefaultQueue
+	}
+	return opt.queue
 }
 
 // ensureDatabaseExists checks if a specific database exists and creates it if it does not.
@@ -118,11 +134,16 @@ func generateNewDBName() (string, error) {
 	return databaseName, nil
 }
 
-// PrepareDatabaseDSConnection Prepare a postgres connection string for testing.
+// PrepareDatabaseConnection Prepare a postgres connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareDatabaseDSConnection(ctx context.Context) (postgresDataSource config.DataSource, close func(context.Context), err error) {
+func PrepareDatabaseConnection(ctx context.Context, testOpts DependancyOption) (postgresDataSource config.DataSource, close func(context.Context), err error) {
+
+	if testOpts.Database() != DefaultDB {
+		return "", func(ctx context.Context) {}, errors.New("only postgresql is the supported database for now")
+	}
+
 	postgresUriStr := os.Getenv("TESTING_DATABASE_URI")
 	if postgresUriStr == "" {
 		postgresUriStr = "postgres://matrix:s3cr3t@127.0.0.1:5432/matrix?sslmode=disable"
@@ -153,9 +174,9 @@ func WithAllDatabases(t *testing.T, testFn func(t *testing.T, db DependancyOptio
 	options := []DependancyOption{
 		{
 			name:  "Default",
-			db:    "postgres",
-			cache: "redis",
-			queue: "nats",
+			db:    DefaultDB,
+			cache: DefaultCache,
+			queue: DefaultQueue,
 		},
 	}
 	for _, opt := range options {

@@ -16,16 +16,12 @@ package postgres
 
 import (
 	"context"
-	"errors"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/pitabwire/frame"
-	"gorm.io/gorm"
-
-	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 )
 
 // threepidSchema defines the schema for third-party identifiers table.
@@ -111,7 +107,7 @@ func (s *threepidTable) SelectLocalpartForThreePID(
 	err = row.Scan(&localpart, &serverName)
 	if err != nil {
 		// If no rows were found, return empty strings and nil error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return "", "", nil
 		}
 		return "", "", err

@@ -104,7 +104,11 @@ func NewInternalAPI(
 ) *internal.FederationInternalAPI {
 	cfg := &dendriteCfg.FederationAPI
 
-	federationDB, err := storage.NewDatabase(ctx, cm, &cfg.Database, caches, dendriteCfg.Global.IsLocalServerName)
+	federationCm, err := cm.FromOptions(ctx, &cfg.Database)
+	if err != nil {
+		logrus.WithError(err).Panic("failed to obtain federation sender db connection manager")
+	}
+	federationDB, err := storage.NewDatabase(ctx, federationCm, caches, dendriteCfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}

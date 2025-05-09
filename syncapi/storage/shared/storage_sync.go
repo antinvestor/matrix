@@ -665,7 +665,7 @@ func (d *DatabaseTransaction) MaxStreamPositionForPresence(ctx context.Context) 
 }
 
 func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
-	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		if err := d.BackwardExtremities.PurgeBackwardExtremities(ctx, roomID); err != nil {
 			return fmt.Errorf("failed to purge backward extremities: %w", err)
 		}
@@ -700,7 +700,7 @@ func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 func (d *Database) PurgeRoomState(
 	ctx context.Context, roomID string,
 ) error {
-	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		// If the event is a create event then we'll delete all of the existing
 		// data for the room. The only reason that a create event would be replayed
 		// to us in this way is if we're about to receive the entire room state.

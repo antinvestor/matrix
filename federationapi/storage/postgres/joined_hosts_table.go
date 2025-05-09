@@ -23,8 +23,8 @@ import (
 	"github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/pitabwire/frame"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
 // Schema for the joined hosts table

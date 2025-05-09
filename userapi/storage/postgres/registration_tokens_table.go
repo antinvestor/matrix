@@ -115,7 +115,7 @@ func (s *registrationTokenTable) RegistrationTokenExists(ctx context.Context, to
 	row := db.Raw(s.selectToken, token).Row()
 	err := row.Scan(&existingToken)
 	if err != nil {
-		if frame.DBErrorIsRecordNotFound(err) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return false, nil
 		}
 		return false, err

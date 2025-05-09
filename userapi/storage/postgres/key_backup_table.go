@@ -78,13 +78,13 @@ const selectKeysByRoomIDAndSessionIDSQL = "" +
 	"WHERE user_id = $1 AND version = $2 AND room_id = $3 AND session_id = $4"
 
 type keyBackupTable struct {
-	cm                                 *sqlutil.Connections
-	insertBackupKeySQL                 string
-	updateBackupKeySQL                 string
-	countKeysSQL                       string
-	selectBackupKeysSQL                string
-	selectKeysByRoomIDSQL              string
-	selectKeysByRoomIDAndSessionIDSQL  string
+	cm                                *sqlutil.Connections
+	insertBackupKeySQL                string
+	updateBackupKeySQL                string
+	countKeysSQL                      string
+	selectBackupKeysSQL               string
+	selectKeysByRoomIDSQL             string
+	selectKeysByRoomIDAndSessionIDSQL string
 }
 
 // NewPostgresKeyBackupTable creates a new postgres key backup table.

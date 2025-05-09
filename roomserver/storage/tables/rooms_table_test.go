@@ -2,6 +2,7 @@ package tables_test
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
@@ -10,31 +11,20 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateRoomsTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tab tables.Rooms, close func()) {
+func mustCreateRoomsTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) tables.Rooms {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	err = postgres.CreateRoomsTable(ctx, db)
-	assert.NoError(t, err)
-	tab, err = postgres.PrepareRoomsTable(ctx, db)
+	cm := sqlutil.NewConnectionManager(svc)
 
+	tab, err := postgres.NewPostgresRoomsTable(ctx, cm)
 	assert.NoError(t, err)
 
-	return tab, closeDb
+	return tab
 }
 
 func TestRoomsTable(t *testing.T) {
@@ -42,28 +32,28 @@ func TestRoomsTable(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		tab, closeFn := mustCreateRoomsTable(ctx, t, testOpts)
-		defer closeFn()
 
-		wantRoomNID, err := tab.InsertRoomNID(ctx, nil, room.ID, room.Version)
+		tab := mustCreateRoomsTable(ctx, svc, t, testOpts)
+
+		wantRoomNID, err := tab.InsertRoomNID(ctx, room.ID, room.Version)
 		assert.NoError(t, err)
 
 		// Create dummy room
-		_, err = tab.InsertRoomNID(ctx, nil, util.RandomString(16), room.Version)
+		_, err = tab.InsertRoomNID(ctx, util.RandomString(16), room.Version)
 		assert.NoError(t, err)
 
-		gotRoomNID, err := tab.SelectRoomNID(ctx, nil, room.ID)
+		gotRoomNID, err := tab.SelectRoomNID(ctx, room.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, wantRoomNID, gotRoomNID)
 
 		// Ensure non existent roomNID errors
-		roomNID, err := tab.SelectRoomNID(ctx, nil, "!doesnotexist:localhost")
+		roomNID, err := tab.SelectRoomNID(ctx, "!doesnotexist:localhost")
 		assert.Error(t, err)
 		assert.Equal(t, types.RoomNID(0), roomNID)
 
-		roomInfo, err := tab.SelectRoomInfo(ctx, nil, room.ID)
+		roomInfo, err := tab.SelectRoomInfo(ctx, room.ID)
 		assert.NoError(t, err)
 		expected := &types.RoomInfo{
 			RoomNID:     wantRoomNID,
@@ -72,22 +62,22 @@ func TestRoomsTable(t *testing.T) {
 		expected.SetIsStub(true) // there are no latestEventNIDs
 		assert.Equal(t, expected, roomInfo)
 
-		roomInfo, err = tab.SelectRoomInfo(ctx, nil, "!doesnotexist:localhost")
+		roomInfo, err = tab.SelectRoomInfo(ctx, "!doesnotexist:localhost")
 		assert.NoError(t, err)
 		assert.Nil(t, roomInfo)
 
-		roomVersions, err := tab.SelectRoomVersionsForRoomNIDs(ctx, nil, []types.RoomNID{wantRoomNID, 1337})
+		roomVersions, err := tab.SelectRoomVersionsForRoomNIDs(ctx, []types.RoomNID{wantRoomNID, 1337})
 		assert.NoError(t, err)
 		assert.Equal(t, roomVersions[wantRoomNID], room.Version)
 		// Room does not exist
 		_, ok := roomVersions[1337]
 		assert.False(t, ok)
 
-		roomIDs, err := tab.BulkSelectRoomIDs(ctx, nil, []types.RoomNID{wantRoomNID, 1337})
+		roomIDs, err := tab.BulkSelectRoomIDs(ctx, []types.RoomNID{wantRoomNID, 1337})
 		assert.NoError(t, err)
 		assert.Equal(t, []string{room.ID}, roomIDs)
 
-		roomNIDs, err := tab.BulkSelectRoomNIDs(ctx, nil, []string{room.ID, "!doesnotexist:localhost"})
+		roomNIDs, err := tab.BulkSelectRoomNIDs(ctx, []string{room.ID, "!doesnotexist:localhost"})
 		assert.NoError(t, err)
 		assert.Equal(t, []types.RoomNID{wantRoomNID}, roomNIDs)
 
@@ -95,10 +85,10 @@ func TestRoomsTable(t *testing.T) {
 		lastEventSentNID := types.EventNID(3)
 		stateSnapshotNID := types.StateSnapshotNID(1)
 		// make the room "usable"
-		err = tab.UpdateLatestEventNIDs(ctx, nil, wantRoomNID, wantEventNIDs, lastEventSentNID, stateSnapshotNID)
+		err = tab.UpdateLatestEventNIDs(ctx, wantRoomNID, wantEventNIDs, lastEventSentNID, stateSnapshotNID)
 		assert.NoError(t, err)
 
-		roomInfo, err = tab.SelectRoomInfo(ctx, nil, room.ID)
+		roomInfo, err = tab.SelectRoomInfo(ctx, room.ID)
 		assert.NoError(t, err)
 		expected = &types.RoomInfo{
 			RoomNID:     wantRoomNID,
@@ -107,16 +97,16 @@ func TestRoomsTable(t *testing.T) {
 		expected.SetStateSnapshotNID(1)
 		assert.Equal(t, expected, roomInfo)
 
-		eventNIDs, snapshotNID, err := tab.SelectLatestEventNIDs(ctx, nil, wantRoomNID)
+		eventNIDs, snapshotNID, err := tab.SelectLatestEventNIDs(ctx, wantRoomNID)
 		assert.NoError(t, err)
 		assert.Equal(t, wantEventNIDs, eventNIDs)
 		assert.Equal(t, types.StateSnapshotNID(1), snapshotNID)
 
 		// Again, doesn't exist
-		_, _, err = tab.SelectLatestEventNIDs(ctx, nil, 1337)
+		_, _, err = tab.SelectLatestEventNIDs(ctx, 1337)
 		assert.Error(t, err)
 
-		eventNIDs, eventNID, snapshotNID, err := tab.SelectLatestEventsNIDsForUpdate(ctx, nil, wantRoomNID)
+		eventNIDs, eventNID, snapshotNID, err := tab.SelectLatestEventsNIDsForUpdate(ctx, wantRoomNID)
 		assert.NoError(t, err)
 		assert.Equal(t, wantEventNIDs, eventNIDs)
 		assert.Equal(t, types.EventNID(3), eventNID)

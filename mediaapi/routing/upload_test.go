@@ -11,8 +11,6 @@ import (
 
 	"github.com/antinvestor/matrix/test/testrig"
 
-	"github.com/antinvestor/matrix/test"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
@@ -50,20 +48,11 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		DynamicThumbnails: false,
 	}
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
-	// create testdata folder and remove when done
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	defer closeDb()
 
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewMediaAPIDatasource(ctx, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	})
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewMediaAPIDatasource(ctx, cm)
 	if err != nil {
 		t.Errorf("error opening mediaapi database: %v", err)
 	}

@@ -159,7 +159,7 @@ func (t *relayQueueTable) SelectQueueEntryCount(
 	var count int64
 	db := t.cm.Connection(ctx, true) // Read-only
 	err := db.Raw(t.selectQueueEntryCountSQL, serverName).Row().Scan(&count)
-	if frame.DBErrorIsRecordNotFound(err) {
+	if sqlutil.ErrorIsNoRows(err) {
 		// It's acceptable for there to be no rows referencing a given
 		// JSON NID but it's not an error condition. Just return as if
 		// there's a zero count.

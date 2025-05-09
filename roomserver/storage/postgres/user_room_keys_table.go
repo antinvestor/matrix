@@ -17,8 +17,6 @@ package postgres
 import (
 	"context"
 	"crypto/ed25519"
-	"errors"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -26,7 +24,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
-	"gorm.io/gorm"
 )
 
 // SQL queries for user room keys table
@@ -143,7 +140,7 @@ func (s *userRoomKeysStatements) SelectUserRoomPrivateKey(
 	var result ed25519.PrivateKey
 	row := db.Raw(s.selectUserRoomKeySQL, userNID, roomNID).Row()
 	err := row.Scan(&result)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if sqlutil.ErrorIsNoRows(err) {
 		return nil, nil
 	}
 	return result, err
@@ -160,7 +157,7 @@ func (s *userRoomKeysStatements) SelectUserRoomPublicKey(
 	var result ed25519.PublicKey
 	row := db.Raw(s.selectUserRoomPublicKeySQL, userNID, roomNID).Row()
 	err := row.Scan(&result)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if sqlutil.ErrorIsNoRows(err) {
 		return nil, nil
 	}
 	return result, err
@@ -208,7 +205,7 @@ func (s *userRoomKeysStatements) SelectAllPublicKeysForUser(
 	db := s.cm.Connection(ctx, true)
 
 	rows, err := db.Raw(s.selectAllUserRoomPublicKeyForUserSQL, userNID).Rows()
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if sqlutil.ErrorIsNoRows(err) {
 		return nil, nil
 	}
 	if err != nil {

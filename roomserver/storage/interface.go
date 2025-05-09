@@ -31,13 +31,13 @@ import (
 type Database interface {
 	UserRoomKeys
 	ReportedEvents
-	// Do we support processing input events for more than one room at a time?
+	// SupportsConcurrentRoomInputs Do we support processing input events for more than one room at a time?
 	SupportsConcurrentRoomInputs() bool
 	AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVersion gomatrixserverlib.RoomVersion) (roomNID types.RoomNID, err error)
 	// RoomInfo returns room information for the given room ID, or nil if there is no room.
 	RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
 	RoomInfoByNID(ctx context.Context, roomNID types.RoomNID) (*types.RoomInfo, error)
-	// Store the room state at an event in the database
+	// AddState Store the room state at an event in the database
 	AddState(
 		ctx context.Context,
 		roomNID types.RoomNID,
@@ -49,12 +49,12 @@ type Database interface {
 		ctx context.Context, e gomatrixserverlib.PDU,
 	) (missingAuth, missingPrev []string, err error)
 
-	// Look up the state of a room at each event for a list of string event IDs.
+	// StateAtEventIDs Look up the state of a room at each event for a list of string event IDs.
 	// Returns an error if there is an error talking to the database.
 	// The length of []types.StateAtEvent is guaranteed to equal the length of eventIDs if no error is returned.
 	// Returns a types.MissingEventError if the room state for the event IDs aren't in the database
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
-	// Look up the numeric IDs for a list of string event types.
+	// EventTypeNIDs Look up the numeric IDs for a list of string event types.
 	// Returns a map from string event type to numeric ID for the event type.
 	EventTypeNIDs(ctx context.Context, eventTypes []string) (map[string]types.EventTypeNID, error)
 	// Look up the numeric IDs for a list of string event state keys.
@@ -128,7 +128,7 @@ type Database interface {
 	// Returns an error if there was a problem talking to the database.
 	RemoveRoomAlias(ctx context.Context, alias string) error
 	// Build a membership updater for the target user in a room.
-	MembershipUpdater(ctx context.Context, roomID, targetUserID string, targetLocal bool, roomVersion gomatrixserverlib.RoomVersion) (*shared.MembershipUpdater, error)
+	MembershipUpdater(ctx context.Context, roomID, targetUserID string, targetLocal bool, roomVersion gomatrixserverlib.RoomVersion) (context.Context, *shared.MembershipUpdater, error)
 	// Lookup the membership of a given user in a given room.
 	// Returns the numeric ID of the latest membership event sent from this user
 	// in this room, along a boolean set to true if the user is still in this room,

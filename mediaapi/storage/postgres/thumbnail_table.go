@@ -74,7 +74,7 @@ SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method 
 
 type thumbnailStatements struct {
 	cm *sqlutil.Connections
-	
+
 	// SQL statements stored as struct fields
 	insertThumbnailStmt  string
 	selectThumbnailStmt  string
@@ -94,12 +94,12 @@ func NewPostgresThumbnailsTable(ctx context.Context, cm *sqlutil.Connections) (t
 
 	// Initialize the statements
 	s := &thumbnailStatements{
-		cm:                  cm,
-		insertThumbnailStmt: insertThumbnailSQL,
-		selectThumbnailStmt: selectThumbnailSQL,
+		cm:                   cm,
+		insertThumbnailStmt:  insertThumbnailSQL,
+		selectThumbnailStmt:  selectThumbnailSQL,
 		selectThumbnailsStmt: selectThumbnailsSQL,
 	}
-	
+
 	return s, nil
 }
 
@@ -107,10 +107,10 @@ func (s *thumbnailStatements) InsertThumbnail(
 	ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata,
 ) error {
 	thumbnailMetadata.MediaMetadata.CreationTimestamp = spec.AsTimestamp(time.Now())
-	
+
 	// Get database connection
 	db := s.cm.Connection(ctx, false)
-	
+
 	// Execute the insertion
 	return db.Exec(
 		s.insertThumbnailStmt,
@@ -143,10 +143,10 @@ func (s *thumbnailStatements) SelectThumbnail(
 			ResizeMethod: resizeMethod,
 		},
 	}
-	
+
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	
+
 	// Execute the query
 	row := db.Raw(
 		s.selectThumbnailStmt,
@@ -156,7 +156,7 @@ func (s *thumbnailStatements) SelectThumbnail(
 		thumbnailMetadata.ThumbnailSize.Height,
 		thumbnailMetadata.ThumbnailSize.ResizeMethod,
 	).Row()
-	
+
 	err := row.Scan(
 		&thumbnailMetadata.MediaMetadata.ContentType,
 		&thumbnailMetadata.MediaMetadata.FileSizeBytes,
@@ -170,14 +170,14 @@ func (s *thumbnailStatements) SelectThumbnails(
 ) ([]*types.ThumbnailMetadata, error) {
 	// Get database connection
 	db := s.cm.Connection(ctx, true)
-	
+
 	// Execute the query
 	rows, err := db.Raw(
-		s.selectThumbnailsStmt, 
-		mediaID, 
+		s.selectThumbnailsStmt,
+		mediaID,
 		mediaOrigin,
 	).Rows()
-	
+
 	if err != nil {
 		return nil, err
 	}

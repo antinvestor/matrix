@@ -105,16 +105,18 @@ func (r *Inviter) ProcessInviteMembership(
 		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", *inviteEvent.StateKey())}
 	}
 	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(userID.Domain())
-	if updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID().String(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
+	if ctx, updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID().String(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
 		return nil, fmt.Errorf("r.Cm.MembershipUpdater: %w", err)
 	}
-	outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
+
+	outputUpdates, err = helpers.UpdateToInviteMembership(ctx, updater, &types.Event{
 		EventNID: 0,
 		PDU:      inviteEvent.PDU,
 	}, outputUpdates, inviteEvent.Version())
 	if err != nil {
 		return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 	}
+
 	if err = updater.Commit(); err != nil {
 		return nil, fmt.Errorf("updater.Commit: %w", err)
 	}

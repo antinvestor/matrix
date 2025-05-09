@@ -108,7 +108,12 @@ func Enable(
 	ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
-	db, err := NewDatabase(ctx, cm, &cfg.MSCs.Database)
+	mscCm, err := cm.FromOptions(ctx, &cfg.MSCs.Database)
+	if err != nil {
+		return fmt.Errorf("cannot obtain  MSC2836 connection manager: %w", err)
+	}
+
+	db, err := NewDatabase(ctx, mscCm)
 	if err != nil {
 		return fmt.Errorf("cannot enable MSC2836: %w", err)
 	}

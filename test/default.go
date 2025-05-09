@@ -6,23 +6,23 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 )
 
-func PrepareDefaultDSConnections(ctx context.Context) (config.DefaultOpts, func(), error) {
+func PrepareDefaultDSConnections(ctx context.Context, testOpts DependancyOption) (config.DefaultOpts, func(ctx context.Context), error) {
 
-	cacheConnStr, closeCache, err := PrepareRedisDataSourceConnection(ctx)
+	cacheConnStr, closeCache, err := PrepareCacheConnection(ctx, testOpts)
 	if err != nil {
 		return config.DefaultOpts{}, nil, err
 	}
 
-	queueConnStr, closeQueue, err := PrepareNatsDataSourceConnection(ctx)
+	queueConnStr, closeQueue, err := PrepareQueueConnection(ctx, testOpts)
 	if err != nil {
-		defer closeCache()
+		defer closeCache(ctx)
 		return config.DefaultOpts{}, nil, err
 	}
 
-	dbConnStr, closeDb, err := PrepareDatabaseDSConnection(ctx)
+	dbConnStr, closeDb, err := PrepareDatabaseConnection(ctx, testOpts)
 	if err != nil {
-		defer closeCache()
-		defer closeQueue()
+		defer closeCache(ctx)
+		defer closeQueue(ctx)
 		return config.DefaultOpts{}, nil, err
 	}
 
@@ -30,9 +30,9 @@ func PrepareDefaultDSConnections(ctx context.Context) (config.DefaultOpts, func(
 			DatabaseConnectionStr: dbConnStr,
 			QueueConnectionStr:    queueConnStr,
 			CacheConnectionStr:    cacheConnStr,
-		}, func() {
-			closeCache()
-			closeQueue()
-			closeDb()
+		}, func(ctx context.Context) {
+			closeCache(ctx)
+			closeQueue(ctx)
+			closeDb(ctx)
 		}, nil
 }

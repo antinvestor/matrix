@@ -20,10 +20,9 @@ func TestCollect(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		db, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, "localhost", bcrypt.MinCost, 1000, 1000, "")
+
+		cm := sqlutil.NewConnectionManager(svc)
+		db, err := storage.NewUserDatabase(ctx, nil, cm, "localhost", bcrypt.MinCost, 1000, 1000, "")
 		if err != nil {
 			t.Error(err)
 		}

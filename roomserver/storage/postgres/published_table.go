@@ -17,13 +17,10 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/pitabwire/frame"
-	"gorm.io/gorm"
 )
 
 // Schema for the published table
@@ -115,7 +112,7 @@ func (t *publishedTable) SelectPublishedFromRoomID(
 
 	row := db.Raw(t.selectPublishedSQL, roomID).Row()
 	err = row.Scan(&published)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if sqlutil.ErrorIsNoRows(err) {
 		return false, nil
 	}
 	return

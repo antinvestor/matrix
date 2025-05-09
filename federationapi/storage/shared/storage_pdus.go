@@ -16,7 +16,6 @@ package shared
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,12 +33,11 @@ func (d *Database) AssociatePDUWithDestinations(
 	destinations map[spec.ServerName]struct{},
 	dbReceipt *receipt.Receipt,
 ) error {
-	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		var err error
 		for destination := range destinations {
 			err = d.FederationQueuePDUs.InsertQueuePDU(
 				ctx,                // context
-				txn,                // SQL transaction
 				"",                 // transaction ID
 				destination,        // destination server name
 				dbReceipt.GetNID(), // NID from the federationapi_queue_json table
@@ -65,7 +63,7 @@ func (d *Database) GetPendingPDUs(
 	// to know in SQLite mode that nothing else is trying to modify
 	// the database.
 	events = make(map[*receipt.Receipt]*types.HeaderedEvent)
-	err = d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		nids, err := d.FederationQueuePDUs.SelectQueuePDUs(ctx, serverName, limit)
 		if err != nil {
 			return fmt.Errorf("SelectQueuePDUs: %w", err)
@@ -118,7 +116,7 @@ func (d *Database) CleanPDUs(
 		nids[i] = receipts[i].GetNID()
 	}
 
-	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		if err := d.FederationQueuePDUs.DeleteQueuePDUs(ctx, serverName, nids); err != nil {
 			return err
 		}
@@ -150,5 +148,5 @@ func (d *Database) CleanPDUs(
 func (d *Database) GetPendingPDUServerNames(
 	ctx context.Context,
 ) ([]spec.ServerName, error) {
-	return d.FederationQueuePDUs.SelectQueuePDUServerNames(ctx, nil)
+	return d.FederationQueuePDUs.SelectQueuePDUServerNames(ctx)
 }

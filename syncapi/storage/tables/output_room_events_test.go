@@ -1,8 +1,9 @@
 package tables_test
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"reflect"
 	"testing"
 
@@ -11,49 +12,39 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/test"
 )
 
-func newOutputRoomEventsTable(t *testing.T, _ test.DependancyOption) (tables.Events, *sql.DB, func()) {
+func newOutputRoomEventsTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (*sqlutil.Connections, tables.Events) {
 	t.Helper()
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
+	cm := sqlutil.NewConnectionManager(svc)
 
 	var tab tables.Events
-	tab, err = postgres.NewPostgresEventsTable(ctx, db)
+	tab, err := postgres.NewPostgresEventsTable(ctx, cm)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
-	return tab, db, closeDb
+	return cm, tab
 }
 
 func TestOutputRoomEventsTable(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
+
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, closeDb := newOutputRoomEventsTable(t, testOpts)
-		defer closeDb()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		cm, tab := newOutputRoomEventsTable(ctx, svc, t, testOpts)
+
 		events := room.Events()
-		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
+		err := sqlutil.WithTransaction(ctx, cm, func(ctx context.Context) error {
 			for _, ev := range events {
 				_, err := tab.InsertEvent(ctx, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 				if err != nil {
@@ -107,8 +98,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 }
 
 func TestReindex(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
+
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
@@ -126,9 +116,13 @@ func TestReindex(t *testing.T) {
 	})
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, closeDb := newOutputRoomEventsTable(t, testOpts)
-		defer closeDb()
-		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		cm, tab := newOutputRoomEventsTable(ctx, svc, t, testOpts)
+
+		err := sqlutil.WithTransaction(ctx, cm, func(ctx context.Context) error {
 			for _, ev := range room.Events() {
 				_, err := tab.InsertEvent(ctx, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 				if err != nil {
@@ -142,7 +136,7 @@ func TestReindex(t *testing.T) {
 			t.Fatalf("err: %s", err)
 		}
 
-		events, err := tab.ReIndex(ctx, nil, 10, 0, []string{
+		events, err := tab.ReIndex(ctx, 10, 0, []string{
 			spec.MRoomName,
 			spec.MRoomTopic,
 			"m.room.message"})

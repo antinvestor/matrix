@@ -18,7 +18,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -28,7 +27,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
-	"gorm.io/gorm"
 )
 
 // Schema for the membership table
@@ -73,7 +71,7 @@ CREATE INDEX IF NOT EXISTS roomserver_membership_target_nid ON roomserver_member
 const membershipSchemaRevert = `DROP TABLE IF EXISTS roomserver_membership;`
 
 // SQL queries for the membership table
-const selectJoinedUsersSetForRoomsAndUserSQL = "" +
+var selectJoinedUsersSetForRoomsAndUserSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
 	" WHERE (target_local OR $1 = false)" +
 	" AND room_nid = ANY($2) AND target_nid = ANY($3)" +
@@ -457,7 +455,7 @@ func (t *membershipTable) SelectLocalServerInRoom(
 	row := db.Raw(t.selectLocalServerInRoomSQL, tables.MembershipStateJoin, roomNID).Row()
 	err := row.Scan(&nid)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return false, nil
 		}
 		return false, err
@@ -475,7 +473,7 @@ func (t *membershipTable) SelectServerInRoom(
 	var nid types.RoomNID
 	err := db.Raw(t.selectServerInRoomSQL, tables.MembershipStateJoin, roomNID, serverName).Row().Scan(&nid)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return false, nil
 		}
 		return false, err

@@ -1,49 +1,36 @@
 package tables_test
 
 import (
-	"database/sql"
+	"context"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
 )
 
-func newRelationsTable(t *testing.T, _ test.DependancyOption) (tables.Relations, *sql.DB, func()) {
+func newRelationsTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) tables.Relations {
 	t.Helper()
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
+	cm := sqlutil.NewConnectionManager(svc)
 
 	var tab tables.Relations
-	tab, err = postgres.NewPostgresRelationsTable(ctx, db)
+	tab, err := postgres.NewPostgresRelationsTable(ctx, cm)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
-	return tab, db, closeDb
+	return tab
 }
 
-func compareRelationsToExpected(t *testing.T, tab tables.Relations, r types.Range, expected []types.RelationEntry) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-	relations, _, err := tab.SelectRelationsInRange(ctx, nil, roomID, "a", "", "", r, 50)
+func compareRelationsToExpected(ctx context.Context, t *testing.T, tab tables.Relations, r types.Range, expected []types.RelationEntry) {
+
+	relations, _, err := tab.SelectRelationsInRange(ctx, roomID, "a", "", "", r, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,22 +53,21 @@ const relType = "m.reaction"
 func TestRelationsTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
 
-		tab, _, closeDb := newRelationsTable(t, testOpts)
-		defer closeDb()
+		tab := newRelationsTable(ctx, svc, t, testOpts)
 
 		// Insert some relations
 		for _, child := range []string{"b", "c", "d"} {
-			if err := tab.InsertRelation(ctx, nil, roomID, "a", child, childType, relType); err != nil {
+			if err := tab.InsertRelation(ctx, roomID, "a", child, childType, relType); err != nil {
 				t.Fatal(err)
 			}
 		}
 
 		// Check the maxVal position, we've inserted three things so it
 		// should be 3
-		if maxVal, err := tab.SelectMaxRelationID(ctx, nil); err != nil {
+		if maxVal, err := tab.SelectMaxRelationID(ctx); err != nil {
 			t.Fatal(err)
 		} else if maxVal != 3 {
 			t.Fatalf("maxVal position should have been 3 but got %d", maxVal)
@@ -111,11 +97,11 @@ func TestRelationsTable(t *testing.T) {
 				{Position: 1, EventID: "b"},
 			},
 		} {
-			compareRelationsToExpected(t, tab, r, expected)
+			compareRelationsToExpected(ctx, t, tab, r, expected)
 		}
 
 		// Now delete one of the relations
-		if err := tab.DeleteRelation(ctx, nil, roomID, "c"); err != nil {
+		if err := tab.DeleteRelation(ctx, roomID, "c"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -137,18 +123,18 @@ func TestRelationsTable(t *testing.T) {
 				{Position: 1, EventID: "b"},
 			},
 		} {
-			compareRelationsToExpected(t, tab, r, expected)
+			compareRelationsToExpected(ctx, t, tab, r, expected)
 		}
 
 		// Insert some new relations
 		for _, child := range []string{"e", "f", "g", "h"} {
-			if err := tab.InsertRelation(ctx, nil, roomID, "a", child, childType, relType); err != nil {
+			if err := tab.InsertRelation(ctx, roomID, "a", child, childType, relType); err != nil {
 				t.Fatal(err)
 			}
 		}
 
 		// Check the maxVal position, we've inserted four things so it should now be 7
-		if maxVal, err := tab.SelectMaxRelationID(ctx, nil); err != nil {
+		if maxVal, err := tab.SelectMaxRelationID(ctx); err != nil {
 			t.Fatal(err)
 		} else if maxVal != 7 {
 			t.Fatalf("maxVal position should have been 3 but got %d", maxVal)
@@ -182,7 +168,7 @@ func TestRelationsTable(t *testing.T) {
 				{Position: 3, EventID: "d"},
 			},
 		} {
-			compareRelationsToExpected(t, tab, r, expected)
+			compareRelationsToExpected(ctx, t, tab, r, expected)
 		}
 	})
 }

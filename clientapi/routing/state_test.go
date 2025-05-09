@@ -133,7 +133,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 	}
 
 	t.Run("request simple state key", func(t *testing.T) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t)
 		defer svc.Stop(ctx)
 
 		rsAPI := stateTestRoomserverAPI{
@@ -159,7 +159,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 	})
 
 	t.Run("user ID key translated to room key in pseudo ID rooms", func(t *testing.T) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t)
 		defer svc.Stop(ctx)
 
 		stateSenderUserID := "@sender:domain"
@@ -197,7 +197,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 	})
 
 	t.Run("user ID key not translated to room key in non-pseudo ID rooms", func(t *testing.T) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t)
 		defer svc.Stop(ctx)
 
 		stateSenderUserID := "@sender:domain"

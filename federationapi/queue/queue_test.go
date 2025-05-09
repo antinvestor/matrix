@@ -551,7 +551,7 @@ func TestSendPDUBatches(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-	// ctx, db, fc, queues, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
+	// ctx, db, fc, queues:= testSetup(failuresUntilBlacklist, true, t, testOpts, true)
 	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	defer closeSetup()
@@ -592,7 +592,7 @@ func TestSendEDUBatches(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-	// ctx, db, fc, queues, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
+	// ctx, db, fc, queues:= testSetup(failuresUntilBlacklist, true, t, testOpts, true)
 	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	defer closeSetup()
@@ -633,7 +633,7 @@ func TestSendPDUAndEDUBatches(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-	// ctx, db, fc, queues, closeDb := testSetup(failuresUntilBlacklist, true, t, testOpts, true)
+	// ctx, db, fc, queues:= testSetup(failuresUntilBlacklist, true, t, testOpts, true)
 	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	defer closeSetup()
@@ -717,7 +717,7 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 	destination := spec.ServerName("remotehost")
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, db, fc, queues, closeDb := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, true)
+		ctx, db, fc, queues := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, true)
 		// NOTE : These defers aren't called if go test is killed so the dbs may not get cleaned up.
 
 		defer func() {

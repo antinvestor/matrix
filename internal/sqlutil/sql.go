@@ -16,7 +16,9 @@ package sqlutil
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"github.com/pitabwire/frame"
 )
 
 type contextKey string
@@ -81,4 +83,11 @@ func WithTransaction(ctx context.Context, cm *Connections, fn func(ctx context.C
 
 	succeeded = true
 	return
+}
+
+func ErrorIsNoRows(err error) bool {
+	if errors.Is(err, sql.ErrNoRows) {
+		return true
+	}
+	return frame.DBErrorIsRecordNotFound(err)
 }

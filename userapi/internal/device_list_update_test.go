@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"net/url"
@@ -38,7 +39,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	roomserver "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
@@ -158,7 +158,7 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) fclient.F
 // Test that the device keys get persisted and emitted if we have the previous IDs.
 func TestUpdateHavePrevID(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	db := &mockDeviceListUpdaterDatabase{
@@ -208,7 +208,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 // and that the user's devices are marked as stale until it succeeds.
 func TestUpdateNoPrevID(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	db := &mockDeviceListUpdaterDatabase{
@@ -297,7 +297,7 @@ func TestDebounce(t *testing.T) {
 
 	t.Skipf("panic on closed channel on GHA")
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	db := &mockDeviceListUpdaterDatabase{
@@ -376,20 +376,16 @@ func TestDebounce(t *testing.T) {
 	}
 }
 
-func mustCreateKeyserverDB(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.KeyDatabase, func()) {
+func mustCreateKeyserverDB(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.KeyDatabase {
 	t.Helper()
 
-	connStr, clearDB, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewKeyDatabase(ctx, cm, &config.DatabaseOptions{ConnectionString: connStr})
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return db, clearDB
+	return db
 }
 
 type mockKeyserverRoomserverAPI struct {
@@ -410,11 +406,10 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 	rsAPI := &mockKeyserverRoomserverAPI{leftUsers: []string{bob.ID}}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
 
-		db, clearDB := mustCreateKeyserverDB(ctx, t, testOpts)
-		defer clearDB()
+		db := mustCreateKeyserverDB(ctx, svc, t, testOpts)
 
 		// This should not get deleted
 		if err := db.MarkDeviceListStale(ctx, alice.ID, true); err != nil {
@@ -499,7 +494,7 @@ func Test_dedupeStateList(t *testing.T) {
 
 func TestDeviceListUpdaterIgnoreBlacklisted(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	unreachableServer := spec.ServerName("notlocalhost")

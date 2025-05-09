@@ -627,14 +627,14 @@ func (d *Database) BulkSelectSnapshotsFromEventIDs(
 func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
-) (*MembershipUpdater, error) {
+) (context.Context, *MembershipUpdater, error) {
 	var err error
 	var updater *MembershipUpdater
-	_ = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
-		updater, err = NewMembershipUpdater(ctx, d, roomID, targetUserID, targetLocal, roomVersion)
+	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+		ctx, updater, err = NewMembershipUpdater(ctx, d, roomID, targetUserID, targetLocal, roomVersion)
 		return err
 	})
-	return updater, err
+	return ctx, updater, err
 }
 
 func (d *Database) GetRoomUpdater(
@@ -771,6 +771,7 @@ func (d *EventDatabase) StoreEvent(
 	)
 
 	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+
 		if eventNID, stateNID, err = d.EventsTable.InsertEvent(
 			ctx,
 			roomInfo.RoomNID,
@@ -781,15 +782,16 @@ func (d *EventDatabase) StoreEvent(
 			event.Depth(),
 			isRejected,
 		); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if sqlutil.ErrorIsNoRows(err) {
 				// We've already inserted the event so select the numeric event ID
 				eventNID, stateNID, err = d.EventsTable.SelectEvent(ctx, event.EventID())
+				if err != nil {
+					return fmt.Errorf("d.EventsTable.SelectEvent: %w", err)
+				}
 			} else if err != nil {
 				return fmt.Errorf("d.EventsTable.InsertEvent: %w", err)
 			}
-			if err != nil {
-				return fmt.Errorf("d.EventsTable.SelectEvent: %w", err)
-			}
+
 		}
 
 		if err = d.EventJSONTable.InsertEventJSON(ctx, eventNID, event.JSON()); err != nil {

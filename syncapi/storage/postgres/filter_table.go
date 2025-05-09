@@ -67,19 +67,19 @@ INSERT INTO syncapi_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETU
 
 // filterTable implements the tables.Filter interface
 type filterTable struct {
-	cm                        *sqlutil.Connections
-	selectFilterSQL           string
+	cm                         *sqlutil.Connections
+	selectFilterSQL            string
 	selectFilterIDByContentSQL string
-	insertFilterSQL           string
+	insertFilterSQL            string
 }
 
 // NewPostgresFilterTable creates a new filter table
 func NewPostgresFilterTable(ctx context.Context, cm *sqlutil.Connections) (tables.Filter, error) {
 	t := &filterTable{
-		cm:                        cm,
-		selectFilterSQL:           selectFilterSQL,
+		cm:                         cm,
+		selectFilterSQL:            selectFilterSQL,
 		selectFilterIDByContentSQL: selectFilterIDByContentSQL,
-		insertFilterSQL:           insertFilterSQL,
+		insertFilterSQL:            insertFilterSQL,
 	}
 
 	// Perform the migration
@@ -102,7 +102,7 @@ func (t *filterTable) SelectFilter(
 	// Retrieve filter from database (stored as canonical JSON)
 	var filterData []byte
 	db := t.cm.Connection(ctx, true)
-	
+
 	row := db.Raw(t.selectFilterSQL, localpart, filterID).Row()
 	err := row.Scan(&filterData)
 	if err != nil {

@@ -20,7 +20,7 @@ func mustCreateInboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.
 	ctx, svc, cfg := testrig.Init(t, testOpts)
 	defer svc.Stop(ctx)
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -47,8 +47,7 @@ func TestInboundPeeksTable(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDB := mustCreateInboundpeeksTable(t, testOpts)
-		defer closeDB()
+		tab := mustCreateInboundpeeksTable(t, testOpts)
 
 		// Insert a peek
 		peekID := util.RandomString(8)

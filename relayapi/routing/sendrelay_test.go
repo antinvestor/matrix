@@ -182,7 +182,7 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 
 func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{

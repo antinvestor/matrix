@@ -223,6 +223,17 @@ func NewPostgresEventsTable(ctx context.Context, cm *sqlutil.Connections) (table
 	return s, nil
 }
 
+// Struct to hold the values returned by the RETURNING clause
+type ReturnedIDs struct {
+	EventNID         int64 `gorm:"column:event_nid"`
+	StateSnapshotNID int64 `gorm:"column:state_snapshot_nid"`
+}
+
+type returnedIDs struct {
+	EventNID         int64 `gorm:"column:event_nid"`
+	StateSnapshotNID int64 `gorm:"column:state_snapshot_nid"`
+}
+
 // InsertEvent adds a new event to the events table.
 // If the event already exists in the table, it will only update the is_rejected status if the event was previously rejected.
 func (s *eventStatements) InsertEvent(
@@ -245,10 +256,9 @@ func (s *eventStatements) InsertEvent(
 	db := s.cm.Connection(ctx, false)
 
 	// Insert the event
-	var eventNID int64
-	var stateNID int64
-	err := db.Raw(s.insertEventSQL, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, pq.Array(authNIDs), depth, isRejected).Row().Scan(&eventNID, &stateNID)
-	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
+	var finalIDs returnedIDs
+	err := db.Raw(s.insertEventSQL, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, pq.Array(authNIDs), depth, isRejected).Scan(&finalIDs).Error
+	return types.EventNID(finalIDs.EventNID), types.StateSnapshotNID(finalIDs.StateSnapshotNID), err
 }
 
 // SelectEvent retrieves an event from the database by its event ID.
@@ -696,6 +706,14 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 		result[eventNID] = roomNID
 	}
 	return result, rows.Err()
+}
+
+func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {
+	nids := make([]int64, len(eventNIDs))
+	for i := range eventNIDs {
+		nids[i] = int64(eventNIDs[i])
+	}
+	return nids
 }
 
 // SelectEventRejected checks if an event has been rejected.

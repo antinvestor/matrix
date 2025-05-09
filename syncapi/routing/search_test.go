@@ -207,13 +207,11 @@ func TestSearch(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		db, err := storage.NewSyncServerDatabase(ctx, cm, &cfg.SyncAPI.Database)
+		cm := sqlutil.NewConnectionManager(svc)
+		db, err := storage.NewSyncServerDatabase(ctx, cm)
 		assert.NoError(t, err)
 
 		// store the events in the database

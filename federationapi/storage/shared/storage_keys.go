@@ -17,8 +17,6 @@ package shared
 
 import (
 	"context"
-	"database/sql"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 )
@@ -33,7 +31,7 @@ func (d *Database) FetchKeys(
 	ctx context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
-	return d.ServerSigningKeys.BulkSelectServerKeys(ctx, nil, requests)
+	return d.ServerSigningKeys.BulkSelectServerKeys(ctx, requests)
 }
 
 // StoreKeys implements gomatrixserverlib.KeyDatabase
@@ -41,7 +39,7 @@ func (d *Database) StoreKeys(
 	ctx context.Context,
 	keyMap map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	return d.Writer.Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
 		var lastErr error
 		for request, keys := range keyMap {
 			if err := d.ServerSigningKeys.UpsertServerKeys(ctx, request, keys); err != nil {

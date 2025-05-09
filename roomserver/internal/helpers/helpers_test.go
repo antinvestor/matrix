@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
@@ -18,33 +19,18 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateDatabase(t *testing.T, _ test.DependancyOption) (context.Context, storage.Database, func()) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-	conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(ctx)
-	if err != nil {
-		t.Fatalf("Could not create redis container %s", err)
-	}
+func mustCreateDatabase(ctx context.Context, svc *frame.Service, cfg *config.Dendrite, t *testing.T, _ test.DependancyOption) storage.Database {
 
-	caches, err := caching.NewCache(&config.CacheOptions{
-		ConnectionString: cacheConnStr,
-	})
+	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: conStr})
-	db, err := storage.NewDatabase(ctx, cm, &config.DatabaseOptions{ConnectionString: conStr}, caches)
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewDatabase(ctx, cm, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}
-	return ctx, db, func() {
-		closeCache()
-		closeDb()
-	}
+	return db
 }
 
 func TestIsInvitePendingWithoutNID(t *testing.T) {
@@ -54,8 +40,11 @@ func TestIsInvitePendingWithoutNID(t *testing.T) {
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat))
 	_ = bob
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, db, closeDb := mustCreateDatabase(t, testOpts)
-		defer closeDb()
+
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateDatabase(ctx, svc, cfg, t, testOpts)
 
 		// store all events
 		var authNIDs []types.EventNID

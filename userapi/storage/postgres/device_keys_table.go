@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/lib/pq"
@@ -27,7 +26,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-	"gorm.io/gorm"
 	"github.com/pitabwire/frame"
 )
 
@@ -182,7 +180,7 @@ func (s *deviceKeysTable) SelectMaxStreamIDForUser(ctx context.Context, userID s
 	row := db.Raw(s.selectMaxStreamForUserSQL, userID).Row()
 	err = row.Scan(&streamID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return 0, nil
 		}
 		return 0, err

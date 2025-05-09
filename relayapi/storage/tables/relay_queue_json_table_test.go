@@ -55,10 +55,10 @@ func mustCreateQueueJSONTable(
 	ctx context.Context,
 	t *testing.T,
 	_ test.DependancyOption,
-) (database RelayQueueJSONDatabase, closeDb func()) {
+) (database RelayQueueJSONDatabase) {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
+	connStr, closeDb, err := test.PrepareDatabaseConnection(ctx)
 	if err != nil {
 		t.Fatalf("failed to open database: %s", err)
 	}
@@ -83,10 +83,9 @@ func mustCreateQueueJSONTable(
 
 func TestShoudInsertTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateQueueJSONTable(ctx, t, testOpts)
 
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)
@@ -103,10 +102,9 @@ func TestShoudInsertTransaction(t *testing.T) {
 
 func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateQueueJSONTable(ctx, t, testOpts)
 
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)
@@ -142,10 +140,9 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 
 func TestShouldDeleteTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
-		defer closeDb()
+		db := mustCreateQueueJSONTable(ctx, t, testOpts)
 
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)

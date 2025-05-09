@@ -48,7 +48,7 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             sqlutil.NewDefaultWriter(),
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -79,7 +79,7 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 }
 
 func TestGetInvalidPrevEntryFails(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
@@ -106,7 +106,7 @@ func TestGetInvalidPrevEntryFails(t *testing.T) {
 }
 
 func TestGetReturnsSavedTransaction(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
@@ -158,7 +158,7 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 }
 
 func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{

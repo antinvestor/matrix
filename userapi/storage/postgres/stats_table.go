@@ -312,7 +312,7 @@ func (s *statsTable) registeredUserByType(ctx context.Context) (map[string]int64
 		spec.AsTimestamp(registeredAfter),
 	).Rows()
 	if err != nil {
-		if !frame.DBErrorIsRecordNotFound(err) {
+		if !sqlutil.ErrorIsNoRows(err) {
 			logrus.Error("Failed to get registered users: ", err)
 		}
 		return nil, err
@@ -361,7 +361,7 @@ func (s *statsTable) r30Users(ctx context.Context) (map[string]int64, error) {
 	rows, err := db.Raw(s.countR30Users, spec.AsTimestamp(lastSeenAfter), diff.Milliseconds()).Rows()
 
 	if err != nil {
-		if !frame.DBErrorIsRecordNotFound(err) {
+		if !sqlutil.ErrorIsNoRows(err) {
 			logrus.Error("Failed to get r30 users: ", err)
 		}
 		return nil, err

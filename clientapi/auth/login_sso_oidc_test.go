@@ -15,7 +15,7 @@ import (
 )
 
 func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	mux := http.NewServeMux()
@@ -75,7 +75,7 @@ func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
 }
 
 func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	const callbackURL = "https://matrix.example.com/continue"
@@ -145,7 +145,7 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 }
 
 func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	idp := &oidcIdentityProvider{
@@ -176,7 +176,7 @@ func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
 }
 
 func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	const callbackURL = "https://matrix.example.com/continue"
@@ -256,7 +256,7 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 }
 
 func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	mux := http.NewServeMux()

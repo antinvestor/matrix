@@ -3,7 +3,7 @@ package tables_test
 import (
 	"context"
 	"crypto/ed25519"
-	"database/sql"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
@@ -13,36 +13,30 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 	ed255192 "golang.org/x/crypto/ed25519"
 )
 
-func mustCreateUserRoomKeysTable(t *testing.T, _ test.DependancyOption) (ctx context.Context, tab tables.UserRoomKeys, db *sql.DB, closeDb func()) {
+func mustCreateUserRoomKeysTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (cm *sqlutil.Connections, tab tables.UserRoomKeys) {
 	t.Helper()
 
-	ctx = testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err = sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
-	tab, err = postgres.NewPostgresUserRoomKeysTable(ctx, db)
+	cm = sqlutil.NewConnectionManager(svc)
 
+	tab, err := postgres.NewPostgresUserRoomKeysTable(ctx, cm)
 	assert.NoError(t, err)
 
-	return ctx, tab, db, closeDb
+	return cm, tab
 }
 
 func TestUserRoomKeysTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, tab, db, closeDb := mustCreateUserRoomKeysTable(t, testOpts)
-		defer closeDb()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		cm, tab := mustCreateUserRoomKeysTable(ctx, svc, t, testOpts)
+
 		userNID := types.EventStateKeyNID(1)
 		roomNID := types.RoomNID(1)
 		_, key, err := ed25519.GenerateKey(nil)

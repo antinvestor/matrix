@@ -21,8 +21,6 @@ func Test_AuthFallback(t *testing.T) {
 
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
 
 		for _, useHCaptcha := range []bool{false, true} {
 			for _, recaptchaEnabled := range []bool{false, true} {

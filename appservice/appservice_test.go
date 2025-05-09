@@ -133,8 +133,6 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
 
 		// Create a dummy application service
 		as := &config.ApplicationService{
@@ -159,7 +157,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 
 		// Create required internal APIs
 		natsInstance := jetstream.NATSInstance{}
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -228,10 +226,8 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	srv.Start()
 	defer srv.Close()
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, cfg := testrig.Init(t)
 	defer svc.Stop(ctx)
-	cfg, tearDown := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer tearDown()
 
 	// Create a dummy application service
 	as := &config.ApplicationService{
@@ -255,7 +251,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	}
 	// Create required internal APIs
 	natsInstance := jetstream.NATSInstance{}
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
@@ -269,7 +265,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 }
 
 func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID string, wantExists bool) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	userResp := &api.UserIDExistsResponse{}
 
@@ -284,7 +280,7 @@ func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID stri
 }
 
 func testAliasExists(t *testing.T, asAPI api.AppServiceInternalAPI, alias string, wantExists bool) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	aliasResp := &api.RoomAliasExistsResponse{}
 
@@ -299,7 +295,7 @@ func testAliasExists(t *testing.T, asAPI api.AppServiceInternalAPI, alias string
 }
 
 func testLocations(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult []api.ASLocationResponse) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	locationResp := &api.LocationResponse{}
 
@@ -314,7 +310,7 @@ func testLocations(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, 
 }
 
 func testUser(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult []api.ASUserResponse) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	userResp := &api.UserResponse{}
 
@@ -329,7 +325,7 @@ func testUser(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantR
 }
 
 func testProtocol(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantResult map[string]api.ASProtocolResponse) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	protoResp := &api.ProtocolResponse{}
 
@@ -358,9 +354,8 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+
+		cm := sqlutil.NewConnectionManager(svc)
 		natsInstance := &jetstream.NATSInstance{}
 
 		evChan := make(chan struct{})
@@ -443,10 +438,8 @@ func TestOutputAppserviceEvent(t *testing.T) {
 
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		t.Cleanup(closeDB)
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		natsInstance := &jetstream.NATSInstance{}
 
 		evChan := make(chan struct{})
