@@ -1,105 +1,97 @@
 package msc2836
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
+	"errors"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
-// Schema definitions
-const (
-	postgresSchema = `
-	CREATE TABLE IF NOT EXISTS msc2836_edges (
-		parent_event_id TEXT NOT NULL,
-		child_event_id TEXT NOT NULL,
-		rel_type TEXT NOT NULL,
-		parent_room_id TEXT NOT NULL,
-		parent_servers TEXT NOT NULL,
-		CONSTRAINT msc2836_edges_uniq UNIQUE (parent_event_id, child_event_id, rel_type)
-	);
+// Schema for edges and nodes tables
+const msc2836Schema = `
+CREATE TABLE IF NOT EXISTS msc2836_edges (
+	parent_event_id TEXT NOT NULL,
+	child_event_id TEXT NOT NULL,
+	rel_type TEXT NOT NULL,
+	parent_room_id TEXT NOT NULL,
+	parent_servers TEXT NOT NULL,
+	CONSTRAINT msc2836_edges_uniq UNIQUE (parent_event_id, child_event_id, rel_type)
+);
 
-	CREATE TABLE IF NOT EXISTS msc2836_nodes (
-		event_id TEXT PRIMARY KEY NOT NULL,
-		origin_server_ts BIGINT NOT NULL,
-		room_id TEXT NOT NULL,
-		unsigned_children_count BIGINT NOT NULL,
-		unsigned_children_hash TEXT NOT NULL,
-		explored SMALLINT NOT NULL
-	);
-	`
-)
+CREATE TABLE IF NOT EXISTS msc2836_nodes (
+	event_id TEXT PRIMARY KEY NOT NULL,
+	origin_server_ts BIGINT NOT NULL,
+	room_id TEXT NOT NULL,
+	unsigned_children_count BIGINT NOT NULL,
+	unsigned_children_hash TEXT NOT NULL,
+	explored SMALLINT NOT NULL
+);
+`
 
-// SQL query constants
-const (
-	// Insert edge represents a relationship between parent and child
-	insertEdgeSQL = `
-		INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type, parent_room_id, parent_servers)
-		VALUES($1, $2, $3, $4, $5)
-		ON CONFLICT DO NOTHING
-	`
+// Schema revert for edges and nodes tables
+const msc2836SchemaRevert = `
+DROP TABLE IF EXISTS msc2836_nodes;
+DROP TABLE IF EXISTS msc2836_edges;
+`
 
-	// Insert node with event metadata
-	insertNodeSQL = `
-		INSERT INTO msc2836_nodes(event_id, origin_server_ts, room_id, unsigned_children_count, unsigned_children_hash, explored)
-		VALUES($1, $2, $3, $4, $5, 0)
-		ON CONFLICT (event_id) DO UPDATE SET
-			origin_server_ts = EXCLUDED.origin_server_ts,
-			room_id = EXCLUDED.room_id
-	`
+// SQL for inserting an edge into the msc2836_edges table
+const insertEdgeSQL = `
+	INSERT INTO msc2836_edges(parent_event_id, child_event_id, rel_type, parent_room_id, parent_servers)
+	VALUES($1, $2, $3, $4, $5)
+	ON CONFLICT DO NOTHING
+`
 
-	// Select children for a parent, ordered by origin_server_ts ascending
-	selectChildrenForParentOldestFirstSQL = `
-		SELECT c.event_id, c.origin_server_ts, c.room_id
-		FROM msc2836_edges AS r
-		JOIN msc2836_nodes AS c ON r.child_event_id = c.event_id
-		WHERE r.parent_event_id = $1 AND r.rel_type = $2
-		ORDER BY c.origin_server_ts ASC
-	`
+// SQL for inserting a node into the msc2836_nodes table
+const insertNodeSQL = `
+	INSERT INTO msc2836_nodes(event_id, origin_server_ts, room_id, unsigned_children_count, unsigned_children_hash, explored)
+	VALUES($1, $2, $3, $4, $5, $6)
+	ON CONFLICT DO NOTHING
+`
 
-	// Select children for a parent, ordered by origin_server_ts descending
-	selectChildrenForParentRecentFirstSQL = `
-		SELECT c.event_id, c.origin_server_ts, c.room_id
-		FROM msc2836_edges AS r
-		JOIN msc2836_nodes AS c ON r.child_event_id = c.event_id
-		WHERE r.parent_event_id = $1 AND r.rel_type = $2
-		ORDER BY c.origin_server_ts DESC
-	`
+// SQL for selecting children for a parent, sorted by origin_server_ts
+const selectChildrenForParentOldestFirstSQL = `
+	SELECT child_event_id, origin_server_ts, room_id FROM msc2836_edges
+	LEFT JOIN msc2836_nodes ON msc2836_edges.child_event_id = msc2836_nodes.event_id
+	WHERE parent_event_id = $1 AND rel_type = $2
+	ORDER BY origin_server_ts ASC
+`
 
-	// Select parent for a child
-	selectParentForChildSQL = `
-		SELECT p.event_id, p.origin_server_ts, p.room_id
-		FROM msc2836_edges AS r
-		JOIN msc2836_nodes AS p ON r.parent_event_id = p.event_id
-		WHERE r.child_event_id = $1 AND r.rel_type = $2
-	`
+// SQL for selecting children for a parent, sorted by origin_server_ts in descending order
+const selectChildrenForParentRecentFirstSQL = `
+	SELECT child_event_id, origin_server_ts, room_id FROM msc2836_edges
+	LEFT JOIN msc2836_nodes ON msc2836_edges.child_event_id = msc2836_nodes.event_id
+	WHERE parent_event_id = $1 AND rel_type = $2
+	ORDER BY origin_server_ts DESC
+`
 
-	// Update child metadata
-	updateChildMetadataSQL = `
-		INSERT INTO msc2836_nodes (event_id, origin_server_ts, room_id, unsigned_children_count, unsigned_children_hash, explored)
-		VALUES ($1, $2, $3, $4, $5, 0)
-		ON CONFLICT (event_id) DO UPDATE SET
-			unsigned_children_count = CASE WHEN msc2836_nodes.unsigned_children_count < EXCLUDED.unsigned_children_count THEN EXCLUDED.unsigned_children_count ELSE msc2836_nodes.unsigned_children_count END,
-			unsigned_children_hash = CASE WHEN msc2836_nodes.unsigned_children_count < EXCLUDED.unsigned_children_count THEN EXCLUDED.unsigned_children_hash ELSE msc2836_nodes.unsigned_children_hash END,
-			explored = CASE WHEN msc2836_nodes.unsigned_children_count < EXCLUDED.unsigned_children_count THEN 0 ELSE msc2836_nodes.explored END
-	`
+// SQL for selecting a parent for a child
+const selectParentForChildSQL = `
+	SELECT parent_event_id, parent_room_id FROM msc2836_edges
+	WHERE child_event_id = $1 AND rel_type = $2
+`
 
-	// Select child metadata
-	selectChildMetadataSQL = `
-		SELECT unsigned_children_count, unsigned_children_hash, explored FROM msc2836_nodes WHERE event_id = $1
-	`
+// SQL for updating child metadata
+const updateChildMetadataSQL = `
+	UPDATE msc2836_nodes SET unsigned_children_count=$1, unsigned_children_hash=$2, explored=$3 WHERE event_id=$4
+`
 
-	// Update child metadata explored status
-	updateChildMetadataExploredSQL = `
-		UPDATE msc2836_nodes SET explored = 1 WHERE event_id = $1
-	`
-)
+// SQL for selecting child metadata
+const selectChildMetadataSQL = `
+	SELECT unsigned_children_count, unsigned_children_hash, explored FROM msc2836_nodes WHERE event_id=$1
+`
+
+// SQL for updating explored flag for child metadata
+const updateChildMetadataExploredSQL = `
+	UPDATE msc2836_nodes SET explored=$1 WHERE event_id=$2
+`
 
 type eventInfo struct {
 	EventID        string
@@ -135,8 +127,7 @@ type Database interface {
 // postgresDB implements the Database interface using Postgres
 type postgresDB struct {
 	cm *sqlutil.Connections
-
-	// SQL query strings
+	// SQL query string fields, initialized at construction
 	insertEdgeSQL                         string
 	insertNodeSQL                         string
 	selectChildrenForParentOldestFirstSQL string
@@ -148,23 +139,23 @@ type postgresDB struct {
 }
 
 // NewDatabase loads the database for msc2836
-func NewDatabase(ctx context.Context, cm *sqlutil.Connections, dbOpts *config.DatabaseOptions) (Database, error) {
-	if !cm.DS().IsPostgres() {
-		return nil, fmt.Errorf("unexpected database type")
-	}
+func NewDatabase(ctx context.Context, cm *sqlutil.Connections) (Database, error) {
 	return newPostgresDatabase(ctx, cm)
-
 }
 
 func newPostgresDatabase(ctx context.Context, cm *sqlutil.Connections) (Database, error) {
-
-	// Create tables if they don't exist
-	if err := cm.Connection(ctx, false).Exec(postgresSchema).Error; err != nil {
+	// Create migration patch
+	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+		Name:        "msc2836_tables_schema_001",
+		Patch:       msc2836Schema,
+		RevertPatch: msc2836SchemaRevert,
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	// Initialize the database
-	d := &postgresDB{
+	// Create table implementation with SQL queries
+	p := &postgresDB{
 		cm:                                    cm,
 		insertEdgeSQL:                         insertEdgeSQL,
 		insertNodeSQL:                         insertNodeSQL,
@@ -176,121 +167,121 @@ func newPostgresDatabase(ctx context.Context, cm *sqlutil.Connections) (Database
 		updateChildMetadataExploredSQL:        updateChildMetadataExploredSQL,
 	}
 
-	return d, nil
+	return p, nil
 }
 
-// PostgreSQL implementation
-func (d *postgresDB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent) error {
+func (p *postgresDB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent) error {
 	parent, child, relType := parentChildEventIDs(ev)
-	if parent == "" || child == "" || relType == "" {
+	if parent == "" || child == "" {
 		return nil
 	}
-	roomID, servers := roomIDAndServers(ev)
-	serversJSON, err := json.Marshal(servers)
+	relationRoomID, relationServers := roomIDAndServers(ev)
+	relationServersJSON, err := json.Marshal(relationServers)
 	if err != nil {
 		return err
 	}
-
-	db := d.cm.Connection(ctx, false)
-
-	// Store the edge (relationship)
-	if err := db.Exec(d.insertEdgeSQL, parent, child, relType, roomID, serversJSON).Error; err != nil {
-		return err
-	}
-
-	// Store the node (event) with metadata
-	originServerTS := ev.OriginServerTS()
-	if err := db.Exec(d.insertNodeSQL, child, originServerTS, ev.RoomID().String(), 0, "", 0).Error; err != nil {
-		return err
-	}
-
-	// Update child metadata if needed
-	return d.UpdateChildMetadata(ctx, ev)
-}
-
-func (d *postgresDB) UpdateChildMetadata(ctx context.Context, ev *types.HeaderedEvent) error {
 	count, hash := extractChildMetadata(ev)
-	if count == 0 || hash == nil {
-		return nil
-	}
 
-	db := d.cm.Connection(ctx, false)
-	hashStr := base64.StdEncoding.EncodeToString(hash)
-	eventID := ev.EventID()
-	return db.Exec(
-		d.updateChildMetadataSQL,
-		eventID,
-		ev.OriginServerTS(),
-		ev.RoomID().String(),
-		count,
-		hashStr,
-	).Error
+	return p.cm.Writer().Do(ctx, p.cm, func(ctx context.Context) error {
+
+		db := p.cm.Connection(ctx, false)
+
+		// Insert edge
+		result := db.Exec(p.insertEdgeSQL, parent, child, relType, relationRoomID, string(relationServersJSON))
+		if result.Error != nil {
+			return result.Error
+		}
+
+		util.GetLogger(ctx).Infof("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
+
+		// Insert node
+		result = db.Exec(p.insertNodeSQL, ev.EventID(), ev.OriginServerTS(), ev.RoomID().String(), count, base64.RawStdEncoding.EncodeToString(hash), 0)
+		if result.Error != nil {
+			return result.Error
+		}
+		return nil
+	})
 }
 
-func (d *postgresDB) ChildMetadata(ctx context.Context, eventID string) (count int, hash []byte, explored bool, err error) {
-	var hashB64 string
+func (p *postgresDB) UpdateChildMetadata(ctx context.Context, ev *types.HeaderedEvent) error {
+	eventCount, eventHash := extractChildMetadata(ev)
+	if eventCount == 0 {
+		return nil // nothing to update with
+	}
+
+	// extract current children count/hash, if they are less than the current event then update the columns and set to unexplored
+	count, hash, _, err := p.ChildMetadata(ctx, ev.EventID())
+	if err != nil {
+		return err
+	}
+	if eventCount > count || (eventCount == count && !bytes.Equal(hash, eventHash)) {
+		db := p.cm.Connection(ctx, false)
+		result := db.Exec(p.updateChildMetadataSQL, eventCount, base64.RawStdEncoding.EncodeToString(eventHash), 0, ev.EventID())
+		return result.Error
+	}
+	return nil
+}
+
+func (p *postgresDB) ChildMetadata(ctx context.Context, eventID string) (count int, hash []byte, explored bool, err error) {
+	var b64hash string
 	var exploredInt int
 
-	db := d.cm.Connection(ctx, true)
-	row := db.Raw(d.selectChildMetadataSQL, eventID).Row()
-	err = row.Scan(&count, &hashB64, &exploredInt)
+	db := p.cm.Connection(ctx, true)
+	row := db.Raw(p.selectChildMetadataSQL, eventID).Row()
+	err = row.Scan(&count, &b64hash, &exploredInt)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return 0, nil, false, nil
+		if errors.Is(err, sql.ErrNoRows) {
+			err = nil
 		}
-		return 0, nil, false, err
+		return
 	}
-
-	hash, err = base64.StdEncoding.DecodeString(hashB64)
-	return count, hash, exploredInt == 1, err
+	hash, err = base64.RawStdEncoding.DecodeString(b64hash)
+	explored = exploredInt > 0
+	return
 }
 
-func (d *postgresDB) MarkChildrenExplored(ctx context.Context, eventID string) error {
-	db := d.cm.Connection(ctx, false)
-	return db.Exec(d.updateChildMetadataExploredSQL, eventID).Error
+func (p *postgresDB) MarkChildrenExplored(ctx context.Context, eventID string) error {
+	db := p.cm.Connection(ctx, false)
+	result := db.Exec(p.updateChildMetadataExploredSQL, 1, eventID)
+	return result.Error
 }
 
-func (d *postgresDB) ChildrenForParent(ctx context.Context, eventID, relType string, recentFirst bool) ([]eventInfo, error) {
-	var rows *sql.Rows
-	var err error
+func (p *postgresDB) ChildrenForParent(ctx context.Context, eventID, relType string, recentFirst bool) ([]eventInfo, error) {
+	db := p.cm.Connection(ctx, true)
 
-	db := d.cm.Connection(ctx, true)
-
-	// Select the appropriate query based on sort order
-	queryStr := d.selectChildrenForParentOldestFirstSQL
+	var query string
 	if recentFirst {
-		queryStr = d.selectChildrenForParentRecentFirstSQL
+		query = p.selectChildrenForParentRecentFirstSQL
+	} else {
+		query = p.selectChildrenForParentOldestFirstSQL
 	}
 
-	rows, err = db.Raw(queryStr, eventID, relType).Rows()
+	rows, err := db.Raw(query, eventID, relType).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer rows.Close()
 
-	var result []eventInfo
+	var children []eventInfo
 	for rows.Next() {
-		var ei eventInfo
-		if err = rows.Scan(&ei.EventID, &ei.OriginServerTS, &ei.RoomID); err != nil {
+		var evInfo eventInfo
+		if err := rows.Scan(&evInfo.EventID, &evInfo.OriginServerTS, &evInfo.RoomID); err != nil {
 			return nil, err
 		}
-		result = append(result, ei)
+		children = append(children, evInfo)
 	}
-
-	return result, rows.Err()
+	return children, rows.Err()
 }
 
-func (d *postgresDB) ParentForChild(ctx context.Context, eventID, relType string) (*eventInfo, error) {
-	db := d.cm.Connection(ctx, true)
-
-	row := db.Raw(d.selectParentForChildSQL, eventID, relType).Row()
-
+func (p *postgresDB) ParentForChild(ctx context.Context, eventID, relType string) (*eventInfo, error) {
 	var ei eventInfo
-	err := row.Scan(&ei.EventID, &ei.OriginServerTS, &ei.RoomID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
+
+	db := p.cm.Connection(ctx, true)
+	row := db.Raw(p.selectParentForChildSQL, eventID, relType).Row()
+	err := row.Scan(&ei.EventID, &ei.RoomID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
 	return &ei, nil
