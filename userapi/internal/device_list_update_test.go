@@ -310,12 +310,13 @@ func TestDebounce(t *testing.T) {
 	srv := spec.ServerName("example.com")
 	userID := "@alice:example.com"
 	keyJSON := `{"user_id":"` + userID + `","device_id":"JLAFKJWSCS","algorithms":["m.olm.v1.curve25519-aes-sha2","m.megolm.v1.aes-sha2"],"keys":{"curve25519:JLAFKJWSCS":"3C5BFWi2Y8MaVvjM8M22DBmh24PmgR0nPvJOIArzgyI","ed25519:JLAFKJWSCS":"lEuiRJBit0IG6nUf5pUzWTUEsRVVe/HJkoKuEww9ULI"},"signatures":{"` + userID + `":{"ed25519:JLAFKJWSCS":"dSO80A01XiigH3uBiDVx/EjzaoycHcjq9lfQX0uWsqxl2giMIiSPR8a4d291W1ihKJL/a+myXS367WT6NAIcBA"}}}`
-	incomingFedReq := make(chan struct{})
+	incomingFedReq := make(chan struct{}, 5)
+	defer close(incomingFedReq)
 	fedClient := newFedClient(func(req *http.Request) (*http.Response, error) {
 		if req.URL.Path != "/_matrix/federation/v1/user/devices/"+url.PathEscape(userID) {
 			return nil, fmt.Errorf("test: invalid path: %s", req.URL.Path)
 		}
-		close(incomingFedReq)
+		incomingFedReq <- struct{}{}
 		return <-fedCh, nil
 	})
 	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
