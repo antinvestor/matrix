@@ -16,9 +16,9 @@ package internal
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -161,7 +161,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(ctx context.Context, senderID sp
 	}
 
 	ev, err := r.DB.GetStateEvent(ctx, roomID, spec.MRoomCanonicalAlias, "")
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return true, false, err
 	} else if ev != nil {
 		stateAlias := gjson.GetBytes(ev.Content(), "alias").Str

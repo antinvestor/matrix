@@ -82,7 +82,7 @@ const deletePushersByAppIdAndPushKeySQL = "" +
 
 // pushersTable represents a pushers table for user data
 type pushersTable struct {
-	cm                             *sqlutil.Connections
+	cm                             sqlutil.ConnectionManager
 	insertPusher                   string
 	selectPushers                  string
 	deletePusher                   string
@@ -90,9 +90,9 @@ type pushersTable struct {
 }
 
 // NewPostgresPusherTable creates a new postgres pusher table
-func NewPostgresPusherTable(ctx context.Context, cm *sqlutil.Connections) (tables.PusherTable, error) {
+func NewPostgresPusherTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.PusherTable, error) {
 	// Perform schema migration first
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_pushers_table_schema_001",
 		Patch:       pushersSchema,
 		RevertPatch: pushersSchemaRevert,

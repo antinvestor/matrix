@@ -62,7 +62,7 @@ const selectPreviousEventExistsSQL = "" +
 
 // previousEventsTable implements the tables.PreviousEvents interface using GORM
 type previousEventsTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query strings loaded from constants
 	insertPreviousEventSQL       string
@@ -70,9 +70,9 @@ type previousEventsTable struct {
 }
 
 // NewPostgresPreviousEventsTable creates a new previous events table
-func NewPostgresPreviousEventsTable(ctx context.Context, cm *sqlutil.Connections) (tables.PreviousEvents, error) {
+func NewPostgresPreviousEventsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.PreviousEvents, error) {
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_previous_events_table_schema_001",
 		Patch:       previousEventSchema,
 		RevertPatch: previousEventSchemaRevert,

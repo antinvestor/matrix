@@ -28,7 +28,7 @@ import (
 )
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(ctx context.Context, cm *sqlutil.Connections, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 
 	registationTokensTable, err := NewPostgresRegistrationTokensTable(ctx, cm)
 	if err != nil {
@@ -83,6 +83,11 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections, serverName spec.S
 		return nil, fmt.Errorf("NewPostgresStatsTable: %w", err)
 	}
 
+	err = cm.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return &shared.Database{
 		Cm:                    cm,
 		AccountDatas:          accountDataTbl,
@@ -105,7 +110,7 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections, serverName spec.S
 	}, nil
 }
 
-func NewKeyDatabase(ctx context.Context, cm *sqlutil.Connections) (*shared.KeyDatabase, error) {
+func NewKeyDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (*shared.KeyDatabase, error) {
 
 	otk, err := NewPostgresOneTimeKeysTable(ctx, cm)
 	if err != nil {
@@ -128,6 +133,11 @@ func NewKeyDatabase(ctx context.Context, cm *sqlutil.Connections) (*shared.KeyDa
 		return nil, err
 	}
 	css, err := NewPostgresCrossSigningSigsTable(ctx, cm)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cm.Migrate(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -158,6 +158,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		// Create required internal APIs
 		natsInstance := jetstream.NATSInstance{}
 		cm := sqlutil.NewConnectionManager(svc)
+
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)

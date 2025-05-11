@@ -62,7 +62,7 @@ const selectQueueJSONSQL = "" +
 
 // relayQueueJSONTable implements the tables.RelayQueueJSON interface
 type relayQueueJSONTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL queries stored as struct fields
 	insertQueueJSONSQL string
@@ -71,7 +71,7 @@ type relayQueueJSONTable struct {
 }
 
 // NewPostgresRelayQueueJSONTable creates a new relay queue JSON table
-func NewPostgresRelayQueueJSONTable(ctx context.Context, cm *sqlutil.Connections) (tables.RelayQueueJSON, error) {
+func NewPostgresRelayQueueJSONTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.RelayQueueJSON, error) {
 	t := &relayQueueJSONTable{
 		cm: cm,
 
@@ -82,7 +82,7 @@ func NewPostgresRelayQueueJSONTable(ctx context.Context, cm *sqlutil.Connections
 	}
 
 	// Migrate the table schema
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "relayapi_relay_queue_json_table_schema_001",
 		Patch:       relayQueueJSONSchema,
 		RevertPatch: relayQueueJSONSchemaRevert,

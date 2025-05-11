@@ -72,7 +72,7 @@ DELETE FROM syncapi_notification_data WHERE room_id = $1
 
 // notificationDataTable implements tables.NotificationData
 type notificationDataTable struct {
-	cm                                    *sqlutil.Connections
+	cm                                    sqlutil.ConnectionManager
 	upsertRoomUnreadNotificationCountsSQL string
 	selectUserUnreadNotificationsForRooms string
 	selectMaxNotificationIDSQL            string
@@ -80,7 +80,7 @@ type notificationDataTable struct {
 }
 
 // NewPostgresNotificationDataTable creates a new notification data table
-func NewPostgresNotificationDataTable(ctx context.Context, cm *sqlutil.Connections) (tables.NotificationData, error) {
+func NewPostgresNotificationDataTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.NotificationData, error) {
 	t := &notificationDataTable{
 		cm:                                    cm,
 		upsertRoomUnreadNotificationCountsSQL: upsertRoomUnreadNotificationCountsSQL,
@@ -90,7 +90,7 @@ func NewPostgresNotificationDataTable(ctx context.Context, cm *sqlutil.Connectio
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_notification_data_table_schema_001",
 		Patch:       notificationDataSchema,
 		RevertPatch: notificationDataSchemaRevert,

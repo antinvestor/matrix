@@ -31,7 +31,7 @@ type Database struct {
 }
 
 // NewDatabase a postgres database.
-func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.RoomServerCaches) (*Database, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
 
 	eventsJSON, err := NewPostgresEventJSONTable(ctx, cm)
@@ -95,6 +95,11 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.Roo
 		return nil, err
 	}
 	reportedEvents, err := NewPostgresReportedEventsTable(ctx, cm)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cm.Migrate(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -68,15 +68,13 @@ WHERE user_id = $1 AND device_id = ANY($2)
 
 const selectBatchDeviceKeysSQL = `
 SELECT device_id, key_json, stream_id, display_name FROM keyserver_device_keys
-WHERE user_id = $1 AND device_id = ANY($2)
+WHERE user_id = $1 AND key_json <> ''
 `
 
 const selectBatchDeviceKeysWithEmptiesSQL = `
 SELECT
-    user_id, device_id, key_json, stream_id, display_name,
-    (key_json = '{}' OR key_json = '') AS no_keys
-    FROM keyserver_device_keys
-    WHERE user_id = $1 AND (key_json = '{}' OR key_json = '' OR device_id = ANY($2))
+    device_id, key_json, stream_id, display_name
+    FROM keyserver_device_keys WHERE user_id = $1
 `
 
 const selectMaxStreamForUserSQL = `
@@ -96,7 +94,7 @@ DELETE FROM keyserver_device_keys WHERE user_id = $1
 `
 
 type deviceKeysTable struct {
-	cm                                  *sqlutil.Connections
+	cm                                  sqlutil.ConnectionManager
 	upsertDeviceKeysSQL                 string
 	selectDeviceKeysSQL                 string
 	selectBatchDeviceKeysSQL            string
@@ -108,7 +106,7 @@ type deviceKeysTable struct {
 }
 
 // NewPostgresDeviceKeysTable creates a new postgres device keys table
-func NewPostgresDeviceKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.DeviceKeys, error) {
+func NewPostgresDeviceKeysTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.DeviceKeys, error) {
 	t := &deviceKeysTable{
 		cm:                                  cm,
 		upsertDeviceKeysSQL:                 upsertDeviceKeysSQL,
@@ -122,7 +120,7 @@ func NewPostgresDeviceKeysTable(ctx context.Context, cm *sqlutil.Connections) (t
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "keyserver_device_keys_table_schema_001",
 		Patch:       deviceKeysSchema,
 		RevertPatch: deviceKeysSchemaRevert,
@@ -177,13 +175,20 @@ func (s *deviceKeysTable) SelectDeviceKeysJSON(ctx context.Context, keys []api.D
 // SelectMaxStreamIDForUser returns the maximum stream ID for the given user.
 func (s *deviceKeysTable) SelectMaxStreamIDForUser(ctx context.Context, userID string) (streamID int64, err error) {
 	db := s.cm.Connection(ctx, true)
+
+	var nullableStreamId sql.NullInt64
+
 	row := db.Raw(s.selectMaxStreamForUserSQL, userID).Row()
-	err = row.Scan(&streamID)
+	err = row.Scan(&nullableStreamId)
 	if err != nil {
 		if sqlutil.ErrorIsNoRows(err) {
 			return 0, nil
 		}
 		return 0, err
+	}
+
+	if nullableStreamId.Valid {
+		streamID = nullableStreamId.Int64
 	}
 	return
 }
@@ -208,14 +213,10 @@ func (s *deviceKeysTable) InsertDeviceKeys(ctx context.Context, keys []api.Devic
 	db := s.cm.Connection(ctx, false)
 
 	for _, key := range keys {
-		keyJSON, err := json.Marshal(key.KeyJSON)
-		if err != nil {
-			return err
-		}
-
-		err = db.Exec(
+		now := time.Now().Unix()
+		err := db.Exec(
 			s.upsertDeviceKeysSQL,
-			key.UserID, key.DeviceID, time.Now().Unix(), keyJSON, key.StreamID, key.DisplayName,
+			key.UserID, key.DeviceID, now, string(key.KeyJSON), key.StreamID, key.DisplayName,
 		).Error
 		if err != nil {
 			return err
@@ -244,63 +245,39 @@ func (s *deviceKeysTable) SelectBatchDeviceKeys(ctx context.Context, userID stri
 	var err error
 
 	if includeEmpty {
-		rows, err = db.Raw(s.selectBatchDeviceKeysWithEmptiesSQL, userID, pq.StringArray(deviceIDs)).Rows()
+		rows, err = db.Raw(s.selectBatchDeviceKeysWithEmptiesSQL, userID).Rows()
 	} else {
-		rows, err = db.Raw(s.selectBatchDeviceKeysSQL, userID, pq.StringArray(deviceIDs)).Rows()
+		rows, err = db.Raw(s.selectBatchDeviceKeysSQL, userID).Rows()
 	}
 
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectBatchDeviceKeys: rows.close() failed")
-
+	deviceIDMap := make(map[string]bool)
+	for _, d := range deviceIDs {
+		deviceIDMap[d] = true
+	}
 	var result []api.DeviceMessage
-	if includeEmpty {
-		for rows.Next() {
-			var userID, deviceID, displayName string
-			var keyJSON []byte
-			var streamID int64
-			var noKeys bool
-			if err := rows.Scan(&userID, &deviceID, &keyJSON, &streamID, &displayName, &noKeys); err != nil {
-				return nil, err
-			}
-
-			var dm api.DeviceMessage
-			dm.UserID = userID
-			dm.DeviceID = deviceID
-			dm.StreamID = streamID
-			dm.DisplayName = displayName
-
-			if !noKeys {
-				if err := json.Unmarshal(keyJSON, &dm.KeyJSON); err != nil {
-					return nil, err
-				}
-			}
-
-			result = append(result, dm)
+	var displayName sql.NullString
+	for rows.Next() {
+		dk := api.DeviceMessage{
+			Type: api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{
+				UserID: userID,
+			},
 		}
-	} else {
-		for rows.Next() {
-			var deviceID, displayName string
-			var keyJSON []byte
-			var streamID int64
-			if err := rows.Scan(&deviceID, &keyJSON, &streamID, &displayName); err != nil {
-				return nil, err
-			}
-
-			var dm api.DeviceMessage
-			dm.UserID = userID
-			dm.DeviceID = deviceID
-			dm.StreamID = streamID
-			dm.DisplayName = displayName
-
-			if err := json.Unmarshal(keyJSON, &dm.KeyJSON); err != nil {
-				return nil, err
-			}
-
-			result = append(result, dm)
+		err0 := rows.Scan(&dk.DeviceID, &dk.KeyJSON, &dk.StreamID, &displayName)
+		if err0 != nil {
+			return nil, err0
+		}
+		if displayName.Valid {
+			dk.DisplayName = displayName.String
+		}
+		// include the key if we want all keys (no device) or it was asked
+		if deviceIDMap[dk.DeviceID] || len(deviceIDs) == 0 {
+			result = append(result, dk)
 		}
 	}
-
 	return result, rows.Err()
 }

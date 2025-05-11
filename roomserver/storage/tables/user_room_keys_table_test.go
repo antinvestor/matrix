@@ -18,7 +18,7 @@ import (
 	ed255192 "golang.org/x/crypto/ed25519"
 )
 
-func mustCreateUserRoomKeysTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (cm *sqlutil.Connections, tab tables.UserRoomKeys) {
+func mustCreateUserRoomKeysTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (cm sqlutil.ConnectionManager, tab tables.UserRoomKeys) {
 	t.Helper()
 
 	cm = sqlutil.NewConnectionManager(svc)
@@ -42,7 +42,7 @@ func TestUserRoomKeysTable(t *testing.T) {
 		_, key, err := ed25519.GenerateKey(nil)
 		assert.NoError(t, err)
 
-		err = sqlutil.WithTransaction(ctx, cm, func(ctx context.Context) error {
+		err = cm.Do(ctx, func(ctx context.Context) error {
 			var gotKey, key2, key3 ed25519.PrivateKey
 			var pubKey ed25519.PublicKey
 			gotKey, err = tab.InsertUserRoomPrivatePublicKey(ctx, userNID, roomNID, key)

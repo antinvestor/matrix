@@ -68,7 +68,7 @@ DELETE FROM userapi_threepids WHERE threepid = $1 AND medium = $2
 `
 
 type threepidTable struct {
-	cm                             *sqlutil.Connections
+	cm                             sqlutil.ConnectionManager
 	selectLocalpartForThreePIDSQL  string
 	selectThreePIDsForLocalpartSQL string
 	insertThreePIDSQL              string
@@ -76,7 +76,7 @@ type threepidTable struct {
 }
 
 // NewPostgresThreePIDTable creates a new ThreePID table.
-func NewPostgresThreePIDTable(ctx context.Context, cm *sqlutil.Connections) (tables.ThreePIDTable, error) {
+func NewPostgresThreePIDTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.ThreePIDTable, error) {
 	s := &threepidTable{
 		cm:                             cm,
 		selectLocalpartForThreePIDSQL:  selectLocalpartForThreePIDSQL,
@@ -86,7 +86,7 @@ func NewPostgresThreePIDTable(ctx context.Context, cm *sqlutil.Connections) (tab
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_threepids_table_schema_001",
 		Patch:       threepidSchema,
 		RevertPatch: threepidSchemaRevert,

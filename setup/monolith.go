@@ -69,7 +69,7 @@ func (m *Monolith) AddAllPublicRoutes(
 	ctx context.Context,
 	cfg *config.Dendrite,
 	routers httputil.Routers,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	natsInstance *jetstream.NATSInstance,
 	caches *caching.Caches,
 

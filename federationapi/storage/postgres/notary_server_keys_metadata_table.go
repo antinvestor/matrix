@@ -89,7 +89,7 @@ const deleteUnusedServerKeysJSONSQL = `
 
 // notaryServerKeysMetadataTable stores the metadata for notary server keys
 type notaryServerKeysMetadataTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	upsertServerKeysSQL                   string
 	selectNotaryKeyResponsesSQL           string
@@ -99,7 +99,7 @@ type notaryServerKeysMetadataTable struct {
 }
 
 // NewPostgresNotaryServerKeysMetadataTable creates a new postgres notary server keys metadata table
-func NewPostgresNotaryServerKeysMetadataTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationNotaryServerKeysMetadata, error) {
+func NewPostgresNotaryServerKeysMetadataTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationNotaryServerKeysMetadata, error) {
 	s := &notaryServerKeysMetadataTable{
 		cm:                                    cm,
 		upsertServerKeysSQL:                   upsertServerKeysSQL,
@@ -110,7 +110,7 @@ func NewPostgresNotaryServerKeysMetadataTable(ctx context.Context, cm *sqlutil.C
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_notary_server_keys_metadata_table_schema_001",
 		Patch:       notaryServerKeysMetadataSchema,
 		RevertPatch: notaryServerKeysMetadataSchemaRevert,
@@ -135,7 +135,7 @@ func (s *notaryServerKeysMetadataTable) UpsertKey(
 	row := db.Raw(s.selectNotaryKeyMetadataSQL, serverName, keyID).Row()
 	err := row.Scan(&existingNotaryID, &existingValidUntil)
 	if err != nil {
-		if err.Error() != "sql: no rows in result set" {
+		if !sqlutil.ErrorIsNoRows(err) {
 			return 0, err
 		}
 	}

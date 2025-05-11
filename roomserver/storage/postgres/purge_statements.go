@@ -87,7 +87,7 @@ const (
 
 // purgeStatements holds the SQL queries for purging rooms
 type purgeStatements struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query string fields
 	purgeEventJSONSQL            string
@@ -105,7 +105,7 @@ type purgeStatements struct {
 }
 
 // NewPostgresPurgeTable creates a new instance of the purge statements.
-func NewPostgresPurgeTable(_ context.Context, cm *sqlutil.Connections) (tables.Purge, error) {
+func NewPostgresPurgeTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Purge, error) {
 	s := &purgeStatements{
 		cm: cm,
 

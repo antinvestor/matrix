@@ -73,7 +73,7 @@ const selectQueueEntryCountSQL = "" +
 
 // relayQueueTable implements the tables.RelayQueue interface
 type relayQueueTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL queries stored as struct fields
 	insertQueueEntrySQL      string
@@ -84,7 +84,7 @@ type relayQueueTable struct {
 
 // NewPostgresRelayQueueTable creates a new relay queue table
 func NewPostgresRelayQueueTable(
-	ctx context.Context, cm *sqlutil.Connections,
+	ctx context.Context, cm sqlutil.ConnectionManager,
 ) (tables.RelayQueue, error) {
 	t := &relayQueueTable{
 		cm: cm,
@@ -97,7 +97,7 @@ func NewPostgresRelayQueueTable(
 	}
 
 	// Migrate the table schema
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "relayapi_relay_queue_table_schema_001",
 		Patch:       relayQueueSchema,
 		RevertPatch: relayQueueSchemaRevert,

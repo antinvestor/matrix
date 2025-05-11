@@ -17,9 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -99,7 +96,7 @@ const bulkSelectRoomNIDsSQL = "" +
 
 // roomsTable implements the tables.Rooms interface using GORM
 type roomsTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query strings loaded from constants
 	insertRoomNIDSQL                  string
@@ -115,9 +112,9 @@ type roomsTable struct {
 }
 
 // NewPostgresRoomsTable creates a new rooms table
-func NewPostgresRoomsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Rooms, error) {
+func NewPostgresRoomsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Rooms, error) {
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_rooms_table_schema_001",
 		Patch:       roomsSchema,
 		RevertPatch: roomsSchemaRevert,
@@ -168,7 +165,7 @@ func (t *roomsTable) SelectRoomInfo(ctx context.Context, roomID string) (*types.
 	err := row.Scan(
 		&info.RoomVersion, &info.RoomNID, &stateSnapshotNID, &latestNIDs,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		return nil, nil
 	}
 	info.SetStateSnapshotNID(stateSnapshotNID)

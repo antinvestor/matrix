@@ -16,9 +16,7 @@ package internal
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
 )
@@ -31,7 +29,7 @@ func (a *UserInternalAPI) PerformEnsureSSOAccountExists(ctx context.Context, req
 		ServerName: req.ServerName,
 	}, &qAccRes)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !sqlutil.ErrorIsNoRows(err) {
 
 			return err
 		}

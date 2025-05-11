@@ -11,12 +11,14 @@ import (
 // contend on database locks in, e.g. SQLite. Only one task will run
 // at a time on a given ExclusiveWriter.
 type ExclusiveWriter struct {
+	cm      ConnectionManager
 	running atomic.Bool
 	todo    chan transactionWriterTask
 }
 
-func NewExclusiveWriter() Writer {
+func NewExclusiveWriter(cm ConnectionManager) Writer {
 	return &ExclusiveWriter{
+		cm:   cm,
 		todo: make(chan transactionWriterTask),
 	}
 }
@@ -24,7 +26,7 @@ func NewExclusiveWriter() Writer {
 // transactionWriterTask represents a specific task.
 type transactionWriterTask struct {
 	ctx  context.Context
-	cm   *Connections
+	opts []*WriterOption
 	f    func(ctx context.Context) error
 	wait chan error
 }
@@ -34,7 +36,7 @@ type transactionWriterTask struct {
 // txn parameter if one is supplied, and if not, will take out a
 // new transaction from the database supplied in the database
 // parameter. Either way, this will block until the task is done.
-func (w *ExclusiveWriter) Do(ctx context.Context, cm *Connections, f func(ctx context.Context) error) error {
+func (w *ExclusiveWriter) Do(ctx context.Context, f func(ctx context.Context) error, opts ...*WriterOption) error {
 	if w.todo == nil {
 		return errors.New("not initialised")
 	}
@@ -42,8 +44,8 @@ func (w *ExclusiveWriter) Do(ctx context.Context, cm *Connections, f func(ctx co
 		go w.run()
 	}
 	task := transactionWriterTask{
-		cm:   cm,
 		ctx:  ctx,
+		opts: opts,
 		f:    f,
 		wait: make(chan error, 1),
 	}
@@ -62,10 +64,17 @@ func (w *ExclusiveWriter) run() {
 
 	defer w.running.Store(false)
 	for task := range w.todo {
-		if task.cm != nil {
-			task.wait <- WithTransaction(task.ctx, task.cm, func(ctx context.Context) error {
-				return task.f(ctx)
-			})
+		if w.cm != nil {
+
+			task.wait <- func(ctx context.Context) error {
+				ctx0, txn, err := w.cm.BeginTx(ctx, task.opts...)
+				if err != nil {
+					return err
+				}
+				return WithTransaction(ctx0, txn, func(ctx context.Context) error {
+					return task.f(ctx)
+				})
+			}(task.ctx)
 		} else {
 			task.wait <- task.f(task.ctx)
 		}

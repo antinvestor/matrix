@@ -17,8 +17,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
@@ -91,7 +89,7 @@ const purgeEventsTopologySQL = "" +
 
 // outputRoomEventsTopologyTable represents a table storing topology of room events
 type outputRoomEventsTopologyTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	insertEventInTopologySQL                 string
 	selectEventIDsInRangeASCSQL              string
@@ -103,7 +101,7 @@ type outputRoomEventsTopologyTable struct {
 }
 
 // NewPostgresTopologyTable creates a new topology table
-func NewPostgresTopologyTable(ctx context.Context, cm *sqlutil.Connections) (tables.Topology, error) {
+func NewPostgresTopologyTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Topology, error) {
 	t := &outputRoomEventsTopologyTable{
 		cm: cm,
 
@@ -118,7 +116,7 @@ func NewPostgresTopologyTable(ctx context.Context, cm *sqlutil.Connections) (tab
 	}
 
 	// Run migrations
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_output_room_events_topology_table_schema_001",
 		Patch:       outputRoomEventsTopologySchema,
 		RevertPatch: outputRoomEventsTopologySchemaRevert,
@@ -168,7 +166,7 @@ func (t *outputRoomEventsTopologyTable) SelectEventIDsInRange(
 
 	// Query the event IDs.
 	rows, err := db.Raw(query, roomID, minDepth, maxDepth, maxDepth, maxStreamPos, limit).Rows()
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		// If no event matched the request, return an empty slice.
 		return []string{}, start, end, nil
 	} else if err != nil {

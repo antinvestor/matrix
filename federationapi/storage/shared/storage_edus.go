@@ -59,7 +59,7 @@ func (d *Database) AssociateEDUWithDestinations(
 	if eduType == spec.MDirectToDevice || eduType == spec.MDeviceListUpdate {
 		expiresAt = 0
 	}
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		var err error
 		for destination := range destinations {
 			err = d.FederationQueueEDUs.InsertQueueEDU(
@@ -85,7 +85,7 @@ func (d *Database) GetPendingEDUs(
 	err error,
 ) {
 	edus = make(map[*receipt.Receipt]*gomatrixserverlib.EDU)
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		nids, err := d.FederationQueueEDUs.SelectQueueEDUs(ctx, serverName, limit)
 		if err != nil {
 			return fmt.Errorf("SelectQueueEDUs: %w", err)
@@ -137,7 +137,7 @@ func (d *Database) CleanEDUs(
 		nids[i] = receipts[i].GetNID()
 	}
 
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		if err := d.FederationQueueEDUs.DeleteQueueEDUs(ctx, serverName, nids); err != nil {
 			return err
 		}
@@ -175,7 +175,7 @@ func (d *Database) GetPendingEDUServerNames(
 // DeleteExpiredEDUs deletes expired EDUs and evicts them from the cache.
 func (d *Database) DeleteExpiredEDUs(ctx context.Context) error {
 	var jsonNIDs []int64
-	err := d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) (err error) {
+	err := d.Cm.Do(ctx, func(ctx context.Context) (err error) {
 		expiredBefore := spec.AsTimestamp(time.Now())
 		jsonNIDs, err = d.FederationQueueEDUs.SelectExpiredEDUs(ctx, expiredBefore)
 		if err != nil {

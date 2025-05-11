@@ -16,10 +16,7 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -66,14 +63,14 @@ const selectAccountDataByTypeSQL = "" +
 
 // accountDataTable represents the account data table in the database.
 type accountDataTable struct {
-	cm                         *sqlutil.Connections
+	cm                         sqlutil.ConnectionManager
 	insertAccountDataSQL       string
 	selectAccountDataSQL       string
 	selectAccountDataByTypeSQL string
 }
 
 // NewPostgresAccountDataTable creates a new account data table object.
-func NewPostgresAccountDataTable(ctx context.Context, cm *sqlutil.Connections) (tables.AccountDataTable, error) {
+func NewPostgresAccountDataTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.AccountDataTable, error) {
 	t := &accountDataTable{
 		cm:                         cm,
 		insertAccountDataSQL:       insertAccountDataSQL,
@@ -82,7 +79,7 @@ func NewPostgresAccountDataTable(ctx context.Context, cm *sqlutil.Connections) (
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_account_datas_table_schema_001",
 		Patch:       accountDataSchema,
 		RevertPatch: accountDataSchemaRevert,
@@ -161,7 +158,7 @@ func (t *accountDataTable) SelectAccountDataByType(
 	db := t.cm.Connection(ctx, true)
 	row := db.Raw(t.selectAccountDataByTypeSQL, localpart, serverName, roomID, dataType).Row()
 	if err = row.Scan(&bytes); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil
 		}
 		return

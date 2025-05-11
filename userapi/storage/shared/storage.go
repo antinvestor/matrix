@@ -17,7 +17,6 @@ package shared
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -44,8 +43,7 @@ import (
 
 // Database represents an account database
 type Database struct {
-	Cm                    *sqlutil.Connections
-	Writer                sqlutil.Writer
+	Cm                    sqlutil.ConnectionManager
 	RegistrationTokens    tables.RegistrationTokensTable
 	Accounts              tables.AccountsTable
 	Profiles              tables.ProfileTable
@@ -72,7 +70,7 @@ type KeyDatabase struct {
 	StaleDeviceListsTable tables.StaleDeviceLists
 	CrossSigningKeysTable tables.CrossSigningKeys
 	CrossSigningSigsTable tables.CrossSigningSigs
-	Cm                    *sqlutil.Connections
+	Cm                    sqlutil.ConnectionManager
 }
 
 const (
@@ -86,7 +84,7 @@ func (d *Database) RegistrationTokenExists(ctx context.Context, token string) (b
 }
 
 func (d *Database) InsertRegistrationToken(ctx context.Context, registrationToken *clientapi.RegistrationToken) (created bool, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		created, err = d.RegistrationTokens.InsertRegistrationToken(ctx, registrationToken)
 		return err
 	})
@@ -102,7 +100,7 @@ func (d *Database) GetRegistrationToken(ctx context.Context, tokenString string)
 }
 
 func (d *Database) DeleteRegistrationToken(ctx context.Context, tokenString string) (err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		err = d.RegistrationTokens.DeleteRegistrationToken(ctx, tokenString)
 		return err
 	})
@@ -110,7 +108,7 @@ func (d *Database) DeleteRegistrationToken(ctx context.Context, tokenString stri
 }
 
 func (d *Database) UpdateRegistrationToken(ctx context.Context, tokenString string, newAttributes map[string]interface{}) (updatedToken *clientapi.RegistrationToken, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		updatedToken, err = d.RegistrationTokens.UpdateRegistrationToken(ctx, tokenString, newAttributes)
 		return err
 	})
@@ -152,7 +150,7 @@ func (d *Database) SetAvatarURL(
 	localpart string, serverName spec.ServerName,
 	avatarURL string,
 ) (profile *authtypes.Profile, changed bool, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		profile, changed, err = d.Profiles.SetAvatarURL(ctx, localpart, serverName, avatarURL)
 		return err
 	})
@@ -166,7 +164,7 @@ func (d *Database) SetDisplayName(
 	localpart string, serverName spec.ServerName,
 	displayName string,
 ) (profile *authtypes.Profile, changed bool, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		profile, changed, err = d.Profiles.SetDisplayName(ctx, localpart, serverName, displayName)
 		return err
 	})
@@ -182,7 +180,7 @@ func (d *Database) SetPassword(
 	if err != nil {
 		return err
 	}
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.Accounts.UpdatePassword(ctx, localpart, serverName, hash)
 	})
 }
@@ -194,7 +192,7 @@ func (d *Database) CreateAccount(
 	ctx context.Context, localpart string, serverName spec.ServerName,
 	plaintextPassword, appserviceID string, accountType api.AccountType,
 ) (acc *api.Account, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		// For guest accounts, we create a new numeric local part
 		if accountType == api.AccountTypeGuest {
 			var numLocalpart int64
@@ -263,7 +261,7 @@ func (d *Database) QueryPushRules(
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal default push rules: %w", err)
 		}
-		err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+		err = d.Cm.Do(ctx, func(ctx context.Context) error {
 			if dbErr := d.AccountDatas.InsertAccountData(ctx, localpart, serverName, "", "m.push_rules", prbs); dbErr != nil {
 				return fmt.Errorf("failed to save default push rules: %w", dbErr)
 			}
@@ -290,7 +288,7 @@ func (d *Database) SaveAccountData(
 	ctx context.Context, localpart string, serverName spec.ServerName,
 	roomID, dataType string, content json.RawMessage,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.AccountDatas.InsertAccountData(ctx, localpart, serverName, roomID, dataType, content)
 	})
 }
@@ -344,7 +342,7 @@ func (d *Database) SaveThreePIDAssociation(
 	localpart string, serverName spec.ServerName,
 	medium string,
 ) (err error) {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		user, _, err := d.ThreePIDs.SelectLocalpartForThreePID(
 			ctx, threepid, medium,
 		)
@@ -367,7 +365,7 @@ func (d *Database) SaveThreePIDAssociation(
 func (d *Database) RemoveThreePIDAssociation(
 	ctx context.Context, threepid string, medium string,
 ) (err error) {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.ThreePIDs.DeleteThreePID(ctx, threepid, medium)
 	})
 }
@@ -399,7 +397,7 @@ func (d *Database) GetThreePIDsForLocalpart(
 // If the DB returns sql.ErrNoRows the Localpart isn't taken.
 func (d *Database) CheckAccountAvailability(ctx context.Context, localpart string, serverName spec.ServerName) (bool, error) {
 	_, err := d.Accounts.SelectAccountByLocalpart(ctx, localpart, serverName)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		return true, nil
 	}
 	return false, err
@@ -412,7 +410,7 @@ func (d *Database) GetAccountByLocalpart(ctx context.Context, localpart string, 
 ) (*api.Account, error) {
 	// try to get the account with lowercase localpart (majority)
 	acc, err := d.Accounts.SelectAccountByLocalpart(ctx, strings.ToLower(localpart), serverName)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		acc, err = d.Accounts.SelectAccountByLocalpart(ctx, localpart, serverName) // try with localpart as passed by the request
 	}
 	return acc, err
@@ -427,7 +425,7 @@ func (d *Database) SearchProfiles(ctx context.Context, localpart string, searchS
 
 // DeactivateAccount deactivates the user's account, removing all ability for the user to login again.
 func (d *Database) DeactivateAccount(ctx context.Context, localpart string, serverName spec.ServerName) (err error) {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.Accounts.DeactivateAccount(ctx, localpart, serverName)
 	})
 }
@@ -442,7 +440,7 @@ func (d *Database) CreateOpenIDToken(
 		return 0, nil
 	}
 	expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + d.OpenIDTokenLifetimeMS
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.OpenIDTokens.InsertOpenIDToken(ctx, token, localpart, domain, expiresAtMS)
 	})
 	return expiresAtMS, err
@@ -459,7 +457,7 @@ func (d *Database) GetOpenIDTokenAttributes(
 func (d *Database) CreateKeyBackup(
 	ctx context.Context, userID, algorithm string, authData json.RawMessage,
 ) (version string, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		version, err = d.KeyBackupVersions.InsertKeyBackup(ctx, userID, algorithm, authData, "")
 		return err
 	})
@@ -469,7 +467,7 @@ func (d *Database) CreateKeyBackup(
 func (d *Database) UpdateKeyBackupAuthData(
 	ctx context.Context, userID, version string, authData json.RawMessage,
 ) (err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.KeyBackupVersions.UpdateKeyBackupAuthData(ctx, userID, version, authData)
 	})
 	return
@@ -478,7 +476,7 @@ func (d *Database) UpdateKeyBackupAuthData(
 func (d *Database) DeleteKeyBackup(
 	ctx context.Context, userID, version string,
 ) (exists bool, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		exists, err = d.KeyBackupVersions.DeleteKeyBackup(ctx, userID, version)
 		return err
 	})
@@ -488,7 +486,7 @@ func (d *Database) DeleteKeyBackup(
 func (d *Database) GetKeyBackup(
 	ctx context.Context, userID, version string,
 ) (versionResult, algorithm string, authData json.RawMessage, etag string, deleted bool, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		versionResult, algorithm, authData, etag, deleted, err = d.KeyBackupVersions.SelectKeyBackup(ctx, userID, version)
 		return err
 	})
@@ -498,7 +496,7 @@ func (d *Database) GetKeyBackup(
 func (d *Database) GetBackupKeys(
 	ctx context.Context, version, userID, filterRoomID, filterSessionID string,
 ) (result map[string]map[string]api.KeyBackupSession, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		if filterSessionID != "" {
 			result, err = d.KeyBackups.SelectKeysByRoomIDAndSessionID(ctx, userID, version, filterRoomID, filterSessionID)
 			return err
@@ -516,7 +514,7 @@ func (d *Database) GetBackupKeys(
 func (d *Database) CountBackupKeys(
 	ctx context.Context, version, userID string,
 ) (count int64, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		count, err = d.KeyBackups.CountKeys(ctx, userID, version)
 		if err != nil {
 			return err
@@ -531,7 +529,7 @@ func (d *Database) UpsertBackupKeys(
 	ctx context.Context, version, userID string, uploads []api.InternalKeyBackupSession,
 ) (count int64, etag string, err error) {
 	// wrap the following logic in a txn to ensure we atomically upload keys
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		_, _, _, oldETag, deleted, err := d.KeyBackupVersions.SelectKeyBackup(ctx, userID, version)
 		if err != nil {
 			return err
@@ -640,42 +638,18 @@ func (d *Database) CreateDevice(
 	deviceID *string, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
 ) (dev *api.Device, returnErr error) {
 	if deviceID != nil {
-		_, ok := d.Writer.(*sqlutil.ExclusiveWriter)
-		if ok { // we're using most likely using SQLite, so do things a little different
-			returnErr = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
-				var err error
 
-				devices, err := d.Devices.SelectDevicesByLocalpart(ctx, localpart, serverName, "")
-				if err != nil && !errors.Is(err, sql.ErrNoRows) {
-					return err
-				}
-				// No devices yet, only create a new one
-				if len(devices) == 0 {
-					dev, err = d.Devices.InsertDevice(ctx, *deviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
-					return err
-				}
-				sessionID := devices[0].SessionID + 1
-
-				// Revoke existing tokens for this device
-				if err = d.Devices.DeleteDevice(ctx, *deviceID, localpart, serverName); err != nil {
-					return err
-				}
-				// Create a new device with the session ID incremented
-				dev, err = d.Devices.InsertDeviceWithSessionID(ctx, *deviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent, sessionID)
+		returnErr = d.Cm.Do(ctx, func(ctx context.Context) error {
+			var err error
+			// Revoke existing tokens for this device
+			if err = d.Devices.DeleteDevice(ctx, *deviceID, localpart, serverName); err != nil {
 				return err
-			})
-		} else {
-			returnErr = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
-				var err error
-				// Revoke existing tokens for this device
-				if err = d.Devices.DeleteDevice(ctx, *deviceID, localpart, serverName); err != nil {
-					return err
-				}
+			}
 
-				dev, err = d.Devices.InsertDevice(ctx, *deviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
-				return err
-			})
-		}
+			dev, err = d.Devices.InsertDevice(ctx, *deviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
+			return err
+		})
+
 	} else {
 		// We generate device IDs in a loop in case its already taken.
 		// We cap this at going round 5 times to ensure we don't spin forever
@@ -686,7 +660,7 @@ func (d *Database) CreateDevice(
 				return nil, returnErr
 			}
 
-			returnErr = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+			returnErr = d.Cm.Do(ctx, func(ctx context.Context) error {
 				var err error
 				dev, err = d.Devices.InsertDevice(ctx, newDeviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
 				return err
@@ -718,7 +692,7 @@ func (d *Database) UpdateDevice(
 	localpart string, serverName spec.ServerName,
 	deviceID string, displayName *string,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.Devices.UpdateDeviceName(ctx, localpart, serverName, deviceID, displayName)
 	})
 }
@@ -732,8 +706,8 @@ func (d *Database) RemoveDevices(
 	localpart string, serverName spec.ServerName,
 	devices []string,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
-		if err := d.Devices.DeleteDevices(ctx, localpart, serverName, devices); !errors.Is(err, sql.ErrNoRows) {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
+		if err := d.Devices.DeleteDevices(ctx, localpart, serverName, devices); !sqlutil.ErrorIsNoRows(err) {
 			return err
 		}
 		return nil
@@ -748,12 +722,13 @@ func (d *Database) RemoveAllDevices(
 	localpart string, serverName spec.ServerName,
 	exceptDeviceID string,
 ) (devices []api.Device, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		devices, err = d.Devices.SelectDevicesByLocalpart(ctx, localpart, serverName, exceptDeviceID)
 		if err != nil {
 			return err
 		}
-		if err := d.Devices.DeleteDevicesByLocalpart(ctx, localpart, serverName, exceptDeviceID); !errors.Is(err, sql.ErrNoRows) {
+		err = d.Devices.DeleteDevicesByLocalpart(ctx, localpart, serverName, exceptDeviceID)
+		if !sqlutil.ErrorIsNoRows(err) {
 			return err
 		}
 		return nil
@@ -763,7 +738,7 @@ func (d *Database) RemoveAllDevices(
 
 // UpdateDeviceLastSeen updates a last seen timestamp and the ip address.
 func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart string, serverName spec.ServerName, deviceID, ipAddr, userAgent string) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.Devices.UpdateDeviceLastSeen(ctx, localpart, serverName, deviceID, ipAddr, userAgent)
 	})
 }
@@ -780,7 +755,7 @@ func (d *Database) CreateLoginToken(ctx context.Context, data *api.LoginTokenDat
 		Expiration: time.Now().Add(d.LoginTokenLifetime),
 	}
 
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.LoginTokens.InsertLoginToken(ctx, meta, data)
 	})
 	if err != nil {
@@ -801,7 +776,7 @@ func generateLoginToken() (string, error) {
 
 // RemoveLoginToken removes the named token (and may clean up other expired tokens).
 func (d *Database) RemoveLoginToken(ctx context.Context, token string) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.LoginTokens.DeleteLoginToken(ctx, token)
 	})
 }
@@ -813,13 +788,13 @@ func (d *Database) GetLoginTokenDataByToken(ctx context.Context, token string) (
 }
 
 func (d *Database) InsertNotification(ctx context.Context, localpart string, serverName spec.ServerName, eventID string, pos uint64, tweaks map[string]interface{}, n *api.Notification) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.Notifications.Insert(ctx, localpart, serverName, eventID, pos, pushrules.BoolTweakOr(tweaks, pushrules.HighlightTweak, false), n)
 	})
 }
 
 func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart string, serverName spec.ServerName, roomID string, pos uint64) (affected bool, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		affected, err = d.Notifications.DeleteUpTo(ctx, localpart, serverName, roomID, pos)
 		return err
 	})
@@ -827,7 +802,7 @@ func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart string
 }
 
 func (d *Database) SetNotificationsRead(ctx context.Context, localpart string, serverName spec.ServerName, roomID string, pos uint64, b bool) (affected bool, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		affected, err = d.Notifications.UpdateRead(ctx, localpart, serverName, roomID, pos, b)
 		return err
 	})
@@ -847,7 +822,7 @@ func (d *Database) GetRoomNotificationCounts(ctx context.Context, localpart stri
 }
 
 func (d *Database) DeleteOldNotifications(ctx context.Context) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.Notifications.Clean(ctx)
 	})
 }
@@ -860,7 +835,7 @@ func (d *Database) UpsertPusher(
 	if err != nil {
 		return err
 	}
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.Pushers.InsertPusher(
 			ctx,
 			p.SessionID,
@@ -891,9 +866,9 @@ func (d *Database) GetPushers(
 func (d *Database) RemovePusher(
 	ctx context.Context, appid, pushkey, localpart string, serverName spec.ServerName,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		err := d.Pushers.DeletePusher(ctx, appid, pushkey, localpart, serverName)
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil
 		}
 		return err
@@ -906,7 +881,7 @@ func (d *Database) RemovePusher(
 func (d *Database) RemovePushers(
 	ctx context.Context, appid, pushkey string,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.Pushers.DeletePushers(ctx, appid, pushkey)
 	})
 }
@@ -917,7 +892,7 @@ func (d *Database) UserStatistics(ctx context.Context) (*types.UserStatistics, *
 }
 
 func (d *Database) UpsertDailyRoomsMessages(ctx context.Context, serverName spec.ServerName, stats types.MessageStats, activeRooms, activeE2EERooms int64) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.Stats.UpsertDailyStats(ctx, serverName, stats, activeRooms, activeE2EERooms)
 	})
 }
@@ -935,7 +910,7 @@ func (d *KeyDatabase) ExistingOneTimeKeys(ctx context.Context, userID, deviceID 
 }
 
 func (d *KeyDatabase) StoreOneTimeKeys(ctx context.Context, keys api.OneTimeKeys) (counts *api.OneTimeKeysCount, err error) {
-	_ = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	_ = d.Cm.Do(ctx, func(ctx context.Context) error {
 		counts, err = d.OneTimeKeysTable.InsertOneTimeKeys(ctx, keys)
 		return err
 	})
@@ -959,7 +934,7 @@ func (d *KeyDatabase) PrevIDsExists(ctx context.Context, userID string, prevIDs 
 }
 
 func (d *KeyDatabase) StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage, clearUserIDs []string) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		for _, userID := range clearUserIDs {
 			err := d.DeviceKeysTable.DeleteAllDeviceKeys(ctx, userID)
 			if err != nil {
@@ -976,7 +951,7 @@ func (d *KeyDatabase) StoreLocalDeviceKeys(ctx context.Context, keys []api.Devic
 	for _, k := range keys {
 		userIDToStreamID[k.UserID] = 0
 	}
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		for userID := range userIDToStreamID {
 			streamID, err := d.DeviceKeysTable.SelectMaxStreamIDForUser(ctx, userID)
 			if err != nil {
@@ -1001,7 +976,7 @@ func (d *KeyDatabase) DeviceKeysForUser(ctx context.Context, userID string, devi
 
 func (d *KeyDatabase) ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[string]map[string]string) ([]api.OneTimeKeys, error) {
 	var result []api.OneTimeKeys
-	err := d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err := d.Cm.Do(ctx, func(ctx context.Context) error {
 		for userID, deviceToAlgo := range userToDeviceToAlgorithm {
 			for deviceID, algo := range deviceToAlgo {
 				keyJSON, err := d.OneTimeKeysTable.SelectAndDeleteOneTimeKey(ctx, userID, deviceID, algo)
@@ -1023,7 +998,7 @@ func (d *KeyDatabase) ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map
 }
 
 func (d *KeyDatabase) StoreKeyChange(ctx context.Context, userID string) (id int64, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		id, err = d.KeyChangesTable.InsertKeyChange(ctx, userID)
 		return err
 	})
@@ -1042,7 +1017,7 @@ func (d *KeyDatabase) StaleDeviceLists(ctx context.Context, domains []spec.Serve
 
 // MarkDeviceListStale sets the stale bit for this user to isStale.
 func (d *KeyDatabase) MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.StaleDeviceListsTable.InsertStaleDeviceList(ctx, userID, isStale)
 	})
 }
@@ -1050,15 +1025,15 @@ func (d *KeyDatabase) MarkDeviceListStale(ctx context.Context, userID string, is
 // DeleteDeviceKeys removes the device keys for a given user/device, and any accompanying
 // cross-signing signatures relating to that device.
 func (d *KeyDatabase) DeleteDeviceKeys(ctx context.Context, userID string, deviceIDs []gomatrixserverlib.KeyID) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		for _, deviceID := range deviceIDs {
-			if err := d.CrossSigningSigsTable.DeleteCrossSigningSigsForTarget(ctx, userID, deviceID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			if err := d.CrossSigningSigsTable.DeleteCrossSigningSigsForTarget(ctx, userID, deviceID); err != nil && !sqlutil.ErrorIsNoRows(err) {
 				return fmt.Errorf("d.CrossSigningSigsTable.DeleteCrossSigningSigsForTarget: %w", err)
 			}
-			if err := d.DeviceKeysTable.DeleteDeviceKeys(ctx, userID, string(deviceID)); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			if err := d.DeviceKeysTable.DeleteDeviceKeys(ctx, userID, string(deviceID)); err != nil && !sqlutil.ErrorIsNoRows(err) {
 				return fmt.Errorf("d.DeviceKeysTable.DeleteDeviceKeys: %w", err)
 			}
-			if err := d.OneTimeKeysTable.DeleteOneTimeKeys(ctx, userID, string(deviceID)); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			if err := d.OneTimeKeysTable.DeleteOneTimeKeys(ctx, userID, string(deviceID)); err != nil && !sqlutil.ErrorIsNoRows(err) {
 				return fmt.Errorf("d.OneTimeKeysTable.DeleteOneTimeKeys: %w", err)
 			}
 		}
@@ -1117,7 +1092,7 @@ func (d *KeyDatabase) CrossSigningSigsForTarget(ctx context.Context, originUserI
 
 // StoreCrossSigningKeysForUser stores the latest known cross-signing keys for a user.
 func (d *KeyDatabase) StoreCrossSigningKeysForUser(ctx context.Context, userID string, keyMap types.CrossSigningKeyMap) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		for keyType, keyData := range keyMap {
 			if err := d.CrossSigningKeysTable.UpsertCrossSigningKeysForUser(ctx, userID, keyType, keyData); err != nil {
 				return fmt.Errorf("d.CrossSigningKeysTable.InsertCrossSigningKeysForUser: %w", err)
@@ -1134,7 +1109,7 @@ func (d *KeyDatabase) StoreCrossSigningSigsForTarget(
 	targetUserID string, targetKeyID gomatrixserverlib.KeyID,
 	signature spec.Base64Bytes,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		if err := d.CrossSigningSigsTable.UpsertCrossSigningSigsForTarget(ctx, originUserID, originKeyID, targetUserID, targetKeyID, signature); err != nil {
 			return fmt.Errorf("d.CrossSigningSigsTable.InsertCrossSigningSigsForTarget: %w", err)
 		}
@@ -1147,7 +1122,7 @@ func (d *KeyDatabase) DeleteStaleDeviceLists(
 	ctx context.Context,
 	userIDs []string,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.StaleDeviceListsTable.DeleteStaleDeviceLists(ctx, userIDs)
 	})
 }

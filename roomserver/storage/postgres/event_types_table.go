@@ -95,7 +95,7 @@ const bulkSelectEventTypeNIDSQL = "" +
 
 // eventTypesTable implements the tables.EventTypes interface using GORM
 type eventTypesTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query strings loaded from constants
 	insertEventTypeNIDSQL     string
@@ -104,9 +104,9 @@ type eventTypesTable struct {
 }
 
 // NewPostgresEventTypesTable creates a new event types table
-func NewPostgresEventTypesTable(ctx context.Context, cm *sqlutil.Connections) (tables.EventTypes, error) {
+func NewPostgresEventTypesTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.EventTypes, error) {
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_event_types_table_schema_001",
 		Patch:       eventTypesSchema,
 		RevertPatch: eventTypesSchemaRevert,

@@ -1,6 +1,8 @@
 package tables_test
 
 import (
+	"context"
+	"github.com/pitabwire/frame"
 	"reflect"
 	"testing"
 
@@ -10,54 +12,44 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateInboundpeeksTable(t *testing.T, _ test.DependancyOption) (tables.FederationInboundPeeks, func()) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
+func mustCreateInboundpeeksTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) tables.FederationInboundPeeks {
 
-	connStr, closeDb, err := test.PrepareDatabaseConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
+	cm := sqlutil.NewConnectionManager(svc)
 	var tab tables.FederationInboundPeeks
-	tab, err = postgres.NewPostgresInboundPeeksTable(ctx, db)
+	tab, err := postgres.NewPostgresInboundPeeksTable(ctx, cm)
 
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)
 	}
-	return tab, closeDb
+	return tab
 }
 
 func TestInboundPeeksTable(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
+
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab := mustCreateInboundpeeksTable(t, testOpts)
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		tab := mustCreateInboundpeeksTable(ctx, svc, t, testOpts)
 
 		// Insert a peek
 		peekID := util.RandomString(8)
 		var renewalInterval int64 = 1000
-		if err := tab.InsertInboundPeek(ctx, nil, serverName, room.ID, peekID, renewalInterval); err != nil {
+		if err := tab.InsertInboundPeek(ctx, serverName, room.ID, peekID, renewalInterval); err != nil {
 			t.Fatal(err)
 		}
 
 		// select the newly inserted peek
-		inboundPeek1, err := tab.SelectInboundPeek(ctx, nil, serverName, room.ID, peekID)
+		inboundPeek1, err := tab.SelectInboundPeek(ctx, serverName, room.ID, peekID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -77,12 +69,12 @@ func TestInboundPeeksTable(t *testing.T) {
 		}
 
 		// Renew the peek
-		if err = tab.RenewInboundPeek(ctx, nil, serverName, room.ID, peekID, 2000); err != nil {
+		if err = tab.RenewInboundPeek(ctx, serverName, room.ID, peekID, 2000); err != nil {
 			t.Fatal(err)
 		}
 
 		// verify the values changed
-		inboundPeek2, err := tab.SelectInboundPeek(ctx, nil, serverName, room.ID, peekID)
+		inboundPeek2, err := tab.SelectInboundPeek(ctx, serverName, room.ID, peekID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,12 +89,12 @@ func TestInboundPeeksTable(t *testing.T) {
 		}
 
 		// delete the peek
-		if err = tab.DeleteInboundPeek(ctx, nil, serverName, room.ID, peekID); err != nil {
+		if err = tab.DeleteInboundPeek(ctx, serverName, room.ID, peekID); err != nil {
 			t.Fatal(err)
 		}
 
 		// There should be no peek anymore
-		peek, err := tab.SelectInboundPeek(ctx, nil, serverName, room.ID, peekID)
+		peek, err := tab.SelectInboundPeek(ctx, serverName, room.ID, peekID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,14 +106,14 @@ func TestInboundPeeksTable(t *testing.T) {
 		var peekIDs []string
 		for i := 0; i < 5; i++ {
 			peekID = util.RandomString(8)
-			if err = tab.InsertInboundPeek(ctx, nil, serverName, room.ID, peekID, 1000); err != nil {
+			if err = tab.InsertInboundPeek(ctx, serverName, room.ID, peekID, 1000); err != nil {
 				t.Fatal(err)
 			}
 			peekIDs = append(peekIDs, peekID)
 		}
 
 		// Now select them
-		inboundPeeks, err := tab.SelectInboundPeeks(ctx, nil, room.ID)
+		inboundPeeks, err := tab.SelectInboundPeeks(ctx, room.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -135,12 +127,12 @@ func TestInboundPeeksTable(t *testing.T) {
 		assert.ElementsMatch(t, gotPeekIDs, peekIDs)
 
 		// And delete them again
-		if err = tab.DeleteInboundPeeks(ctx, nil, room.ID); err != nil {
+		if err = tab.DeleteInboundPeeks(ctx, room.ID); err != nil {
 			t.Fatal(err)
 		}
 
 		// they should be gone now
-		inboundPeeks, err = tab.SelectInboundPeeks(ctx, nil, room.ID)
+		inboundPeeks, err = tab.SelectInboundPeeks(ctx, room.ID)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -16,10 +16,7 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
@@ -67,14 +64,14 @@ INSERT INTO syncapi_filter (filter, id, localpart) VALUES ($1, DEFAULT, $2) RETU
 
 // filterTable implements the tables.Filter interface
 type filterTable struct {
-	cm                         *sqlutil.Connections
+	cm                         sqlutil.ConnectionManager
 	selectFilterSQL            string
 	selectFilterIDByContentSQL string
 	insertFilterSQL            string
 }
 
 // NewPostgresFilterTable creates a new filter table
-func NewPostgresFilterTable(ctx context.Context, cm *sqlutil.Connections) (tables.Filter, error) {
+func NewPostgresFilterTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Filter, error) {
 	t := &filterTable{
 		cm:                         cm,
 		selectFilterSQL:            selectFilterSQL,
@@ -83,7 +80,7 @@ func NewPostgresFilterTable(ctx context.Context, cm *sqlutil.Connections) (table
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_filter_table_schema_001",
 		Patch:       filterSchema,
 		RevertPatch: filterSchemaRevert,
@@ -143,7 +140,7 @@ func (t *filterTable) InsertFilter(
 	// problem as both calls will result in the same filterID
 	row := db.Raw(t.selectFilterIDByContentSQL, localpart, filterJSON).Row()
 	err = row.Scan(&existingFilterID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return "", err
 	}
 	// If it does, return the existing ID

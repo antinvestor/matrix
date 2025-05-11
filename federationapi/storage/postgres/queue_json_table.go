@@ -62,7 +62,7 @@ const selectJSONSQL = "" +
 
 // queueJSONTable stores JSON for federation queue
 type queueJSONTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertJSONSQL string
 	deleteJSONSQL string
@@ -70,7 +70,7 @@ type queueJSONTable struct {
 }
 
 // NewPostgresQueueJSONTable creates a new postgres queue JSON table
-func NewPostgresQueueJSONTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationQueueJSON, error) {
+func NewPostgresQueueJSONTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationQueueJSON, error) {
 	s := &queueJSONTable{
 		cm:            cm,
 		insertJSONSQL: insertJSONSQL,
@@ -79,7 +79,7 @@ func NewPostgresQueueJSONTable(ctx context.Context, cm *sqlutil.Connections) (ta
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_queue_json_table_schema_001",
 		Patch:       queueJSONSchema,
 		RevertPatch: queueJSONSchemaRevert,

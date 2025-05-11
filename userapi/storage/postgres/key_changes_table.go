@@ -53,16 +53,16 @@ SELECT user_id, change_id FROM keyserver_key_changes WHERE change_id > $1 AND ch
 `
 
 type keyChangesTable struct {
-	cm                  *sqlutil.Connections
+	cm                  sqlutil.ConnectionManager
 	upsertKeyChangeSQL  string
 	selectKeyChangesSQL string
 }
 
 // NewPostgresKeyChangesTable creates a new key changes table
-func NewPostgresKeyChangesTable(ctx context.Context, cm *sqlutil.Connections) (tables.KeyChanges, error) {
+func NewPostgresKeyChangesTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.KeyChanges, error) {
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "keyserver_key_changes_table_schema_001",
 		Patch:       keyChangesSchema,
 		RevertPatch: keyChangesSchemaRevert,

@@ -75,7 +75,7 @@ const selectQueuePDUServerNamesSQL = "" +
 
 // queuePDUTable stores PDUs for sending to other servers
 type queuePDUTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertQueuePDUSQL                   string
 	deleteQueuePDUSQL                   string
@@ -85,7 +85,7 @@ type queuePDUTable struct {
 }
 
 // NewPostgresQueuePDUsTable creates a new postgres queue PDUs table
-func NewPostgresQueuePDUsTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationQueuePDUs, error) {
+func NewPostgresQueuePDUsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationQueuePDUs, error) {
 	s := &queuePDUTable{
 		cm:                                  cm,
 		insertQueuePDUSQL:                   insertQueuePDUSQL,
@@ -96,7 +96,7 @@ func NewPostgresQueuePDUsTable(ctx context.Context, cm *sqlutil.Connections) (ta
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_queue_pdus_table_schema_001",
 		Patch:       queuePDUsSchema,
 		RevertPatch: queuePDUsSchemaRevert,

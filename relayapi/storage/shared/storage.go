@@ -28,7 +28,7 @@ import (
 )
 
 type Database struct {
-	Cm                *sqlutil.Connections
+	Cm                sqlutil.ConnectionManager
 	IsLocalServerName func(spec.ServerName) bool
 	Cache             caching.FederationCache
 	RelayQueue        tables.RelayQueue
@@ -46,7 +46,7 @@ func (d *Database) StoreTransaction(
 	}
 
 	var nid int64
-	_ = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	_ = d.Cm.Do(ctx, func(ctx context.Context) error {
 		nid, err = d.RelayQueueJSON.InsertQueueJSON(ctx, string(jsonTransaction))
 		return err
 	})
@@ -64,7 +64,7 @@ func (d *Database) AssociateTransactionWithDestinations(
 	transactionID gomatrixserverlib.TransactionID,
 	dbReceipt *receipt.Receipt,
 ) error {
-	err := d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err := d.Cm.Do(ctx, func(ctx context.Context) error {
 		var lastErr error
 		for destination := range destinations {
 			destination := destination
@@ -94,7 +94,7 @@ func (d *Database) CleanTransactions(
 		nids[i] = dbReceipt.GetNID()
 	}
 
-	err := d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err := d.Cm.Do(ctx, func(ctx context.Context) error {
 		deleteEntryErr := d.RelayQueue.DeleteQueueEntries(ctx, userID.Domain(), nids)
 		// TODO : If there are still queue entries for any of these nids for other destinations
 		// then we shouldn't delete the json entries.
@@ -134,7 +134,7 @@ func (d *Database) GetTransaction(
 	firstNID := nids[0]
 
 	txns := map[int64][]byte{}
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		txns, err = d.RelayQueueJSON.SelectQueueJSON(ctx, nids)
 		return err
 	})

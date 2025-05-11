@@ -295,8 +295,6 @@ func TestUpdateNoPrevID(t *testing.T) {
 // update is still ongoing.
 func TestDebounce(t *testing.T) {
 
-	t.Skipf("panic on closed channel on GHA")
-
 	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 

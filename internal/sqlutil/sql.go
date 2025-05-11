@@ -66,12 +66,7 @@ func EndTransactionWithCheck(txn Transaction, succeeded *bool, err *error) {
 // WithTransaction runs a block of code passing in an SQL transaction
 // If the code returns an error or panics then the transactions is rolledback
 // Otherwise the transaction is committed.
-func WithTransaction(ctx context.Context, cm *Connections, fn func(ctx context.Context) error) (err error) {
-
-	ctx, txn, err := cm.BeginTx(ctx)
-	if err != nil {
-		return
-	}
+func WithTransaction(ctx context.Context, txn Transaction, fn func(ctx context.Context) error) (err error) {
 
 	succeeded := false
 	defer EndTransactionWithCheck(txn, &succeeded, &err)

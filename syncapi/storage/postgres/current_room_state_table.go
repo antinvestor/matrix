@@ -141,7 +141,7 @@ LIMIT 5
 
 // currentRoomStateTable implements tables.CurrentRoomState
 type currentRoomStateTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query fields
 	upsertRoomStateSQL                string
@@ -160,7 +160,7 @@ type currentRoomStateTable struct {
 }
 
 // NewPostgresCurrentRoomStateTable creates a new CurrentRoomState table
-func NewPostgresCurrentRoomStateTable(ctx context.Context, cm *sqlutil.Connections) (tables.CurrentRoomState, error) {
+func NewPostgresCurrentRoomStateTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.CurrentRoomState, error) {
 	t := &currentRoomStateTable{
 		cm: cm,
 
@@ -181,7 +181,7 @@ func NewPostgresCurrentRoomStateTable(ctx context.Context, cm *sqlutil.Connectio
 	}
 
 	// Run migrations
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_current_room_state_table_schema_001",
 		Patch:       currentRoomStateSchema,
 		RevertPatch: currentRoomStateSchemaRevert,

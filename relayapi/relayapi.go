@@ -56,7 +56,7 @@ func AddPublicRoutes(
 func NewRelayInternalAPI(
 	ctx context.Context,
 	cfg *config.Dendrite,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	fedClient fclient.FederationClient,
 	rsAPI rsAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,

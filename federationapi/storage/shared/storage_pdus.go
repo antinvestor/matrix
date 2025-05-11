@@ -33,7 +33,7 @@ func (d *Database) AssociatePDUWithDestinations(
 	destinations map[spec.ServerName]struct{},
 	dbReceipt *receipt.Receipt,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		var err error
 		for destination := range destinations {
 			err = d.FederationQueuePDUs.InsertQueuePDU(
@@ -63,7 +63,7 @@ func (d *Database) GetPendingPDUs(
 	// to know in SQLite mode that nothing else is trying to modify
 	// the database.
 	events = make(map[*receipt.Receipt]*types.HeaderedEvent)
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		nids, err := d.FederationQueuePDUs.SelectQueuePDUs(ctx, serverName, limit)
 		if err != nil {
 			return fmt.Errorf("SelectQueuePDUs: %w", err)
@@ -116,7 +116,7 @@ func (d *Database) CleanPDUs(
 		nids[i] = receipts[i].GetNID()
 	}
 
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		if err := d.FederationQueuePDUs.DeleteQueuePDUs(ctx, serverName, nids); err != nil {
 			return err
 		}

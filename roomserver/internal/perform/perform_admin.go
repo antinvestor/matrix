@@ -16,10 +16,9 @@ package perform
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -168,7 +167,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 	}
 
 	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, *fullUserID, spec.Invite)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return nil, err
 	}
 

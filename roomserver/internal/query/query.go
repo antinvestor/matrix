@@ -17,9 +17,9 @@ package query
 import (
 	"context"
 	"crypto/ed25519"
-	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	//"github.com/antinvestor/matrix/roomserver/internal"
 	"github.com/antinvestor/gomatrixserverlib"
@@ -423,7 +423,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 		var eventNIDs []types.EventNID
 		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, request.LocalOnly)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if sqlutil.ErrorIsNoRows(err) {
 				return nil
 			}
 			return fmt.Errorf("r.Cm.GetMembershipEventNIDsForRoom: %w", err)
@@ -463,7 +463,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 		var eventNIDs []types.EventNID
 		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if sqlutil.ErrorIsNoRows(err) {
 				return nil
 			}
 			return err
@@ -878,7 +878,7 @@ func (r *Queryer) QueryRoomsForUser(ctx context.Context, userID spec.UserID, des
 
 func (r *Queryer) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
 	users, err := r.DB.GetKnownUsers(ctx, req.UserID, req.SearchString, req.Limit)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return err
 	}
 	for _, user := range users {

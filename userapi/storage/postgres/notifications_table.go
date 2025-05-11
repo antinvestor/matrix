@@ -87,7 +87,7 @@ const cleanNotificationsSQL = "" +
 
 // notificationsTable represents a notifications table for user data
 type notificationsTable struct {
-	cm                           *sqlutil.Connections
+	cm                           sqlutil.ConnectionManager
 	insertNotification           string
 	deleteNotificationsUpTo      string
 	updateNotificationRead       string
@@ -98,9 +98,9 @@ type notificationsTable struct {
 }
 
 // NewPostgresNotificationTable creates a new postgres notification table
-func NewPostgresNotificationTable(ctx context.Context, cm *sqlutil.Connections) (tables.NotificationTable, error) {
+func NewPostgresNotificationTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.NotificationTable, error) {
 	// Perform schema migration first
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_notifications_table_schema_001",
 		Patch:       notificationSchema,
 		RevertPatch: notificationSchemaRevert,

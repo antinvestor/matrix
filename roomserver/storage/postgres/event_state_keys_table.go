@@ -76,7 +76,7 @@ const bulkSelectEventStateKeySQL = "" +
 
 // eventStateKeysTable implements the tables.EventStateKeys interface using GORM
 type eventStateKeysTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query strings loaded from constants
 	insertEventStateKeyNIDSQL     string
@@ -86,9 +86,9 @@ type eventStateKeysTable struct {
 }
 
 // NewPostgresEventStateKeysTable creates a new event state keys table
-func NewPostgresEventStateKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.EventStateKeys, error) {
+func NewPostgresEventStateKeysTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.EventStateKeys, error) {
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_event_state_keys_table_schema_001",
 		Patch:       eventStateKeysSchema,
 		RevertPatch: eventStateKeysSchemaRevert,

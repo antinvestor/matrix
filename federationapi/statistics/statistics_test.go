@@ -19,8 +19,9 @@ const (
 
 func TestBackoff(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
+
 	stats := NewStatistics(nil, FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)
 	server := ServerStatistics{
 		statistics: &stats,
@@ -112,7 +113,7 @@ func TestBackoff(t *testing.T) {
 
 func TestRelayServersListing(t *testing.T) {
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 
 	stats := NewStatistics(test.NewInMemoryFederationDatabase(), FailuresUntilBlacklist, FailuresUntilAssumedOffline, false)

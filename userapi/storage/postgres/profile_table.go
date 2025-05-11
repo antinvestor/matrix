@@ -82,7 +82,7 @@ SELECT localpart, server_name, display_name, avatar_url FROM userapi_profiles WH
 
 // profileTable represents the profiles table in the database.
 type profileTable struct {
-	cm                          *sqlutil.Connections
+	cm                          sqlutil.ConnectionManager
 	serverNoticesLocalpart      string
 	insertProfileSQL            string
 	selectProfileByLocalpartSQL string
@@ -92,7 +92,7 @@ type profileTable struct {
 }
 
 // NewPostgresProfilesTable creates a new profile table object.
-func NewPostgresProfilesTable(ctx context.Context, cm *sqlutil.Connections, serverNoticesLocalpart string) (tables.ProfileTable, error) {
+func NewPostgresProfilesTable(ctx context.Context, cm sqlutil.ConnectionManager, serverNoticesLocalpart string) (tables.ProfileTable, error) {
 	s := &profileTable{
 		cm:                          cm,
 		serverNoticesLocalpart:      serverNoticesLocalpart,
@@ -104,7 +104,7 @@ func NewPostgresProfilesTable(ctx context.Context, cm *sqlutil.Connections, serv
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_profiles_table_schema_001",
 		Patch:       profilesSchema,
 		RevertPatch: profilesSchemaRevert,

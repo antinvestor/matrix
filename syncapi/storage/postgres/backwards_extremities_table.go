@@ -65,7 +65,7 @@ DELETE FROM syncapi_backward_extremities WHERE room_id = $1
 
 // backwardExtremitiesTable represents a table storing backward extremities
 type backwardExtremitiesTable struct {
-	cm                                  *sqlutil.Connections
+	cm                                  sqlutil.ConnectionManager
 	insertBackwardExtremitySQL          string
 	selectBackwardExtremitiesForRoomSQL string
 	deleteBackwardExtremitySQL          string
@@ -73,7 +73,7 @@ type backwardExtremitiesTable struct {
 }
 
 // NewPostgresBackwardsExtremitiesTable creates a new backward extremities table
-func NewPostgresBackwardsExtremitiesTable(ctx context.Context, cm *sqlutil.Connections) (tables.BackwardsExtremities, error) {
+func NewPostgresBackwardsExtremitiesTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.BackwardsExtremities, error) {
 	t := &backwardExtremitiesTable{
 		cm:                                  cm,
 		insertBackwardExtremitySQL:          insertBackwardExtremitySQL,
@@ -83,7 +83,7 @@ func NewPostgresBackwardsExtremitiesTable(ctx context.Context, cm *sqlutil.Conne
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_backward_extremities_table_schema_001",
 		Patch:       backwardExtremitiesSchema,
 		RevertPatch: backwardExtremitiesSchemaRevert,

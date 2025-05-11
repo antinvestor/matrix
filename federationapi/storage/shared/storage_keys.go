@@ -39,7 +39,7 @@ func (d *Database) StoreKeys(
 	ctx context.Context,
 	keyMap map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		var lastErr error
 		for request, keys := range keyMap {
 			if err := d.ServerSigningKeys.UpsertServerKeys(ctx, request, keys); err != nil {

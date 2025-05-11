@@ -16,8 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal"
@@ -89,7 +87,7 @@ WHERE ($3::text IS NULL OR t.membership = $3)
 
 // membershipsTable implements tables.Memberships
 type membershipsTable struct {
-	cm                        *sqlutil.Connections
+	cm                        sqlutil.ConnectionManager
 	upsertMembershipSQL       string
 	selectMembershipCountSQL  string
 	selectMembershipBeforeSQL string
@@ -98,7 +96,7 @@ type membershipsTable struct {
 }
 
 // NewPostgresMembershipsTable creates a new memberships table
-func NewPostgresMembershipsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Memberships, error) {
+func NewPostgresMembershipsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Memberships, error) {
 	t := &membershipsTable{
 		cm:                        cm,
 		upsertMembershipSQL:       upsertMembershipSQL,
@@ -109,7 +107,7 @@ func NewPostgresMembershipsTable(ctx context.Context, cm *sqlutil.Connections) (
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_memberships_table_schema_001",
 		Patch:       membershipsSchema,
 		RevertPatch: membershipsSchemaRevert,
@@ -165,7 +163,7 @@ func (t *membershipsTable) SelectMembershipForUser(
 	row := db.Raw(t.selectMembershipBeforeSQL, roomID, userID, pos).Row()
 	err = row.Scan(&membership, &topologyPos)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return "leave", 0, nil
 		}
 		return "", 0, err

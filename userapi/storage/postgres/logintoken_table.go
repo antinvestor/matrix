@@ -65,14 +65,14 @@ const selectLoginTokenSQL = "" +
 	"SELECT user_id, extra_data FROM userapi_login_tokens WHERE token = $1 AND token_expires_at > $2"
 
 type loginTokenTable struct {
-	cm                  *sqlutil.Connections
+	cm                  sqlutil.ConnectionManager
 	insertLoginTokenSQL string
 	deleteLoginTokenSQL string
 	selectLoginTokenSQL string
 }
 
 // NewPostgresLoginTokenTable creates a new postgres login token table.
-func NewPostgresLoginTokenTable(ctx context.Context, cm *sqlutil.Connections) (tables.LoginTokenTable, error) {
+func NewPostgresLoginTokenTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.LoginTokenTable, error) {
 	t := &loginTokenTable{
 		cm:                  cm,
 		insertLoginTokenSQL: insertLoginTokenSQL,
@@ -81,7 +81,7 @@ func NewPostgresLoginTokenTable(ctx context.Context, cm *sqlutil.Connections) (t
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_login_tokens_table_schema_001",
 		Patch:       loginTokenSchema,
 		RevertPatch: loginTokenSchemaRevert,

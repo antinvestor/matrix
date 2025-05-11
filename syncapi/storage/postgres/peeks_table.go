@@ -93,7 +93,7 @@ DELETE FROM syncapi_peeks WHERE room_id = $1
 
 // peeksTable implements tables.Peeks
 type peeksTable struct {
-	cm                      *sqlutil.Connections
+	cm                      sqlutil.ConnectionManager
 	insertPeekSQL           string
 	deletePeekSQL           string
 	deletePeeksSQL          string
@@ -104,7 +104,7 @@ type peeksTable struct {
 }
 
 // NewPostgresPeeksTable creates a new peeks table
-func NewPostgresPeeksTable(ctx context.Context, cm *sqlutil.Connections) (tables.Peeks, error) {
+func NewPostgresPeeksTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Peeks, error) {
 	t := &peeksTable{
 		cm:                      cm,
 		insertPeekSQL:           insertPeekSQL,
@@ -117,7 +117,7 @@ func NewPostgresPeeksTable(ctx context.Context, cm *sqlutil.Connections) (tables
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_peeks_table_schema_001",
 		Patch:       peeksSchema,
 		RevertPatch: peeksSchemaRevert,

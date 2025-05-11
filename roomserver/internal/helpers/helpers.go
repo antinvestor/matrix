@@ -2,9 +2,8 @@ package helpers
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"sort"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -297,7 +296,7 @@ func slowGetHistoryVisibilityState(
 	roomState := state.NewStateResolution(db, info, querier)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("roomState.LoadStateAtEvent: %w", err)

@@ -81,7 +81,7 @@ const bulkSelectStateBlockEntriesSQL = "" +
 
 // stateBlockStatements holds prepared SQL statements for the state block table.
 type stateBlockStatements struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query string fields
 	insertStateDataSQL             string
@@ -90,8 +90,8 @@ type stateBlockStatements struct {
 
 // NewPostgresStateBlockTable creates a new instance of the state block table.
 // If the table does not exist, it will be created.
-func NewPostgresStateBlockTable(ctx context.Context, cm *sqlutil.Connections) (tables.StateBlock, error) {
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+func NewPostgresStateBlockTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.StateBlock, error) {
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_state_block_schema_001",
 		Patch:       stateBlockSchema,
 		RevertPatch: stateBlockSchemaRevert,

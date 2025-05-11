@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"sort"
 	"strconv"
 	"strings"
@@ -49,7 +50,9 @@ func (d dummyQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.Room
 
 // nolint:gocyclo
 func main() {
-	ctx := context.Background()
+
+	ctx, svc := frame.NewService("resolve-state")
+
 	cfg := setup.ParseFlags(true)
 	cfg.Logging = append(cfg.Logging[:0], config.LogrusHook{
 		Type:  "std",
@@ -68,11 +71,14 @@ func main() {
 		}
 	}
 
-	cm := sqlutil.NewConnectionManager(svc)
-
 	dbOpts := cfg.RoomServer.Database
 	if dbOpts.ConnectionString == "" {
 		dbOpts = cfg.Global.DatabaseOptions
+	}
+
+	cm, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &dbOpts)
+	if err != nil {
+		panic(err)
 	}
 
 	cfg.Global.Cache.MaxAge = time.Minute * 5
@@ -82,7 +88,7 @@ func main() {
 	}
 
 	fmt.Println("Opening database")
-	roomserverDB, err := storage.NewDatabase(ctx, cm, &dbOpts, caches)
+	roomserverDB, err := storage.NewDatabase(ctx, cm, caches)
 	if err != nil {
 		panic(err)
 	}

@@ -25,7 +25,7 @@ func NewMembershipUpdater(
 	var roomNID types.RoomNID
 	var targetUserNID types.EventStateKeyNID
 	var err error
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		roomNID, err = d.assignRoomNID(ctx, roomID, roomVersion)
 		if err != nil {
 			return err
@@ -49,7 +49,7 @@ func (d *Database) membershipUpdaterTxn(
 	targetUserNID types.EventStateKeyNID,
 	targetLocal bool,
 ) (context.Context, *MembershipUpdater, error) {
-	err := d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err := d.Cm.Do(ctx, func(ctx context.Context) error {
 		if err := d.MembershipTable.InsertMembership(ctx, roomNID, targetUserNID, targetLocal); err != nil {
 			return fmt.Errorf("d.MembershipTable.InsertMembership: %w", err)
 		}
@@ -112,7 +112,7 @@ func (u *MembershipUpdater) Delete(ctx context.Context) error {
 func (u *MembershipUpdater) Update(ctx context.Context, newMembership tables.MembershipState, event *types.Event) (bool, []string, error) {
 	var inserted bool    // Did the query result in a membership change?
 	var retired []string // Did we retire any updates in the process?
-	return inserted, retired, u.d.Cm.Writer().Do(ctx, u.d.Cm, func(ctx context.Context) error {
+	return inserted, retired, u.d.Cm.Do(ctx, func(ctx context.Context) error {
 		senderUserNID, err := u.d.assignStateKeyNID(ctx, string(event.SenderID()))
 		if err != nil {
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)

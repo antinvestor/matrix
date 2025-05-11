@@ -87,7 +87,7 @@ const selectJoinedHostsForRoomsExcludingBlacklistedSQL = "" +
 
 // joinedHostsTable stores information about which servers are joined to which rooms
 type joinedHostsTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertJoinedHostsSQL                             string
 	deleteJoinedHostsSQL                             string
@@ -99,7 +99,7 @@ type joinedHostsTable struct {
 }
 
 // NewPostgresJoinedHostsTable creates a new postgres joined hosts table
-func NewPostgresJoinedHostsTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationJoinedHosts, error) {
+func NewPostgresJoinedHostsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationJoinedHosts, error) {
 	s := &joinedHostsTable{
 		cm:                           cm,
 		insertJoinedHostsSQL:         insertJoinedHostsSQL,
@@ -112,7 +112,7 @@ func NewPostgresJoinedHostsTable(ctx context.Context, cm *sqlutil.Connections) (
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_joined_hosts_table_schema_001",
 		Patch:       joinedHostsSchema,
 		RevertPatch: joinedHostsSchemaRevert,

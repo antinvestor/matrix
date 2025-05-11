@@ -16,9 +16,8 @@ package internal
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/userapi/api"
@@ -55,7 +54,7 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 	tokenData, err := a.DB.GetLoginTokenDataByToken(ctx, req.Token)
 	if err != nil {
 		res.Data = nil
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil
 		}
 		return err
@@ -67,9 +66,9 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 	if !a.Config.Matrix.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot return a login token for a remote user (server name %s)", domain)
 	}
-	if _, err := a.DB.GetAccountByLocalpart(ctx, localpart, domain); err != nil {
+	if _, err = a.DB.GetAccountByLocalpart(ctx, localpart, domain); err != nil {
 		res.Data = nil
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil
 		}
 		return err

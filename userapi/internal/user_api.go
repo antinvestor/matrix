@@ -298,7 +298,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	isExisting := false
 	if req.DeviceID != nil && *req.DeviceID != "" {
 		existingDev, err := a.DB.GetDeviceByID(ctx, req.Localpart, req.ServerName, *req.DeviceID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if err != nil && !sqlutil.ErrorIsNoRows(err) {
 			return err
 		}
 		isExisting = existingDev.ID == *req.DeviceID
@@ -416,7 +416,7 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 		return fmt.Errorf("server name %s is not local", domain)
 	}
 	dev, err := a.DB.GetDeviceByID(ctx, localpart, domain, req.DeviceID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		res.DeviceExists = false
 		return nil
 	} else if err != nil {
@@ -471,7 +471,7 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, userID string) (*aut
 	}
 	prof, err := a.DB.GetProfileByLocalpart(ctx, local, domain)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, appserviceAPI.ErrProfileNotExists
 		}
 		return nil, err
@@ -578,7 +578,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 	}
 	device, err := a.DB.GetDeviceByAccessToken(ctx, req.AccessToken)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil
 		}
 		return err
@@ -782,7 +782,7 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 	version, algorithm, authData, etag, deleted, err := a.DB.GetKeyBackup(ctx, req.UserID, req.Version)
 	res.Version = version
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return res, nil
 		}
 		if errors.Is(err, strconv.ErrSyntax) {

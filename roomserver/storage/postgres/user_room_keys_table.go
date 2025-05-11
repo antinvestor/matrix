@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS roomserver_user_room_keys (
 
 // userRoomKeysStatements holds the SQL queries for user room keys
 type userRoomKeysStatements struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query string fields
 	insertUserRoomPrivateKeySQL          string
@@ -76,7 +76,7 @@ type userRoomKeysStatements struct {
 
 // NewPostgresUserRoomKeysTable creates a new instance of the user room keys table.
 // It creates the table if it doesn't exist and applies any necessary migrations.
-func NewPostgresUserRoomKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.UserRoomKeys, error) {
+func NewPostgresUserRoomKeysTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.UserRoomKeys, error) {
 	s := &userRoomKeysStatements{
 		cm: cm,
 
@@ -89,7 +89,7 @@ func NewPostgresUserRoomKeysTable(ctx context.Context, cm *sqlutil.Connections) 
 	}
 
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_user_room_keys_schema_001",
 		Patch:       userRoomKeysSchema,
 		RevertPatch: userRoomKeysSchemaRevert,

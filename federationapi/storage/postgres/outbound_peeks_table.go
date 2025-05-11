@@ -70,7 +70,7 @@ const deleteOutboundPeeksSQL = "" +
 
 // outboundPeeksTable stores information about outbound peeks to other servers
 type outboundPeeksTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertOutboundPeekSQL  string
 	selectOutboundPeekSQL  string
@@ -81,7 +81,7 @@ type outboundPeeksTable struct {
 }
 
 // NewPostgresOutboundPeeksTable creates a new postgres outbound peeks table
-func NewPostgresOutboundPeeksTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationOutboundPeeks, error) {
+func NewPostgresOutboundPeeksTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationOutboundPeeks, error) {
 	s := &outboundPeeksTable{
 		cm:                     cm,
 		insertOutboundPeekSQL:  insertOutboundPeekSQL,
@@ -93,7 +93,7 @@ func NewPostgresOutboundPeeksTable(ctx context.Context, cm *sqlutil.Connections)
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_outbound_peeks_table_schema_001",
 		Patch:       outboundPeeksSchema,
 		RevertPatch: outboundPeeksSchemaRevert,

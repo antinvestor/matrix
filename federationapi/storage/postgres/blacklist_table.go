@@ -56,7 +56,7 @@ const deleteAllBlacklistSQL = "" +
 
 // blacklistTable stores the list of blacklisted servers
 type blacklistTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertBlacklistSQL    string
 	selectBlacklistSQL    string
@@ -65,7 +65,7 @@ type blacklistTable struct {
 }
 
 // NewPostgresBlacklistTable creates a new postgres blacklist table
-func NewPostgresBlacklistTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationBlacklist, error) {
+func NewPostgresBlacklistTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationBlacklist, error) {
 	s := &blacklistTable{
 		cm:                    cm,
 		insertBlacklistSQL:    insertBlacklistSQL,
@@ -75,7 +75,7 @@ func NewPostgresBlacklistTable(ctx context.Context, cm *sqlutil.Connections) (ta
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_blacklist_table_schema_001",
 		Patch:       blacklistSchema,
 		RevertPatch: blacklistSchemaRevert,

@@ -24,7 +24,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/internal"
 	"github.com/antinvestor/matrix/relayapi/routing"
 	"github.com/antinvestor/matrix/relayapi/storage/shared"
@@ -62,8 +61,9 @@ func createFederationRequest(
 
 func TestForwardEmptyReturnsOk(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -85,8 +85,9 @@ func TestForwardEmptyReturnsOk(t *testing.T) {
 
 func TestForwardBadJSONReturnsError(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -114,8 +115,9 @@ func TestForwardBadJSONReturnsError(t *testing.T) {
 
 func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -148,8 +150,9 @@ func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 
 func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -185,8 +188,9 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}

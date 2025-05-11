@@ -94,7 +94,7 @@ func AddPublicRoutes(
 func NewInternalAPI(
 	ctx context.Context,
 	dendriteCfg *config.Dendrite,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	natsInstance *jetstream.NATSInstance,
 	federation fclient.FederationClient,
 	rsAPI roomserverAPI.FederationRoomserverAPI,

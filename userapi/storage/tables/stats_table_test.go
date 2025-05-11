@@ -22,7 +22,7 @@ import (
 )
 
 func mustMakeDBs(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (
-	*sqlutil.Connections, tables.AccountsTable, tables.DevicesTable, tables.StatsTable) {
+	sqlutil.ConnectionManager, tables.AccountsTable, tables.DevicesTable, tables.StatsTable) {
 	t.Helper()
 
 	var (
@@ -45,6 +45,11 @@ func mustMakeDBs(ctx context.Context, svc *frame.Service, t *testing.T, _ test.D
 	statsTable, err = postgres.NewPostgresStatsTable(ctx, cm, "localhost")
 	if err != nil {
 		t.Fatalf("unable to open stats db: %v", err)
+	}
+
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("unable to migrate db: %v", err)
 	}
 
 	return cm, accTable, devTable, statsTable
@@ -80,7 +85,7 @@ func mustMakeAccountAndDevice(
 func mustUpdateDeviceLastSeen(
 	ctx context.Context,
 	t *testing.T,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	localpart string,
 	timestamp time.Time,
 ) {
@@ -94,7 +99,7 @@ func mustUpdateDeviceLastSeen(
 func mustUserUpdateRegistered(
 	ctx context.Context,
 	t *testing.T,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	localpart string,
 	timestamp time.Time,
 ) {

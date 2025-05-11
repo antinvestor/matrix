@@ -2,7 +2,7 @@ package tables_test
 
 import (
 	"context"
-	"database/sql"
+	"github.com/pitabwire/frame"
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
@@ -11,7 +11,6 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,39 +23,26 @@ const (
 )
 
 type RelayServersDatabase struct {
-	DB     *sql.DB
-	Writer sqlutil.Writer
-	Table  tables.FederationRelayServers
+	Cm    sqlutil.ConnectionManager
+	Table tables.FederationRelayServers
 }
 
 func mustCreateRelayServersTable(
-	ctx context.Context,
+	ctx context.Context, svc *frame.Service,
 	t *testing.T,
 	_ test.DependancyOption,
-) (database RelayServersDatabase, close func()) {
+) *RelayServersDatabase {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
+	cm := sqlutil.NewConnectionManager(svc)
 	var tab tables.FederationRelayServers
-	tab, err = postgres.NewPostgresRelayServersTable(ctx, db)
+	tab, err := postgres.NewPostgresRelayServersTable(ctx, cm)
 	assert.NoError(t, err)
 
-	assert.NoError(t, err)
-
-	database = RelayServersDatabase{
-		DB:     db,
-		Writer: sqlutil.NewDefaultWriter(),
-		Table:  tab,
+	return &RelayServersDatabase{
+		Cm:    cm,
+		Table: tab,
 	}
-	return database, closeDb
 }
 
 func Equal(a, b []spec.ServerName) bool {
@@ -73,18 +59,19 @@ func Equal(a, b []spec.ServerName) bool {
 
 func TestShouldInsertRelayServers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db := mustCreateRelayServersTable(ctx, t, testOpts)
+
+		db := mustCreateRelayServersTable(ctx, svc, t, testOpts)
 
 		expectedRelayServers := []spec.ServerName{server2, server3}
 
-		err := db.Table.InsertRelayServers(ctx, nil, server1, expectedRelayServers)
+		err := db.Table.InsertRelayServers(ctx, server1, expectedRelayServers)
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
-		relayServers, err := db.Table.SelectRelayServers(ctx, nil, server1)
+		relayServers, err := db.Table.SelectRelayServers(ctx, server1)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}
@@ -97,25 +84,25 @@ func TestShouldInsertRelayServers(t *testing.T) {
 
 func TestShouldInsertRelayServersWithDuplicates(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db := mustCreateRelayServersTable(ctx, t, testOpts)
+		db := mustCreateRelayServersTable(ctx, svc, t, testOpts)
 
 		insertRelayServers := []spec.ServerName{server2, server2, server2, server3, server2}
 		expectedRelayServers := []spec.ServerName{server2, server3}
 
-		err := db.Table.InsertRelayServers(ctx, nil, server1, insertRelayServers)
+		err := db.Table.InsertRelayServers(ctx, server1, insertRelayServers)
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
 		// Insert the same list again, this shouldn't fail and should have no effect.
-		err = db.Table.InsertRelayServers(ctx, nil, server1, insertRelayServers)
+		err = db.Table.InsertRelayServers(ctx, server1, insertRelayServers)
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
-		relayServers, err := db.Table.SelectRelayServers(ctx, nil, server1)
+		relayServers, err := db.Table.SelectRelayServers(ctx, server1)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}
@@ -128,12 +115,12 @@ func TestShouldInsertRelayServersWithDuplicates(t *testing.T) {
 
 func TestShouldGetRelayServersUnknownDestination(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db := mustCreateRelayServersTable(ctx, t, testOpts)
+		db := mustCreateRelayServersTable(ctx, svc, t, testOpts)
 
 		// Query relay servers for a destination that doesn't exist in the table.
-		relayServers, err := db.Table.SelectRelayServers(ctx, nil, server1)
+		relayServers, err := db.Table.SelectRelayServers(ctx, server1)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}
@@ -146,40 +133,40 @@ func TestShouldGetRelayServersUnknownDestination(t *testing.T) {
 
 func TestShouldDeleteCorrectRelayServers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db := mustCreateRelayServersTable(ctx, t, testOpts)
+		db := mustCreateRelayServersTable(ctx, svc, t, testOpts)
 
 		relayServers1 := []spec.ServerName{server2, server3}
 		relayServers2 := []spec.ServerName{server1, server3, server4}
 
-		err := db.Table.InsertRelayServers(ctx, nil, server1, relayServers1)
+		err := db.Table.InsertRelayServers(ctx, server1, relayServers1)
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
-		err = db.Table.InsertRelayServers(ctx, nil, server2, relayServers2)
+		err = db.Table.InsertRelayServers(ctx, server2, relayServers2)
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
-		err = db.Table.DeleteRelayServers(ctx, nil, server1, []spec.ServerName{server2})
+		err = db.Table.DeleteRelayServers(ctx, server1, []spec.ServerName{server2})
 		if err != nil {
 			t.Fatalf("Failed deleting relay servers for %s: %s", server1, err.Error())
 		}
-		err = db.Table.DeleteRelayServers(ctx, nil, server2, []spec.ServerName{server1, server4})
+		err = db.Table.DeleteRelayServers(ctx, server2, []spec.ServerName{server1, server4})
 		if err != nil {
 			t.Fatalf("Failed deleting relay servers for %s: %s", server2, err.Error())
 		}
 
 		expectedRelayServers := []spec.ServerName{server3}
-		relayServers, err := db.Table.SelectRelayServers(ctx, nil, server1)
+		relayServers, err := db.Table.SelectRelayServers(ctx, server1)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}
 		if !Equal(relayServers, expectedRelayServers) {
 			t.Fatalf("Expected: %v \nActual: %v", expectedRelayServers, relayServers)
 		}
-		relayServers, err = db.Table.SelectRelayServers(ctx, nil, server2)
+		relayServers, err = db.Table.SelectRelayServers(ctx, server2)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}
@@ -191,35 +178,35 @@ func TestShouldDeleteCorrectRelayServers(t *testing.T) {
 
 func TestShouldDeleteAllRelayServers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, svc, cfg := testrig.Init(t, testOpts)
+		ctx, svc, _ := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-		db := mustCreateRelayServersTable(ctx, t, testOpts)
+		db := mustCreateRelayServersTable(ctx, svc, t, testOpts)
 
 		expectedRelayServers := []spec.ServerName{server2, server3}
 
-		err := db.Table.InsertRelayServers(ctx, nil, server1, expectedRelayServers)
+		err := db.Table.InsertRelayServers(ctx, server1, expectedRelayServers)
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
-		err = db.Table.InsertRelayServers(ctx, nil, server2, expectedRelayServers)
+		err = db.Table.InsertRelayServers(ctx, server2, expectedRelayServers)
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
-		err = db.Table.DeleteAllRelayServers(ctx, nil, server1)
+		err = db.Table.DeleteAllRelayServers(ctx, server1)
 		if err != nil {
 			t.Fatalf("Failed deleting relay servers for %s: %s", server1, err.Error())
 		}
 
-		expectedRelayServers1 := []spec.ServerName{}
-		relayServers, err := db.Table.SelectRelayServers(ctx, nil, server1)
+		var expectedRelayServers1 []spec.ServerName
+		relayServers, err := db.Table.SelectRelayServers(ctx, server1)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}
 		if !Equal(relayServers, expectedRelayServers1) {
 			t.Fatalf("Expected: %v \nActual: %v", expectedRelayServers1, relayServers)
 		}
-		relayServers, err = db.Table.SelectRelayServers(ctx, nil, server2)
+		relayServers, err = db.Table.SelectRelayServers(ctx, server2)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}

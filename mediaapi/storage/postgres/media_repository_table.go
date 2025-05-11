@@ -70,7 +70,7 @@ SELECT content_type, file_size_bytes, creation_ts, upload_name, media_id, user_i
 `
 
 type mediaStatements struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL statements stored as struct fields
 	insertMediaStmt       string
@@ -78,9 +78,9 @@ type mediaStatements struct {
 	selectMediaByHashStmt string
 }
 
-func NewPostgresMediaRepositoryTable(ctx context.Context, cm *sqlutil.Connections) (tables.MediaRepository, error) {
+func NewPostgresMediaRepositoryTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.MediaRepository, error) {
 	// Create the table using standardized migration approach
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "mediaapi_media_repository_table_schema_001",
 		Patch:       mediaSchema,
 		RevertPatch: mediaSchemaRevert,

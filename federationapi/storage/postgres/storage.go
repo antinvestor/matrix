@@ -28,13 +28,11 @@ import (
 // Database stores information needed by the federation sender
 type Database struct {
 	shared.Database
-	cm *sqlutil.Connections
 }
 
 // NewDatabase opens a new database
-func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
 	var d Database
-	d.cm = cm
 
 	blacklist, err := NewPostgresBlacklistTable(ctx, cm)
 	if err != nil {
@@ -85,7 +83,13 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.Fed
 		return nil, err
 	}
 
+	err = cm.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	d.Database = shared.Database{
+		Cm:                       cm,
 		IsLocalServerName:        isLocalServerName,
 		Cache:                    cache,
 		FederationJoinedHosts:    joinedHosts,

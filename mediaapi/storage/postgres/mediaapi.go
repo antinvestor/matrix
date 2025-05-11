@@ -24,7 +24,7 @@ import (
 )
 
 // NewDatabase opens a postgres database.
-func NewDatabase(ctx context.Context, cm *sqlutil.Connections) (*shared.Database, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (*shared.Database, error) {
 
 	mediaRepo, err := NewPostgresMediaRepositoryTable(ctx, cm)
 	if err != nil {
@@ -34,10 +34,15 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections) (*shared.Database
 	if err != nil {
 		return nil, err
 	}
+
+	err = cm.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return &shared.Database{
 		MediaRepository: mediaRepo,
 		Thumbnails:      thumbnails,
 		Cm:              cm,
-		Writer:          cm.Writer(),
 	}, nil
 }

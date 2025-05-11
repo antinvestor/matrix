@@ -17,9 +17,8 @@ package perform
 import (
 	"context"
 	"crypto/ed25519"
-	"database/sql"
-	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"strings"
 	"time"
 
@@ -258,7 +257,7 @@ func (r *Joiner) performJoinRoomByID(
 		var guestAccessEvent *types.HeaderedEvent
 		guestAccess := "forbidden"
 		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, spec.MRoomGuestAccess, "")
-		if (err != nil && !errors.Is(err, sql.ErrNoRows)) || guestAccessEvent == nil {
+		if (err != nil && !sqlutil.ErrorIsNoRows(err)) || guestAccessEvent == nil {
 			logrus.WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
 		}
 		if guestAccessEvent != nil {

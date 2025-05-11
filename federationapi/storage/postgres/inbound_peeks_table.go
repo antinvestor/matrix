@@ -71,7 +71,7 @@ const deleteInboundPeeksSQL = "" +
 
 // inboundPeeksTable stores information about inbound peeks from other servers
 type inboundPeeksTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertInboundPeekSQL  string
 	selectInboundPeekSQL  string
@@ -82,7 +82,7 @@ type inboundPeeksTable struct {
 }
 
 // NewPostgresInboundPeeksTable creates a new postgres inbound peeks table
-func NewPostgresInboundPeeksTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationInboundPeeks, error) {
+func NewPostgresInboundPeeksTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationInboundPeeks, error) {
 	s := &inboundPeeksTable{
 		cm:                    cm,
 		insertInboundPeekSQL:  insertInboundPeekSQL,
@@ -94,7 +94,7 @@ func NewPostgresInboundPeeksTable(ctx context.Context, cm *sqlutil.Connections) 
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_inbound_peeks_table_schema_001",
 		Patch:       inboundPeeksSchema,
 		RevertPatch: inboundPeeksSchemaRevert,

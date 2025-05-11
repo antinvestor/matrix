@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTopologyTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (*sqlutil.Connections, tables.Topology) {
+func newTopologyTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (sqlutil.ConnectionManager, tables.Topology) {
 	t.Helper()
 
 	cm := sqlutil.NewConnectionManager(svc)
@@ -41,7 +41,7 @@ func TestTopologyTable(t *testing.T) {
 		cm, tab := newTopologyTable(ctx, svc, t, testOpts)
 
 		events := room.Events()
-		err := sqlutil.WithTransaction(ctx, cm, func(ctx context.Context) error {
+		err := cm.Do(ctx, func(ctx context.Context) error {
 			var highestPos types.StreamPosition
 			for i, ev := range events {
 				topoPos, err := tab.InsertEventInTopology(ctx, ev, types.StreamPosition(i))

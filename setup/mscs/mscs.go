@@ -29,7 +29,7 @@ import (
 )
 
 // Enable MSCs - returns an error on unknown MSCs
-func Enable(ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, caches *caching.Caches) error {
+func Enable(ctx context.Context, cfg *config.Dendrite, cm sqlutil.ConnectionManager, routers httputil.Routers, monolith *setup.Monolith, caches *caching.Caches) error {
 	for _, msc := range cfg.MSCs.MSCs {
 		util.GetLogger(ctx).WithField("msc", msc).Info("Enabling MSC")
 		if err := EnableMSC(ctx, cfg, cm, routers, monolith, msc, caches); err != nil {
@@ -39,7 +39,7 @@ func Enable(ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, 
 	return nil
 }
 
-func EnableMSC(ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, monolith *setup.Monolith, msc string, caches *caching.Caches) error {
+func EnableMSC(ctx context.Context, cfg *config.Dendrite, cm sqlutil.ConnectionManager, routers httputil.Routers, monolith *setup.Monolith, msc string, caches *caching.Caches) error {
 	switch msc {
 	case "msc2836":
 		return msc2836.Enable(ctx, cfg, cm, routers, monolith.RoomserverAPI, monolith.FederationAPI, monolith.UserAPI, monolith.KeyRing)

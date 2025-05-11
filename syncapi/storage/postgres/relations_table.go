@@ -85,7 +85,7 @@ SELECT COALESCE(MAX(id), 0) FROM syncapi_relations
 
 // relationsTable implements tables.Relations
 type relationsTable struct {
-	cm                            *sqlutil.Connections
+	cm                            sqlutil.ConnectionManager
 	insertRelationSQL             string
 	selectRelationsInRangeAscSQL  string
 	selectRelationsInRangeDescSQL string
@@ -94,7 +94,7 @@ type relationsTable struct {
 }
 
 // NewPostgresRelationsTable creates a new relations table
-func NewPostgresRelationsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Relations, error) {
+func NewPostgresRelationsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Relations, error) {
 	t := &relationsTable{
 		cm:                            cm,
 		insertRelationSQL:             insertRelationSQL,
@@ -105,7 +105,7 @@ func NewPostgresRelationsTable(ctx context.Context, cm *sqlutil.Connections) (ta
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_relations_table_schema_001",
 		Patch:       relationsSchema,
 		RevertPatch: relationsSchemaRevert,

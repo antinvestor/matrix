@@ -17,7 +17,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
@@ -91,7 +90,7 @@ SELECT COALESCE(MAX(localpart::bigint), 0) FROM userapi_accounts WHERE localpart
 `
 
 type accountsTable struct {
-	cm                        *sqlutil.Connections
+	cm                        sqlutil.ConnectionManager
 	serverName                spec.ServerName
 	insertAccountStmt         string
 	updatePasswordStmt        string
@@ -102,7 +101,7 @@ type accountsTable struct {
 }
 
 // NewPostgresAccountsTable creates a new postgres accounts table.
-func NewPostgresAccountsTable(ctx context.Context, cm *sqlutil.Connections, serverName spec.ServerName) (tables.AccountsTable, error) {
+func NewPostgresAccountsTable(ctx context.Context, cm sqlutil.ConnectionManager, serverName spec.ServerName) (tables.AccountsTable, error) {
 	s := &accountsTable{
 		cm:                        cm,
 		serverName:                serverName,
@@ -115,7 +114,7 @@ func NewPostgresAccountsTable(ctx context.Context, cm *sqlutil.Connections, serv
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_accounts_table_schema_001",
 		Patch:       accountsSchema,
 		RevertPatch: accountsSchemaRevert,
@@ -198,7 +197,7 @@ func (s *accountsTable) SelectAccountByLocalpart(
 	row := db.Raw(s.selectAccountByLocalpart, localpart, serverName).Row()
 	err := row.Scan(&acc.Localpart, &acc.ServerName, &appserviceIDPtr, &acc.AccountType)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !sqlutil.ErrorIsNoRows(err) {
 			log.WithError(err).Error("Unable to retrieve user from the db")
 		}
 		return nil, err

@@ -78,7 +78,7 @@ const selectKeysByRoomIDAndSessionIDSQL = "" +
 	"WHERE user_id = $1 AND version = $2 AND room_id = $3 AND session_id = $4"
 
 type keyBackupTable struct {
-	cm                                *sqlutil.Connections
+	cm                                sqlutil.ConnectionManager
 	insertBackupKeySQL                string
 	updateBackupKeySQL                string
 	countKeysSQL                      string
@@ -88,7 +88,7 @@ type keyBackupTable struct {
 }
 
 // NewPostgresKeyBackupTable creates a new postgres key backup table.
-func NewPostgresKeyBackupTable(ctx context.Context, cm *sqlutil.Connections) (tables.KeyBackupTable, error) {
+func NewPostgresKeyBackupTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.KeyBackupTable, error) {
 	t := &keyBackupTable{
 		cm:                                cm,
 		insertBackupKeySQL:                insertBackupKeySQL,
@@ -100,7 +100,7 @@ func NewPostgresKeyBackupTable(ctx context.Context, cm *sqlutil.Connections) (ta
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_key_backups_table_schema_001",
 		Patch:       keyBackupTableSchema,
 		RevertPatch: keyBackupTableSchemaRevert,

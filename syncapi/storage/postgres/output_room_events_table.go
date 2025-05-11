@@ -214,7 +214,7 @@ const searchEventsCountSQL = `SELECT COUNT(*) FROM syncapi_output_room_events WH
 
 // outputRoomEventsTable represents the table for storing output room events
 type outputRoomEventsTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query fields
 	insertEventSQL                string
@@ -238,7 +238,7 @@ type outputRoomEventsTable struct {
 }
 
 // NewPostgresEventsTable creates a new events table
-func NewPostgresEventsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Events, error) {
+func NewPostgresEventsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Events, error) {
 	t := &outputRoomEventsTable{
 		cm: cm,
 
@@ -264,7 +264,7 @@ func NewPostgresEventsTable(ctx context.Context, cm *sqlutil.Connections) (table
 	}
 
 	// Run migrations
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_output_room_events_table_schema_001",
 		Patch:       outputRoomEventsSchema,
 		RevertPatch: outputRoomEventsSchemaRevert,

@@ -65,7 +65,7 @@ const updateTokenExpiryTimeSQL = "" +
 
 // registrationTokenTable represents a registration tokens table
 type registrationTokenTable struct {
-	cm                                  *sqlutil.Connections
+	cm                                  sqlutil.ConnectionManager
 	selectToken                         string
 	insertToken                         string
 	listAllTokens                       string
@@ -79,9 +79,9 @@ type registrationTokenTable struct {
 }
 
 // NewPostgresRegistrationTokensTable creates a new postgres registration tokens table
-func NewPostgresRegistrationTokensTable(ctx context.Context, cm *sqlutil.Connections) (tables.RegistrationTokensTable, error) {
+func NewPostgresRegistrationTokensTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.RegistrationTokensTable, error) {
 	// Perform schema migration first
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_registration_tokens_table_schema_001",
 		Patch:       registrationTokensSchema,
 		RevertPatch: registrationTokensSchemaRevert,

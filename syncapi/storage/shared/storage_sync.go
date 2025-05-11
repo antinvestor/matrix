@@ -294,9 +294,9 @@ func (d *DatabaseTransaction) StreamToTopologicalPosition(
 ) (types.TopologyToken, error) {
 	topoPos, err := d.Topology.SelectStreamToTopologicalPosition(ctx, roomID, streamPos, backwardOrdering)
 	switch {
-	case errors.Is(err, sql.ErrNoRows) && backwardOrdering: // no events in range, going backward
+	case sqlutil.ErrorIsNoRows(err) && backwardOrdering: // no events in range, going backward
 		return types.TopologyToken{PDUPosition: streamPos}, nil
-	case errors.Is(err, sql.ErrNoRows) && !backwardOrdering: // no events in range, going forward
+	case sqlutil.ErrorIsNoRows(err) && !backwardOrdering: // no events in range, going forward
 		return types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}, nil
 	case err != nil: // some other error happened
 		return types.TopologyToken{}, fmt.Errorf("d.Topology.SelectStreamToTopologicalPosition: %w", err)
@@ -347,7 +347,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	// user has ever interacted with — joined to, kicked/banned from, left.
 	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, userID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil, nil
 		}
 		return nil, nil, err
@@ -365,14 +365,14 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	// get all the state events ever (i.e. for all available rooms) between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, r, nil, allRoomIDs)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil, nil
 		}
 		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, stateNeeded, eventMap)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil, nil
 		}
 		return nil, nil, err
@@ -386,14 +386,14 @@ func (d *DatabaseTransaction) GetStateDeltas(
 		var eventMapFiltered map[string]types.StreamEvent
 		stateNeededFiltered, eventMapFiltered, err = d.OutputEvents.SelectStateInRange(ctx, r, stateFilter, allRoomIDs)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if sqlutil.ErrorIsNoRows(err) {
 				return nil, nil, nil
 			}
 			return nil, nil, err
 		}
 		stateFiltered, err = d.fetchStateEvents(ctx, stateNeededFiltered, eventMapFiltered)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if sqlutil.ErrorIsNoRows(err) {
 				return nil, nil, nil
 			}
 			return nil, nil, err
@@ -403,7 +403,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	// find out which rooms this user is peeking, if any.
 	// We do this before joins so any peeks get overwritten
 	peeks, err := d.Peeks.SelectPeeksInRange(ctx, userID, device.ID, r)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return nil, nil, err
 	}
 
@@ -414,7 +414,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 			var s []types.StreamEvent
 			s, err = d.currentStateStreamEventsForRoom(ctx, peek.RoomID, stateFilter)
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
+				if sqlutil.ErrorIsNoRows(err) {
 					continue
 				}
 				return nil, nil, err
@@ -450,7 +450,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 					// joined room instead of a delta.
 					var s []types.StreamEvent
 					if s, err = d.currentStateStreamEventsForRoom(ctx, roomID, stateFilter); err != nil {
-						if errors.Is(err, sql.ErrNoRows) {
+						if sqlutil.ErrorIsNoRows(err) {
 							continue
 						}
 						return nil, nil, err
@@ -503,7 +503,7 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 	// user has ever interacted with — joined to, kicked/banned from, left.
 	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, userID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil, nil
 		}
 		return nil, nil, err
@@ -522,7 +522,7 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 	deltas := make(map[string]types.StateDelta)
 
 	peeks, err := d.Peeks.SelectPeeksInRange(ctx, userID, device.ID, r)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return nil, nil, err
 	}
 
@@ -547,14 +547,14 @@ func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 	// Get all the state events ever between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, r, stateFilter, allRoomIDs)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil, nil
 		}
 		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, stateNeeded, eventMap)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil, nil
 		}
 		return nil, nil, err
@@ -665,7 +665,7 @@ func (d *DatabaseTransaction) MaxStreamPositionForPresence(ctx context.Context) 
 }
 
 func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		if err := d.BackwardExtremities.PurgeBackwardExtremities(ctx, roomID); err != nil {
 			return fmt.Errorf("failed to purge backward extremities: %w", err)
 		}
@@ -700,7 +700,7 @@ func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 func (d *Database) PurgeRoomState(
 	ctx context.Context, roomID string,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		// If the event is a create event then we'll delete all of the existing
 		// data for the room. The only reason that a create event would be replayed
 		// to us in this way is if we're about to receive the entire room state.

@@ -1024,102 +1024,107 @@ func TestCapabilities(t *testing.T) {
 
 func TestTurnserver(t *testing.T) {
 	alice := test.NewUser(t)
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
 
-	cfg.ClientAPI.RateLimiting.Enabled = false
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-	natsInstance := jetstream.NATSInstance{}
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(svc)
+		cfg.ClientAPI.RateLimiting.Enabled = false
 
-	// Needed to create accounts
-	caches, err := caching.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-	rsAPI.SetFederationAPI(ctx, nil, nil)
-	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-	//rsAPI.SetUserAPI(userAPI)
-	// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
-	AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		natsInstance := jetstream.NATSInstance{}
 
-	// Create the users in the userapi and login
-	accessTokens := map[*test.User]userDevice{
-		alice: {},
-	}
-	createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(svc)
 
-	testCases := []struct {
-		name              string
-		turnConfig        config.TURN
-		wantEmptyResponse bool
-	}{
-		{
-			name:              "no turn server configured",
-			wantEmptyResponse: true,
-		},
-		{
-			name:              "servers configured but not userLifeTime",
-			wantEmptyResponse: true,
-			turnConfig:        config.TURN{URIs: []string{""}},
-		},
-		{
-			name:              "missing sharedSecret/username/password",
-			wantEmptyResponse: true,
-			turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m"},
-		},
-		{
-			name:       "with shared secret",
-			turnConfig: config.TURN{URIs: []string{""}, UserLifetime: "1m", SharedSecret: "iAmSecret"},
-		},
-		{
-			name:       "with username/password secret",
-			turnConfig: config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username", Password: "iAmSecret"},
-		},
-		{
-			name:              "only username set",
-			turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username"},
-			wantEmptyResponse: true,
-		},
-		{
-			name:              "only password set",
-			turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username"},
-			wantEmptyResponse: true,
-		},
-	}
+		// Needed to create accounts
+		caches, err := caching.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI.SetFederationAPI(ctx, nil, nil)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		//rsAPI.SetUserAPI(userAPI)
+		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
+		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/voip/turnServer", strings.NewReader(""))
-			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
-			cfg.ClientAPI.TURN = tc.turnConfig
-			routers.Client.ServeHTTP(rec, req)
-			assert.Equal(t, http.StatusOK, rec.Code)
+		// Create the users in the userapi and login
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
-			if tc.wantEmptyResponse && rec.Body.String() != "{}" {
-				t.Fatalf("expected an empty response, but got %s", rec.Body.String())
-			}
-			if !tc.wantEmptyResponse {
-				assert.NotEqual(t, "{}", rec.Body.String())
+		testCases := []struct {
+			name              string
+			turnConfig        config.TURN
+			wantEmptyResponse bool
+		}{
+			{
+				name:              "no turn server configured",
+				wantEmptyResponse: true,
+			},
+			{
+				name:              "servers configured but not userLifeTime",
+				wantEmptyResponse: true,
+				turnConfig:        config.TURN{URIs: []string{""}},
+			},
+			{
+				name:              "missing sharedSecret/username/password",
+				wantEmptyResponse: true,
+				turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m"},
+			},
+			{
+				name:       "with shared secret",
+				turnConfig: config.TURN{URIs: []string{""}, UserLifetime: "1m", SharedSecret: "iAmSecret"},
+			},
+			{
+				name:       "with username/password secret",
+				turnConfig: config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username", Password: "iAmSecret"},
+			},
+			{
+				name:              "only username set",
+				turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username"},
+				wantEmptyResponse: true,
+			},
+			{
+				name:              "only password set",
+				turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username"},
+				wantEmptyResponse: true,
+			},
+		}
 
-				resp := gomatrix.RespTurnServer{}
-				err := json.NewDecoder(rec.Body).Decode(&resp)
-				assert.NoError(t, err)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				rec := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/voip/turnServer", strings.NewReader(""))
+				req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+				cfg.ClientAPI.TURN = tc.turnConfig
+				routers.Client.ServeHTTP(rec, req)
+				assert.Equal(t, http.StatusOK, rec.Code)
 
-				duration, _ := time.ParseDuration(tc.turnConfig.UserLifetime)
-				assert.Equal(t, tc.turnConfig.URIs, resp.URIs)
-				assert.Equal(t, int(duration.Seconds()), resp.TTL)
-				if tc.turnConfig.Username != "" && tc.turnConfig.Password != "" {
-					assert.Equal(t, tc.turnConfig.Username, resp.Username)
-					assert.Equal(t, tc.turnConfig.Password, resp.Password)
+				if tc.wantEmptyResponse && rec.Body.String() != "{}" {
+					t.Fatalf("expected an empty response, but got %s", rec.Body.String())
 				}
-			}
-		})
-	}
+				if !tc.wantEmptyResponse {
+					assert.NotEqual(t, "{}", rec.Body.String())
+
+					resp := gomatrix.RespTurnServer{}
+					err := json.NewDecoder(rec.Body).Decode(&resp)
+					assert.NoError(t, err)
+
+					duration, _ := time.ParseDuration(tc.turnConfig.UserLifetime)
+					assert.Equal(t, tc.turnConfig.URIs, resp.URIs)
+					assert.Equal(t, int(duration.Seconds()), resp.TTL)
+					if tc.turnConfig.Username != "" && tc.turnConfig.Password != "" {
+						assert.Equal(t, tc.turnConfig.Username, resp.Username)
+						assert.Equal(t, tc.turnConfig.Password, resp.Password)
+					}
+				}
+			})
+		}
+
+	})
 }
 
 func Test3PID(t *testing.T) {

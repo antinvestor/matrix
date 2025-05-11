@@ -73,7 +73,7 @@ SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method 
 `
 
 type thumbnailStatements struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL statements stored as struct fields
 	insertThumbnailStmt  string
@@ -81,9 +81,9 @@ type thumbnailStatements struct {
 	selectThumbnailsStmt string
 }
 
-func NewPostgresThumbnailsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Thumbnails, error) {
+func NewPostgresThumbnailsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Thumbnails, error) {
 	// Create the table using standardized migration approach
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "mediaapi_thumbnail_table_schema_001",
 		Patch:       thumbnailSchema,
 		RevertPatch: thumbnailSchemaRevert,

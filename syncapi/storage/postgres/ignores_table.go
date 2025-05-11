@@ -53,13 +53,13 @@ ON CONFLICT (user_id) DO UPDATE set ignores_json = $2
 
 // ignoresTable implements tables.Ignores
 type ignoresTable struct {
-	cm               *sqlutil.Connections
+	cm               sqlutil.ConnectionManager
 	selectIgnoresSQL string
 	upsertIgnoresSQL string
 }
 
 // NewPostgresIgnoresTable creates a new ignores table
-func NewPostgresIgnoresTable(ctx context.Context, cm *sqlutil.Connections) (tables.Ignores, error) {
+func NewPostgresIgnoresTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Ignores, error) {
 	t := &ignoresTable{
 		cm:               cm,
 		selectIgnoresSQL: selectIgnoresSQL,
@@ -67,7 +67,7 @@ func NewPostgresIgnoresTable(ctx context.Context, cm *sqlutil.Connections) (tabl
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_ignores_table_schema_001",
 		Patch:       ignoresSchema,
 		RevertPatch: ignoresSchemaRevert,

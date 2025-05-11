@@ -34,7 +34,7 @@ import (
 func NewUserDatabase(
 	ctx context.Context,
 	profileCli *profilev1.ProfileClient,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	serverName spec.ServerName,
 	bcryptCost int,
 	openIDTokenLifetimeMS int64,
@@ -63,7 +63,7 @@ func NewUserDatabase(
 
 // NewKeyDatabase opens a new Postgres database (base on dataSourceName) scheme)
 // and sets postgres connection parameters.
-func NewKeyDatabase(ctx context.Context, cm *sqlutil.Connections) (KeyDatabase, error) {
+func NewKeyDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (KeyDatabase, error) {
 	switch {
 	case cm.DS().IsPostgres():
 		return postgres.NewKeyDatabase(ctx, cm)

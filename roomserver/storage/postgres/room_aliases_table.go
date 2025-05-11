@@ -63,7 +63,7 @@ const deleteRoomAliasSQL = "" +
 
 // roomAliasesTable implements the tables.RoomAliases interface using GORM
 type roomAliasesTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query strings loaded from constants
 	insertRoomAliasSQL          string
@@ -74,9 +74,9 @@ type roomAliasesTable struct {
 }
 
 // NewPostgresRoomAliasesTable creates a new room aliases table
-func NewPostgresRoomAliasesTable(ctx context.Context, cm *sqlutil.Connections) (tables.RoomAliases, error) {
+func NewPostgresRoomAliasesTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.RoomAliases, error) {
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_room_aliases_table_schema_001",
 		Patch:       roomAliasesSchema,
 		RevertPatch: roomAliasesSchemaRevert,

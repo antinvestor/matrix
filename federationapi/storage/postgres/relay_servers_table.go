@@ -63,7 +63,7 @@ const deleteAllRelayServersSQL = "" +
 
 // relayServersTable stores information about relay servers
 type relayServersTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertRelayServersSQL    string
 	selectRelayServersSQL    string
@@ -72,7 +72,7 @@ type relayServersTable struct {
 }
 
 // NewPostgresRelayServersTable creates a new postgres relay servers table
-func NewPostgresRelayServersTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationRelayServers, error) {
+func NewPostgresRelayServersTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationRelayServers, error) {
 	s := &relayServersTable{
 		cm:                       cm,
 		insertRelayServersSQL:    insertRelayServersSQL,
@@ -82,7 +82,7 @@ func NewPostgresRelayServersTable(ctx context.Context, cm *sqlutil.Connections) 
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_relay_servers_table_schema_001",
 		Patch:       relayServersSchema,
 		RevertPatch: relayServersSchemaRevert,

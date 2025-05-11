@@ -24,7 +24,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/shared"
 	"github.com/antinvestor/matrix/test"
 	"github.com/stretchr/testify/assert"
@@ -63,11 +62,12 @@ func (f *testFedClient) P2PGetTransactionFromRelay(
 }
 
 func TestPerformRelayServerSync(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -85,11 +85,12 @@ func TestPerformRelayServerSync(t *testing.T) {
 }
 
 func TestPerformRelayServerSyncFedError(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -107,11 +108,12 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 }
 
 func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}

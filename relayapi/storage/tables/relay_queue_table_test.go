@@ -33,9 +33,8 @@ import (
 )
 
 type RelayQueueDatabase struct {
-	Cm     *sqlutil.Connections
-	Writer sqlutil.Writer
-	Table  tables.RelayQueue
+	Cm    sqlutil.ConnectionManager
+	Table tables.RelayQueue
 }
 
 func mustCreateQueueTable(
@@ -51,10 +50,12 @@ func mustCreateQueueTable(
 	tab, err := postgres.NewPostgresRelayQueueTable(ctx, cm)
 	assert.NoError(t, err)
 
+	err = cm.Migrate(ctx)
+	assert.NoError(t, err)
+
 	database = RelayQueueDatabase{
-		Cm:     cm,
-		Writer: sqlutil.NewDefaultWriter(),
-		Table:  tab,
+		Cm:    cm,
+		Table: tab,
 	}
 	return database
 }
@@ -156,7 +157,7 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
-		_ = db.Writer.Do(ctx, db.Cm, func(ctx context.Context) error {
+		_ = db.Cm.Do(ctx, func(ctx context.Context) error {
 			err = db.Table.DeleteQueueEntries(ctx, serverName, []int64{nid})
 			return err
 		})
@@ -199,7 +200,7 @@ func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
-		_ = db.Writer.Do(ctx, db.Cm, func(ctx context.Context) error {
+		_ = db.Cm.Do(ctx, func(ctx context.Context) error {
 			err = db.Table.DeleteQueueEntries(ctx, serverName, []int64{nid})
 			return err
 		})

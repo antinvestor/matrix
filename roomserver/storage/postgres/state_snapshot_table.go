@@ -130,7 +130,7 @@ type StateSnapshot struct {
 
 // stateSnapshotStatements holds prepared SQL statements for the state snapshot table.
 type stateSnapshotStatements struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query string fields
 	insertStateSQL                              string
@@ -141,7 +141,7 @@ type stateSnapshotStatements struct {
 
 // NewPostgresStateSnapshotTable creates a new instance of the state snapshot table.
 // If the table does not exist, it will be created.
-func NewPostgresStateSnapshotTable(ctx context.Context, cm *sqlutil.Connections) (tables.StateSnapshot, error) {
+func NewPostgresStateSnapshotTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.StateSnapshot, error) {
 	s := &stateSnapshotStatements{
 		cm: cm,
 
@@ -152,7 +152,7 @@ func NewPostgresStateSnapshotTable(ctx context.Context, cm *sqlutil.Connections)
 	}
 
 	// Create the table if it doesn't exist
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_state_snapshots_schema_001",
 		Patch:       stateSnapshotSchema,
 		RevertPatch: stateSnapshotSchemaRevert,

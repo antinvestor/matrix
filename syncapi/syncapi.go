@@ -43,7 +43,7 @@ func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
 	dendriteCfg *config.Dendrite,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,

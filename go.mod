@@ -5,8 +5,8 @@ go 1.24.0
 require (
 	github.com/Arceliar/phony v0.0.0-20220903101357-530938a4b13d
 	github.com/MFAshby/stdemuxerhook v1.0.0
-	github.com/antinvestor/apis/go/common v1.33.0
-	github.com/antinvestor/apis/go/partition v1.33.0
+	github.com/antinvestor/apis/go/common v1.34.0
+	github.com/antinvestor/apis/go/partition v1.34.2
 	github.com/antinvestor/apis/go/profile v1.33.1
 	github.com/antinvestor/gomatrix v0.1.2
 	github.com/antinvestor/gomatrixserverlib v0.1.3
@@ -18,12 +18,11 @@ require (
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/lib/pq v1.10.9
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20250324075430-479c9abf1ca5
 	github.com/nats-io/nats.go v1.41.2
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pitabwire/frame v1.32.2
+	github.com/pitabwire/frame v1.32.4
 	github.com/pitabwire/util v0.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
@@ -34,15 +33,15 @@ require (
 	github.com/tidwall/sjson v1.2.5
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
-	golang.org/x/crypto v0.37.0
+	golang.org/x/crypto v0.38.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	golang.org/x/image v0.26.0
 	golang.org/x/oauth2 v0.29.0
-	golang.org/x/sync v0.13.0
-	golang.org/x/term v0.31.0
+	golang.org/x/sync v0.14.0
+	golang.org/x/term v0.32.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v3 v3.0.1
-	gorm.io/gorm v1.26.0
+	gorm.io/gorm v1.26.1
 	gotest.tools/v3 v3.5.2
 	maunium.net/go/mautrix v0.23.3
 )
@@ -68,7 +67,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.2 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.0 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -103,15 +102,15 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
-	go.uber.org/mock v0.5.0 // indirect
+	go.uber.org/mock v0.5.2 // indirect
 	gocloud.dev v0.41.0 // indirect
-	golang.org/x/net v0.39.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.228.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250324211829-b45e905df463 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250428153025-10db94c68c34 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250425173222-7b384671a197 // indirect
 	google.golang.org/grpc v1.72.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect

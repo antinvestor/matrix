@@ -32,7 +32,7 @@ import (
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	cfg *config.Dendrite,
 	userAPI userapi.MediaUserAPI,
 	client *fclient.Client,

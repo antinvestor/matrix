@@ -83,7 +83,7 @@ DELETE FROM syncapi_receipts WHERE room_id = $1
 
 // receiptTable implements tables.Receipts
 type receiptTable struct {
-	cm                    *sqlutil.Connections
+	cm                    sqlutil.ConnectionManager
 	upsertReceiptSQL      string
 	selectRoomReceiptsSQL string
 	selectMaxReceiptIDSQL string
@@ -91,7 +91,7 @@ type receiptTable struct {
 }
 
 // NewPostgresReceiptsTable creates a new receipts table
-func NewPostgresReceiptsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Receipts, error) {
+func NewPostgresReceiptsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Receipts, error) {
 	t := &receiptTable{
 		cm:                    cm,
 		upsertReceiptSQL:      upsertReceiptSQL,
@@ -101,7 +101,7 @@ func NewPostgresReceiptsTable(ctx context.Context, cm *sqlutil.Connections) (tab
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_receipts_table_schema_001",
 		Patch:       receiptsSchema,
 		RevertPatch: receiptsSchemaRevert,

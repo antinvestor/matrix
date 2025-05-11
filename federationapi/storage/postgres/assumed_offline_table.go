@@ -55,7 +55,7 @@ const deleteAllAssumedOfflineSQL = "" +
 
 // assumedOfflineTable stores the list of assumed offline servers
 type assumedOfflineTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertAssumedOfflineSQL    string
 	selectAssumedOfflineSQL    string
@@ -64,7 +64,7 @@ type assumedOfflineTable struct {
 }
 
 // NewPostgresAssumedOfflineTable creates a new postgres assumed offline table
-func NewPostgresAssumedOfflineTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationAssumedOffline, error) {
+func NewPostgresAssumedOfflineTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationAssumedOffline, error) {
 	s := &assumedOfflineTable{
 		cm:                         cm,
 		insertAssumedOfflineSQL:    insertAssumedOfflineSQL,
@@ -74,7 +74,7 @@ func NewPostgresAssumedOfflineTable(ctx context.Context, cm *sqlutil.Connections
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_assumed_offline_table_schema_001",
 		Patch:       assumedOfflineSchema,
 		RevertPatch: assumedOfflineSchemaRevert,

@@ -16,8 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -209,7 +207,7 @@ ON CONFLICT (localpart, device_id, timestamp) DO NOTHING
 const queryDBEngineVersion = "SHOW server_version;"
 
 type statsTable struct {
-	cm                        *sqlutil.Connections
+	cm                        sqlutil.ConnectionManager
 	serverName                spec.ServerName
 	lastUpdate                time.Time
 	countUsersLastSeenAfter   string
@@ -223,9 +221,9 @@ type statsTable struct {
 	selectDailyMessages       string
 }
 
-func NewPostgresStatsTable(ctx context.Context, cm *sqlutil.Connections, serverName spec.ServerName) (tables.StatsTable, error) {
+func NewPostgresStatsTable(ctx context.Context, cm sqlutil.ConnectionManager, serverName spec.ServerName) (tables.StatsTable, error) {
 	// Perform schema migrations first
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_daily_visits_table_schema_001",
 		Patch:       userDailyVisitsSchema,
 		RevertPatch: userDailyVisitsSchemaRevert,
@@ -234,7 +232,7 @@ func NewPostgresStatsTable(ctx context.Context, cm *sqlutil.Connections, serverN
 		return nil, err
 	}
 
-	err = cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err = cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_daily_stats_table_schema_001",
 		Patch:       messagesDailySchema,
 		RevertPatch: messagesDailySchemaRevert,
@@ -277,24 +275,27 @@ func (s *statsTable) startTimers(ctx context.Context) {
 
 func (s *statsTable) allUsers(ctx context.Context) (result int64, err error) {
 	db := s.cm.Connection(ctx, true)
-	err = db.Raw(s.countUserByAccountType,
+	row := db.Raw(s.countUserByAccountType,
 		pq.Int64Array{
 			int64(api.AccountTypeUser),
-			int64(api.AccountTypeAdmin),
 			int64(api.AccountTypeGuest),
+			int64(api.AccountTypeAdmin),
 			int64(api.AccountTypeAppService),
-		}).Scan(&result).Error
+		}).Row()
+	err = row.Scan(&result)
 	return
 }
 
 func (s *statsTable) nonBridgedUsers(ctx context.Context) (result int64, err error) {
 	db := s.cm.Connection(ctx, true)
-	err = db.Raw(s.countUserByAccountType,
+	row := db.Raw(s.countUserByAccountType,
 		pq.Int64Array{
 			int64(api.AccountTypeUser),
+			int64(api.AccountTypeGuest),
 			int64(api.AccountTypeAdmin),
 			int64(api.AccountTypeGuest),
-		}).Scan(&result).Error
+		}).Row()
+	err = row.Scan(&result)
 	return
 }
 
@@ -375,6 +376,10 @@ func (s *statsTable) r30Users(ctx context.Context) (map[string]int64, error) {
 		if err = rows.Scan(&platform, &count); err != nil {
 			return nil, err
 		}
+		if platform == "unknown" {
+			continue
+		}
+		result["all"] += count
 		result[platform] = count
 	}
 
@@ -526,7 +531,7 @@ func (s *statsTable) DailyRoomsMessages(
 	db := s.cm.Connection(ctx, true)
 	row := db.Raw(s.selectDailyMessages, serverName, spec.AsTimestamp(timestamp)).Row()
 	err = row.Scan(&msgStats.Messages, &msgStats.SentMessages, &msgStats.MessagesE2EE, &msgStats.SentMessagesE2EE, &activeRooms, &activeE2EERooms)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return msgStats, 0, 0, err
 	}
 	return msgStats, activeRooms, activeE2EERooms, nil

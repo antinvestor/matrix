@@ -553,7 +553,7 @@ func (r *Inputer) processRoomEvent(
 
 	// If guest_access changed and is not can_join, kick all guest users.
 	if event.Type() == spec.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
-		if err = r.kickGuests(ctx, event, roomInfo); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if err = r.kickGuests(ctx, event, roomInfo); err != nil && !sqlutil.ErrorIsNoRows(err) {
 			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
 		}
 	}
@@ -719,7 +719,7 @@ func (r *Inputer) fetchAuthEvents(
 		isRejected := false
 		if roomInfo != nil {
 			isRejected, err = r.DB.IsEventRejected(ctx, roomInfo.RoomNID, ev.EventID())
-			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			if err != nil && !sqlutil.ErrorIsNoRows(err) {
 				return fmt.Errorf("r.Cm.IsEventRejected failed: %w", err)
 			}
 		}

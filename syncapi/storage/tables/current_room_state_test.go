@@ -17,7 +17,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func newCurrentRoomStateTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, *sqlutil.Connections) {
+func newCurrentRoomStateTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, sqlutil.ConnectionManager) {
 	t.Helper()
 
 	cm := sqlutil.NewConnectionManager(svc)
@@ -43,7 +43,7 @@ func TestCurrentRoomStateTable(t *testing.T) {
 		tab, cm := newCurrentRoomStateTable(ctx, svc, t, testOpts)
 
 		events := room.CurrentState()
-		err := sqlutil.WithTransaction(ctx, cm, func(ctx context.Context) error {
+		err := cm.Do(ctx, func(ctx context.Context) error {
 			for i, ev := range events {
 				ev.StateKeyResolved = ev.StateKey()
 				userID, err := spec.NewUserID(string(ev.SenderID()), true)

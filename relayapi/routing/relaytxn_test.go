@@ -23,7 +23,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/internal"
 	"github.com/antinvestor/matrix/relayapi/routing"
 	"github.com/antinvestor/matrix/relayapi/storage/shared"
@@ -44,11 +43,12 @@ func createQuery(
 }
 
 func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
-	ctx, svc, cfg := testrig.Init(t, testOpts)
+	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Cm:             sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -82,8 +82,9 @@ func TestGetInvalidPrevEntryFails(t *testing.T) {
 	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -109,8 +110,9 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -161,8 +163,9 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	ctx, svc, _ := testrig.Init(t)
 	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDefaultWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}

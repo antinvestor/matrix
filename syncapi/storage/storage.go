@@ -23,7 +23,7 @@ import (
 )
 
 // NewSyncServerDatabase opens a database connection.
-func NewSyncServerDatabase(ctx context.Context, cm *sqlutil.Connections) (Database, error) {
+func NewSyncServerDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (Database, error) {
 	switch {
 	case cm.DS().IsPostgres():
 		return postgres.NewDatabase(ctx, cm)

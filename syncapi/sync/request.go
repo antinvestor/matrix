@@ -15,10 +15,9 @@
 package sync
 
 import (
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"math"
 	"net/http"
 	"strconv"
@@ -66,7 +65,8 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 				return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 			}
-			if err := syncDB.GetFilter(req.Context(), &filter, localpart, filterQuery); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			err = syncDB.GetFilter(req.Context(), &filter, localpart, filterQuery)
+			if err != nil && !sqlutil.ErrorIsNoRows(err) {
 				util.GetLogger(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
 				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
 			}

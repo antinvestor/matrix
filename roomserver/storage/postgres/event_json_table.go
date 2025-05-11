@@ -60,7 +60,7 @@ const bulkSelectEventJSONSQL = "" +
 
 // eventJSONTable implements the tables.EventJSON interface using GORM
 type eventJSONTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query strings loaded from constants
 	insertEventJSONSQL     string
@@ -68,9 +68,9 @@ type eventJSONTable struct {
 }
 
 // NewPostgresEventJSONTable creates a new event JSON table
-func NewPostgresEventJSONTable(ctx context.Context, cm *sqlutil.Connections) (tables.EventJSON, error) {
+func NewPostgresEventJSONTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.EventJSON, error) {
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_event_json_table_schema_001",
 		Patch:       eventJSONSchema,
 		RevertPatch: eventJSONSchemaRevert,

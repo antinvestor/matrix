@@ -125,7 +125,7 @@ const updateDeviceLastSeen = "" +
 
 // devicesTable represents the devices table in the database.
 type devicesTable struct {
-	cm                          *sqlutil.Connections
+	cm                          sqlutil.ConnectionManager
 	insertDeviceSQL             string
 	selectDeviceByTokenSQL      string
 	selectDeviceByIDSQL         string
@@ -140,10 +140,10 @@ type devicesTable struct {
 }
 
 // NewPostgresDevicesTable creates a new devices table object.
-func NewPostgresDevicesTable(ctx context.Context, cm *sqlutil.Connections, serverName spec.ServerName) (tables.DevicesTable, error) {
+func NewPostgresDevicesTable(ctx context.Context, cm sqlutil.ConnectionManager, serverName spec.ServerName) (tables.DevicesTable, error) {
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_devices_table_schema_001",
 		Patch:       devicesSchema,
 		RevertPatch: devicesSchemaRevert,

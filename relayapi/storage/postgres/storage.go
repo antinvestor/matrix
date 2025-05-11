@@ -26,13 +26,12 @@ import (
 // Database stores information needed by the relayapi
 type Database struct {
 	shared.Database
-	cm *sqlutil.Connections
 }
 
 // NewDatabase opens a new database
 func NewDatabase(
 	ctx context.Context,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	cache caching.FederationCache,
 	isLocalServerName func(spec.ServerName) bool,
 ) (*Database, error) {
@@ -48,9 +47,13 @@ func NewDatabase(
 		return nil, err
 	}
 
-	d.cm = cm
+	err = cm.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	d.Database = shared.Database{
-		Cm:                d.cm,
+		Cm:                cm,
 		IsLocalServerName: isLocalServerName,
 		Cache:             cache,
 		RelayQueue:        queue,

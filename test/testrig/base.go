@@ -60,6 +60,8 @@ func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.
 		cfg.Global.DatabasePrimaryURL = append(cfg.Global.DatabasePrimaryURL, string(conn))
 	}
 
+	cfg.Global.DatabaseMigrate = "true"
+
 	cfg.Global.ServerName = "test"
 	// use a distinct prefix else concurrent postgres runs will clash since NATS will use
 	// the file system event with InMemory=true :(

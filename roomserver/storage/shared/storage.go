@@ -34,7 +34,7 @@ import (
 const redactionsArePermanent = true
 
 type Database struct {
-	Cm *sqlutil.Connections
+	Cm sqlutil.ConnectionManager
 	EventDatabase
 	Cache              caching.RoomServerCaches
 	RoomsTable         tables.Rooms
@@ -51,7 +51,7 @@ type Database struct {
 
 // EventDatabase contains all tables needed to work with events
 type EventDatabase struct {
-	Cm                  *sqlutil.Connections
+	Cm                  sqlutil.ConnectionManager
 	Cache               caching.RoomServerCaches
 	EventsTable         tables.Events
 	EventJSONTable      tables.EventJSON
@@ -167,7 +167,7 @@ func (d *EventDatabase) eventStateKeyNIDs(
 	if len(eventStateKeys) > len(result) {
 		var nid types.EventStateKeyNID
 		var err error
-		err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+		err = d.Cm.Do(ctx, func(ctx context.Context) error {
 			for _, eventStateKey := range eventStateKeys {
 				if _, ok := result[eventStateKey]; ok {
 					continue
@@ -295,7 +295,7 @@ func (d *Database) addState(
 			}
 		}
 	}
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		if len(state) > 0 {
 			// If there's any state left to add then let's add new blocks.
 			var stateBlockNID types.StateBlockNID
@@ -346,7 +346,7 @@ func (d *EventDatabase) eventNIDs(
 func (d *EventDatabase) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
 	})
 }
@@ -465,7 +465,7 @@ func (d *Database) stateEntries(
 }
 
 func (d *Database) SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.RoomAliasesTable.InsertRoomAlias(ctx, alias, roomID, creatorUserID)
 	})
 }
@@ -485,14 +485,14 @@ func (d *Database) GetCreatorIDForAlias(
 }
 
 func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.RoomAliasesTable.DeleteRoomAlias(ctx, alias)
 	})
 }
 
 func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderID spec.SenderID) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		requestSenderUserNID, err = d.assignStateKeyNID(ctx, string(requestSenderID))
 		return err
 	})
@@ -504,7 +504,7 @@ func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, req
 		d.MembershipTable.SelectMembershipFromRoomAndTarget(
 			ctx, roomNID, requestSenderUserNID,
 		)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		// The user has never been a member of that room
 		return 0, false, false, nil
 	} else if err != nil {
@@ -630,7 +630,7 @@ func (d *Database) MembershipUpdater(
 ) (context.Context, *MembershipUpdater, error) {
 	var err error
 	var updater *MembershipUpdater
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		ctx, updater, err = NewMembershipUpdater(ctx, d, roomID, targetUserID, targetLocal, roomVersion)
 		return err
 	})
@@ -645,7 +645,7 @@ func (d *Database) GetRoomUpdater(
 	}
 	var err error
 	var updater *RoomUpdater
-	_ = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	_ = d.Cm.Do(ctx, func(ctx context.Context) error {
 		updater, err = NewRoomUpdater(ctx, d, roomInfo)
 		return err
 	})
@@ -662,7 +662,7 @@ func (d *Database) AssignRoomNID(ctx context.Context, roomID spec.RoomID, roomVe
 	if err != nil {
 		return 0, err
 	}
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		roomNID, err = d.assignRoomNID(ctx, roomID.String(), roomVersion)
 		if err != nil {
 			return err
@@ -699,7 +699,7 @@ func (d *Database) GetOrCreateRoomInfo(ctx context.Context, event gomatrixserver
 		}, nil
 	}
 
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		roomNID, err = d.assignRoomNID(ctx, event.RoomID().String(), roomVersion)
 		if err != nil {
 			return err
@@ -732,7 +732,7 @@ func (d *Database) GetRoomVersion(ctx context.Context, roomID string) (gomatrixs
 }
 
 func (d *Database) GetOrCreateEventTypeNID(ctx context.Context, eventType string) (eventTypeNID types.EventTypeNID, err error) {
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		if eventTypeNID, err = d.assignEventTypeNID(ctx, eventType); err != nil {
 			return fmt.Errorf("d.assignEventTypeNID: %w", err)
 		}
@@ -746,7 +746,7 @@ func (d *Database) GetOrCreateEventStateKeyNID(ctx context.Context, eventStateKe
 		return 0, nil
 	}
 
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		if eventStateKeyNID, err = d.assignStateKeyNID(ctx, *eventStateKey); err != nil {
 			return fmt.Errorf("d.assignStateKeyNID: %w", err)
 		}
@@ -770,7 +770,7 @@ func (d *EventDatabase) StoreEvent(
 		err      error
 	)
 
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 
 		if eventNID, stateNID, err = d.EventsTable.InsertEvent(
 			ctx,
@@ -838,7 +838,7 @@ func (d *EventDatabase) StoreEvent(
 }
 
 func (d *Database) PublishRoom(ctx context.Context, roomID, appserviceID, networkID string, publish bool) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.PublishedTable.UpsertRoomPublished(ctx, roomID, appserviceID, networkID, publish)
 	})
 }
@@ -883,10 +883,10 @@ func (d *Database) assignRoomNID(
 	}
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, roomID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		// We don't have a numeric ID so insert one into the database.
 		roomNID, err = d.RoomsTable.InsertRoomNID(ctx, roomID, roomVersion)
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			// We raced with another insert so run the select again.
 			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, roomID)
 		}
@@ -908,10 +908,10 @@ func (d *Database) assignEventTypeNID(
 	}
 	// Check if we already have a numeric ID in the database.
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, eventType)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		// We don't have a numeric ID so insert one into the database.
 		eventTypeNID, err = d.EventTypesTable.InsertEventTypeNID(ctx, eventType)
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			// We raced with another insert so run the select again.
 			eventTypeNID, err = d.EventTypesTable.SelectEventTypeNID(ctx, eventType)
 		}
@@ -932,10 +932,10 @@ func (d *EventDatabase) assignStateKeyNID(
 	}
 	// Check if we already have a numeric ID in the database.
 	eventStateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, eventStateKey)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		// We don't have a numeric ID so insert one into the database.
 		eventStateKeyNID, err = d.EventStateKeysTable.InsertEventStateKeyNID(ctx, eventStateKey)
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			// We raced with another insert so run the select again.
 			eventStateKeyNID, err = d.EventStateKeysTable.SelectEventStateKeyNID(ctx, eventStateKey)
 		}
@@ -998,7 +998,7 @@ func (d *EventDatabase) MaybeRedactEvent(
 		ignoreRedaction               bool
 	)
 
-	wErr := d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	wErr := d.Cm.Do(ctx, func(ctx context.Context) error {
 		isRedactionEvent := event.Type() == spec.MRoomRedaction && event.StateKey() == nil
 		if isRedactionEvent {
 			// an event which redacts itself should be ignored
@@ -1220,7 +1220,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		return nil, nil
 	}
 	eventTypeNID, err := d.GetOrCreateEventTypeNID(ctx, evType)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		// No rooms have an event of this type, otherwise we'd have an event type NID
 		return nil, nil
 	}
@@ -1228,7 +1228,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		return nil, err
 	}
 	stateKeyNID, err := d.GetOrCreateEventStateKeyNID(ctx, &stateKey)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		// No rooms have a state event with this state key, otherwise we'd have an state key NID
 		return nil, nil
 	}
@@ -1293,7 +1293,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, evType)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		// No rooms have an event of this type, otherwise we'd have an event type NID
 		return nil, nil
 	}
@@ -1357,7 +1357,7 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID spec.UserID,
 	// Convert provided user ID to NID
 	userNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, userID.String())
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil
 		} else {
 			return nil, fmt.Errorf("SelectEventStateKeyNID: cannot map user ID to state key NIDs: %w", err)
@@ -1367,7 +1367,7 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID spec.UserID,
 	// Use this NID to fetch all associated room keys (for pseudo ID rooms)
 	roomKeyMap, err := d.UserRoomKeyTable.SelectAllPublicKeysForUser(ctx, userNID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			roomKeyMap = map[types.RoomNID]ed25519.PublicKey{}
 		} else {
 			return nil, fmt.Errorf("SelectAllPublicKeysForUser: could not select user room public keys for user: %w", err)
@@ -1653,7 +1653,7 @@ func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget
 		return err
 	}
 
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.MembershipTable.UpdateForgetMembership(ctx, roomNIDs[0], stateKeyNID, forget)
 	})
 }
@@ -1661,10 +1661,10 @@ func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget
 // PurgeRoom removes all information about a given room from the roomserver.
 // For large rooms this operation may take a considerable amount of time.
 func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		roomNID, err := d.RoomsTable.SelectRoomNIDForUpdate(ctx, roomID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if sqlutil.ErrorIsNoRows(err) {
 				return fmt.Errorf("room %s does not exist", roomID)
 			}
 			return fmt.Errorf("failed to lock the room: %w", err)
@@ -1675,7 +1675,7 @@ func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 
 func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error {
 
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		published, err := d.PublishedTable.SelectPublishedFromRoomID(ctx, oldRoomID)
 		if err != nil {
 			return fmt.Errorf("failed to get published room: %w", err)
@@ -1720,7 +1720,7 @@ func (d *Database) InsertUserRoomPrivatePublicKey(ctx context.Context, userID sp
 	}
 	stateKeyNID := stateKeyNIDMap[uID]
 
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		roomInfo, rErr := d.roomInfo(ctx, roomID.String())
 		if rErr != nil {
 			return rErr
@@ -1747,7 +1747,7 @@ func (d *Database) InsertUserRoomPublicKey(ctx context.Context, userID spec.User
 	}
 	stateKeyNID := stateKeyNIDMap[uID]
 
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		roomInfo, rErr := d.roomInfo(ctx, roomID.String())
 		if rErr != nil {
 			return rErr
@@ -1775,7 +1775,7 @@ func (d *Database) SelectUserRoomPrivateKey(ctx context.Context, userID spec.Use
 	}
 	stateKeyNID := stateKeyNIDMap[uID]
 
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		roomInfo, rErr := d.roomInfo(ctx, roomID.String())
 		if rErr != nil {
 			return rErr
@@ -1804,7 +1804,7 @@ func (d *Database) SelectUserRoomPublicKey(ctx context.Context, userID spec.User
 	}
 	stateKeyNID := stateKeyNIDMap[uID]
 
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		roomInfo, rErr := d.roomInfo(ctx, roomID.String())
 		if rErr != nil {
 			return rErr
@@ -1909,7 +1909,7 @@ func (d *Database) InsertReportedEvent(
 	}
 
 	var reportID int64
-	err = d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		reportID, err = d.ReportedEventsTable.InsertReportedEvent(
 			ctx,
 			roomInfo.RoomNID,
@@ -2095,7 +2095,7 @@ func (d *Database) QueryAdminEventReport(ctx context.Context, reportID uint64) (
 }
 
 func (d *Database) AdminDeleteEventReport(ctx context.Context, reportID uint64) error {
-	return d.Cm.Writer().Do(ctx, d.Cm, func(ctx context.Context) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.ReportedEventsTable.DeleteReportedEvent(ctx, reportID)
 	})
 }

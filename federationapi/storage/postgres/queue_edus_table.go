@@ -87,7 +87,7 @@ const deleteExpiredEDUsSQL = "" +
 
 // queueEDUTable implements the tables.FederationQueueEDUs interface using postgres
 type queueEDUTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertQueueEDUSQL                   string
 	deleteQueueEDUSQL                   string
@@ -99,7 +99,7 @@ type queueEDUTable struct {
 }
 
 // NewPostgresQueueEDUsTable creates a new postgres queue EDUs table
-func NewPostgresQueueEDUsTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationQueueEDUs, error) {
+func NewPostgresQueueEDUsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationQueueEDUs, error) {
 	t := &queueEDUTable{
 		cm:                                  cm,
 		insertQueueEDUSQL:                   insertQueueEDUSQL,
@@ -112,7 +112,7 @@ func NewPostgresQueueEDUsTable(ctx context.Context, cm *sqlutil.Connections) (ta
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_queue_edus_table_schema_001",
 		Patch:       queueEDUsSchema,
 		RevertPatch: queueEDUsSchemaRevert,

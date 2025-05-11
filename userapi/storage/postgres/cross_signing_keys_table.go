@@ -54,16 +54,16 @@ const upsertCrossSigningKeysForUserSQL = "" +
 	" ON CONFLICT (user_id, key_type) DO UPDATE SET key_data = $3"
 
 type crossSigningKeysTable struct {
-	cm                               *sqlutil.Connections
+	cm                               sqlutil.ConnectionManager
 	selectCrossSigningKeysForUserSQL string
 	upsertCrossSigningKeysForUserSQL string
 }
 
 // NewPostgresCrossSigningKeysTable creates a new postgres cross signing keys table.
-func NewPostgresCrossSigningKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.CrossSigningKeys, error) {
+func NewPostgresCrossSigningKeysTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.CrossSigningKeys, error) {
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "keyserver_cross_signing_keys_table_schema_001",
 		Patch:       crossSigningKeysSchema,
 		RevertPatch: crossSigningKeysSchemaRevert,

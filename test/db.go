@@ -20,9 +20,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/antinvestor/matrix/setup/config"
@@ -66,12 +68,12 @@ func (opt *DependancyOption) Queue() string {
 // ensureDatabaseExists checks if a specific database exists and creates it if it does not.
 func ensureDatabaseExists(ctx context.Context, postgresUri *url.URL, newDbName string) (*url.URL, error) {
 	connectionString := postgresUri.String()
-	config, err := pgxpool.ParseConfig(connectionString)
+	cfg, err := pgxpool.ParseConfig(connectionString)
 	if err != nil {
 		return postgresUri, err
 	}
-	config.MaxConns = 20 // Increase pool size for concurrency
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+	cfg.MaxConns = 20 // Increase pool size for concurrency
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return postgresUri, err
 	}
@@ -83,14 +85,12 @@ func ensureDatabaseExists(ctx context.Context, postgresUri *url.URL, newDbName s
 	}
 
 	// Check if database exists before trying to create it
-	var exists bool
-	checkQuery := `SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1);`
-	if err := pool.QueryRow(ctx, checkQuery, newDbName).Scan(&exists); err != nil {
-		return postgresUri, err
-	}
-	if !exists {
-		_, err = pool.Exec(ctx, fmt.Sprintf(`CREATE DATABASE %s;`, newDbName))
-		if err != nil {
+	_, err = pool.Exec(ctx, fmt.Sprintf(`CREATE DATABASE %s;`, newDbName))
+	if err != nil {
+
+		var pgErr *pgconn.PgError
+		ok := errors.As(err, &pgErr)
+		if !(ok && pgErr.Code == "42P04" || (pgErr.Code == "XX000" && strings.Contains(pgErr.Message, "tuple concurrently updated"))) {
 			return postgresUri, err
 		}
 	}
@@ -98,7 +98,11 @@ func ensureDatabaseExists(ctx context.Context, postgresUri *url.URL, newDbName s
 	dbUserName := postgresUri.User.Username()
 	_, err = pool.Exec(ctx, fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE %s TO %s;`, newDbName, dbUserName))
 	if err != nil {
-		return postgresUri, err
+		var pgErr *pgconn.PgError
+		ok := errors.As(err, &pgErr)
+		if !(ok && pgErr.Code == "XX000" && strings.Contains(pgErr.Message, "tuple concurrently updated")) {
+			return postgresUri, err
+		}
 	}
 
 	postgresUri.Path = newDbName

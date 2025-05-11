@@ -137,15 +137,12 @@ func TestQueryProfile(t *testing.T) {
 		},
 	}
 
-	runCases := func(testAPI api.UserInternalAPI, http bool) {
+	runCases := func(ctx context.Context, testAPI api.UserInternalAPI, http bool) {
 		mode := "monolith"
 		if http {
 			mode = "HTTP"
 		}
 		for _, tc := range testCases {
-
-			ctx, svc, _ := testrig.Init(t)
-			defer svc.Stop(ctx)
 
 			profile, gotErr := testAPI.QueryProfile(ctx, tc.userID)
 			if tc.wantErr == nil && gotErr != nil || tc.wantErr != nil && gotErr == nil {
@@ -169,14 +166,14 @@ func TestQueryProfile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
 		}
-		if _, _, err := accountDB.SetAvatarURL(ctx, "alice", serverName, aliceAvatarURL); err != nil {
+		if _, _, err = accountDB.SetAvatarURL(ctx, "alice", serverName, aliceAvatarURL); err != nil {
 			t.Fatalf("failed to set avatar url: %s", err)
 		}
-		if _, _, err := accountDB.SetDisplayName(ctx, "alice", serverName, aliceDisplayName); err != nil {
+		if _, _, err = accountDB.SetDisplayName(ctx, "alice", serverName, aliceDisplayName); err != nil {
 			t.Fatalf("failed to set display name: %s", err)
 		}
 
-		runCases(userAPI, false)
+		runCases(ctx, userAPI, false)
 	})
 }
 

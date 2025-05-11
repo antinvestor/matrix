@@ -24,7 +24,7 @@ import (
 )
 
 // NewDatabase opens a database connection.
-func NewDatabase(ctx context.Context, cm *sqlutil.Connections, cache caching.RoomServerCaches) (Database, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache caching.RoomServerCaches) (Database, error) {
 	if !cm.DS().IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type : %v", cm.DS())
 	}

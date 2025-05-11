@@ -24,6 +24,10 @@ func mustCreateTable(ctx context.Context, svc *frame.Service, t *testing.T, _ te
 	if err != nil {
 		t.Fatalf("failed to create new table: %s", err)
 	}
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate stale device lists table: %s", err)
+	}
 	return tab
 }
 

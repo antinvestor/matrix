@@ -84,7 +84,7 @@ const updateInviteRetiredSQL = "" +
 
 // inviteTable implements the tables.Invites interface using GORM
 type inviteTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query strings loaded from constants
 	insertInviteEventSQL               string
@@ -93,9 +93,9 @@ type inviteTable struct {
 }
 
 // NewPostgresInvitesTable creates a new invites table
-func NewPostgresInvitesTable(ctx context.Context, cm *sqlutil.Connections) (tables.Invites, error) {
+func NewPostgresInvitesTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Invites, error) {
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_invites_table_schema_001",
 		Patch:       inviteSchema,
 		RevertPatch: inviteSchemaRevert,

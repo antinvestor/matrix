@@ -48,20 +48,20 @@ const insertServerKeysJSONSQL = "" +
 
 // notaryServerKeysTable stores the JSON responses from server key requests
 type notaryServerKeysTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertServerKeysJSONSQL string
 }
 
 // NewPostgresNotaryServerKeysTable creates a new postgres notary server keys table
-func NewPostgresNotaryServerKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationNotaryServerKeysJSON, error) {
+func NewPostgresNotaryServerKeysTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationNotaryServerKeysJSON, error) {
 	s := &notaryServerKeysTable{
 		cm:                      cm,
 		insertServerKeysJSONSQL: insertServerKeysJSONSQL,
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_notary_server_keys_json_table_schema_001",
 		Patch:       notaryServerKeysJSONSchema,
 		RevertPatch: notaryServerKeysJSONSchemaRevert,

@@ -46,7 +46,7 @@ import (
 func NewInternalAPI(
 	ctx context.Context,
 	dendriteCfg *config.Dendrite,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	natsInstance *jetstream.NATSInstance,
 	rsAPI rsapi.UserRoomserverAPI,
 	fedClient fedsenderapi.KeyserverFederationAPI,
@@ -119,12 +119,12 @@ func NewInternalAPI(
 	updater := internal.NewDeviceListUpdater(ctx, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn)
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
-	if err := updater.CleanUp(ctx); err != nil {
+	if err = updater.CleanUp(ctx); err != nil {
 		logrus.WithError(err).Error("failed to cleanup stale device lists")
 	}
 
 	go func() {
-		if err := updater.Start(ctx); err != nil {
+		if err = updater.Start(ctx); err != nil {
 			logrus.WithError(err).Panicf("failed to start device list updater")
 		}
 	}()

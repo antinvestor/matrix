@@ -169,7 +169,7 @@ WHERE membership_nid > $1 AND target_nid = ANY($2)
 
 // membershipTable implements the tables.Membership interface using GORM
 type membershipTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query strings loaded from constants
 	selectJoinedUsersSetForRoomsAndUserSQL         string
@@ -192,9 +192,9 @@ type membershipTable struct {
 }
 
 // NewPostgresMembershipTable prepares the membership table with the connection manager
-func NewPostgresMembershipTable(ctx context.Context, cm *sqlutil.Connections) (tables.Membership, error) {
+func NewPostgresMembershipTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Membership, error) {
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_membership_table_schema_001",
 		Patch:       membershipSchema,
 		RevertPatch: membershipSchemaRevert,

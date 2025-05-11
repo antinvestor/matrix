@@ -158,6 +158,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
+
 				joinResp := JoinRoomByIDOrAlias(req, tc.device, rsAPI, userAPI, tc.roomID)
 				if tc.wantHTTP200 && !joinResp.Is2xx() {
 					t.Fatalf("expected join room to succeed, but didn't: %+v", joinResp)

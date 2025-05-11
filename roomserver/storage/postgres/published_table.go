@@ -61,7 +61,7 @@ const selectPublishedSQL = "" +
 
 // publishedTable implements the tables.Published interface using GORM
 type publishedTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query strings loaded from constants
 	upsertPublishedSQL        string
@@ -71,9 +71,9 @@ type publishedTable struct {
 }
 
 // NewPostgresPublishedTable creates a new published table
-func NewPostgresPublishedTable(ctx context.Context, cm *sqlutil.Connections) (tables.Published, error) {
+func NewPostgresPublishedTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Published, error) {
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_published_table_schema_001",
 		Patch:       publishedSchema,
 		RevertPatch: publishedSchemaRevert,

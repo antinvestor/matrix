@@ -100,7 +100,7 @@ const selectPresenceAfter = `
 
 // presenceTable implements tables.Presence
 type presenceTable struct {
-	cm                        *sqlutil.Connections
+	cm                        sqlutil.ConnectionManager
 	upsertPresenceSQL         string
 	upsertPresenceFromSyncSQL string
 	selectPresenceForUserSQL  string
@@ -109,7 +109,7 @@ type presenceTable struct {
 }
 
 // NewPostgresPresenceTable creates a new presence table
-func NewPostgresPresenceTable(ctx context.Context, cm *sqlutil.Connections) (tables.Presence, error) {
+func NewPostgresPresenceTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Presence, error) {
 	t := &presenceTable{
 		cm:                        cm,
 		upsertPresenceSQL:         upsertPresenceSQL,
@@ -120,7 +120,7 @@ func NewPostgresPresenceTable(ctx context.Context, cm *sqlutil.Connections) (tab
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_presence_table_schema_001",
 		Patch:       presenceSchema,
 		RevertPatch: presenceSchemaRevert,

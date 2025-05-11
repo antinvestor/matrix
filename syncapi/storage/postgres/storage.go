@@ -32,7 +32,7 @@ type SyncServerDatasource struct {
 }
 
 // NewDatabase creates a new sync server database
-func NewDatabase(ctx context.Context, cm *sqlutil.Connections) (*SyncServerDatasource, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 
 	// Initialize all tables with the connection manager
@@ -97,9 +97,13 @@ func NewDatabase(ctx context.Context, cm *sqlutil.Connections) (*SyncServerDatas
 		return nil, err
 	}
 
+	err = cm.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	d.Database = shared.Database{
 		Cm:                  cm,
-		Writer:              d.writer,
 		AccountData:         accountData,
 		OutputEvents:        events,
 		Topology:            topology,

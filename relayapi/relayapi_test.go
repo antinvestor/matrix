@@ -58,7 +58,7 @@ func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
 
-		cm := sqlutil.NewConnectionManager(svc)
+		cm := sqlutil.NewConnectionManager(nil)
 		assert.Panics(t, func() {
 			relayapi.NewRelayInternalAPI(ctx, cfg, cm, nil, nil, nil, nil, true, nil)
 		})

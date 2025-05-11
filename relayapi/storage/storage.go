@@ -27,7 +27,7 @@ import (
 // NewDatabase opens a new database
 func NewDatabase(
 	ctx context.Context,
-	cm *sqlutil.Connections,
+	cm sqlutil.ConnectionManager,
 	cache caching.FederationCache,
 	isLocalServerName func(spec.ServerName) bool,
 ) (Database, error) {

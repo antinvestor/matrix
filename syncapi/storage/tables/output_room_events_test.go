@@ -18,7 +18,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func newOutputRoomEventsTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (*sqlutil.Connections, tables.Events) {
+func newOutputRoomEventsTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (sqlutil.ConnectionManager, tables.Events) {
 	t.Helper()
 
 	cm := sqlutil.NewConnectionManager(svc)
@@ -44,7 +44,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 		cm, tab := newOutputRoomEventsTable(ctx, svc, t, testOpts)
 
 		events := room.Events()
-		err := sqlutil.WithTransaction(ctx, cm, func(ctx context.Context) error {
+		err := cm.Do(ctx, func(ctx context.Context) error {
 			for _, ev := range events {
 				_, err := tab.InsertEvent(ctx, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 				if err != nil {
@@ -122,7 +122,7 @@ func TestReindex(t *testing.T) {
 
 		cm, tab := newOutputRoomEventsTable(ctx, svc, t, testOpts)
 
-		err := sqlutil.WithTransaction(ctx, cm, func(ctx context.Context) error {
+		err := cm.Do(ctx, func(ctx context.Context) error {
 			for _, ev := range room.Events() {
 				_, err := tab.InsertEvent(ctx, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 				if err != nil {

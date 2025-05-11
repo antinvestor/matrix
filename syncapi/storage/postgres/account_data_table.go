@@ -83,14 +83,14 @@ SELECT MAX(id) FROM syncapi_account_data_type
 
 // accountDataTable represents a table for storing account data
 type accountDataTable struct {
-	cm                          *sqlutil.Connections
+	cm                          sqlutil.ConnectionManager
 	insertAccountDataSQL        string
 	selectAccountDataInRangeSQL string
 	selectMaxAccountDataIDSQL   string
 }
 
 // NewPostgresAccountDataTable creates a new postgres account data table
-func NewPostgresAccountDataTable(ctx context.Context, cm *sqlutil.Connections) (tables.AccountData, error) {
+func NewPostgresAccountDataTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.AccountData, error) {
 	t := &accountDataTable{
 		cm:                          cm,
 		insertAccountDataSQL:        insertAccountDataSQL,
@@ -99,7 +99,7 @@ func NewPostgresAccountDataTable(ctx context.Context, cm *sqlutil.Connections) (
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_account_data_table_schema_001",
 		Patch:       accountDataSchema,
 		RevertPatch: accountDataSchemaRevert,

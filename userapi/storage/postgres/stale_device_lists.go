@@ -68,7 +68,7 @@ const deleteStaleDevicesSQL = "" +
 	"DELETE FROM keyserver_stale_device_lists WHERE user_id = ANY($1)"
 
 type staleDeviceListsTable struct {
-	cm                                   *sqlutil.Connections
+	cm                                   sqlutil.ConnectionManager
 	upsertStaleDeviceListSQL             string
 	selectStaleDeviceListsWithDomainsSQL string
 	selectStaleDeviceListsSQL            string
@@ -76,7 +76,7 @@ type staleDeviceListsTable struct {
 }
 
 // NewPostgresStaleDeviceListsTable creates a new postgres stale device lists table.
-func NewPostgresStaleDeviceListsTable(ctx context.Context, cm *sqlutil.Connections) (tables.StaleDeviceLists, error) {
+func NewPostgresStaleDeviceListsTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.StaleDeviceLists, error) {
 	t := &staleDeviceListsTable{
 		cm:                                   cm,
 		upsertStaleDeviceListSQL:             upsertStaleDeviceListSQL,
@@ -86,7 +86,7 @@ func NewPostgresStaleDeviceListsTable(ctx context.Context, cm *sqlutil.Connectio
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "keyserver_stale_device_lists_table_schema_001",
 		Patch:       staleDeviceListsSchema,
 		RevertPatch: staleDeviceListsSchemaRevert,

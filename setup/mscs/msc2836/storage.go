@@ -3,11 +3,8 @@ package msc2836
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -126,7 +123,7 @@ type Database interface {
 
 // postgresDB implements the Database interface using Postgres
 type postgresDB struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	insertEdgeSQL                         string
 	insertNodeSQL                         string
@@ -139,13 +136,23 @@ type postgresDB struct {
 }
 
 // NewDatabase loads the database for msc2836
-func NewDatabase(ctx context.Context, cm *sqlutil.Connections) (Database, error) {
-	return newPostgresDatabase(ctx, cm)
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (Database, error) {
+	db, err := newPostgresDatabase(ctx, cm)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cm.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
-func newPostgresDatabase(ctx context.Context, cm *sqlutil.Connections) (Database, error) {
+func newPostgresDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (Database, error) {
 	// Create migration patch
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "msc2836_tables_schema_001",
 		Patch:       msc2836Schema,
 		RevertPatch: msc2836SchemaRevert,
@@ -182,7 +189,7 @@ func (p *postgresDB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent)
 	}
 	count, hash := extractChildMetadata(ev)
 
-	return p.cm.Writer().Do(ctx, p.cm, func(ctx context.Context) error {
+	return p.cm.Do(ctx, func(ctx context.Context) error {
 
 		db := p.cm.Connection(ctx, false)
 
@@ -230,7 +237,7 @@ func (p *postgresDB) ChildMetadata(ctx context.Context, eventID string) (count i
 	row := db.Raw(p.selectChildMetadataSQL, eventID).Row()
 	err = row.Scan(&count, &b64hash, &exploredInt)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			err = nil
 		}
 		return
@@ -279,7 +286,7 @@ func (p *postgresDB) ParentForChild(ctx context.Context, eventID, relType string
 	db := p.cm.Connection(ctx, true)
 	row := db.Raw(p.selectParentForChildSQL, eventID, relType).Row()
 	err := row.Scan(&ei.EventID, &ei.RoomID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err

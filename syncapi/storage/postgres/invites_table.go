@@ -86,7 +86,7 @@ DELETE FROM syncapi_invite_events WHERE room_id = $1
 
 // inviteEventsTable implements tables.Invites
 type inviteEventsTable struct {
-	cm                           *sqlutil.Connections
+	cm                           sqlutil.ConnectionManager
 	insertInviteEventSQL         string
 	selectInviteEventsInRangeSQL string
 	deleteInviteEventSQL         string
@@ -95,7 +95,7 @@ type inviteEventsTable struct {
 }
 
 // NewPostgresInvitesTable creates a new invites table
-func NewPostgresInvitesTable(ctx context.Context, cm *sqlutil.Connections) (tables.Invites, error) {
+func NewPostgresInvitesTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Invites, error) {
 	t := &inviteEventsTable{
 		cm:                           cm,
 		insertInviteEventSQL:         insertInviteEventSQL,
@@ -106,7 +106,7 @@ func NewPostgresInvitesTable(ctx context.Context, cm *sqlutil.Connections) (tabl
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_invite_events_table_schema_001",
 		Patch:       inviteEventsSchema,
 		RevertPatch: inviteEventsSchemaRevert,

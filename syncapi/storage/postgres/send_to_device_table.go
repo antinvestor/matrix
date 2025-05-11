@@ -81,7 +81,7 @@ SELECT MAX(id) FROM syncapi_send_to_device
 
 // sendToDeviceTable implements tables.SendToDevice
 type sendToDeviceTable struct {
-	cm                            *sqlutil.Connections
+	cm                            sqlutil.ConnectionManager
 	insertSendToDeviceMessageSQL  string
 	selectSendToDeviceMessagesSQL string
 	deleteSendToDeviceMessagesSQL string
@@ -89,7 +89,7 @@ type sendToDeviceTable struct {
 }
 
 // NewPostgresSendToDeviceTable creates a new send-to-device table
-func NewPostgresSendToDeviceTable(ctx context.Context, cm *sqlutil.Connections) (tables.SendToDevice, error) {
+func NewPostgresSendToDeviceTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.SendToDevice, error) {
 	t := &sendToDeviceTable{
 		cm:                            cm,
 		insertSendToDeviceMessageSQL:  insertSendToDeviceMessageSQL,
@@ -99,7 +99,7 @@ func NewPostgresSendToDeviceTable(ctx context.Context, cm *sqlutil.Connections) 
 	}
 
 	// Perform the migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_send_to_device_table_schema_001",
 		Patch:       sendToDeviceSchema,
 		RevertPatch: sendToDeviceSchemaRevert,

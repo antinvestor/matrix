@@ -2,8 +2,6 @@ package shared
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
@@ -157,7 +155,7 @@ func (u *RoomUpdater) AddState(
 func (u *RoomUpdater) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	return u.d.Cm.Writer().Do(ctx, u.d.Cm, func(ctx context.Context) error {
+	return u.d.Cm.Do(ctx, func(ctx context.Context) error {
 		return u.d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
 	})
 }
@@ -204,7 +202,7 @@ func (u *RoomUpdater) IsReferenced(ctx context.Context, eventID string) (bool, e
 	if err == nil {
 		return true, nil
 	}
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		return false, nil
 	}
 	return false, fmt.Errorf("u.d.PrevEventsTable.SelectPreviousEventExists: %w", err)
@@ -227,7 +225,7 @@ func (u *RoomUpdater) SetLatestEvents(ctx context.Context,
 	for i := range latest {
 		eventNIDs[i] = latest[i].EventNID
 	}
-	return u.d.Cm.Writer().Do(ctx, u.d.Cm, func(ctx context.Context) error {
+	return u.d.Cm.Do(ctx, func(ctx context.Context) error {
 		if err := u.d.RoomsTable.UpdateLatestEventNIDs(ctx, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
 			return fmt.Errorf("u.d.RoomsTable.updateLatestEventNIDs: %w", err)
 		}
@@ -250,7 +248,7 @@ func (u *RoomUpdater) HasEventBeenSent(ctx context.Context, eventNID types.Event
 
 // MarkEventAsSent implements types.RoomRecentEventsUpdater
 func (u *RoomUpdater) MarkEventAsSent(ctx context.Context, eventNID types.EventNID) error {
-	return u.d.Cm.Writer().Do(ctx, u.d.Cm, func(ctx context.Context) error {
+	return u.d.Cm.Do(ctx, func(ctx context.Context) error {
 		return u.d.EventsTable.UpdateEventSentToOutput(ctx, eventNID)
 	})
 }

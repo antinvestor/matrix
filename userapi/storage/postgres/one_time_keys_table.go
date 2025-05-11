@@ -16,9 +16,7 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/antinvestor/matrix/internal"
@@ -88,7 +86,7 @@ WHERE user_id = $1 AND device_id = $2
 `
 
 type oneTimeKeysTable struct {
-	cm                      *sqlutil.Connections
+	cm                      sqlutil.ConnectionManager
 	upsertKeysSQL           string
 	selectKeysSQL           string
 	selectKeysCountSQL      string
@@ -98,7 +96,7 @@ type oneTimeKeysTable struct {
 }
 
 // NewPostgresOneTimeKeysTable creates a new one-time keys table
-func NewPostgresOneTimeKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.OneTimeKeys, error) {
+func NewPostgresOneTimeKeysTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.OneTimeKeys, error) {
 	t := &oneTimeKeysTable{
 		cm:                      cm,
 		upsertKeysSQL:           upsertKeysSQL,
@@ -110,7 +108,7 @@ func NewPostgresOneTimeKeysTable(ctx context.Context, cm *sqlutil.Connections) (
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "keyserver_one_time_keys_table_schema_001",
 		Patch:       oneTimeKeysSchema,
 		RevertPatch: oneTimeKeysSchemaRevert,
@@ -220,7 +218,7 @@ func (s *oneTimeKeysTable) SelectAndDeleteOneTimeKey(
 	row := db.Raw(s.selectKeyByAlgorithmSQL, userID, deviceID, algorithm).Row()
 	err := row.Scan(&keyID, &keyJSON)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil
 		}
 		return nil, err

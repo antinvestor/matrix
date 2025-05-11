@@ -73,14 +73,14 @@ const upsertServerSigningKeysSQL = "" +
 
 // serverSigningKeysTable stores the signing keys for servers
 type serverSigningKeysTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 	// SQL query string fields, initialized at construction
 	bulkSelectServerKeysSQL string
 	upsertServerKeysSQL     string
 }
 
 // NewPostgresServerSigningKeysTable creates a new postgres server signing keys table
-func NewPostgresServerSigningKeysTable(ctx context.Context, cm *sqlutil.Connections) (tables.FederationServerSigningKeys, error) {
+func NewPostgresServerSigningKeysTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationServerSigningKeys, error) {
 	s := &serverSigningKeysTable{
 		cm:                      cm,
 		bulkSelectServerKeysSQL: bulkSelectServerSigningKeysSQL,
@@ -88,7 +88,7 @@ func NewPostgresServerSigningKeysTable(ctx context.Context, cm *sqlutil.Connecti
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "federationapi_server_signing_keys_table_schema_001",
 		Patch:       serverSigningKeysSchema,
 		RevertPatch: serverSigningKeysSchemaRevert,

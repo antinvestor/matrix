@@ -90,7 +90,7 @@ WHERE id = $1
 
 // reportedEventsStatements holds the SQL queries for reported events
 type reportedEventsStatements struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query string fields
 	insertReportedEventSQL      string
@@ -102,7 +102,7 @@ type reportedEventsStatements struct {
 
 // NewPostgresReportedEventsTable creates a new instance of the reported events table.
 // It creates the table if it doesn't exist and applies any necessary migrations.
-func NewPostgresReportedEventsTable(ctx context.Context, cm *sqlutil.Connections) (tables.ReportedEvents, error) {
+func NewPostgresReportedEventsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.ReportedEvents, error) {
 	s := &reportedEventsStatements{
 		cm: cm,
 
@@ -114,7 +114,7 @@ func NewPostgresReportedEventsTable(ctx context.Context, cm *sqlutil.Connections
 	}
 
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_reported_events_schema_001",
 		Patch:       reportedEventsSchema,
 		RevertPatch: reportedEventsSchemaRevert,

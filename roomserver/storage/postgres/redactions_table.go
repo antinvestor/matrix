@@ -61,7 +61,7 @@ const markRedactionValidatedSQL = "" +
 
 // redactionsTable implements the tables.Redactions interface using GORM
 type redactionsTable struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	// SQL query strings loaded from constants
 	insertRedactionSQL                         string
@@ -71,9 +71,9 @@ type redactionsTable struct {
 }
 
 // NewPostgresRedactionsTable creates a new redactions table
-func NewPostgresRedactionsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Redactions, error) {
+func NewPostgresRedactionsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Redactions, error) {
 	// Create the table if it doesn't exist using migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_redactions_table_schema_001",
 		Patch:       redactionsSchema,
 		RevertPatch: redactionsSchemaRevert,

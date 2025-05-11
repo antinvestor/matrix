@@ -16,9 +16,7 @@ package routing
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -125,7 +123,7 @@ func Context(
 
 	id, requestedEvent, err := snapshot.SelectContextEvent(ctx, roomID, eventID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound(fmt.Sprintf("Event %s not found", eventID)),
@@ -165,7 +163,7 @@ func Context(
 	}
 
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, roomID, filter)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		logrus.WithError(err).Error("unable to fetch before events")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -174,7 +172,7 @@ func Context(
 	}
 
 	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, roomID, filter)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		logrus.WithError(err).Error("unable to fetch after events")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

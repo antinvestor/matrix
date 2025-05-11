@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -78,7 +79,7 @@ DROP SEQUENCE IF EXISTS roomserver_event_nid_seq;
 
 // SQL Constants for event table queries
 const insertEventSQL = "" +
-	"INSERT INTO roomserver_events AS e (room_nid, event_type_nid, event_state_key_nid, event_id, auth_event_nids, depth, is_rejected)" +
+	"INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, auth_event_nids, depth, is_rejected)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
 	" ON CONFLICT ON CONSTRAINT roomserver_event_id_unique DO UPDATE" +
 	" SET is_rejected = (CASE WHEN roomserver_events.is_rejected = TRUE THEN $7 ELSE roomserver_events.is_rejected END)" +
@@ -157,7 +158,7 @@ const selectRoomsWithEventTypeNIDSQL = "" +
 
 // eventStatements contains the SQL statements for interacting with the events table.
 type eventStatements struct {
-	cm *sqlutil.Connections
+	cm sqlutil.ConnectionManager
 
 	insertEventSQL                                   string
 	selectEventSQL                                   string
@@ -184,7 +185,7 @@ type eventStatements struct {
 
 // NewPostgresEventsTable creates a new events table. If the table already exists,
 // it will ensure it has the correct schema.
-func NewPostgresEventsTable(ctx context.Context, cm *sqlutil.Connections) (tables.Events, error) {
+func NewPostgresEventsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Events, error) {
 	s := &eventStatements{
 		cm:                                  cm,
 		insertEventSQL:                      insertEventSQL,
@@ -211,7 +212,7 @@ func NewPostgresEventsTable(ctx context.Context, cm *sqlutil.Connections) (table
 	}
 
 	// Apply the events table schema
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "roomserver_events_schema_001",
 		Patch:       eventsSchema,
 		RevertPatch: eventsSchemaRevert,
@@ -221,17 +222,6 @@ func NewPostgresEventsTable(ctx context.Context, cm *sqlutil.Connections) (table
 	}
 
 	return s, nil
-}
-
-// Struct to hold the values returned by the RETURNING clause
-type ReturnedIDs struct {
-	EventNID         int64 `gorm:"column:event_nid"`
-	StateSnapshotNID int64 `gorm:"column:state_snapshot_nid"`
-}
-
-type returnedIDs struct {
-	EventNID         int64 `gorm:"column:event_nid"`
-	StateSnapshotNID int64 `gorm:"column:state_snapshot_nid"`
 }
 
 // InsertEvent adds a new event to the events table.
@@ -256,9 +246,21 @@ func (s *eventStatements) InsertEvent(
 	db := s.cm.Connection(ctx, false)
 
 	// Insert the event
-	var finalIDs returnedIDs
-	err := db.Raw(s.insertEventSQL, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, pq.Array(authNIDs), depth, isRejected).Scan(&finalIDs).Error
-	return types.EventNID(finalIDs.EventNID), types.StateSnapshotNID(finalIDs.StateSnapshotNID), err
+	var nullableEventNID sql.NullInt64
+	var nullableStateNID sql.NullInt64
+	row := db.Raw(s.insertEventSQL, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, pq.Array(authNIDs), depth, isRejected).Row()
+	err := row.Scan(&nullableEventNID, &nullableStateNID)
+
+	eventNID := int64(0)
+	if nullableEventNID.Valid {
+		eventNID = nullableEventNID.Int64
+	}
+	stateNID := int64(0)
+	if nullableStateNID.Valid {
+		stateNID = nullableStateNID.Int64
+	}
+
+	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 
 // SelectEvent retrieves an event from the database by its event ID.
@@ -272,7 +274,8 @@ func (s *eventStatements) SelectEvent(
 	db := s.cm.Connection(ctx, true)
 
 	// Query the database
-	err := db.Raw(s.selectEventSQL, eventID).Row().Scan(&eventNID, &stateNID)
+	row := db.Raw(s.selectEventSQL, eventID).Row()
+	err := row.Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
 

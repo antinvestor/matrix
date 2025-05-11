@@ -54,7 +54,6 @@ func TestHandleQueryProfile(t *testing.T) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
 
-		t.Cleanup(closeRig)
 		cm := sqlutil.NewConnectionManager(svc)
 		routers := httputil.NewRouters()
 

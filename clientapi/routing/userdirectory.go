@@ -16,9 +16,9 @@ package routing
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"net/http"
 	"strings"
 
@@ -63,7 +63,7 @@ func SearchUserDirectory(
 		Limit:  limit,
 	}
 	knownUsersRes := &api.QueryKnownUsersResponse{}
-	if err := rsAPI.QueryKnownUsers(ctx, knownUsersReq, knownUsersRes); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := rsAPI.QueryKnownUsers(ctx, knownUsersReq, knownUsersRes); err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
 	}
 

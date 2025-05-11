@@ -1,7 +1,7 @@
 package routing
 
 import (
-	"context"
+	"github.com/antinvestor/matrix/test"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,10 +25,8 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		Logger        *log.Entry
 	}
 	type args struct {
-		ctx                       context.Context
 		reqReader                 io.Reader
 		cfg                       *config.MediaAPI
-		db                        storage.Database
 		activeThumbnailGeneration *types.ActiveThumbnailGeneration
 	}
 
@@ -48,15 +46,6 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		DynamicThumbnails: false,
 	}
 
-	ctx, svc, _ := testrig.Init(t)
-	defer svc.Stop(ctx)
-
-	cm := sqlutil.NewConnectionManager(svc)
-	db, err := storage.NewMediaAPIDatasource(ctx, cm)
-	if err != nil {
-		t.Errorf("error opening mediaapi database: %v", err)
-	}
-
 	tests := []struct {
 		name   string
 		fields fields
@@ -66,10 +55,8 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		{
 			name: "upload ok",
 			args: args{
-				ctx:       ctx,
 				reqReader: strings.NewReader("test"),
 				cfg:       cfg,
-				db:        db,
 			},
 			fields: fields{
 				Logger: logger,
@@ -83,10 +70,8 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		{
 			name: "upload ok (exact size)",
 			args: args{
-				ctx:       ctx,
 				reqReader: strings.NewReader("testtest"),
 				cfg:       cfg,
-				db:        db,
 			},
 			fields: fields{
 				Logger: logger,
@@ -100,10 +85,8 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		{
 			name: "upload not ok",
 			args: args{
-				ctx:       ctx,
 				reqReader: strings.NewReader("test test test"),
 				cfg:       cfg,
-				db:        db,
 			},
 			fields: fields{
 				Logger: logger,
@@ -117,7 +100,6 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 		{
 			name: "upload ok with unlimited filesize",
 			args: args{
-				ctx:       ctx,
 				reqReader: strings.NewReader("test test test"),
 				cfg: &config.MediaAPI{
 					MaxFileSizeBytes:  config.FileSizeBytes(0),
@@ -125,7 +107,6 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 					AbsBasePath:       config.Path(testdataPath),
 					DynamicThumbnails: false,
 				},
-				db: db,
 			},
 			fields: fields{
 				Logger: logger,
@@ -138,13 +119,26 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &uploadRequest{
-				MediaMetadata: tt.fields.MediaMetadata,
-				Logger:        tt.fields.Logger,
-			}
-			if got := r.doUpload(tt.args.ctx, tt.args.reqReader, tt.args.cfg, tt.args.db, tt.args.activeThumbnailGeneration); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("doUpload() = %+v, want %+v", got, tt.want)
-			}
+
+			test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+
+				ctx, svc, _ := testrig.Init(t, testOpts)
+				defer svc.Stop(ctx)
+
+				cm := sqlutil.NewConnectionManager(svc)
+				db, err0 := storage.NewMediaAPIDatasource(ctx, cm)
+				if err0 != nil {
+					t.Errorf("error opening mediaapi database: %v", err0)
+				}
+
+				r := &uploadRequest{
+					MediaMetadata: tt.fields.MediaMetadata,
+					Logger:        tt.fields.Logger,
+				}
+				if got := r.doUpload(ctx, tt.args.reqReader, tt.args.cfg, db, tt.args.activeThumbnailGeneration); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("doUpload() = %+v, want %+v", got, tt.want)
+				}
+			})
 		})
 	}
 }

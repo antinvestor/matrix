@@ -2,8 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -42,14 +40,14 @@ const selectOpenIDTokenSQL = "" +
 	"SELECT localpart, server_name, token_expires_at_ms FROM userapi_openid_tokens WHERE token = $1"
 
 type openIDTable struct {
-	cm             *sqlutil.Connections
+	cm             sqlutil.ConnectionManager
 	serverName     spec.ServerName
 	insertTokenSQL string
 	selectTokenSQL string
 }
 
 // NewPostgresOpenIDTable creates a new postgres openid table.
-func NewPostgresOpenIDTable(ctx context.Context, cm *sqlutil.Connections, serverName spec.ServerName) (tables.OpenIDTable, error) {
+func NewPostgresOpenIDTable(ctx context.Context, cm sqlutil.ConnectionManager, serverName spec.ServerName) (tables.OpenIDTable, error) {
 	t := &openIDTable{
 		cm:             cm,
 		serverName:     serverName,
@@ -58,7 +56,7 @@ func NewPostgresOpenIDTable(ctx context.Context, cm *sqlutil.Connections, server
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_openid_tokens_table_schema_001",
 		Patch:       openIDTokenSchema,
 		RevertPatch: openIDTokenSchemaRevert,
@@ -97,7 +95,7 @@ func (t *openIDTable) SelectOpenIDTokenAtrributes(
 	err := row.Scan(&localpart, &serverName, &openIDTokenAttrs.ExpiresAtMS)
 
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !sqlutil.ErrorIsNoRows(err) {
 			log.WithError(err).Error("Unable to retrieve token from the db")
 		}
 		return nil, err

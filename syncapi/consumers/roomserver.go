@@ -16,7 +16,6 @@ package consumers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -442,7 +441,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	pduPos, err := s.db.RetireInviteEvent(ctx, msg.EventID)
 	// It's possible we just haven't heard of this invite yet, so
 	// we should not panic if we try to retire it.
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,

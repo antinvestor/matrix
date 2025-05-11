@@ -38,9 +38,6 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		t.Error(err)
 	}
 
-	ctx, svc, _ := testrig.Init(t)
-	defer svc.Stop(ctx)
-
 	// Create a test room, just used to provide events
 	room := test.NewRoom(t, alice)
 	dummyEvent := room.Events()[len(room.Events())-1]
@@ -49,6 +46,10 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 	pushKey := util.RandomString(8)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+
+		ctx, svc, _ := testrig.Init(t)
+		defer svc.Stop(ctx)
+
 		receivedRequest := make(chan bool, 1)
 		// create a test server which responds to our /notify call
 		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -111,14 +112,14 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if err := db.InsertNotification(ctx, aliceLocalpart, serverName, dummyEvent.EventID(), 0, nil, &api.Notification{
+		if err = db.InsertNotification(ctx, aliceLocalpart, serverName, dummyEvent.EventID(), 0, nil, &api.Notification{
 			Event: *ev,
 		}); err != nil {
 			t.Error(err)
 		}
 
 		// Notify the user about a new notification
-		if err := userUtil.NotifyUserCountsAsync(ctx, pushgateway.NewHTTPClient(true), aliceLocalpart, serverName, db); err != nil {
+		if err = userUtil.NotifyUserCountsAsync(ctx, pushgateway.NewHTTPClient(true), aliceLocalpart, serverName, db); err != nil {
 			t.Error(err)
 		}
 		select {

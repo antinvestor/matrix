@@ -76,7 +76,7 @@ const selectLatestVersionSQL = "" +
 	"SELECT MAX(version) FROM userapi_key_backup_versions WHERE user_id = $1"
 
 type keyBackupVersionTable struct {
-	cm                         *sqlutil.Connections
+	cm                         sqlutil.ConnectionManager
 	insertKeyBackupSQL         string
 	updateKeyBackupAuthDataSQL string
 	updateKeyBackupETagSQL     string
@@ -86,10 +86,10 @@ type keyBackupVersionTable struct {
 }
 
 // NewPostgresKeyBackupVersionTable creates a new postgres key backup version table.
-func NewPostgresKeyBackupVersionTable(ctx context.Context, cm *sqlutil.Connections) (tables.KeyBackupVersionTable, error) {
+func NewPostgresKeyBackupVersionTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.KeyBackupVersionTable, error) {
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "userapi_key_backup_versions_table_schema_001",
 		Patch:       keyBackupVersionTableSchema,
 		RevertPatch: keyBackupVersionTableSchemaRevert,

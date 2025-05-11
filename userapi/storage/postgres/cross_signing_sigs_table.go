@@ -62,14 +62,14 @@ const deleteCrossSigningSigsForTargetSQL = "" +
 	"DELETE FROM keyserver_cross_signing_sigs WHERE target_user_id=$1 AND target_key_id=$2"
 
 type crossSigningSigsTable struct {
-	cm                                 *sqlutil.Connections
+	cm                                 sqlutil.ConnectionManager
 	selectCrossSigningSigsForTargetSQL string
 	upsertCrossSigningSigsForTargetSQL string
 	deleteCrossSigningSigsForTargetSQL string
 }
 
 // NewPostgresCrossSigningSigsTable creates a new postgres cross signing signatures table.
-func NewPostgresCrossSigningSigsTable(ctx context.Context, cm *sqlutil.Connections) (tables.CrossSigningSigs, error) {
+func NewPostgresCrossSigningSigsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.CrossSigningSigs, error) {
 	t := &crossSigningSigsTable{
 		cm:                                 cm,
 		selectCrossSigningSigsForTargetSQL: selectCrossSigningSigsForTargetSQL,
@@ -78,7 +78,7 @@ func NewPostgresCrossSigningSigsTable(ctx context.Context, cm *sqlutil.Connectio
 	}
 
 	// Perform schema migration
-	err := cm.MigrateStrings(ctx, frame.MigrationPatch{
+	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "keyserver_cross_signing_sigs_table_schema_001",
 		Patch:       crossSigningSigsSchema,
 		RevertPatch: crossSigningSigsSchemaRevert,

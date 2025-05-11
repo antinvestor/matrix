@@ -10,16 +10,25 @@ import (
 // writer exclusivity. This is fine in PostgreSQL where overlapping
 // transactions and writes are acceptable.
 type DefaultWriter struct {
+	cm ConnectionManager
 }
 
 // NewDefaultWriter returns a new dummy writer.
-func NewDefaultWriter() Writer {
-	return &DefaultWriter{}
+func NewDefaultWriter(cm ConnectionManager) Writer {
+	return &DefaultWriter{
+		cm: cm,
+	}
 }
 
-func (w *DefaultWriter) Do(ctx context.Context, cm *Connections, f func(ctx context.Context) error) error {
-	if cm != nil {
-		return WithTransaction(ctx, cm, func(ctx context.Context) error {
+func (w *DefaultWriter) Do(ctx context.Context, f func(ctx context.Context) error, opts ...*WriterOption) error {
+	if w.cm != nil {
+
+		ctx0, txn, err := w.cm.BeginTx(ctx, opts...)
+		if err != nil {
+			return err
+		}
+
+		return WithTransaction(ctx0, txn, func(ctx context.Context) error {
 			return f(ctx)
 		})
 	} else {
