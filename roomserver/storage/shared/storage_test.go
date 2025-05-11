@@ -48,6 +48,11 @@ func mustCreateRoomServerDatabase(ctx context.Context, svc *frame.Service, cfg *
 
 	assert.NoError(t, err)
 
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate table: %s", err)
+	}
+
 	evDb := shared.EventDatabase{
 		Cm:                  cm,
 		EventStateKeysTable: stateKeyTable, Cache: cache}

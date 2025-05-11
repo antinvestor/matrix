@@ -34,6 +34,11 @@ func mustCreateStateSnapshotTable(ctx context.Context, svc *frame.Service, t *te
 	tab, err := postgres.NewPostgresStateSnapshotTable(ctx, cm)
 	assert.NoError(t, err)
 
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate table: %s", err)
+	}
+
 	return tab
 }
 

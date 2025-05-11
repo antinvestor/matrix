@@ -90,14 +90,7 @@ type accountDataTable struct {
 }
 
 // NewPostgresAccountDataTable creates a new postgres account data table
-func NewPostgresAccountDataTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.AccountData, error) {
-	t := &accountDataTable{
-		cm:                          cm,
-		insertAccountDataSQL:        insertAccountDataSQL,
-		selectAccountDataInRangeSQL: selectAccountDataInRangeSQL,
-		selectMaxAccountDataIDSQL:   selectMaxAccountDataIDSQL,
-	}
-
+func NewPostgresAccountDataTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.AccountData, error) {
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_account_data_table_schema_001",
@@ -106,6 +99,13 @@ func NewPostgresAccountDataTable(ctx context.Context, cm sqlutil.ConnectionManag
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &accountDataTable{
+		cm:                          cm,
+		insertAccountDataSQL:        insertAccountDataSQL,
+		selectAccountDataInRangeSQL: selectAccountDataInRangeSQL,
+		selectMaxAccountDataIDSQL:   selectMaxAccountDataIDSQL,
 	}
 
 	return t, nil

@@ -26,6 +26,11 @@ func mustCreateMembershipTable(ctx context.Context, svc *frame.Service, t *testi
 	stateKeyTab, err = postgres.NewPostgresEventStateKeysTable(ctx, cm)
 	assert.NoError(t, err)
 
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate table: %s", err)
+	}
+
 	return tab, stateKeyTab
 }
 

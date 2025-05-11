@@ -96,15 +96,7 @@ type membershipsTable struct {
 }
 
 // NewPostgresMembershipsTable creates a new memberships table
-func NewPostgresMembershipsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Memberships, error) {
-	t := &membershipsTable{
-		cm:                        cm,
-		upsertMembershipSQL:       upsertMembershipSQL,
-		selectMembershipCountSQL:  selectMembershipCountSQL,
-		selectMembershipBeforeSQL: selectMembershipBeforeSQL,
-		purgeMembershipsSQL:       purgeMembershipsSQL,
-		selectMembersSQL:          selectMembersSQL,
-	}
+func NewPostgresMembershipsTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Memberships, error) {
 
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
@@ -114,6 +106,15 @@ func NewPostgresMembershipsTable(ctx context.Context, cm sqlutil.ConnectionManag
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &membershipsTable{
+		cm:                        cm,
+		upsertMembershipSQL:       upsertMembershipSQL,
+		selectMembershipCountSQL:  selectMembershipCountSQL,
+		selectMembershipBeforeSQL: selectMembershipBeforeSQL,
+		purgeMembershipsSQL:       purgeMembershipsSQL,
+		selectMembersSQL:          selectMembersSQL,
 	}
 
 	return t, nil

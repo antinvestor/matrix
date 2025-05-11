@@ -319,7 +319,7 @@ func TestDebounce(t *testing.T) {
 		incomingFedReq <- struct{}{}
 		return <-fedCh, nil
 	})
-	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 1, nil, "example.test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 	if err := updater.Start(ctx); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}

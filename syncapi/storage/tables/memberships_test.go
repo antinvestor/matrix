@@ -26,6 +26,10 @@ func newMembershipsTable(ctx context.Context, svc *frame.Service, t *testing.T, 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate membership table: %s", err)
+	}
 	return tab
 }
 

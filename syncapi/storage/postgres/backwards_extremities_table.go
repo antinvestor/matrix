@@ -74,13 +74,6 @@ type backwardExtremitiesTable struct {
 
 // NewPostgresBackwardsExtremitiesTable creates a new backward extremities table
 func NewPostgresBackwardsExtremitiesTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.BackwardsExtremities, error) {
-	t := &backwardExtremitiesTable{
-		cm:                                  cm,
-		insertBackwardExtremitySQL:          insertBackwardExtremitySQL,
-		selectBackwardExtremitiesForRoomSQL: selectBackwardExtremitiesForRoomSQL,
-		deleteBackwardExtremitySQL:          deleteBackwardExtremitySQL,
-		purgeBackwardExtremitiesSQL:         purgeBackwardExtremitiesSQL,
-	}
 
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
@@ -90,6 +83,14 @@ func NewPostgresBackwardsExtremitiesTable(ctx context.Context, cm sqlutil.Connec
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &backwardExtremitiesTable{
+		cm:                                  cm,
+		insertBackwardExtremitySQL:          insertBackwardExtremitySQL,
+		selectBackwardExtremitiesForRoomSQL: selectBackwardExtremitiesForRoomSQL,
+		deleteBackwardExtremitySQL:          deleteBackwardExtremitySQL,
+		purgeBackwardExtremitiesSQL:         purgeBackwardExtremitiesSQL,
 	}
 
 	return t, nil

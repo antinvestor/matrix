@@ -23,6 +23,11 @@ func mustCreateRedactionsTable(ctx context.Context, svc *frame.Service, t *testi
 	tab, err := postgres.NewPostgresRedactionsTable(ctx, cm)
 	assert.NoError(t, err)
 
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate table: %s", err)
+	}
+
 	return tab
 }
 

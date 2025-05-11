@@ -109,15 +109,7 @@ type presenceTable struct {
 }
 
 // NewPostgresPresenceTable creates a new presence table
-func NewPostgresPresenceTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Presence, error) {
-	t := &presenceTable{
-		cm:                        cm,
-		upsertPresenceSQL:         upsertPresenceSQL,
-		upsertPresenceFromSyncSQL: upsertPresenceFromSyncSQL,
-		selectPresenceForUserSQL:  selectPresenceForUserSQL,
-		selectMaxPresenceSQL:      selectMaxPresenceSQL,
-		selectPresenceAfter:       selectPresenceAfter,
-	}
+func NewPostgresPresenceTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Presence, error) {
 
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
@@ -127,6 +119,15 @@ func NewPostgresPresenceTable(ctx context.Context, cm sqlutil.ConnectionManager)
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &presenceTable{
+		cm:                        cm,
+		upsertPresenceSQL:         upsertPresenceSQL,
+		upsertPresenceFromSyncSQL: upsertPresenceFromSyncSQL,
+		selectPresenceForUserSQL:  selectPresenceForUserSQL,
+		selectMaxPresenceSQL:      selectMaxPresenceSQL,
+		selectPresenceAfter:       selectPresenceAfter,
 	}
 
 	return t, nil

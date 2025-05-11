@@ -89,15 +89,7 @@ type sendToDeviceTable struct {
 }
 
 // NewPostgresSendToDeviceTable creates a new send-to-device table
-func NewPostgresSendToDeviceTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.SendToDevice, error) {
-	t := &sendToDeviceTable{
-		cm:                            cm,
-		insertSendToDeviceMessageSQL:  insertSendToDeviceMessageSQL,
-		selectSendToDeviceMessagesSQL: selectSendToDeviceMessagesSQL,
-		deleteSendToDeviceMessagesSQL: deleteSendToDeviceMessagesSQL,
-		selectMaxSendToDeviceIDSQL:    selectMaxSendToDeviceIDSQL,
-	}
-
+func NewPostgresSendToDeviceTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.SendToDevice, error) {
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "syncapi_send_to_device_table_schema_001",
@@ -106,6 +98,14 @@ func NewPostgresSendToDeviceTable(ctx context.Context, cm sqlutil.ConnectionMana
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &sendToDeviceTable{
+		cm:                            cm,
+		insertSendToDeviceMessageSQL:  insertSendToDeviceMessageSQL,
+		selectSendToDeviceMessagesSQL: selectSendToDeviceMessagesSQL,
+		deleteSendToDeviceMessagesSQL: deleteSendToDeviceMessagesSQL,
+		selectMaxSendToDeviceIDSQL:    selectMaxSendToDeviceIDSQL,
 	}
 
 	return t, nil

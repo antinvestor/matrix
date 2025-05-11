@@ -80,14 +80,7 @@ type notificationDataTable struct {
 }
 
 // NewPostgresNotificationDataTable creates a new notification data table
-func NewPostgresNotificationDataTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.NotificationData, error) {
-	t := &notificationDataTable{
-		cm:                                    cm,
-		upsertRoomUnreadNotificationCountsSQL: upsertRoomUnreadNotificationCountsSQL,
-		selectUserUnreadNotificationsForRooms: selectUserUnreadNotificationsForRooms,
-		selectMaxNotificationIDSQL:            selectMaxNotificationIDSQL,
-		purgeNotificationDataSQL:              purgeNotificationDataSQL,
-	}
+func NewPostgresNotificationDataTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.NotificationData, error) {
 
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
@@ -97,6 +90,14 @@ func NewPostgresNotificationDataTable(ctx context.Context, cm sqlutil.Connection
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &notificationDataTable{
+		cm:                                    cm,
+		upsertRoomUnreadNotificationCountsSQL: upsertRoomUnreadNotificationCountsSQL,
+		selectUserUnreadNotificationsForRooms: selectUserUnreadNotificationsForRooms,
+		selectMaxNotificationIDSQL:            selectMaxNotificationIDSQL,
+		purgeNotificationDataSQL:              purgeNotificationDataSQL,
 	}
 
 	return t, nil

@@ -102,6 +102,17 @@ type outputRoomEventsTopologyTable struct {
 
 // NewPostgresTopologyTable creates a new topology table
 func NewPostgresTopologyTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Topology, error) {
+
+	// Run migrations
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "syncapi_output_room_events_topology_table_schema_001",
+		Patch:       outputRoomEventsTopologySchema,
+		RevertPatch: outputRoomEventsTopologySchemaRevert,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	t := &outputRoomEventsTopologyTable{
 		cm: cm,
 
@@ -113,16 +124,6 @@ func NewPostgresTopologyTable(ctx context.Context, cm sqlutil.ConnectionManager)
 		selectStreamToTopologicalPositionAscSQL:  selectStreamToTopologicalPositionAscSQL,
 		selectStreamToTopologicalPositionDescSQL: selectStreamToTopologicalPositionDescSQL,
 		purgeEventsTopologySQL:                   purgeEventsTopologySQL,
-	}
-
-	// Run migrations
-	err := cm.Collect(&frame.MigrationPatch{
-		Name:        "syncapi_output_room_events_topology_table_schema_001",
-		Patch:       outputRoomEventsTopologySchema,
-		RevertPatch: outputRoomEventsTopologySchemaRevert,
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	return t, nil

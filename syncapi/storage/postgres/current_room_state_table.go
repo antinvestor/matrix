@@ -160,7 +160,18 @@ type currentRoomStateTable struct {
 }
 
 // NewPostgresCurrentRoomStateTable creates a new CurrentRoomState table
-func NewPostgresCurrentRoomStateTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.CurrentRoomState, error) {
+func NewPostgresCurrentRoomStateTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.CurrentRoomState, error) {
+
+	// Run migrations
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "syncapi_current_room_state_table_schema_001",
+		Patch:       currentRoomStateSchema,
+		RevertPatch: currentRoomStateSchemaRevert,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	t := &currentRoomStateTable{
 		cm: cm,
 
@@ -178,16 +189,6 @@ func NewPostgresCurrentRoomStateTable(ctx context.Context, cm sqlutil.Connection
 		selectSharedUsersSQL:              selectSharedUsersSQL,
 		selectMembershipCountSQL:          selectMembershipCount,
 		selectRoomHeroesSQL:               selectRoomHeroes,
-	}
-
-	// Run migrations
-	err := cm.Collect(&frame.MigrationPatch{
-		Name:        "syncapi_current_room_state_table_schema_001",
-		Patch:       currentRoomStateSchema,
-		RevertPatch: currentRoomStateSchemaRevert,
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	return t, nil

@@ -25,9 +25,13 @@ func newOutputRoomEventsTable(ctx context.Context, svc *frame.Service, t *testin
 
 	var tab tables.Events
 	tab, err := postgres.NewPostgresEventsTable(ctx, cm)
-
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
+	}
+
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate events table: %s", err)
 	}
 	return cm, tab
 }

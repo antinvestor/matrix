@@ -47,37 +47,51 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   --     This isn't a problem for us since we just want to order by this field.
   id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
   -- The event ID for the event
-  event_id TEXT NOT NULL,
+  event_id TEXT NOT NULL CONSTRAINT syncapi_output_room_event_id_idx UNIQUE,
   -- The 'room_id' key for the event.
   room_id TEXT NOT NULL,
   -- The headered JSON for the event, containing potentially additional metadata such as
-  -- the room version. Stored as JSONB.
+  -- the room version. Stored as TEXT because this should be valid UTF-8.
   headered_event_json JSONB NOT NULL,
   -- The event type e.g 'm.room.member'.
   type TEXT NOT NULL,
   -- The 'sender' property of the event.
   sender TEXT NOT NULL,
-  -- True if the event content contains a url key.
-  contains_url BOOLEAN NOT NULL DEFAULT FALSE,
-  -- A list of event IDs which represent a delta of added/removed room state. Must be empty for events that don't change state.
-  add_state_ids TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
-  -- A list of event IDs which represent a delta of added/removed room state. Must be empty for events that don't change state.
-  remove_state_ids TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+  -- true if the event content contains a url key.
+  contains_url BOOL NOT NULL,
+  -- A list of event IDs which represent a delta of added/removed room state. This can be NULL
+  -- if there is no delta.
+  add_state_ids TEXT[],
+  remove_state_ids TEXT[],
   -- The client session that sent the event, if any
   session_id BIGINT,
-  -- The transaction ID that sent the event, if any
+  -- The transaction id used to send the event, if any
   transaction_id TEXT,
-  -- Whether this event came from a history visibility request or not
-  exclude_from_sync BOOLEAN NOT NULL DEFAULT FALSE,
-  -- The history visibility of the event, if any
-  history_visibility INTEGER
+  -- Should the event be excluded from responses to /sync requests. Useful for
+  -- events retrieved through backfilling that have a position in the stream
+  -- that relates to the moment these were retrieved rather than the moment these
+  -- were emitted.
+  exclude_from_sync BOOL DEFAULT FALSE,
+  -- Excludes edited messages from the search index.  
+  exclude_from_search BOOL DEFAULT FALSE,
+  -- The history visibility before this event (1 - world_readable; 2 - shared; 3 - invited; 4 - joined)
+  history_visibility SMALLINT NOT NULL DEFAULT 2
 );
 
--- for event selection
-CREATE UNIQUE INDEX IF NOT EXISTS syncapi_output_room_event_id_idx ON syncapi_output_room_events(event_id);
-CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output_room_events(type);
-CREATE INDEX IF NOT EXISTS syncapi_output_room_events_room_id_idx ON syncapi_output_room_events(room_id);
-CREATE INDEX IF NOT EXISTS syncapi_output_room_events_exclude_idx ON syncapi_output_room_events(exclude_from_sync);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output_room_events (type);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_sender_idx ON syncapi_output_room_events (sender);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_room_id_idx ON syncapi_output_room_events (room_id);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_exclude_from_sync_idx ON syncapi_output_room_events (exclude_from_sync);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_add_state_ids_idx ON syncapi_output_room_events ((add_state_ids IS NOT NULL));
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_remove_state_ids_idx ON syncapi_output_room_events ((remove_state_ids IS NOT NULL));
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_recent_events_idx ON syncapi_output_room_events (room_id, exclude_from_sync, id, sender, type);
+
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_fts_idx ON syncapi_output_room_events
+USING bm25 (event_id, id, room_id, headered_event_json, type, exclude_from_search, sender, contains_url)
+WITH (
+    	key_field='event_id',
+    	json_fields = '{ "headered_event_json": {"fast": true, "normalizer": "raw"}}'
+    );
 `
 
 const outputRoomEventsSchemaRevert = `
@@ -238,7 +252,18 @@ type outputRoomEventsTable struct {
 }
 
 // NewPostgresEventsTable creates a new events table
-func NewPostgresEventsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Events, error) {
+func NewPostgresEventsTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Events, error) {
+
+	// Run migrations
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "syncapi_output_room_events_table_schema_001",
+		Patch:       outputRoomEventsSchema,
+		RevertPatch: outputRoomEventsSchemaRevert,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	t := &outputRoomEventsTable{
 		cm: cm,
 
@@ -261,16 +286,6 @@ func NewPostgresEventsTable(ctx context.Context, cm sqlutil.ConnectionManager) (
 		excludeEventsFromIndexSQL:     excludeEventsFromIndexSQL,
 		searchEventsSQL:               searchEventsSQL,
 		searchEventsCountSQL:          searchEventsCountSQL,
-	}
-
-	// Run migrations
-	err := cm.Collect(&frame.MigrationPatch{
-		Name:        "syncapi_output_room_events_table_schema_001",
-		Patch:       outputRoomEventsSchema,
-		RevertPatch: outputRoomEventsSchemaRevert,
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	return t, nil
@@ -416,7 +431,6 @@ func (t *outputRoomEventsTable) InsertEvent(
 
 	db := t.cm.Connection(ctx, false)
 	row := db.Raw(t.insertEventSQL,
-		ctx,
 		event.RoomID().String(),
 		event.EventID(),
 		headeredJSON,

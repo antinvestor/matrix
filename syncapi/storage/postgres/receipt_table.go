@@ -91,14 +91,7 @@ type receiptTable struct {
 }
 
 // NewPostgresReceiptsTable creates a new receipts table
-func NewPostgresReceiptsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Receipts, error) {
-	t := &receiptTable{
-		cm:                    cm,
-		upsertReceiptSQL:      upsertReceiptSQL,
-		selectRoomReceiptsSQL: selectRoomReceiptsSQL,
-		selectMaxReceiptIDSQL: selectMaxReceiptIDSQL,
-		purgeReceiptsSQL:      purgeReceiptsSQL,
-	}
+func NewPostgresReceiptsTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Receipts, error) {
 
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
@@ -108,6 +101,14 @@ func NewPostgresReceiptsTable(ctx context.Context, cm sqlutil.ConnectionManager)
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &receiptTable{
+		cm:                    cm,
+		upsertReceiptSQL:      upsertReceiptSQL,
+		selectRoomReceiptsSQL: selectRoomReceiptsSQL,
+		selectMaxReceiptIDSQL: selectMaxReceiptIDSQL,
+		purgeReceiptsSQL:      purgeReceiptsSQL,
 	}
 
 	return t, nil

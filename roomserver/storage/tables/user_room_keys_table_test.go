@@ -26,6 +26,11 @@ func mustCreateUserRoomKeysTable(ctx context.Context, svc *frame.Service, t *tes
 	tab, err := postgres.NewPostgresUserRoomKeysTable(ctx, cm)
 	assert.NoError(t, err)
 
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate table: %s", err)
+	}
+
 	return cm, tab
 }
 

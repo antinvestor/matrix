@@ -59,12 +59,7 @@ type ignoresTable struct {
 }
 
 // NewPostgresIgnoresTable creates a new ignores table
-func NewPostgresIgnoresTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Ignores, error) {
-	t := &ignoresTable{
-		cm:               cm,
-		selectIgnoresSQL: selectIgnoresSQL,
-		upsertIgnoresSQL: upsertIgnoresSQL,
-	}
+func NewPostgresIgnoresTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Ignores, error) {
 
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
@@ -74,6 +69,12 @@ func NewPostgresIgnoresTable(ctx context.Context, cm sqlutil.ConnectionManager) 
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &ignoresTable{
+		cm:               cm,
+		selectIgnoresSQL: selectIgnoresSQL,
+		upsertIgnoresSQL: upsertIgnoresSQL,
 	}
 
 	return t, nil

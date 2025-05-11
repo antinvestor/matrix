@@ -95,15 +95,7 @@ type inviteEventsTable struct {
 }
 
 // NewPostgresInvitesTable creates a new invites table
-func NewPostgresInvitesTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Invites, error) {
-	t := &inviteEventsTable{
-		cm:                           cm,
-		insertInviteEventSQL:         insertInviteEventSQL,
-		selectInviteEventsInRangeSQL: selectInviteEventsInRangeSQL,
-		deleteInviteEventSQL:         deleteInviteEventSQL,
-		selectMaxInviteIDSQL:         selectMaxInviteIDSQL,
-		purgeInvitesSQL:              purgeInvitesSQL,
-	}
+func NewPostgresInvitesTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Invites, error) {
 
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
@@ -113,6 +105,15 @@ func NewPostgresInvitesTable(ctx context.Context, cm sqlutil.ConnectionManager) 
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &inviteEventsTable{
+		cm:                           cm,
+		insertInviteEventSQL:         insertInviteEventSQL,
+		selectInviteEventsInRangeSQL: selectInviteEventsInRangeSQL,
+		deleteInviteEventSQL:         deleteInviteEventSQL,
+		selectMaxInviteIDSQL:         selectMaxInviteIDSQL,
+		purgeInvitesSQL:              purgeInvitesSQL,
 	}
 
 	return t, nil

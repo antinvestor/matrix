@@ -17,8 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/shared"
 )
@@ -27,8 +25,6 @@ import (
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	shared.Database
-	db     *sql.DB
-	writer sqlutil.Writer
 }
 
 // NewDatabase creates a new sync server database

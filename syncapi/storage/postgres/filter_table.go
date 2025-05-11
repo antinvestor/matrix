@@ -71,13 +71,7 @@ type filterTable struct {
 }
 
 // NewPostgresFilterTable creates a new filter table
-func NewPostgresFilterTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Filter, error) {
-	t := &filterTable{
-		cm:                         cm,
-		selectFilterSQL:            selectFilterSQL,
-		selectFilterIDByContentSQL: selectFilterIDByContentSQL,
-		insertFilterSQL:            insertFilterSQL,
-	}
+func NewPostgresFilterTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Filter, error) {
 
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
@@ -87,6 +81,13 @@ func NewPostgresFilterTable(ctx context.Context, cm sqlutil.ConnectionManager) (
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &filterTable{
+		cm:                         cm,
+		selectFilterSQL:            selectFilterSQL,
+		selectFilterIDByContentSQL: selectFilterIDByContentSQL,
+		insertFilterSQL:            insertFilterSQL,
 	}
 
 	return t, nil

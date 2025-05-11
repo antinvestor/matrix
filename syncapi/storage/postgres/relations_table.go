@@ -94,15 +94,7 @@ type relationsTable struct {
 }
 
 // NewPostgresRelationsTable creates a new relations table
-func NewPostgresRelationsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Relations, error) {
-	t := &relationsTable{
-		cm:                            cm,
-		insertRelationSQL:             insertRelationSQL,
-		selectRelationsInRangeAscSQL:  selectRelationsInRangeAscSQL,
-		selectRelationsInRangeDescSQL: selectRelationsInRangeDescSQL,
-		deleteRelationSQL:             deleteRelationSQL,
-		selectMaxRelationIDSQL:        selectMaxRelationIDSQL,
-	}
+func NewPostgresRelationsTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Relations, error) {
 
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
@@ -112,6 +104,15 @@ func NewPostgresRelationsTable(ctx context.Context, cm sqlutil.ConnectionManager
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &relationsTable{
+		cm:                            cm,
+		insertRelationSQL:             insertRelationSQL,
+		selectRelationsInRangeAscSQL:  selectRelationsInRangeAscSQL,
+		selectRelationsInRangeDescSQL: selectRelationsInRangeDescSQL,
+		deleteRelationSQL:             deleteRelationSQL,
+		selectMaxRelationIDSQL:        selectMaxRelationIDSQL,
 	}
 
 	return t, nil

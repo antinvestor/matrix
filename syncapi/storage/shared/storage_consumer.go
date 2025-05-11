@@ -40,8 +40,8 @@ import (
 // Database is a temporary struct until we have made syncserver.go the same for both pq/sqlite
 // For now this contains the shared functions
 type Database struct {
-	Cm                  sqlutil.ConnectionManager
-	Writer              sqlutil.Writer
+	Cm sqlutil.ConnectionManager
+
 	Invites             tables.Invites
 	Peeks               tables.Peeks
 	AccountData         tables.AccountData

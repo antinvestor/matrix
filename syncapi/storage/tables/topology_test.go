@@ -26,6 +26,12 @@ func newTopologyTable(ctx context.Context, svc *frame.Service, t *testing.T, _ t
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
+
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate table: %s", err)
+	}
+
 	return cm, tab
 }
 

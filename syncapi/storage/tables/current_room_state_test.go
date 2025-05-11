@@ -28,6 +28,11 @@ func newCurrentRoomStateTable(ctx context.Context, svc *frame.Service, t *testin
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
+
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate database: %s", err)
+	}
 	return tab, cm
 }
 

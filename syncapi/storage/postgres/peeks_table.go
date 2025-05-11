@@ -104,17 +104,7 @@ type peeksTable struct {
 }
 
 // NewPostgresPeeksTable creates a new peeks table
-func NewPostgresPeeksTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Peeks, error) {
-	t := &peeksTable{
-		cm:                      cm,
-		insertPeekSQL:           insertPeekSQL,
-		deletePeekSQL:           deletePeekSQL,
-		deletePeeksSQL:          deletePeeksSQL,
-		selectPeeksInRangeSQL:   selectPeeksInRangeSQL,
-		selectPeekingDevicesSQL: selectPeekingDevicesSQL,
-		selectMaxPeekIDSQL:      selectMaxPeekIDSQL,
-		purgePeeksSQL:           purgePeeksSQL,
-	}
+func NewPostgresPeeksTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Peeks, error) {
 
 	// Perform the migration
 	err := cm.Collect(&frame.MigrationPatch{
@@ -124,6 +114,17 @@ func NewPostgresPeeksTable(ctx context.Context, cm sqlutil.ConnectionManager) (t
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	t := &peeksTable{
+		cm:                      cm,
+		insertPeekSQL:           insertPeekSQL,
+		deletePeekSQL:           deletePeekSQL,
+		deletePeeksSQL:          deletePeeksSQL,
+		selectPeeksInRangeSQL:   selectPeeksInRangeSQL,
+		selectPeekingDevicesSQL: selectPeekingDevicesSQL,
+		selectMaxPeekIDSQL:      selectMaxPeekIDSQL,
+		purgePeeksSQL:           purgePeeksSQL,
 	}
 
 	return t, nil

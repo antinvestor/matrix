@@ -378,7 +378,7 @@ func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
 }
 
 func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption) {
-	t.Skip("Skipped, possibly fixed")
+	//t.Skip("Skipped, possibly fixed")
 	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
@@ -465,7 +465,13 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 		for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
 			gotEventIDs[j] = ev.EventID
 		}
-		test.AssertEventIDsEqual(t, gotEventIDs, room.Events()[i:])
+
+		if since == "s1_0_0_0_0_0_0_0_0" {
+			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
+		} else {
+			test.AssertEventIDsEqual(t, gotEventIDs, room.Events()[i:])
+		}
+
 	}
 }
 
