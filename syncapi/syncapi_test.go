@@ -429,7 +429,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 		}
 		sinceTokens[i] = res.NextBatch.String()
 		if i == 0 { // create event does not produce a room section
-			if len(res.Rooms.Join) != 0 {
+			if res.Rooms != nil && len(res.Rooms.Join) != 0 {
 				t.Fatalf("i=%v got %d joined rooms, want 0", i, len(res.Rooms.Join))
 			}
 		} else { // we should have that room somewhere
@@ -460,7 +460,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 		if len(res.Rooms.Join) != 1 {
 			t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
 		}
-		t.Logf("since=%s res state:%+v res timeline:%+v", since, res.Rooms.Join[room.ID].State.Events, res.Rooms.Join[room.ID].Timeline.Events)
+		//t.Logf("since=%s res state:%+v res timeline:%+v", since, res.Rooms.Join[room.ID].State.Events, res.Rooms.Join[room.ID].Timeline.Events)
 		gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
 		for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
 			gotEventIDs[j] = ev.EventID

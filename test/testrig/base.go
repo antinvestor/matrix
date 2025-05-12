@@ -61,6 +61,7 @@ func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.
 	}
 
 	cfg.Global.DatabaseMigrate = "true"
+	cfg.Global.DatabaseMigrationPath = "./migrations/0001"
 
 	cfg.Global.ServerName = "test"
 	// use a distinct prefix else concurrent postgres runs will clash since NATS will use
@@ -87,9 +88,7 @@ func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *fr
 	}
 	srv.AddCleanupMethod(clearConfig)
 
-	scfg := cfg.Global
-
-	srvOpts := []frame.Option{frame.Config(&scfg), frame.Datastore(ctx)}
+	srvOpts := []frame.Option{frame.Config(&cfg.Global), frame.Datastore(ctx)}
 
 	srv.Init(srvOpts...)
 

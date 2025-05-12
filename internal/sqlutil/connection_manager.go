@@ -111,7 +111,10 @@ func (c *Connections) Migrate(ctx context.Context) error {
 
 	if c.dbPool.CanMigrate() {
 
-		err := c.service.MigratePool(ctx, c.dbPool, "")
+		cfg := c.service.Config().(frame.ConfigurationDatabase)
+		migrationsDirPath := cfg.GetDatabaseMigrationPath()
+
+		err := c.service.MigratePool(ctx, c.dbPool, migrationsDirPath)
 		if err != nil {
 			return err
 		}
@@ -156,6 +159,8 @@ func NewConnectionManager(service *frame.Service) ConnectionManager {
 		if len(primaryUrl) > 0 {
 			opts = &config.DatabaseOptions{ConnectionString: config.DataSource(primaryUrl[0])}
 		}
+
+		cfg.GetDatabaseMigrationPath()
 	}
 
 	return &Connections{

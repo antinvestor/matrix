@@ -116,7 +116,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		searchReq.SearchCategories.RoomEvents.Filter.Limit, nextBatch,
 	)
 	if err != nil {
-		logrus.WithError(err).Error("failed to search fulltext")
+		logrus.WithError(err).Error("failed fulltext search")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

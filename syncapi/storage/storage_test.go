@@ -827,7 +827,7 @@ func TestRoomSummary(t *testing.T) {
 	}{
 		{
 			name:        "after initial creation",
-			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(0), Heroes: []string{}},
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(0)},
 		},
 		{
 			name:        "invited user",

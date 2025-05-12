@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"gorm.io/gorm"
 	"sort"
 	"strings"
 
@@ -131,7 +132,8 @@ const selectRecentEventsSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id DESC LIMIT $8"
 
-// SQL query to select recent events for sync with optimization for multiple rooms
+// selectRecentEventsForSyncSQL contains an optimization to get the recent events for a list of rooms, using a LATERAL JOIN
+// The sub select inside LATERAL () is executed for all room_ids it gets as a parameter $1
 const selectRecentEventsForSyncSQL = `
 WITH room_ids AS (
      SELECT unnest($1::text[]) AS room_id
@@ -217,14 +219,13 @@ const purgeEventsSQL = "" +
 const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE id > $1 AND type = ANY($2) ORDER BY id ASC LIMIT $3"
 
 // SQL query to exclude events from search index
-const excludeEventsFromIndexSQL = "UPDATE syncapi_output_room_events SET exclude_from_search = true WHERE event_id = ANY($1)"
+const excludeEventsFromIndexSQL = "UPDATE syncapi_output_room_events SET exclude_from_search = TRUE WHERE event_id = ANY($1)"
 
 // SQL query to search for events
 const searchEventsSQL = `SELECT id, event_id, headered_event_json, history_visibility, '' AS highlight, paradedb.score(event_id) AS score  
-FROM syncapi_output_room_events WHERE %s ORDER BY score LIMIT $%d OFFSET $%d`
+FROM syncapi_output_room_events WHERE ? ORDER BY score LIMIT ? OFFSET ?`
 
-// SQL query to count search results
-const searchEventsCountSQL = `SELECT COUNT(*) FROM syncapi_output_room_events WHERE %s`
+const searchEventsCountSQL = `SELECT COUNT(*) FROM syncapi_output_room_events WHERE ?`
 
 // outputRoomEventsTable represents the table for storing output room events
 type outputRoomEventsTable struct {
@@ -576,56 +577,8 @@ func (t *outputRoomEventsTable) SelectEvents(
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
-
-	var streamEvents []types.StreamEvent
-	for rows.Next() {
-		var (
-			streamPos         types.StreamPosition
-			eventID           string
-			eventBytes        []byte
-			sessionID         *int64
-			excludeFromSync   bool
-			txnID             *string
-			transactionID     *api.TransactionID
-			historyVisibility int
-		)
-		if err := rows.Scan(&streamPos, &eventID, &eventBytes, &sessionID, &excludeFromSync, &txnID, &historyVisibility); err != nil {
-			return nil, err
-		}
-
-		var ev rstypes.HeaderedEvent
-		if err := json.Unmarshal(eventBytes, &ev); err != nil {
-			return nil, err
-		}
-
-		if sessionID != nil && txnID != nil {
-			transactionID = &api.TransactionID{
-				SessionID:     *sessionID,
-				TransactionID: *txnID,
-			}
-		}
-
-		// Convert history visibility from int to enum
-		hisVis := gomatrixserverlib.HistoryVisibilityShared
-		switch historyVisibility {
-		case 1:
-			hisVis = gomatrixserverlib.HistoryVisibilityWorldReadable
-		case 3:
-			hisVis = gomatrixserverlib.HistoryVisibilityInvited
-		case 4:
-			hisVis = gomatrixserverlib.HistoryVisibilityJoined
-		}
-		ev.Visibility = hisVis
-
-		streamEvents = append(streamEvents, types.StreamEvent{
-			HeaderedEvent:   &ev,
-			StreamPosition:  streamPos,
-			TransactionID:   transactionID,
-			ExcludeFromSync: excludeFromSync,
-		})
-	}
-
-	if err := rows.Err(); err != nil {
+	streamEvents, err := rowsToStreamEvents(rows)
+	if err != nil {
 		return nil, err
 	}
 
@@ -820,40 +773,41 @@ func (t *outputRoomEventsTable) SearchEvents(
 
 	whereExclusionQueryStr := " exclude_from_search @@@ 'false' "
 
+	whereShouldQueryStr := ""
+
 	if len(keys) == 0 {
 		keys = append(keys, "content.body", "content.name", "content.topic")
 	}
 
 	k := len(whereParams) + 1
-	for i, key := range keys {
-		j := i + k
-		whereParams = append(whereParams, searchTerm)
-		whereKeyString := fmt.Sprintf(" paradedb.match( field => 'headered_event_json.%s', value => $%d, distance => 0) ", key, j)
+	whereParams = append(whereParams, searchTerm)
+	for _, key := range keys {
+
+		whereKeyString := fmt.Sprintf(" paradedb.match( field => 'headered_event_json.%s', value => $%d, distance => 0) ", key, k)
 		whereKeyStrings = append(whereKeyStrings, whereKeyString)
 	}
 
-	whereShouldQueryStr := fmt.Sprintf(" should => ARRAY[ %s ]", strings.Join(whereKeyStrings, ", "))
+	whereShouldQueryStr = fmt.Sprintf(" AND event_id @@@ paradedb.boolean(  should => ARRAY[ %s ] )", strings.Join(whereKeyStrings, ", "))
 
-	finalWhereStr := fmt.Sprintf("%s %s AND event_id @@@ paradedb.boolean(  %s )", whereRoomIDQueryStr, whereExclusionQueryStr, whereShouldQueryStr)
+	finalWhereStr := fmt.Sprintf(" %s %s %s", whereRoomIDQueryStr, whereExclusionQueryStr, whereShouldQueryStr)
 
 	db := t.cm.Connection(ctx, true)
 
 	// Get total count
-	totalCountQuery := fmt.Sprintf(t.searchEventsCountSQL, finalWhereStr)
-	err = db.Raw(totalCountQuery, whereParams...).Row().Scan(&totalCount)
+	whereExpr := gorm.Expr(finalWhereStr, whereParams...)
+
+	row := db.Raw(t.searchEventsCountSQL, whereExpr).Row()
+	err = row.Scan(&totalCount)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get search results
-	parameterCount := len(whereParams)
-	finalQuery := fmt.Sprintf(t.searchEventsSQL, finalWhereStr, parameterCount+1, parameterCount+2)
-	whereParams = append(whereParams, limit, offset)
-
-	rows, err = db.Raw(finalQuery, whereParams...).Rows()
+	rows, err = db.Raw(t.searchEventsSQL, whereExpr, limit, offset).Rows()
 	if err != nil {
 		return nil, err
 	}
+
 	defer internal.CloseAndLogIfError(ctx, rows, "SearchEvents: rows.close() failed")
 	resultHits, err := rowsToSearchResult(rows)
 	if err != nil {
