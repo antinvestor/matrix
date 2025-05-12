@@ -469,9 +469,9 @@ func (r *Inputer) InputRoomEvents(
 	// be the one returned as the error string.
 	defer replySub.Drain() // nolint:errcheck
 	for i := 0; i < len(request.InputRoomEvents); i++ {
-		msg, err := replySub.NextMsgWithContext(ctx)
-		if err != nil {
-			response.ErrMsg = err.Error()
+		msg, err0 := replySub.NextMsgWithContext(ctx)
+		if err0 != nil {
+			response.ErrMsg = err0.Error()
 			return
 		}
 		if len(msg.Data) > 0 {

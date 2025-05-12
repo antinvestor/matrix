@@ -863,17 +863,20 @@ func (r *Inputer) calculateAndSetState(
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
-		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs, true); err != nil {
+		entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs, true)
+		if err != nil {
 			return fmt.Errorf("updater.StateEntriesForEventIDs: %w", err)
 		}
 		entries = types.DeduplicateStateEntries(entries)
 
-		if stateAtEvent.BeforeStateSnapshotNID, err = updater.AddState(ctx, roomInfo.RoomNID, nil, entries); err != nil {
+		stateAtEvent.BeforeStateSnapshotNID, err = updater.AddState(ctx, roomInfo.RoomNID, nil, entries)
+		if err != nil {
 			return fmt.Errorf("updater.AddState: %w", err)
 		}
 	} else {
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
-		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event, isRejected); err != nil {
+		stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event, isRejected)
+		if err != nil {
 			return fmt.Errorf("roomState.CalculateAndStoreStateBeforeEvent: %w", err)
 		}
 	}
@@ -882,6 +885,7 @@ func (r *Inputer) calculateAndSetState(
 	if err != nil {
 		return fmt.Errorf("r.Cm.SetState: %w", err)
 	}
+
 	succeeded = true
 	return nil
 }

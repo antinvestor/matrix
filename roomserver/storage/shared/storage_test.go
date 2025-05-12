@@ -58,7 +58,6 @@ func mustCreateRoomServerDatabase(ctx context.Context, svc *frame.Service, cfg *
 		EventStateKeysTable: stateKeyTable, Cache: cache}
 
 	return &shared.Database{
-		Cm:               cm,
 		EventDatabase:    evDb,
 		MembershipTable:  membershipTable,
 		UserRoomKeyTable: userRoomKeys,

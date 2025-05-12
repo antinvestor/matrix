@@ -116,7 +116,6 @@ func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache cachin
 			RedactionsTable:     redactions,
 			ReportedEventsTable: reportedEvents,
 		},
-		Cm:                 cm,
 		Cache:              cache,
 		RoomsTable:         rooms,
 		StateBlockTable:    stateBlock,

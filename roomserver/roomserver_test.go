@@ -66,19 +66,19 @@ func TestUsers(t *testing.T) {
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
 		t.Run("shared users", func(t *testing.T) {
-			testSharedUsers(t, rsAPI)
+			testSharedUsers(ctx, t, rsAPI)
 		})
 
 		t.Run("kick users", func(t *testing.T) {
 			usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
 			rsAPI.SetUserAPI(ctx, usrAPI)
-			testKickUsers(t, rsAPI, usrAPI)
+			testKickUsers(ctx, t, rsAPI, usrAPI)
 		})
 	})
 
 }
 
-func testSharedUsers(t *testing.T, rsAPI api.RoomserverInternalAPI) {
+func testSharedUsers(ctx context.Context, t *testing.T, rsAPI api.RoomserverInternalAPI) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
@@ -91,11 +91,9 @@ func testSharedUsers(t *testing.T, rsAPI api.RoomserverInternalAPI) {
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
 
-	ctx, svc, _ := testrig.Init(t)
-	defer svc.Stop(ctx)
-
 	// Create the room
-	if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+	err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false)
+	if err != nil {
 		t.Errorf("failed to send events: %v", err)
 	}
 
@@ -118,7 +116,7 @@ func testSharedUsers(t *testing.T, rsAPI api.RoomserverInternalAPI) {
 	}
 }
 
-func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI.UserInternalAPI) {
+func testKickUsers(ctx context.Context, t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI.UserInternalAPI) {
 	// Create users and room; Bob is going to be the guest and kicked on revocation of guest access
 	alice := test.NewUser(t, test.WithAccountType(userAPI.AccountTypeUser))
 	bob := test.NewUser(t, test.WithAccountType(userAPI.AccountTypeGuest))
@@ -129,9 +127,6 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 	room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID))
-
-	ctx, svc, _ := testrig.Init(t)
-	defer svc.Stop(ctx)
 
 	// Create the users in the userapi, so the RSAPI can query the account type later
 	for _, u := range []*test.User{alice, bob} {
@@ -169,7 +164,8 @@ func testKickUsers(t *testing.T, rsAPI api.RoomserverInternalAPI, usrAPI userAPI
 	for i := 0; i <= 20; i++ {
 		// Get the membership events AFTER revoking guest access
 		membershipRes2 := &api.QueryMembershipsForRoomResponse{}
-		if err := rsAPI.QueryMembershipsForRoom(ctx, &api.QueryMembershipsForRoomRequest{LocalOnly: true, JoinedOnly: true, RoomID: room.ID}, membershipRes2); err != nil {
+		err := rsAPI.QueryMembershipsForRoom(ctx, &api.QueryMembershipsForRoomRequest{LocalOnly: true, JoinedOnly: true, RoomID: room.ID}, membershipRes2)
+		if err != nil {
 			t.Errorf("failed to query membership for room: %s", err)
 		}
 

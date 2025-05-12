@@ -17,7 +17,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -25,11 +24,14 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
+	"sort"
 )
 
 // The events table holds metadata for each event, the actual JSON is stored
 // separately to keep the size of the rows small.
 const eventsSchema = `
+-- The events table holds metadata for each event, the actual JSON is stored
+-- separately to keep the size of the rows small.
 CREATE SEQUENCE IF NOT EXISTS roomserver_event_nid_seq;
 CREATE TABLE IF NOT EXISTS roomserver_events (
     -- Local numeric ID for the event.
@@ -79,41 +81,43 @@ DROP SEQUENCE IF EXISTS roomserver_event_nid_seq;
 
 // SQL Constants for event table queries
 const insertEventSQL = "" +
-	"INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, auth_event_nids, depth, is_rejected)" +
+	"INSERT INTO roomserver_events AS e (room_nid, event_type_nid, event_state_key_nid, event_id, auth_event_nids, depth, is_rejected)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7)" +
 	" ON CONFLICT ON CONSTRAINT roomserver_event_id_unique DO UPDATE" +
-	" SET is_rejected = (CASE WHEN roomserver_events.is_rejected = TRUE THEN $7 ELSE roomserver_events.is_rejected END)" +
+	" SET is_rejected = $7 WHERE e.event_id = $4 AND e.is_rejected = TRUE" +
 	" RETURNING event_nid, state_snapshot_nid"
 
 const selectEventSQL = "" +
 	"SELECT event_nid, state_snapshot_nid FROM roomserver_events WHERE event_id = $1"
 
 const bulkSelectSnapshotsFromEventIDsSQL = "" +
-	"SELECT state_snapshot_nid, event_id FROM roomserver_events WHERE event_id = ANY($1)"
+	"SELECT event_id, state_snapshot_nid FROM roomserver_events WHERE event_id = ANY($1)"
 
+// Bulk lookup of events by string ID.
+// Sort by the numeric IDs for event type and state key.
 // This means we can use binary search to lookup entries by type and state key.
 const bulkSelectStateEventByIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
-	" WHERE event_id = ANY($1) AND event_state_key_nid != 0" +
+	" WHERE event_id = ANY($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
+// Bulk lookup of events by string ID that aren't excluded.
+// Sort by the numeric IDs for event type and state key.
 // This means we can use binary search to lookup entries by type and state key.
 const bulkSelectStateEventByIDRejectedSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
-	" WHERE event_id = ANY($1) AND event_state_key_nid != 0 AND NOT is_rejected" +
+	" WHERE event_id = ANY($1) AND is_rejected = FALSE" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
+// Bulk look up of events by event NID, optionally filtering by the event type
+// or event state key NIDs if provided. (The CARDINALITY check will return true
+// if the provided arrays are empty, ergo no filtering).
 const bulkSelectStateEventByNIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
-	" WHERE event_nid = ANY($1) AND event_type_nid = ANY($2) AND event_state_key_nid = ANY($3)"
-
-const bulkSelectStateEventByNIDAndNoneEmptyStateKeySQL = "" +
-	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
-	" WHERE event_nid = ANY($1) AND event_state_key_nid != 0"
-
-const bulkSelectStateEventByStateKeySQL = "" +
-	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
-	" WHERE event_type_nid = $1 AND event_state_key_nid = $2"
+	" WHERE event_nid = ANY($1)" +
+	" AND (CARDINALITY($2::bigint[]) = 0 OR event_type_nid = ANY($2))" +
+	" AND (CARDINALITY($3::bigint[]) = 0 OR event_state_key_nid = ANY($3))" +
+	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
 const bulkSelectStateAtEventByIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, is_rejected FROM roomserver_events" +
@@ -153,8 +157,7 @@ const selectRoomNIDsForEventNIDsSQL = "" +
 const selectEventRejectedSQL = "" +
 	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
 
-const selectRoomsWithEventTypeNIDSQL = "" +
-	"SELECT DISTINCT room_nid FROM roomserver_events WHERE event_type_nid = $1"
+const selectRoomsWithEventTypeNIDSQL = `SELECT DISTINCT room_nid FROM roomserver_events WHERE event_type_nid = $1`
 
 // eventStatements contains the SQL statements for interacting with the events table.
 type eventStatements struct {
@@ -166,8 +169,8 @@ type eventStatements struct {
 	bulkSelectStateEventByIDSQL                      string
 	bulkSelectStateEventByIDRejectedSQL              string
 	bulkSelectStateEventByNIDSQL                     string
-	bulkSelectStateEventByNIDAndNoneEmptyStateKeySQL string
-	bulkSelectStateEventByStateKeySQL                string
+	BulkSelectStateEventByNIDAndNoneEmptyStateKeySQL string
+	BulkSelectStateEventByStateKeySQL                string
 	bulkSelectStateAtEventByIDSQL                    string
 	updateEventStateSQL                              string
 	selectEventSentToOutputSQL                       string
@@ -185,30 +188,28 @@ type eventStatements struct {
 
 // NewPostgresEventsTable creates a new events table. If the table already exists,
 // it will ensure it has the correct schema.
-func NewPostgresEventsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Events, error) {
+func NewPostgresEventsTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Events, error) {
 	s := &eventStatements{
-		cm:                                  cm,
-		insertEventSQL:                      insertEventSQL,
-		selectEventSQL:                      selectEventSQL,
-		bulkSelectSnapshotsFromEventIDsSQL:  bulkSelectSnapshotsFromEventIDsSQL,
-		bulkSelectStateEventByIDSQL:         bulkSelectStateEventByIDSQL,
-		bulkSelectStateEventByIDRejectedSQL: bulkSelectStateEventByIDRejectedSQL,
-		bulkSelectStateEventByNIDSQL:        bulkSelectStateEventByNIDSQL,
-		bulkSelectStateEventByNIDAndNoneEmptyStateKeySQL: bulkSelectStateEventByNIDAndNoneEmptyStateKeySQL,
-		bulkSelectStateEventByStateKeySQL:                bulkSelectStateEventByStateKeySQL,
-		bulkSelectStateAtEventByIDSQL:                    bulkSelectStateAtEventByIDSQL,
-		updateEventStateSQL:                              updateEventStateSQL,
-		selectEventSentToOutputSQL:                       selectEventSentToOutputSQL,
-		updateEventSentToOutputSQL:                       updateEventSentToOutputSQL,
-		selectEventIDSQL:                                 selectEventIDSQL,
-		bulkSelectStateAtEventAndReferenceSQL:            bulkSelectStateAtEventAndReferenceSQL,
-		bulkSelectEventIDSQL:                             bulkSelectEventIDSQL,
-		bulkSelectEventNIDSQL:                            bulkSelectEventNIDSQL,
-		bulkSelectUnsentEventNIDSQL:                      bulkSelectUnsentEventNIDSQL,
-		selectMaxEventDepthSQL:                           selectMaxEventDepthSQL,
-		selectRoomNIDsForEventNIDsSQL:                    selectRoomNIDsForEventNIDsSQL,
-		selectEventRejectedSQL:                           selectEventRejectedSQL,
-		selectRoomsWithEventTypeNIDSQL:                   selectRoomsWithEventTypeNIDSQL,
+		cm:                                    cm,
+		insertEventSQL:                        insertEventSQL,
+		selectEventSQL:                        selectEventSQL,
+		bulkSelectSnapshotsFromEventIDsSQL:    bulkSelectSnapshotsFromEventIDsSQL,
+		bulkSelectStateEventByIDSQL:           bulkSelectStateEventByIDSQL,
+		bulkSelectStateEventByIDRejectedSQL:   bulkSelectStateEventByIDRejectedSQL,
+		bulkSelectStateEventByNIDSQL:          bulkSelectStateEventByNIDSQL,
+		bulkSelectStateAtEventByIDSQL:         bulkSelectStateAtEventByIDSQL,
+		updateEventStateSQL:                   updateEventStateSQL,
+		selectEventSentToOutputSQL:            selectEventSentToOutputSQL,
+		updateEventSentToOutputSQL:            updateEventSentToOutputSQL,
+		selectEventIDSQL:                      selectEventIDSQL,
+		bulkSelectStateAtEventAndReferenceSQL: bulkSelectStateAtEventAndReferenceSQL,
+		bulkSelectEventIDSQL:                  bulkSelectEventIDSQL,
+		bulkSelectEventNIDSQL:                 bulkSelectEventNIDSQL,
+		bulkSelectUnsentEventNIDSQL:           bulkSelectUnsentEventNIDSQL,
+		selectMaxEventDepthSQL:                selectMaxEventDepthSQL,
+		selectRoomNIDsForEventNIDsSQL:         selectRoomNIDsForEventNIDsSQL,
+		selectEventRejectedSQL:                selectEventRejectedSQL,
+		selectRoomsWithEventTypeNIDSQL:        selectRoomsWithEventTypeNIDSQL,
 	}
 
 	// Apply the events table schema
@@ -236,29 +237,17 @@ func (s *eventStatements) InsertEvent(
 	depth int64,
 	isRejected bool,
 ) (types.EventNID, types.StateSnapshotNID, error) {
-	// Convert the auth event NIDs to an array
-	authNIDs := make([]int64, len(authEventNIDs))
-	for i := range authEventNIDs {
-		authNIDs[i] = int64(authEventNIDs[i])
-	}
+	var eventNID int64
+	var stateNID int64
 
 	// Get a connection
 	db := s.cm.Connection(ctx, false)
 
 	// Insert the event
-	var nullableEventNID sql.NullInt64
-	var nullableStateNID sql.NullInt64
-	row := db.Raw(s.insertEventSQL, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID), eventID, pq.Array(authNIDs), depth, isRejected).Row()
-	err := row.Scan(&nullableEventNID, &nullableStateNID)
-
-	eventNID := int64(0)
-	if nullableEventNID.Valid {
-		eventNID = nullableEventNID.Int64
-	}
-	stateNID := int64(0)
-	if nullableStateNID.Valid {
-		stateNID = nullableStateNID.Int64
-	}
+	row := db.Raw(s.insertEventSQL, int64(roomNID), int64(eventTypeNID), int64(eventStateKeyNID),
+		eventID, eventNIDsAsArray(authEventNIDs), depth,
+		isRejected).Row()
+	err := row.Scan(&eventNID, &stateNID)
 
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
 }
@@ -325,18 +314,18 @@ func (s *eventStatements) BulkSelectStateEventByID(
 	}
 
 	// Execute the query
-	rows, err := db.Raw(querySQL, pq.Array(eventIDs)).Rows()
+	rows, err := db.Raw(querySQL, pq.StringArray(eventIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateEventByID: rows.close() failed")
-
-	// We know that we will get at most len(eventIDs) results so we can allocate
-	// our result slice to have the same length. We will truncate the slice before
-	// returning in case we get fewer items than expected.
-	results := make([]types.StateEntry, len(eventIDs))
-	count := 0
-	for rows.Next() {
+	// We know that we will only get as many results as event IDs
+	// because of the unique constraint on event IDs.
+	// So we can allocate an array of the correct size now.
+	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
+	results := make([]types.StateEntry, 0, len(eventIDs))
+	i := 0
+	for ; rows.Next(); i++ {
 		var result types.StateEntry
 		if err = rows.Scan(
 			&result.EventTypeNID,
@@ -345,21 +334,22 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		); err != nil {
 			return nil, err
 		}
-		results[count] = result
-		count++
+		results = append(results, result)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-
-	// If we're not excluding rejected events, then we expect to get at least one for each requested event ID
-	if !excludeRejected && count != len(eventIDs) {
+	if !excludeRejected && i != len(eventIDs) {
+		// If there are fewer rows returned than IDs then we were asked to lookup event IDs we don't have.
+		// We don't know which ones were missing because we don't return the string IDs in the query.
+		// However it should be possible debug this by replaying queries or entries from the input kafka logs.
+		// If this turns out to be impossible and we do need the debug information here, it would be better
+		// to do it as a separate query rather than slowing down/complicating the internal case.
 		return nil, types.MissingEventError(
-			fmt.Sprintf("storage: state event IDs missing from the database (%d != %d)", count, len(eventIDs)),
+			fmt.Sprintf("storage: state event IDs missing from the database (%d != %d)", i, len(eventIDs)),
 		)
 	}
-
-	return results[:count], nil
+	return results, nil
 }
 
 // BulkSelectStateEventByNID lookups a list of state events by event NID.
@@ -368,31 +358,28 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 	ctx context.Context, eventNIDs []types.EventNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntry, error) {
-	// Convert event NIDs to int64 array
-	nids := make([]int64, len(eventNIDs))
-	for i := range eventNIDs {
-		nids[i] = int64(eventNIDs[i])
-	}
-
-	// Convert state key tuples to eventTypeNIDs and eventStateKeyNIDs arrays
-	typeNIDArray, stateKeyNIDArray := stateKeyTuplesToArrays(stateKeyTuples)
+	tuples := types.StateKeyTupleSorter(stateKeyTuples)
+	sort.Sort(tuples)
+	eventTypeNIDArray, eventStateKeyNIDArray := tuples.TypesAndStateKeysAsArrays()
 
 	// Get a connection
 	db := s.cm.Connection(ctx, true)
 
 	// Execute the query
-	rows, err := db.Raw(s.bulkSelectStateEventByNIDSQL, pq.Array(nids), pq.Array(typeNIDArray), pq.Array(stateKeyNIDArray)).Rows()
+	rows, err := db.Raw(s.bulkSelectStateEventByNIDSQL, eventNIDsAsArray(eventNIDs), pq.Int64Array(eventTypeNIDArray), pq.Int64Array(eventStateKeyNIDArray)).Rows()
+
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateEventByNID: rows.close() failed")
-
-	// We know that we will get at most len(eventNIDs) results so we can allocate
-	// our result slice to have the same length.
+	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectStateEventByID: rows.close() failed")
+	// We know that we will only get as many results as event IDs
+	// because of the unique constraint on event IDs.
+	// So we can allocate an array of the correct size now.
+	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
 	results := make([]types.StateEntry, len(eventNIDs))
-	count := 0
-	for rows.Next() {
-		var result types.StateEntry
+	i := 0
+	for ; rows.Next(); i++ {
+		result := &results[i]
 		if err = rows.Scan(
 			&result.EventTypeNID,
 			&result.EventStateKeyNID,
@@ -400,20 +387,11 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 		); err != nil {
 			return nil, err
 		}
-		results[count] = result
-		count++
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-
-	if count != len(eventNIDs) {
-		return nil, types.MissingEventError(
-			fmt.Sprintf("storage: event NIDs missing from the database (%d != %d)", count, len(eventNIDs)),
-		)
-	}
-
-	return results[:count], nil
+	return results[:i], nil
 }
 
 // BulkSelectStateAtEventByID lookups the state at a list of events by event ID.
@@ -431,11 +409,10 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventByID: rows.close() failed")
-
 	results := make([]types.StateAtEvent, len(eventIDs))
 	i := 0
-	for rows.Next() {
-		var result types.StateAtEvent
+	for ; rows.Next(); i++ {
+		result := &results[i]
 		if err = rows.Scan(
 			&result.EventTypeNID,
 			&result.EventStateKeyNID,
@@ -445,7 +422,6 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 		); err != nil {
 			return nil, err
 		}
-
 		// Genuine create events are the only case where it's OK to have no previous state.
 		isCreate := result.EventTypeNID == types.MRoomCreateNID && result.EventStateKeyNID == 1
 		if result.BeforeStateSnapshotNID == 0 && !isCreate {
@@ -453,14 +429,10 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 				fmt.Sprintf("storage: missing state for event NID %d", result.EventNID),
 			)
 		}
-		results[i] = result
-		i++
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-
-	// If we got fewer rows than expected, some events are missing
 	if i != len(eventIDs) {
 		return nil, types.MissingEventError(
 			fmt.Sprintf("storage: event IDs missing from the database (%d != %d)", i, len(eventIDs)),

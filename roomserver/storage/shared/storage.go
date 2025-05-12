@@ -34,7 +34,6 @@ import (
 const redactionsArePermanent = true
 
 type Database struct {
-	Cm sqlutil.ConnectionManager
 	EventDatabase
 	Cache              caching.RoomServerCaches
 	RoomsTable         tables.Rooms
@@ -643,13 +642,7 @@ func (d *Database) GetRoomUpdater(
 	if d.GetRoomUpdaterFn != nil {
 		return d.GetRoomUpdaterFn(ctx, roomInfo)
 	}
-	var err error
-	var updater *RoomUpdater
-	_ = d.Cm.Do(ctx, func(ctx context.Context) error {
-		updater, err = NewRoomUpdater(ctx, d, roomInfo)
-		return err
-	})
-	return updater, err
+	return NewRoomUpdater(ctx, d, roomInfo)
 }
 
 func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, eventID string) (bool, error) {
