@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mustCreateFederationDatabase(ctx context.Context, svc *frame.Service, cfg *config.Dendrite, t *testing.T, _ test.DependancyOption) storage.Database {
+func mustCreateFederationDatabase(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, _ test.DependancyOption) storage.Database {
 
 	caches, err := caching.NewCache(&cfg.Global.Cache)
 	if err != nil {

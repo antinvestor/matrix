@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS syncapi_filter (
 	filter TEXT NOT NULL,
 	-- The ID
 	id SERIAL UNIQUE,
-	-- The localpart of the Matrix user ID associated to this filter
+	-- The localpart of the Global user ID associated to this filter
 	localpart TEXT NOT NULL,
 
 	PRIMARY KEY(id, localpart)

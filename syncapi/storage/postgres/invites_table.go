@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +30,9 @@ import (
 
 // Schema for creating invite events table
 const inviteEventsSchema = `
+-- This sequence is shared between all the tables generated from kafka logs.
+CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
+
 CREATE TABLE IF NOT EXISTS syncapi_invite_events (
 	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_stream_id'),
 	event_id TEXT NOT NULL,

@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS mediaapi_media_repository (
     upload_name TEXT NOT NULL,
     -- Alternate RFC 4648 unpadded base64 encoding string representation of a SHA-256 hash sum of the file data.
     base64hash TEXT NOT NULL,
-    -- The user who uploaded the file. Should be a Matrix user ID.
+    -- The user who uploaded the file. Should be a Global user ID.
     user_id TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS mediaapi_media_repository_index ON mediaapi_media_repository (media_id, media_origin);

@@ -38,14 +38,14 @@ func newServiceWithoutT() (context.Context, *frame.Service) {
 	return frame.NewService("Test Srv", opts...)
 }
 
-func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.Dendrite, func(ctx context.Context), error) {
+func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.Matrix, func(ctx context.Context), error) {
 
 	defaultOpts, closeDSConns, err := test.PrepareDefaultDSConnections(ctx, testOpts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var cfg config.Dendrite
+	var cfg config.Matrix
 	cfg.Defaults(defaultOpts)
 	cfg.FederationAPI.KeyPerspectives = nil
 
@@ -60,7 +60,7 @@ func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.
 		cfg.Global.DatabasePrimaryURL = append(cfg.Global.DatabasePrimaryURL, string(conn))
 	}
 
-	cfg.Global.DatabaseMigrate = "true"
+	cfg.Global.DatabaseMigrate = true
 	cfg.Global.DatabaseMigrationPath = "./migrations/0001"
 
 	cfg.Global.ServerName = "test"
@@ -74,7 +74,7 @@ func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.
 	}, nil
 }
 
-func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *frame.Service, *config.Dendrite) {
+func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *frame.Service, *config.Matrix) {
 
 	opts := test.DependancyOption{}
 	if len(testOpts) > 0 {
@@ -95,7 +95,7 @@ func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *fr
 	return ctx, srv, cfg
 }
 
-func InitWithoutT(testOpts ...test.DependancyOption) (context.Context, *frame.Service, *config.Dendrite, error) {
+func InitWithoutT(testOpts ...test.DependancyOption) (context.Context, *frame.Service, *config.Matrix, error) {
 
 	opts := test.DependancyOption{}
 	if len(testOpts) > 0 {

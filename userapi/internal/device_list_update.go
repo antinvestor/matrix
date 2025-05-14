@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -560,7 +560,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 			}
 		case gomatrix.HTTPError:
 			// The remote server returned an error, give it some time to recover.
-			// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
+			// This is to avoid spamming remote servers, which may not be Global servers anymore.
 			if e.Code >= 300 {
 				logger.WithError(e).Debug("GetUserDevices returned gomatrix.HTTPError")
 				return hourWaitTime, err

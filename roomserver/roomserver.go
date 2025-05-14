@@ -34,7 +34,7 @@ import (
 // you may wish to call `SetFederationAPI` on the returned struct to avoid nil-dereference errors.
 func NewInternalAPI(
 	ctx context.Context,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	natsInstance *jetstream.NATSInstance,
 	caches caching.RoomServerCaches,

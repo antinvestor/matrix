@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -57,8 +57,8 @@ func TestHandleSend(t *testing.T) {
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
 		natsInstance := jetstream.NATSInstance{}
 		routers.Federation = fedMux
-		cfg.FederationAPI.Matrix.ServerName = testOrigin
-		cfg.FederationAPI.Matrix.Metrics.Enabled = false
+		cfg.FederationAPI.Global.ServerName = testOrigin
+		cfg.FederationAPI.Global.Metrics.Enabled = false
 		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, &natsInstance, nil, nil, nil, nil, true)
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()

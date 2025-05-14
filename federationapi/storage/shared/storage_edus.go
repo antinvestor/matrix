@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -164,7 +164,7 @@ func (d *Database) CleanEDUs(
 	})
 }
 
-// GetPendingServerNames returns the server names that have EDUs
+// GetPendingEDUServerNames returns the server names that have EDUs
 // waiting to be sent.
 func (d *Database) GetPendingEDUServerNames(
 	ctx context.Context,

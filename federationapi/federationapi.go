@@ -45,7 +45,7 @@ import (
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	dendriteConfig *config.Dendrite,
+	dendriteConfig *config.Matrix,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userAPI.FederationUserAPI,
 	federation fclient.FederationClient,
@@ -56,15 +56,15 @@ func AddPublicRoutes(
 ) {
 	cfg := &dendriteConfig.FederationAPI
 	mscCfg := &dendriteConfig.MSCs
-	js, _ := natsInstance.Prepare(ctx, &cfg.Matrix.JetStream)
+	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
-		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
-		TopicDeviceListUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
-		TopicSigningKeyUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		TopicReceiptEvent:      cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		TopicTypingEvent:       cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		TopicPresenceEvent:     cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		TopicDeviceListUpdate:  cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		TopicSigningKeyUpdate:  cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
 		Config:                 cfg,
 		UserAPI:                userAPI,
 	}
@@ -93,7 +93,7 @@ func AddPublicRoutes(
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Dendrite,
+	dendriteCfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	natsInstance *jetstream.NATSInstance,
 	federation fclient.FederationClient,
@@ -119,14 +119,14 @@ func NewInternalAPI(
 
 	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1, cfg.P2PFederationRetriesUntilAssumedOffline+1, cfg.EnableRelays)
 
-	js, nats := natsInstance.Prepare(ctx, &cfg.Matrix.JetStream)
+	js, nats := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 
-	signingInfo := dendriteCfg.Global.SigningIdentities()
+	signingInfo := cfg.Global.SigningIdentities()
 
 	queues := queue.NewOutgoingQueues(ctx,
 		federationDB,
-		cfg.Matrix.DisableFederation,
-		cfg.Matrix.ServerName, federation, &stats,
+		cfg.Global.DisableFederation,
+		cfg.Global.ServerName, federation, &stats,
 		signingInfo,
 	)
 

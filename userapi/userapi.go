@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ import (
 // using its `SetFederationAPI` method, other you may get nil-dereference errors.
 func NewInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Dendrite,
+	dendriteCfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	natsInstance *jetstream.NATSInstance,
 	rsAPI rsapi.UserRoomserverAPI,
@@ -73,7 +73,7 @@ func NewInternalAPI(
 		dendriteCfg.UserAPI.BCryptCost,
 		dendriteCfg.UserAPI.OpenIDTokenLifetimeMS,
 		api.DefaultLoginTokenLifetime,
-		dendriteCfg.UserAPI.Matrix.ServerNotices.LocalPart,
+		dendriteCfg.UserAPI.Global.ServerNotices.LocalPart,
 	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")

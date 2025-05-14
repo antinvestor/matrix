@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
 	routers httputil.Routers,
-	dendriteCfg *config.Dendrite,
+	dendriteCfg *config.Matrix,
 	keyRing gomatrixserverlib.JSONVerifier,
 	relayAPI api.RelayInternalAPI,
 ) {
@@ -55,7 +55,7 @@ func AddPublicRoutes(
 
 func NewRelayInternalAPI(
 	ctx context.Context,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	fedClient fclient.FederationClient,
 	rsAPI rsAPI.RoomserverInternalAPI,

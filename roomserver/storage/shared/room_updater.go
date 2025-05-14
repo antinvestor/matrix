@@ -11,7 +11,6 @@ import (
 )
 
 type RoomUpdater struct {
-	txn                     sqlutil.Transaction
 	d                       *Database
 	roomInfo                *types.RoomInfo
 	latestEvents            []types.StateAtEventAndReference
@@ -20,74 +19,42 @@ type RoomUpdater struct {
 	roomExists              bool
 }
 
-func rollback(txn sqlutil.Transaction) {
-	if txn == nil {
-		return
-	}
-	_ = txn.Rollback() // nolint: errcheck
-}
-
 func NewRoomUpdater(ctx context.Context, d *Database, roomInfo *types.RoomInfo) (*RoomUpdater, error) {
 	// If the roomInfo is nil then that means that the room doesn't exist
 	// yet, so we can't do `SelectLatestEventsNIDsForUpdate` because that
 	// would involve locking a row on the table that doesn't exist. Instead
 	// we will just run with a normal database transaction. It'll either
 	// succeed, processing a create event which creates the room, or it won't.
-
-	ctx, txn, err := d.Cm.BeginTx(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	if roomInfo == nil {
 		return &RoomUpdater{
-			txn, d, nil, nil, "", 0, false,
+			d, nil, nil, "", 0, false,
 		}, nil
 	}
 
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
 		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, roomInfo.RoomNID)
 	if err != nil {
-		rollback(txn)
 		return nil, err
 	}
 	stateAndRefs, err := d.EventsTable.BulkSelectStateAtEventAndReference(ctx, eventNIDs)
 	if err != nil {
-		rollback(txn)
 		return nil, err
 	}
 	var lastEventIDSent string
 	if lastEventNIDSent != 0 {
 		lastEventIDSent, err = d.EventsTable.SelectEventID(ctx, lastEventNIDSent)
 		if err != nil {
-			rollback(txn)
 			return nil, err
 		}
 	}
 	return &RoomUpdater{
-		txn, d, roomInfo, stateAndRefs, lastEventIDSent, currentStateSnapshotNID, true,
+		d, roomInfo, stateAndRefs, lastEventIDSent, currentStateSnapshotNID, true,
 	}, nil
 }
 
 // RoomExists returns true if the room exists and false otherwise.
 func (u *RoomUpdater) RoomExists() bool {
 	return u.roomExists
-}
-
-// Implements sqlutil.Transaction
-func (u *RoomUpdater) Commit() error {
-	if u.txn == nil { // SQLite mode probably
-		return nil
-	}
-	return u.txn.Commit()
-}
-
-// Implements sqlutil.Transaction
-func (u *RoomUpdater) Rollback() error {
-	if u.txn == nil { // SQLite mode probably
-		return nil
-	}
-	return u.txn.Rollback()
 }
 
 // RoomVersion implements types.RoomRecentEventsUpdater
@@ -155,9 +122,7 @@ func (u *RoomUpdater) AddState(
 func (u *RoomUpdater) SetState(
 	ctx context.Context, eventNID types.EventNID, stateNID types.StateSnapshotNID,
 ) error {
-	return u.d.Cm.Do(ctx, func(ctx context.Context) error {
-		return u.d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
-	})
+	return u.d.EventsTable.UpdateEventState(ctx, eventNID, stateNID)
 }
 
 func (u *RoomUpdater) EventTypeNIDs(
@@ -225,20 +190,20 @@ func (u *RoomUpdater) SetLatestEvents(ctx context.Context,
 	for i := range latest {
 		eventNIDs[i] = latest[i].EventNID
 	}
-	return u.d.Cm.Do(ctx, func(ctx context.Context) error {
-		if err := u.d.RoomsTable.UpdateLatestEventNIDs(ctx, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
-			return fmt.Errorf("u.d.RoomsTable.updateLatestEventNIDs: %w", err)
-		}
 
-		// Since it's entirely possible that this types.RoomInfo came from the
-		// cache, we should make sure to update that entry so that the next run
-		// works from live data.
-		if u.roomInfo != nil {
-			u.roomInfo.SetStateSnapshotNID(currentStateSnapshotNID)
-			u.roomInfo.SetIsStub(false)
-		}
-		return nil
-	})
+	// Use the existing transaction instead of creating a new one with u.d.Cm.Do
+	if err := u.d.RoomsTable.UpdateLatestEventNIDs(ctx, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
+		return fmt.Errorf("u.d.RoomsTable.updateLatestEventNIDs: %w", err)
+	}
+
+	// Since it's entirely possible that this types.RoomInfo came from the
+	// cache, we should make sure to update that entry so that the next run
+	// works from live data.
+	if u.roomInfo != nil {
+		u.roomInfo.SetStateSnapshotNID(currentStateSnapshotNID)
+		u.roomInfo.SetIsStub(false)
+	}
+	return nil
 }
 
 // HasEventBeenSent implements types.RoomRecentEventsUpdater

@@ -22,7 +22,7 @@ import (
 	ed255192 "golang.org/x/crypto/ed25519"
 )
 
-func mustCreateRoomServerDatabase(ctx context.Context, svc *frame.Service, cfg *config.Dendrite, t *testing.T, _ test.DependancyOption) *shared.Database {
+func mustCreateRoomServerDatabase(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, _ test.DependancyOption) *shared.Database {
 	t.Helper()
 
 	cache, err := caching.NewCache(&cfg.Global.Cache)

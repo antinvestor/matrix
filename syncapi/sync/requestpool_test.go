@@ -119,9 +119,9 @@ func TestRequestPool_updatePresence(t *testing.T) {
 		producer: publisher,
 		consumer: consumer,
 		cfg: &config.SyncAPI{
-			Matrix: &config.Global{
+			Global: &config.Global{
 				JetStream: config.JetStream{
-					TopicPrefix: "Dendrite",
+					TopicPrefix: "Matrix",
 				},
 				Presence: config.PresenceOptions{
 					EnableInbound:  true,

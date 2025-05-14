@@ -34,7 +34,7 @@ import (
 const accountsSchema = `
 -- Stores data about accounts.
 CREATE TABLE IF NOT EXISTS userapi_accounts (
-    -- The Matrix user ID localpart for this account
+    -- The Global user ID localpart for this account
     localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
     -- When this account was first created, as a unix timestamp (ms resolution).

@@ -1,4 +1,4 @@
-// Copyright 2023 The Matrix.org Foundation C.I.C.
+// Copyright 2023 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -53,7 +53,15 @@ func (c *Connections) DS() *config.DataSource {
 }
 
 func (c *Connections) Connection(ctx context.Context, readOnly bool) *gorm.DB {
+	// Check for a transaction in the stack first
+	stack := GetTransactionStack(ctx)
+	if !stack.IsEmpty() {
+		if txn, ok := stack.Peek().(*defaultTransaction); ok {
+			return txn.txn
+		}
+	}
 
+	// Check for legacy transaction in context (for backward compatibility)
 	txn, ok := ctx.Value(ctxKeyTransaction).(*defaultTransaction)
 	if ok {
 		return txn.txn
@@ -67,16 +75,22 @@ func (c *Connections) Connection(ctx context.Context, readOnly bool) *gorm.DB {
 }
 
 func (c *Connections) BeginTx(ctx context.Context, opts ...*WriterOption) (context.Context, Transaction, error) {
-
 	var sqlOpts []*sql.TxOptions
 	for _, opt := range opts {
 		sqlOpts = append(sqlOpts, opt.SqlOpts...)
 	}
 
+	// Get the active transaction stack or create a new one
+	stack := GetTransactionStack(ctx)
+	ctx = WithTransactionStack(ctx, stack)
+
 	writeDb := c.Connection(ctx, false)
 	gormTxn := writeDb.Begin(sqlOpts...)
 	txn := newDefaultTransaction(gormTxn)
+
+	// Add to context for backward compatibility
 	ctx = context.WithValue(ctx, ctxKeyTransaction, txn)
+
 	return ctx, txn, gormTxn.Error
 }
 

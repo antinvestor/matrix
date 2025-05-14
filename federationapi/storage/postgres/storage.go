@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/shared"
 	"github.com/antinvestor/matrix/internal/caching"
@@ -72,11 +70,11 @@ func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache cachin
 	}
 	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, cm)
 	if err != nil {
-		return nil, fmt.Errorf("NewPostgresNotaryServerKeysTable: %s", err)
+		return nil, err
 	}
 	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, cm)
 	if err != nil {
-		return nil, fmt.Errorf("NewPostgresNotaryServerKeysMetadataTable: %s", err)
+		return nil, err
 	}
 	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, cm)
 	if err != nil {

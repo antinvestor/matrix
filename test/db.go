@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ func ensureDatabaseExists(ctx context.Context, postgresUri *url.URL, newDbName s
 
 		var pgErr *pgconn.PgError
 		ok := errors.As(err, &pgErr)
-		if !(ok && pgErr.Code == "42P04" || (pgErr.Code == "XX000" && strings.Contains(pgErr.Message, "tuple concurrently updated"))) {
+		if !(ok && pgErr.Code == "42P04" || pgErr.Code == "23505" || (pgErr.Code == "XX000" && strings.Contains(pgErr.Message, "tuple concurrently updated"))) {
 			return postgresUri, err
 		}
 	}

@@ -3,8 +3,6 @@ package shared
 import (
 	"context"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -12,7 +10,6 @@ import (
 
 type MembershipUpdater struct {
 	d             *Database
-	transaction   sqlutil.Transaction
 	roomNID       types.RoomNID
 	targetUserNID types.EventStateKeyNID
 	oldMembership tables.MembershipState
@@ -49,14 +46,9 @@ func (d *Database) membershipUpdaterTxn(
 	targetUserNID types.EventStateKeyNID,
 	targetLocal bool,
 ) (context.Context, *MembershipUpdater, error) {
-	err := d.Cm.Do(ctx, func(ctx context.Context) error {
-		if err := d.MembershipTable.InsertMembership(ctx, roomNID, targetUserNID, targetLocal); err != nil {
-			return fmt.Errorf("d.MembershipTable.InsertMembership: %w", err)
-		}
-		return nil
-	})
+	err := d.MembershipTable.InsertMembership(ctx, roomNID, targetUserNID, targetLocal)
 	if err != nil {
-		return ctx, nil, fmt.Errorf("u.d.Writer.Do: %w", err)
+		return ctx, nil, fmt.Errorf("d.MembershipTable.InsertMembership: %w", err)
 	}
 
 	membership, err := d.MembershipTable.SelectMembershipForUpdate(ctx, roomNID, targetUserNID)
@@ -64,22 +56,9 @@ func (d *Database) membershipUpdaterTxn(
 		return ctx, nil, err
 	}
 
-	ctx, transaction, err := d.Cm.BeginTx(ctx)
-	if err != nil {
-		return ctx, nil, err
-	}
-
 	return ctx, &MembershipUpdater{
-		d, transaction, roomNID, targetUserNID, membership,
+		d, roomNID, targetUserNID, membership,
 	}, nil
-}
-
-func (u *MembershipUpdater) Rollback() error {
-	return u.transaction.Rollback()
-}
-
-func (u *MembershipUpdater) Commit() error {
-	return u.transaction.Commit()
 }
 
 // IsInvite implements types.MembershipUpdater

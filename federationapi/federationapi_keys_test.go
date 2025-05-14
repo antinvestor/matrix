@@ -2,12 +2,15 @@ package federationapi
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -16,13 +19,10 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
-
 	"github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/routing"
 	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/setup/config"
 )
 
 type server struct {
@@ -40,7 +40,7 @@ func (s *server) renew() {
 	// server C's cases which have validity either as now or
 	// in the past.
 	s.validity = time.Hour
-	s.config.Matrix.KeyValidityPeriod = s.validity
+	s.config.Global.KeyValidityPeriod = s.validity
 }
 
 var (
@@ -54,69 +54,6 @@ var servers = map[string]*server{
 	"a.com": serverA,
 	"b.com": serverB,
 	"c.com": serverC,
-}
-
-func TestMain(m *testing.M) {
-	// Set up the server key API for each "server" that we
-	// will use in our tests.
-	os.Exit(func() int {
-
-		ctx, svc, cfg, err := testrig.InitWithoutT()
-		if err != nil {
-			panic("couldn't initialize testrig: " + err.Error())
-		}
-
-		for _, s := range servers {
-
-			// Draw up just enough Dendrite config for the server key
-			// API to work.
-
-			cfg.Global.ServerName = s.name
-
-			// Generate a new key.
-			_, cfg.Global.PrivateKey, err = ed25519.GenerateKey(nil)
-			if err != nil {
-				panic("can't generate identity key: " + err.Error())
-			}
-
-			cfg.Global.JetStream.TopicPrefix = string(s.name[:1])
-			cfg.Global.KeyID = serverKeyID
-			cfg.Global.KeyValidityPeriod = s.validity
-			cfg.FederationAPI.KeyPerspectives = nil
-
-			s.config = &cfg.FederationAPI
-
-			s.cache, err = caching.NewCache(&config.CacheOptions{
-				ConnectionString: cfg.Global.Cache.ConnectionString,
-			})
-			if err != nil {
-				panic("can't create cache : " + err.Error())
-			}
-
-			natsInstance := jetstream.NATSInstance{}
-
-			// Create a transport which redirects federation requests to
-			// the mock round tripper. Since we're not *really* listening for
-			// federation requests then this will return the key instead.
-			transport := &http.Transport{}
-			transport.RegisterProtocol("matrix", &MockRoundTripper{})
-
-			// Create the federation client.
-			s.fedclient = fclient.NewFederationClient(
-				s.config.Matrix.SigningIdentities(),
-				fclient.WithTransport(transport),
-			)
-
-			// Finally, build the server key APIs.
-
-			cm := sqlutil.NewConnectionManager(svc)
-			s.api = NewInternalAPI(ctx, cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)
-		}
-
-		// Now that we have built our server key APIs, start the
-		// rest of the tests.
-		return m.Run()
-	}())
 }
 
 type MockRoundTripper struct{}
@@ -151,17 +88,89 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 	return
 }
 
+func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *config.Matrix) {
+	var err error
+	for _, s := range servers {
+
+		// Make a copy of the configuration to avoid modifying the original
+		cfg := *cfg0
+
+		cm := sqlutil.NewConnectionManager(svc)
+
+		globalCfg := cfg.Global
+		// Draw up just enough Matrix config for the server key
+		// API to work.
+		globalCfg.ServerName = s.name
+
+		// Generate a new key.
+		_, globalCfg.PrivateKey, err = ed25519.GenerateKey(nil)
+		if err != nil {
+			panic("can't generate identity key: " + err.Error())
+		}
+
+		globalCfg.KeyID = serverKeyID
+		globalCfg.KeyValidityPeriod = s.validity
+		cfg.FederationAPI.KeyPerspectives = nil
+
+		globalCfg.JetStream.TopicPrefix = string(s.name[:1])
+		cfg.FederationAPI.Global = &globalCfg
+		cfg.KeyServer.Global = &globalCfg
+
+		s.config = &cfg.FederationAPI
+
+		s.cache, err = caching.NewCache(&config.CacheOptions{
+			ConnectionString: globalCfg.Cache.ConnectionString,
+		})
+		if err != nil {
+			panic("can't create cache : " + err.Error())
+		}
+
+		natsInstance := jetstream.NATSInstance{}
+
+		// Create a transport which redirects federation requests to
+		// the mock round tripper. Since we're not *really* listening for
+		// federation requests then this will return the key instead.
+		transport := &http.Transport{}
+		transport.RegisterProtocol("matrix", &MockRoundTripper{})
+
+		// Create the federation client.
+		s.fedclient = createFederationClient(s)
+
+		// Finally, build the server key APIs.
+
+		s.api = NewInternalAPI(ctx, &cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)
+	}
+}
+
+func createFederationClient(s *server) fclient.FederationClient {
+	// Create a transport which redirects federation requests to
+	// the mock round tripper. Since we're not *really* listening for
+	// federation requests then this will return the key instead.
+	transport := &http.Transport{}
+	transport.RegisterProtocol("matrix", &MockRoundTripper{})
+
+	// Create the federation client.
+	return fclient.NewFederationClient(
+		s.config.Global.SigningIdentities(),
+		fclient.WithTransport(transport),
+	)
+}
+
 func TestServersRequestOwnKeys(t *testing.T) {
 	// Each server will request its own keys. There's no reason
 	// for this to fail as each server should know its own keys.
-	ctx, svc, _ := testrig.Init(t)
+	ctx, svc, cfg := testrig.Init(t)
 	defer svc.Stop(ctx)
 
+	createFederationDbKeys(ctx, svc, cfg)
+
 	for name, s := range servers {
+
 		req := gomatrixserverlib.PublicKeyLookupRequest{
 			ServerName: s.name,
 			KeyID:      serverKeyID,
 		}
+
 		res, err := s.api.FetchKeys(
 			ctx,
 			map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp{
@@ -171,6 +180,7 @@ func TestServersRequestOwnKeys(t *testing.T) {
 		if err != nil {
 			t.Fatalf("server could not fetch own key: %s", err)
 		}
+
 		if _, ok := res[req]; !ok {
 			t.Fatalf("server didn't return its own key in the results")
 		}
@@ -182,8 +192,10 @@ func TestRenewalBehaviour(t *testing.T) {
 	// Server A will request Server C's key but their validity period
 	// is an hour in the past. We'll retrieve the key as, even though it's
 	// past its validity, it will be able to verify past events.
-	ctx, svc, _ := testrig.Init(t)
+	ctx, svc, cfg := testrig.Init(t)
 	defer svc.Stop(ctx)
+
+	createFederationDbKeys(ctx, svc, cfg)
 
 	req := gomatrixserverlib.PublicKeyLookupRequest{
 		ServerName: serverC.name,

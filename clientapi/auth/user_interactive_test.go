@@ -48,7 +48,7 @@ func (d *fakeAccountDatabase) QueryAccountByPassword(ctx context.Context, req *a
 
 func setup() *UserInteractive {
 	cfg := &config.ClientAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: serverName,
 			},

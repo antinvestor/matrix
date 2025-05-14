@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS userapi_threepids (
 	threepid TEXT NOT NULL,
 	-- The 3PID medium
 	medium TEXT NOT NULL DEFAULT 'email',
-	-- The localpart of the Matrix user ID associated to this 3PID
+	-- The localpart of the Global user ID associated to this 3PID
 	localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
 

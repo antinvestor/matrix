@@ -33,7 +33,7 @@ func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
 	cm sqlutil.ConnectionManager,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	userAPI userapi.MediaUserAPI,
 	client *fclient.Client,
 	fedClient fclient.FederationClient,

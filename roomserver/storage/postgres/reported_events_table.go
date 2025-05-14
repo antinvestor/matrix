@@ -1,4 +1,4 @@
-// Copyright 2023 The Matrix.org Foundation C.I.C.
+// Copyright 2023 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,11 +55,11 @@ CREATE TABLE IF NOT EXISTS roomserver_reported_events
 WITH countReports AS (
     SELECT count(*) as report_count
     FROM roomserver_reported_events
-    WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
+    WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::BIGINT IS NULL OR reporting_user_nid = $2::BIGINT)
 )
 SELECT report_count, id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
 FROM roomserver_reported_events, countReports
-WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
+WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::BIGINT IS NULL OR reporting_user_nid = $2::BIGINT)
 ORDER BY received_ts DESC
 OFFSET $3
 LIMIT $4
@@ -69,11 +69,11 @@ LIMIT $4
 WITH countReports AS (
     SELECT count(*) as report_count
     FROM roomserver_reported_events
-    WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
+    WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::BIGINT IS NULL OR reporting_user_nid = $2::BIGINT)
 )
 SELECT report_count, id, room_nid, event_nid, reporting_user_nid, event_sender_nid, reason, score, received_ts
 FROM roomserver_reported_events, countReports
-WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::TEXT IS NULL OR reporting_user_nid = $2::BIGINT)
+WHERE ($1::BIGINT IS NULL OR room_nid = $1::BIGINT) AND ($2::BIGINT IS NULL OR reporting_user_nid = $2::BIGINT)
 ORDER BY received_ts ASC
 OFFSET $3
 LIMIT $4

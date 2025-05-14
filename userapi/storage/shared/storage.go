@@ -334,7 +334,7 @@ func (d *Database) hashPassword(plaintext string) (hash string, err error) {
 var Err3PIDInUse = errors.New("this third-party identifier is already in use")
 
 // SaveThreePIDAssociation saves the association between a third party identifier
-// and a local Matrix user (identified by the user's ID's local part).
+// and a local Global user (identified by the user's ID's local part).
 // If the third-party identifier is already part of an association, returns Err3PIDInUse.
 // Returns an error if there was a problem talking to the database.
 func (d *Database) SaveThreePIDAssociation(

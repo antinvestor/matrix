@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ func (r *Leaver) PerformLeave(
 	req *rsAPI.PerformLeaveRequest,
 	res *rsAPI.PerformLeaveResponse,
 ) ([]rsAPI.OutputEvent, error) {
-	if !r.Cfg.Matrix.IsLocalServerName(req.Leaver.Domain()) {
+	if !r.Cfg.Global.IsLocalServerName(req.Leaver.Domain()) {
 		return nil, fmt.Errorf("user %q does not belong to this homeserver", req.Leaver.String())
 	}
 	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
@@ -105,7 +105,7 @@ func (r *Leaver) performLeaveRoomByID(
 		} else {
 			domain = sender.Domain()
 		}
-		if !r.Cfg.Matrix.IsLocalServerName(domain) {
+		if !r.Cfg.Global.IsLocalServerName(domain) {
 			return r.performFederatedRejectInvite(ctx, req, res, domain, eventID, *leaver)
 		}
 		// check that this is not a "server notice room"
@@ -256,13 +256,6 @@ func (r *Leaver) performFederatedRejectInvite(
 	if updater != nil {
 		if err = updater.Delete(ctx); err != nil {
 			util.GetLogger(ctx).WithError(err).Errorf("failed to delete membership, still retiring invite event")
-			if err = updater.Rollback(); err != nil {
-				util.GetLogger(ctx).WithError(err).Errorf("failed to rollback deleting membership, still retiring invite event")
-			}
-		} else {
-			if err = updater.Commit(); err != nil {
-				util.GetLogger(ctx).WithError(err).Errorf("failed to commit deleting membership, still retiring invite event")
-			}
 		}
 	}
 

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 
 	"github.com/lib/pq"
 
@@ -180,10 +179,10 @@ func (t *queueEDUTable) SelectQueueEDUReferenceJSONCount(
 	var count int64
 	db := t.cm.Connection(ctx, true)
 	err := db.Raw(t.selectQueueEDUReferenceJSONCountSQL, jsonNID).Row().Scan(&count)
-	if err != nil {
-		return 0, err
+	if sqlutil.ErrorIsNoRows(err) {
+		return -1, nil
 	}
-	return count, nil
+	return count, err
 }
 
 // SelectQueueEDUServerNames returns the server names with EDUs queued
@@ -205,9 +204,7 @@ func (t *queueEDUTable) SelectQueueEDUServerNames(
 		}
 		result = append(result, serverName)
 	}
-	if len(result) == 0 {
-		return nil, errors.New("no rows found")
-	}
+
 	return result, rows.Err()
 }
 
@@ -224,8 +221,8 @@ func (t *queueEDUTable) SelectExpiredEDUs(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectExpiredEDUs: rows.close() failed")
 
 	var result []int64
+	var nid int64
 	for rows.Next() {
-		var nid int64
 		if err = rows.Scan(&nid); err != nil {
 			return nil, err
 		}

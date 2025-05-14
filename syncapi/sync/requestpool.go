@@ -1,6 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"strings"
@@ -104,7 +105,7 @@ func (rp *RequestPool) cleanLastSeen() {
 }
 
 func (rp *RequestPool) cleanPresence(ctx context.Context, db storage.Presence, cleanupTime time.Duration) {
-	if !rp.cfg.Matrix.Presence.EnableOutbound {
+	if !rp.cfg.Global.Presence.EnableOutbound {
 		return
 	}
 	for {
@@ -140,7 +141,7 @@ func (rp *RequestPool) updatePresence(ctx context.Context, db storage.Presence, 
 }
 
 func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Presence, presence string, userID string, checkAgain bool) {
-	if !rp.cfg.Matrix.Presence.EnableOutbound {
+	if !rp.cfg.Global.Presence.EnableOutbound {
 		return
 	}
 
@@ -290,7 +291,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	// Extract values from request
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
-		if err == types.ErrMalformedSyncToken {
+		if errors.Is(err, types.ErrMalformedSyncToken) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.InvalidParam(err.Error()),

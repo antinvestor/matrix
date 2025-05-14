@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -104,7 +104,7 @@ func (r *Inviter) ProcessInviteMembership(
 	if err != nil {
 		return nil, api.ErrInvalidID{Err: fmt.Errorf("the user ID %s is invalid", *inviteEvent.StateKey())}
 	}
-	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(userID.Domain())
+	isTargetLocal := r.Cfg.Global.IsLocalServerName(userID.Domain())
 	if ctx, updater, err = r.DB.MembershipUpdater(ctx, inviteEvent.RoomID().String(), *inviteEvent.StateKey(), isTargetLocal, inviteEvent.Version()); err != nil {
 		return nil, fmt.Errorf("r.Cm.MembershipUpdater: %w", err)
 	}
@@ -117,9 +117,6 @@ func (r *Inviter) ProcessInviteMembership(
 		return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 	}
 
-	if err = updater.Commit(); err != nil {
-		return nil, fmt.Errorf("updater.Commit: %w", err)
-	}
 	return outputUpdates, nil
 }
 
@@ -155,11 +152,11 @@ func (r *Inviter) PerformInvite(
 		return err
 	}
 
-	if !r.Cfg.Matrix.IsLocalServerName(req.InviteInput.Inviter.Domain()) {
+	if !r.Cfg.Global.IsLocalServerName(req.InviteInput.Inviter.Domain()) {
 		return api.ErrInvalidID{Err: fmt.Errorf("the invite must be from a local user")}
 	}
 
-	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(req.InviteInput.Invitee.Domain())
+	isTargetLocal := r.Cfg.Global.IsLocalServerName(req.InviteInput.Invitee.Domain())
 
 	signingKey := req.InviteInput.PrivateKey
 	if info.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {

@@ -57,7 +57,7 @@ func (r *Peeker) performPeek(
 	if err != nil {
 		return "", api.ErrInvalidID{Err: fmt.Errorf("supplied user ID %q in incorrect format", req.UserID)}
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		return "", api.ErrInvalidID{Err: fmt.Errorf("user %q does not belong to this homeserver", req.UserID)}
 	}
 	if strings.HasPrefix(req.RoomIDOrAlias, "!") {
@@ -83,7 +83,7 @@ func (r *Peeker) performPeekRoomByAlias(
 	// Check if this alias matches our own server configuration. If it
 	// doesn't then we'll need to try a federated peek.
 	var roomID string
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		// The alias isn't owned by us, so we will need to try peeking using
 		// a remote server.
 		dirReq := fsAPI.PerformDirectoryLookupRequest{
@@ -130,7 +130,7 @@ func (r *Peeker) performPeekRoomByID(
 
 	// handle federated peeks
 	// FIXME: don't create an outbound peek if we already have one going.
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		// If the server name in the room ID isn't ours then it's a
 		// possible candidate for finding the room via federation. Add
 		// it to the list of servers to try.

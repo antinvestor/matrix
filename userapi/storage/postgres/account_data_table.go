@@ -28,7 +28,7 @@ import (
 const accountDataSchema = `
 -- Stores data about accounts data.
 CREATE TABLE IF NOT EXISTS userapi_account_datas (
-    -- The Matrix user ID localpart for this account
+    -- The Global user ID localpart for this account
     localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
     -- The room ID for this data (empty string if not specific to a room)

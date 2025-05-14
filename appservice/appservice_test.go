@@ -429,7 +429,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 }
 
 // Note: If this test panics, it is because we timed out waiting for the
-// join event to come through to the appservice and we close the Cm/shutdown Dendrite. This makes the
+// join event to come through to the appservice and we close the Cm/shutdown Matrix. This makes the
 // syncAPI unhappy, as it is unable to write to the database.
 func TestOutputAppserviceEvent(t *testing.T) {
 	alice := test.NewUser(t)

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ func (r *Joiner) performJoin(
 	if err != nil {
 		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("supplied user ID %q in incorrect format", req.UserID)}
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user %q does not belong to this homeserver", req.UserID)}
 	}
 	if strings.HasPrefix(req.RoomIDOrAlias, "!") {
@@ -107,7 +107,7 @@ func (r *Joiner) performJoinRoomByAlias(
 	// Check if this alias matches our own server configuration. If it
 	// doesn't then we'll need to try a federated join.
 	var roomID string
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		// The alias isn't owned by us, so we will need to try joining using
 		// a remote server.
 		dirReq := fsAPI.PerformDirectoryLookupRequest{
@@ -155,7 +155,7 @@ func (r *Joiner) performJoinRoomByID(
 	// The original client request ?server_name=... may include this HS so filter that out so we
 	// don't attempt to make_join with ourselves
 	for i := 0; i < len(req.ServerNames); i++ {
-		if r.Cfg.Matrix.IsLocalServerName(req.ServerNames[i]) {
+		if r.Cfg.Global.IsLocalServerName(req.ServerNames[i]) {
 			// delete this entry
 			req.ServerNames = append(req.ServerNames[:i], req.ServerNames[i+1:]...)
 			i--
@@ -171,7 +171,7 @@ func (r *Joiner) performJoinRoomByID(
 	// If the server name in the room ID isn't ours then it's a
 	// possible candidate for finding the room via federation. Add
 	// it to the list of servers to try.
-	if !r.Cfg.Matrix.IsLocalServerName(roomID.Domain()) {
+	if !r.Cfg.Global.IsLocalServerName(roomID.Domain()) {
 		req.ServerNames = append(req.ServerNames, roomID.Domain())
 	}
 
@@ -234,7 +234,7 @@ func (r *Joiner) performJoinRoomByID(
 
 			// If we were invited by someone from another server then we can
 			// assume they are in the room so we can join via them.
-			if inviter != nil && !r.Cfg.Matrix.IsLocalServerName(inviter.Domain()) {
+			if inviter != nil && !r.Cfg.Global.IsLocalServerName(inviter.Domain()) {
 				req.ServerNames = append(req.ServerNames, inviter.Domain())
 				forceFederatedJoin = true
 				memberEvent := gjson.Parse(string(inviteEvent.JSON()))
@@ -285,7 +285,7 @@ func (r *Joiner) performJoinRoomByID(
 	// but everyone has since left. I suspect it does the wrong thing.
 
 	var buildRes rsAPI.QueryLatestEventsAndStateResponse
-	identity := r.Cfg.Matrix.SigningIdentity
+	identity := r.Cfg.Global.SigningIdentity
 
 	// at this point we know we have an existing room
 	if inRoomRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
@@ -379,7 +379,7 @@ func (r *Joiner) performJoinRoomByID(
 		// The room doesn't exist locally. If the room ID looks like it should
 		// be ours then this probably means that we've nuked our database at
 		// some point.
-		if r.Cfg.Matrix.IsLocalServerName(roomID.Domain()) {
+		if r.Cfg.Global.IsLocalServerName(roomID.Domain()) {
 			// If there are no more server names to try then give up here.
 			// Otherwise we'll try a federated join as normal, since it's quite
 			// possible that the room still exists on other servers.

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ func TestFederationClientQueryKeys(t *testing.T) {
 	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
@@ -68,7 +68,7 @@ func TestFederationClientQueryKeys(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -93,7 +93,7 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 	assert.Nil(t, err)
 
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
@@ -104,7 +104,7 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -125,7 +125,7 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
@@ -136,7 +136,7 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -158,7 +158,7 @@ func TestFederationClientClaimKeys(t *testing.T) {
 	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
@@ -169,7 +169,7 @@ func TestFederationClientClaimKeys(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{
@@ -192,7 +192,7 @@ func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
 	assert.Nil(t, err)
 
 	cfg := config.FederationAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: "server",
 			},
@@ -203,7 +203,7 @@ func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
 	queues := queue.NewOutgoingQueues(
 		ctx, testDB,
 		false,
-		cfg.Matrix.ServerName, fedClient, &stats,
+		cfg.Global.ServerName, fedClient, &stats,
 		nil,
 	)
 	fedapi := FederationInternalAPI{

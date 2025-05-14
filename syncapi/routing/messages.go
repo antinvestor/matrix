@@ -570,7 +570,7 @@ func (r *messagesReq) backfill(ctx context.Context, roomID string, backwardsExtr
 		RoomID:               roomID,
 		BackwardsExtremities: backwardsExtremities,
 		Limit:                limit,
-		ServerName:           r.cfg.Matrix.ServerName,
+		ServerName:           r.cfg.Global.ServerName,
 		VirtualHost:          r.device.UserDomain(),
 	}, &res)
 	if err != nil {

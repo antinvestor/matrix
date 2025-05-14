@@ -42,7 +42,7 @@ import (
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	dendriteCfg *config.Dendrite,
+	dendriteCfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	natsInstance *jetstream.NATSInstance,
 	userAPI userapi.SyncUserAPI,

@@ -18,7 +18,7 @@ const openIDTokenSchema = `
 CREATE TABLE IF NOT EXISTS userapi_openid_tokens (
 	-- The value of the token issued to a user
 	token TEXT NOT NULL PRIMARY KEY,
-    -- The Matrix user ID for this account
+    -- The Global user ID for this account
 	localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
 	-- When the token expires, as a unix timestamp (ms resolution).

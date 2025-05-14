@@ -70,7 +70,7 @@ func main() {
 		log.Fatalf("Failed to start due to configuration errors")
 	}
 
-	log.Infof("Matrix version %s", internal.VersionString())
+	log.Infof("Global version %s", internal.VersionString())
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
 		log.Warn("Open registration is enabled")
 	}

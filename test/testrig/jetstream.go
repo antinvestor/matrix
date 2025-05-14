@@ -20,7 +20,7 @@ func MustPublishMsgs(t *testing.T, jsctx nats.JetStreamContext, msgs ...*nats.Ms
 	}
 }
 
-func NewOutputEventMsg(t *testing.T, cfg *config.Dendrite, roomID string, update api.OutputEvent) *nats.Msg {
+func NewOutputEventMsg(t *testing.T, cfg *config.Matrix, roomID string, update api.OutputEvent) *nats.Msg {
 	t.Helper()
 	msg := nats.NewMsg(cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent))
 	msg.Header.Set(jetstream.RoomEventType, string(update.Type))

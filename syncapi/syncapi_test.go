@@ -442,7 +442,6 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 	// sync with no token "" and with the penultimate token and this should neatly return room events in the timeline block
 	sinceTokens = append([]string{""}, sinceTokens[:len(sinceTokens)-1]...)
 
-	t.Logf("waited for events to be consumed; syncing with %v", sinceTokens)
 	for i, since := range sinceTokens {
 		w := httptest.NewRecorder()
 		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
@@ -454,7 +453,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 			t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
 		}
 		var res types.Response
-		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
 			t.Errorf("failed to decode response body: %s", err)
 		}
 		if len(res.Rooms.Join) != 1 {
@@ -469,6 +468,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 		if since == "s1_0_0_0_0_0_0_0_0" {
 			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
 		} else {
+			t.Logf("since; matching %v for got : %v and want : %v", since, len(gotEventIDs), len(room.Events()[i:]))
 			test.AssertEventIDsEqual(t, gotEventIDs, room.Events()[i:])
 		}
 
@@ -626,9 +626,6 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		natsInstance := jetstream.NATSInstance{}
-
-		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 		// Use the actual internal roomserver API
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
@@ -900,8 +897,6 @@ func TestGetMembership(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		natsInstance := jetstream.NATSInstance{}
-		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 		// Use an actual roomserver for this
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
@@ -919,7 +914,7 @@ func TestGetMembership(t *testing.T) {
 				if tc.additionalEvents != nil {
 					tc.additionalEvents(t, room)
 				}
-				if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+				if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
 
@@ -1495,7 +1490,7 @@ func syncUntil(t *testing.T,
 	}
 }
 
-func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*rstypes.HeaderedEvent) []*nats.Msg {
+func toNATSMsgs(t *testing.T, cfg *config.Matrix, input ...*rstypes.HeaderedEvent) []*nats.Msg {
 	result := make([]*nats.Msg, len(input))
 	for i, ev := range input {
 		var addsStateIDs []string

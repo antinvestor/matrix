@@ -2300,8 +2300,6 @@ func TestGetMembership(t *testing.T) {
 		}
 
 		natsInstance := jetstream.NATSInstance{}
-		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 		// Use an actual roomserver for this
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
@@ -2367,8 +2365,6 @@ func TestCreateRoomInvite(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		natsInstance := jetstream.NATSInstance{}
-		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 		// Use an actual roomserver for this
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
@@ -2441,8 +2437,6 @@ func TestReportEvent(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		natsInstance := jetstream.NATSInstance{}
-		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 		// Use an actual roomserver for this
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)

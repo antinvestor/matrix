@@ -43,9 +43,9 @@ var keyIDRegexp = regexp.MustCompile("^ed25519:[a-zA-Z0-9_]+$")
 // This will change whenever we make breaking changes to the config format.
 const Version = 2
 
-// Dendrite contains all the config used by a dendrite process.
+// Matrix contains all the config used by a matrix process.
 // Relative paths are resolved relative to the current working directory
-type Dendrite struct {
+type Matrix struct {
 	// The version of the configuration file.
 	// If the version in a file doesn't match the current dendrite config
 	// version then we can give a clear error message telling the user
@@ -201,7 +201,7 @@ type ConfigErrors []string
 
 // Load a yaml config file for a server run as multiple processes or as a monolith.
 // Checks the config to ensure that it is valid.
-func Load(configPath string) (*Dendrite, error) {
+func Load(configPath string) (*Matrix, error) {
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -219,8 +219,8 @@ func loadConfig(
 	basePath string,
 	configData []byte,
 	readFile func(string) ([]byte, error),
-) (*Dendrite, error) {
-	var c Dendrite
+) (*Matrix, error) {
+	var c Matrix
 	c.Defaults(DefaultOpts{})
 
 	err := yaml.Unmarshal(configData, &c)
@@ -316,7 +316,7 @@ func LoadMatrixKey(privateKeyPath string, readFile func(string) ([]byte, error))
 
 // Derive generates data that is derived from various values provided in
 // the config file.
-func (config *Dendrite) Derive() error {
+func (config *Matrix) Derive() error {
 	// Determine registration flows based off config values
 
 	config.Derived.Registration.Params = make(map[string]interface{})
@@ -343,7 +343,7 @@ func (config *Dendrite) Derive() error {
 	return nil
 }
 
-func (config *Dendrite) LoadEnv() error {
+func (config *Matrix) LoadEnv() error {
 	return config.Global.LoadEnv()
 }
 
@@ -354,7 +354,7 @@ type DefaultOpts struct {
 }
 
 // Defaults sets default config values if they are not explicitly set.
-func (config *Dendrite) Defaults(opts DefaultOpts) {
+func (config *Matrix) Defaults(opts DefaultOpts) {
 	config.Version = Version
 
 	config.Global.Defaults(opts)
@@ -371,7 +371,7 @@ func (config *Dendrite) Defaults(opts DefaultOpts) {
 	config.Wiring()
 }
 
-func (config *Dendrite) Verify(configErrs *ConfigErrors) {
+func (config *Matrix) Verify(configErrs *ConfigErrors) {
 	type verifiable interface {
 		Verify(configErrs *ConfigErrors)
 	}
@@ -385,27 +385,27 @@ func (config *Dendrite) Verify(configErrs *ConfigErrors) {
 	}
 }
 
-func (config *Dendrite) Wiring() {
-	config.ClientAPI.Matrix = &config.Global
-	config.FederationAPI.Matrix = &config.Global
+func (config *Matrix) Wiring() {
+	config.ClientAPI.Global = &config.Global
+	config.FederationAPI.Global = &config.Global
 	config.FederationAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
-	config.KeyServer.Matrix = &config.Global
+	config.KeyServer.Global = &config.Global
 	config.KeyServer.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
-	config.MediaAPI.Matrix = &config.Global
+	config.MediaAPI.Global = &config.Global
 	config.MediaAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
-	config.RoomServer.Matrix = &config.Global
+	config.RoomServer.Global = &config.Global
 	config.RoomServer.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
-	config.SyncAPI.Matrix = &config.Global
+	config.SyncAPI.Global = &config.Global
 	config.SyncAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
-	config.UserAPI.Matrix = &config.Global
+	config.UserAPI.Global = &config.Global
 	config.UserAPI.AccountDatabase.ConnectionString = config.Global.DatabaseOptions.ConnectionString
-	config.AppServiceAPI.Matrix = &config.Global
-	config.RelayAPI.Matrix = &config.Global
+	config.AppServiceAPI.Global = &config.Global
+	config.RelayAPI.Global = &config.Global
 	config.RelayAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
 	config.MSCs.Matrix = &config.Global
@@ -453,7 +453,7 @@ func checkPositive(configErrs *ConfigErrors, key string, value int64) {
 }
 
 // checkLogging verifies the parameters logging.* are valid.
-func (config *Dendrite) checkLogging(configErrs *ConfigErrors) {
+func (config *Matrix) checkLogging(configErrs *ConfigErrors) {
 	for _, logrusHook := range config.Logging {
 		checkNotEmpty(configErrs, "logging.type", string(logrusHook.Type))
 		checkNotEmpty(configErrs, "logging.level", string(logrusHook.Level))
@@ -462,7 +462,7 @@ func (config *Dendrite) checkLogging(configErrs *ConfigErrors) {
 
 // check returns an error type containing all errors found within the config
 // file.
-func (config *Dendrite) check() error { // monolithic
+func (config *Matrix) check() error { // monolithic
 	var configErrs ConfigErrors
 
 	if config.Version != Version {
@@ -530,12 +530,12 @@ func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserv
 }
 
 // SetupTracing configures the opentracing using the supplied configuration.
-func (config *Dendrite) SetupTracing() (closer io.Closer, err error) {
+func (config *Matrix) SetupTracing() (closer io.Closer, err error) {
 	if !config.Tracing.Enabled {
 		return io.NopCloser(bytes.NewReader([]byte{})), nil
 	}
 	return config.Tracing.Jaeger.InitGlobalTracer(
-		"Dendrite",
+		"Matrix",
 		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
 		jaegerconfig.Metrics(jaegermetrics.NullFactory),
 	)

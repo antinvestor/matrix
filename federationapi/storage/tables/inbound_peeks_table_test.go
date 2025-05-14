@@ -26,6 +26,10 @@ func mustCreateInboundpeeksTable(ctx context.Context, svc *frame.Service, t *tes
 	if err != nil {
 		t.Fatalf("failed to create table: %s", err)
 	}
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate table: %s", err)
+	}
 	return tab
 }
 

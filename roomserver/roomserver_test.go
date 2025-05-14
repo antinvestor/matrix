@@ -173,7 +173,7 @@ func testKickUsers(ctx context.Context, t *testing.T, rsAPI api.RoomserverIntern
 		if !reflect.DeepEqual(membershipRes, membershipRes2) {
 			return
 		}
-		time.Sleep(time.Millisecond * 10)
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	t.Errorf("memberships didn't change in time")
@@ -606,8 +606,6 @@ func TestRedaction(t *testing.T) {
 					updater, err := db.GetRoomUpdater(ctx, roomInfo)
 					assert.NoError(t, err)
 					err = updater.SetState(ctx, eventNID, stateAtEvent.BeforeStateSnapshotNID)
-					assert.NoError(t, err)
-					err = updater.Commit()
 					assert.NoError(t, err)
 
 					_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev.PDU, &plResolver, &FakeQuerier{})

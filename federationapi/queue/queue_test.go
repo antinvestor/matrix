@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ import (
 	"github.com/antinvestor/matrix/test"
 )
 
-func mustCreateFederationDatabase(ctx context.Context, svc *frame.Service, cfg *config.Dendrite, t *testing.T, realDatabase bool) storage.Database {
+func mustCreateFederationDatabase(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, realDatabase bool) storage.Database {
 	if realDatabase {
 		// Real Database/s
 
@@ -105,9 +105,7 @@ func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {
 	return &gomatrixserverlib.EDU{Type: spec.MTyping}
 }
 
-func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, realDatabase bool) (context.Context, storage.Database, *stubFederationClient, *OutgoingQueues, func()) {
-
-	ctx, svc, cfg := testrig.Init(t)
+func testSetup(ctx context.Context, svc *frame.Service, cfg *config.Matrix, failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, realDatabase bool) (storage.Database, *stubFederationClient, *OutgoingQueues) {
 
 	db := mustCreateFederationDatabase(ctx, svc, cfg, t, realDatabase)
 
@@ -128,17 +126,19 @@ func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32
 	}
 	queues := NewOutgoingQueues(ctx, db, false, "localhost", fc, &stats, signingInfo)
 
-	return ctx, db, fc, queues, func() {
-		svc.Stop(ctx)
-	}
+	return db, fc, queues
 }
 
 func TestSendPDUOnSuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
-	defer closeSetup()
+
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	ev := mustCreatePDU(t)
 	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
@@ -160,10 +160,13 @@ func TestSendPDUOnSuccessRemovedFromDB(t *testing.T) {
 
 func TestSendEDUOnSuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	ev := mustCreateEDU(t)
 	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
@@ -185,10 +188,13 @@ func TestSendEDUOnSuccessRemovedFromDB(t *testing.T) {
 
 func TestSendPDUOnFailStoredInDB(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
 	ev := mustCreatePDU(t)
 	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
@@ -211,10 +217,13 @@ func TestSendPDUOnFailStoredInDB(t *testing.T) {
 
 func TestSendEDUOnFailStoredInDB(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
 	ev := mustCreateEDU(t)
 	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
@@ -237,11 +246,13 @@ func TestSendEDUOnFailStoredInDB(t *testing.T) {
 
 func TestSendPDUAgainDoesntInterruptBackoff(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
 	ev := mustCreatePDU(t)
 	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
@@ -285,11 +296,13 @@ func TestSendPDUAgainDoesntInterruptBackoff(t *testing.T) {
 
 func TestSendEDUAgainDoesntInterruptBackoff(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
 	ev := mustCreateEDU(t)
 	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
@@ -333,11 +346,13 @@ func TestSendEDUAgainDoesntInterruptBackoff(t *testing.T) {
 
 func TestSendPDUMultipleFailuresBlacklisted(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
 	ev := mustCreatePDU(t)
 	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
@@ -362,11 +377,13 @@ func TestSendPDUMultipleFailuresBlacklisted(t *testing.T) {
 
 func TestSendEDUMultipleFailuresBlacklisted(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
 	ev := mustCreateEDU(t)
 	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
@@ -391,11 +408,13 @@ func TestSendEDUMultipleFailuresBlacklisted(t *testing.T) {
 
 func TestSendPDUBlacklistedWithPriorExternalFailure(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
 	queues.statistics.ForServer(ctx, destination).Failure(ctx)
 
@@ -422,11 +441,13 @@ func TestSendPDUBlacklistedWithPriorExternalFailure(t *testing.T) {
 
 func TestSendEDUBlacklistedWithPriorExternalFailure(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(2)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
 	queues.statistics.ForServer(ctx, destination).Failure(ctx)
 
@@ -453,11 +474,13 @@ func TestSendEDUBlacklistedWithPriorExternalFailure(t *testing.T) {
 
 func TestRetryServerSendsPDUSuccessfully(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(1)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
 	// NOTE : getQueue before sending event to ensure we grab the same queue reference
 	// before it is blacklisted and deleted.
@@ -501,11 +524,13 @@ func TestRetryServerSendsPDUSuccessfully(t *testing.T) {
 
 func TestRetryServerSendsEDUSuccessfully(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(1)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, false)
 
 	// NOTE : getQueue before sending event to ensure we grab the same queue reference
 	// before it is blacklisted and deleted.
@@ -549,14 +574,16 @@ func TestRetryServerSendsEDUSuccessfully(t *testing.T) {
 
 func TestSendPDUBatches(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 	// ctx, db, fc, queues:= testSetup(failuresUntilBlacklist, true, t, testOpts, true)
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	// Populate database with > maxPDUsPerTransaction
@@ -590,14 +617,16 @@ func TestSendPDUBatches(t *testing.T) {
 
 func TestSendEDUBatches(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 	// ctx, db, fc, queues:= testSetup(failuresUntilBlacklist, true, t, testOpts, true)
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	// Populate database with > maxEDUsPerTransaction
@@ -631,14 +660,16 @@ func TestSendEDUBatches(t *testing.T) {
 
 func TestSendPDUAndEDUBatches(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
 
 	// test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 	// ctx, db, fc, queues:= testSetup(failuresUntilBlacklist, true, t, testOpts, true)
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	// Populate database with > maxEDUsPerTransaction
@@ -682,11 +713,13 @@ func TestSendPDUAndEDUBatches(t *testing.T) {
 
 func TestExternalFailureBackoffDoesntStartQueue(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, false)
 
 	dest := queues.getQueue(ctx, destination)
 	queues.statistics.ForServer(ctx, destination).Failure(ctx)
@@ -714,15 +747,17 @@ func TestExternalFailureBackoffDoesntStartQueue(t *testing.T) {
 
 func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 	// NOTE : Only one test case against real databases can be run at a time.
-	t.Parallel()
+
 	failuresUntilBlacklist := uint32(1)
 	destination := spec.ServerName("remotehost")
 	destinations := map[spec.ServerName]struct{}{destination: {}}
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, true)
-		// NOTE : These defers aren't called if go test is killed so the dbs may not get cleaned up.
 
-		defer closeSetup()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, true)
+		// NOTE : These defers aren't called if go test is killed so the dbs may not get cleaned up.
 
 		// NOTE : getQueue before sending event to ensure we grab the same queue reference
 		// before it is blacklisted and deleted.
@@ -779,12 +814,14 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 
 func TestSendPDUMultipleFailuresAssumedOffline(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(7)
 	failuresUntilAssumedOffline := uint32(2)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, false)
 
 	ev := mustCreatePDU(t)
 	err := queues.SendEvent(ctx, ev, "localhost", []spec.ServerName{destination})
@@ -809,12 +846,14 @@ func TestSendPDUMultipleFailuresAssumedOffline(t *testing.T) {
 
 func TestSendEDUMultipleFailuresAssumedOffline(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(7)
 	failuresUntilAssumedOffline := uint32(2)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, false)
 
 	ev := mustCreateEDU(t)
 	err := queues.SendEDU(ctx, ev, "localhost", []spec.ServerName{destination})
@@ -839,12 +878,14 @@ func TestSendEDUMultipleFailuresAssumedOffline(t *testing.T) {
 
 func TestSendPDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	failuresUntilAssumedOffline := uint32(1)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, false)
 
 	relayServers := []spec.ServerName{"relayserver"}
 	queues.statistics.ForServer(ctx, destination).AddRelayServers(ctx, relayServers)
@@ -875,12 +916,14 @@ func TestSendPDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 
 func TestSendEDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	failuresUntilBlacklist := uint32(16)
 	failuresUntilAssumedOffline := uint32(1)
 	destination := spec.ServerName("remotehost")
-	ctx, db, fc, queues, closeSetup := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, false)
-
-	defer closeSetup()
+	db, fc, queues := testSetup(ctx, svc, cfg, failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, false)
 
 	relayServers := []spec.ServerName{"relayserver"}
 	queues.statistics.ForServer(ctx, destination).AddRelayServers(ctx, relayServers)

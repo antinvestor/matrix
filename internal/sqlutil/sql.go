@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package sqlutil
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"github.com/pitabwire/frame"
 )
@@ -28,9 +27,59 @@ func (c contextKey) String() string {
 }
 
 const ctxKeyTransaction = contextKey("transactionKey")
+const ctxKeyTransactionStack = contextKey("transactionStackKey")
 
 // ErrUserExists is returned if a username already exists in the database.
 var ErrUserExists = errors.New("username already exists")
+
+// TransactionStack represents a stack of transactions to enable proper nesting
+type TransactionStack struct {
+	transactions []Transaction
+}
+
+// Push adds a new transaction to the top of the stack
+func (s *TransactionStack) Push(txn Transaction) {
+	s.transactions = append(s.transactions, txn)
+}
+
+// Pop removes and returns the transaction at the top of the stack
+func (s *TransactionStack) Pop() Transaction {
+	if len(s.transactions) == 0 {
+		return nil
+	}
+
+	last := len(s.transactions) - 1
+	txn := s.transactions[last]
+	s.transactions = s.transactions[:last]
+	return txn
+}
+
+// Peek returns the transaction at the top of the stack without removing it
+func (s *TransactionStack) Peek() Transaction {
+	if len(s.transactions) == 0 {
+		return nil
+	}
+
+	return s.transactions[len(s.transactions)-1]
+}
+
+// IsEmpty returns true if the stack has no transactions
+func (s *TransactionStack) IsEmpty() bool {
+	return len(s.transactions) == 0
+}
+
+// GetTransactionStack retrieves the transaction stack from the context or creates a new one
+func GetTransactionStack(ctx context.Context) *TransactionStack {
+	if stack, ok := ctx.Value(ctxKeyTransactionStack).(*TransactionStack); ok {
+		return stack
+	}
+	return &TransactionStack{}
+}
+
+// WithTransactionStack adds a transaction stack to the context
+func WithTransactionStack(ctx context.Context, stack *TransactionStack) context.Context {
+	return context.WithValue(ctx, ctxKeyTransactionStack, stack)
+}
 
 // A Transaction is something that can be committed or rolledback.
 type Transaction interface {
@@ -68,6 +117,12 @@ func EndTransactionWithCheck(txn Transaction, succeeded *bool, err *error) {
 // Otherwise the transaction is committed.
 func WithTransaction(ctx context.Context, txn Transaction, fn func(ctx context.Context) error) (err error) {
 
+	stack := GetTransactionStack(ctx)
+	stack.Push(txn)
+	defer func() {
+		stack.Pop()
+	}()
+
 	succeeded := false
 	defer EndTransactionWithCheck(txn, &succeeded, &err)
 
@@ -81,8 +136,5 @@ func WithTransaction(ctx context.Context, txn Transaction, fn func(ctx context.C
 }
 
 func ErrorIsNoRows(err error) bool {
-	if errors.Is(err, sql.ErrNoRows) {
-		return true
-	}
-	return frame.DBErrorIsRecordNotFound(err)
+	return frame.ErrorIsNoRows(err)
 }

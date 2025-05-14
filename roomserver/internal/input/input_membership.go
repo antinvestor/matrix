@@ -17,14 +17,13 @@ package input
 import (
 	"context"
 	"fmt"
-	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-
 	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
+
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
-	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 )
 
@@ -105,14 +104,9 @@ func (r *Inputer) updateMembership(
 		return nil, err
 	}
 
-	defer func() {
-		succeeded := err == nil
-		_ = sqlutil.EndTransaction(mu, &succeeded)
-	}()
-
 	// In an ideal world, we shouldn't ever have "add" be nil and "remove" be
 	// set, as this implies that we're deleting a state event without replacing
-	// it (a thing that ordinarily shouldn't happen in Matrix). However, state
+	// it (a thing that ordinarily shouldn't happen in Global). However, state
 	// resets are sadly a thing occasionally and we have to account for that.
 	// Beforehand there used to be a check here which stopped dead if we hit
 	// this scenario, but that meant that the membership table got out of sync

@@ -30,7 +30,7 @@ import (
 const profilesSchema = `
 -- Stores data about accounts profiles.
 CREATE TABLE IF NOT EXISTS userapi_profiles (
-    -- The Matrix user ID localpart for this account
+    -- The Global user ID localpart for this account
     localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
     -- The display name for this account

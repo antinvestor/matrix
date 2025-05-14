@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ func (d *dummyProducer) PublishMsg(msg *nats.Msg, _ ...nats.PubOpt) (*nats.PubAc
 	return &nats.PubAck{}, nil
 }
 
-func MustMakeInternalAPI(ctx context.Context, svc *frame.Service, cfg *config.Dendrite, t *testing.T, opts apiTestOpts, testOpts test.DependancyOption, publisher producers.JetStreamPublisher) (api.UserInternalAPI, storage.UserDatabase) {
+func MustMakeInternalAPI(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, opts apiTestOpts, testOpts test.DependancyOption, publisher producers.JetStreamPublisher) (api.UserInternalAPI, storage.UserDatabase) {
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}

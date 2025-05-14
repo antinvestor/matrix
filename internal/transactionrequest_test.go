@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -206,7 +206,7 @@ func TestProcessTransactionRequestPDUInvalidSignature(t *testing.T) {
 	}
 }
 
-func createTransactionWithEDU(ctx context.Context, cfg *config.Dendrite, edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext) {
+func createTransactionWithEDU(ctx context.Context, cfg *config.Matrix, edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext) {
 
 	natsInstance := &jetstream.NATSInstance{}
 	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)

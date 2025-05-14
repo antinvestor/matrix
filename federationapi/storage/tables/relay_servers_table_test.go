@@ -39,6 +39,9 @@ func mustCreateRelayServersTable(
 	tab, err := postgres.NewPostgresRelayServersTable(ctx, cm)
 	assert.NoError(t, err)
 
+	err = cm.Migrate(ctx)
+	assert.NoError(t, err)
+
 	return &RelayServersDatabase{
 		Cm:    cm,
 		Table: tab,
