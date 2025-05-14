@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@ package query
 import (
 	"context"
 	"crypto/ed25519"
-	"database/sql"
 	"errors"
 	"fmt"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	//"github.com/antinvestor/matrix/roomserver/internal"
 	"github.com/antinvestor/gomatrixserverlib"
@@ -33,7 +34,7 @@ import (
 
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
@@ -44,10 +45,10 @@ import (
 
 type Queryer struct {
 	DB                storage.Database
-	Cache             caching.RoomServerCaches
+	Cache             cacheutil.RoomServerCaches
 	IsLocalServerName func(spec.ServerName) bool
 	ServerACLs        *acls.ServerACLs
-	Cfg               *config.Dendrite
+	Cfg               *config.Matrix
 	FSAPI             fsAPI.RoomserverFederationAPI
 }
 
@@ -423,14 +424,14 @@ func (r *Queryer) QueryMembershipsForRoom(
 		var eventNIDs []types.EventNID
 		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, request.LocalOnly)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if sqlutil.ErrorIsNoRows(err) {
 				return nil
 			}
-			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
+			return fmt.Errorf("r.Cm.GetMembershipEventNIDsForRoom: %w", err)
 		}
 		events, err = r.DB.Events(ctx, info.RoomVersion, eventNIDs)
 		if err != nil {
-			return fmt.Errorf("r.DB.Events: %w", err)
+			return fmt.Errorf("r.Cm.Events: %w", err)
 		}
 		for _, event := range events {
 			clientEvent := synctypes.ToClientEventDefault(func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
@@ -463,7 +464,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 		var eventNIDs []types.EventNID
 		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if sqlutil.ErrorIsNoRows(err) {
 				return nil
 			}
 			return err
@@ -501,7 +502,7 @@ func (r *Queryer) QueryServerJoinedToRoom(
 ) error {
 	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
-		return fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return fmt.Errorf("r.Cm.RoomInfo: %w", err)
 	}
 	if info != nil {
 		response.RoomVersion = info.RoomVersion
@@ -514,12 +515,12 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	if r.IsLocalServerName(request.ServerName) || request.ServerName == "" {
 		response.IsInRoom, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
 		if err != nil {
-			return fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
+			return fmt.Errorf("r.Cm.GetLocalServerInRoom: %w", err)
 		}
 	} else {
 		response.IsInRoom, err = r.DB.GetServerInRoom(ctx, info.RoomNID, request.ServerName)
 		if err != nil {
-			return fmt.Errorf("r.DB.GetServerInRoom: %w", err)
+			return fmt.Errorf("r.Cm.GetServerInRoom: %w", err)
 		}
 	}
 
@@ -551,12 +552,12 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 	if r.IsLocalServerName(serverName) || serverName == "" {
 		isInRoom, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
 		if err != nil {
-			return allowed, fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
+			return allowed, fmt.Errorf("r.Cm.GetLocalServerInRoom: %w", err)
 		}
 	} else {
 		isInRoom, err = r.DB.GetServerInRoom(ctx, info.RoomNID, serverName)
 		if err != nil {
-			return allowed, fmt.Errorf("r.DB.GetServerInRoom: %w", err)
+			return allowed, fmt.Errorf("r.Cm.GetServerInRoom: %w", err)
 		}
 	}
 
@@ -878,7 +879,7 @@ func (r *Queryer) QueryRoomsForUser(ctx context.Context, userID spec.UserID, des
 
 func (r *Queryer) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
 	users, err := r.DB.GetKnownUsers(ctx, req.UserID, req.SearchString, req.Limit)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return err
 	}
 	for _, user := range users {
@@ -1038,7 +1039,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, roomID spec.Ro
 	// or is a stub entry then we can't do anything.
 	roomInfo, err := r.DB.RoomInfo(ctx, roomID.String())
 	if err != nil {
-		return "", fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return "", fmt.Errorf("r.Cm.RoomInfo: %w", err)
 	}
 	if roomInfo == nil || roomInfo.IsStub() {
 		return "", nil // fmt.Errorf("room %q doesn't exist or is stub room", req.RoomID)

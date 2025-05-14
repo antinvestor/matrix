@@ -10,7 +10,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/statistics"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/jetstream"
 
@@ -32,20 +32,19 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 	charlie := test.NewUser(t, test.WithAccountType(uapi.AccountTypeGuest))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		qm := jetstream.NATSInstance{}
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil) // creates the rs.Inputer etc
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-		asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, userAPI, rsAPI)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		asAPI := appservice.NewInternalAPI(ctx, cfg, &qm, userAPI, rsAPI)
 
 		// Create the users in the userapi
 		for _, u := range []*test.User{alice, bob, charlie} {
@@ -159,6 +158,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
+
 				joinResp := JoinRoomByIDOrAlias(req, tc.device, rsAPI, userAPI, tc.roomID)
 				if tc.wantHTTP200 && !joinResp.Is2xx() {
 					t.Fatalf("expected join room to succeed, but didn't: %+v", joinResp)

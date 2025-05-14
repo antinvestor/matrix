@@ -53,7 +53,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 
 	lastPos, receipts, err := snapshot.RoomReceiptsAfter(ctx, joinedRooms, from)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.RoomReceiptsAfter failed")
+		req.Log.WithError(err).Error("p.Cm.RoomReceiptsAfter failed")
 		return from
 	}
 

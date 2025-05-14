@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,48 +16,46 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/shared"
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 // Database stores information needed by the relayapi
 type Database struct {
 	shared.Database
-	db     *sql.DB
-	writer sqlutil.Writer
 }
 
 // NewDatabase opens a new database
 func NewDatabase(
 	ctx context.Context,
-	conMan *sqlutil.Connections,
-	dbProperties *config.DatabaseOptions,
-	cache caching.FederationCache,
+	cm sqlutil.ConnectionManager,
+	cache cacheutil.FederationCache,
 	isLocalServerName func(spec.ServerName) bool,
 ) (*Database, error) {
 	var d Database
-	var err error
-	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
-		return nil, err
-	}
-	queue, err := NewPostgresRelayQueueTable(ctx, d.db)
+
+	queue, err := NewPostgresRelayQueueTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	queueJSON, err := NewPostgresRelayQueueJSONTable(ctx, d.db)
+
+	queueJSON, err := NewPostgresRelayQueueJSONTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
+
+	err = cm.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	d.Database = shared.Database{
-		DB:                d.db,
+		Cm:                cm,
 		IsLocalServerName: isLocalServerName,
 		Cache:             cache,
-		Writer:            d.writer,
 		RelayQueue:        queue,
 		RelayQueueJSON:    queueJSON,
 	}

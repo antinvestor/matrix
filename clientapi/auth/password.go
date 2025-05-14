@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -74,14 +74,14 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			JSON: spec.BadJSON("A password must be supplied."),
 		}
 	}
-	localpart, domain, err := userutil.ParseUsernameParam(username, t.Config.Matrix)
+	localpart, domain, err := userutil.ParseUsernameParam(username, t.Config.Global)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: spec.InvalidUsername(err.Error()),
 		}
 	}
-	if !t.Config.Matrix.IsLocalServerName(domain) {
+	if !t.Config.Global.IsLocalServerName(domain) {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: spec.InvalidUsername("The server name is not known."),
@@ -115,7 +115,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 				JSON: spec.Unknown("Unable to fetch account by password."),
 			}
 		}
-		// Technically we could tell them if the user does not exist by checking if errors.Is(err, sql.ErrNoRows)
+		// Technically we could tell them if the user does not exist by checking if sqlutil.ErrorIsNoRows(err)
 		// but that would leak the existence of the user.
 		if !res.Exists {
 			return nil, &util.JSONResponse{

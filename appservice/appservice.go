@@ -34,8 +34,8 @@ import (
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	ctx context.Context,
-	cfg *config.Dendrite,
-	natsInstance *jetstream.NATSInstance,
+	cfg *config.Matrix,
+	qm *jetstream.NATSInstance,
 	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceInternalAPI {
@@ -66,7 +66,7 @@ func NewInternalAPI(
 
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
 	// We can't add ASes at runtime so this is safe to do.
-	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+	js, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
 	consumer := consumers.NewOutputRoomEventConsumer(
 		ctx, &cfg.AppServiceAPI,
 		js, rsAPI,

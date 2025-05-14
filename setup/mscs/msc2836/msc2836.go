@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -105,10 +105,15 @@ func toClientResponse(ctx context.Context, res *MSC2836EventRelationshipsRespons
 
 // Enable this MSC
 func Enable(
-	ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
+	ctx context.Context, cfg *config.Matrix, cm sqlutil.ConnectionManager, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
-	db, err := NewDatabase(ctx, cm, &cfg.MSCs.Database)
+	mscCm, err := cm.FromOptions(ctx, &cfg.MSCs.Database)
+	if err != nil {
+		return fmt.Errorf("cannot obtain  MSC2836 connection manager: %w", err)
+	}
+
+	db, err := NewDatabase(ctx, mscCm)
 	if err != nil {
 		return fmt.Errorf("cannot enable MSC2836: %w", err)
 	}
@@ -428,7 +433,7 @@ func (rc *reqCtx) includeChildren(ctx context.Context, db Database, parentID str
 		if result != nil {
 			rc.injectResponseToRoomserver(ctx, result)
 		}
-		// fallthrough to pull these new events from the DB
+		// fallthrough to pull these new events from the Cm
 	}
 	children, err := db.ChildrenForParent(ctx, parentID, constRelType, recentFirst)
 	if err != nil {
@@ -476,7 +481,7 @@ func walkThread(
 			// if event is not found, use remoteEventRelationships to explore that part of the thread remotely.
 			// This will probably be easiest if the event relationships response is directly pumped into the database
 			// so the next walk will do the right thing. This requires those events to be authed and likely injected as
-			// outliers into the roomserver DB, which will de-dupe appropriately.
+			// outliers into the roomserver Cm, which will de-dupe appropriately.
 			event := rc.lookForEvent(ctx, wi.EventID)
 			if event != nil {
 				result = append(result, event)

@@ -1,6 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
 // Copyright 2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -351,8 +351,8 @@ type QueryAdminEventReportsResponse struct {
 	Score            int64                  `json:"score"`
 	EventNID         types.EventNID         `json:"-"` // only used to query the state
 	RoomNID          types.RoomNID          `json:"-"` // only used to query the state
-	ReportingUserNID types.EventStateKeyNID `json:"-"` // only used in the DB
-	SenderNID        types.EventStateKeyNID `json:"-"` // only used in the DB
+	ReportingUserNID types.EventStateKeyNID `json:"-"` // only used in the Cm
+	SenderNID        types.EventStateKeyNID `json:"-"` // only used in the Cm
 	RoomID           string                 `json:"room_id"`
 	EventID          string                 `json:"event_id"`
 	UserID           string                 `json:"user_id"` // the user reporting the event

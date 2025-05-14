@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,23 +16,21 @@ package shared
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 )
 
 type Database struct {
-	DB                *sql.DB
+	Cm                sqlutil.ConnectionManager
 	IsLocalServerName func(spec.ServerName) bool
-	Cache             caching.FederationCache
-	Writer            sqlutil.Writer
+	Cache             cacheutil.FederationCache
 	RelayQueue        tables.RelayQueue
 	RelayQueueJSON    tables.RelayQueueJSON
 }
@@ -48,8 +46,8 @@ func (d *Database) StoreTransaction(
 	}
 
 	var nid int64
-	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nid, err = d.RelayQueueJSON.InsertQueueJSON(ctx, txn, string(jsonTransaction))
+	_ = d.Cm.Do(ctx, func(ctx context.Context) error {
+		nid, err = d.RelayQueueJSON.InsertQueueJSON(ctx, string(jsonTransaction))
 		return err
 	})
 	if err != nil {
@@ -66,13 +64,12 @@ func (d *Database) AssociateTransactionWithDestinations(
 	transactionID gomatrixserverlib.TransactionID,
 	dbReceipt *receipt.Receipt,
 ) error {
-	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	err := d.Cm.Do(ctx, func(ctx context.Context) error {
 		var lastErr error
 		for destination := range destinations {
 			destination := destination
 			err := d.RelayQueue.InsertQueueEntry(
 				ctx,
-				txn,
 				transactionID,
 				destination.Domain(),
 				dbReceipt.GetNID(),
@@ -97,8 +94,8 @@ func (d *Database) CleanTransactions(
 		nids[i] = dbReceipt.GetNID()
 	}
 
-	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		deleteEntryErr := d.RelayQueue.DeleteQueueEntries(ctx, txn, userID.Domain(), nids)
+	err := d.Cm.Do(ctx, func(ctx context.Context) error {
+		deleteEntryErr := d.RelayQueue.DeleteQueueEntries(ctx, userID.Domain(), nids)
 		// TODO : If there are still queue entries for any of these nids for other destinations
 		// then we shouldn't delete the json entries.
 		// But this can't happen with the current api design.
@@ -108,7 +105,7 @@ func (d *Database) CleanTransactions(
 		// json entries of the same transaction.
 		//
 		// TLDR; this works as expected right now but can easily be optimised in the future.
-		deleteJSONErr := d.RelayQueueJSON.DeleteQueueJSON(ctx, txn, nids)
+		deleteJSONErr := d.RelayQueueJSON.DeleteQueueJSON(ctx, nids)
 
 		if deleteEntryErr != nil {
 			return fmt.Errorf("d.deleteQueueEntries: %w", deleteEntryErr)
@@ -127,7 +124,7 @@ func (d *Database) GetTransaction(
 	userID spec.UserID,
 ) (*gomatrixserverlib.Transaction, *receipt.Receipt, error) {
 	entriesRequested := 1
-	nids, err := d.RelayQueue.SelectQueueEntries(ctx, nil, userID.Domain(), entriesRequested)
+	nids, err := d.RelayQueue.SelectQueueEntries(ctx, userID.Domain(), entriesRequested)
 	if err != nil {
 		return nil, nil, fmt.Errorf("d.SelectQueueEntries: %w", err)
 	}
@@ -137,8 +134,8 @@ func (d *Database) GetTransaction(
 	firstNID := nids[0]
 
 	txns := map[int64][]byte{}
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		txns, err = d.RelayQueueJSON.SelectQueueJSON(ctx, txn, nids)
+	err = d.Cm.Do(ctx, func(ctx context.Context) error {
+		txns, err = d.RelayQueueJSON.SelectQueueJSON(ctx, nids)
 		return err
 	})
 	if err != nil {
@@ -163,7 +160,7 @@ func (d *Database) GetTransactionCount(
 	ctx context.Context,
 	userID spec.UserID,
 ) (int64, error) {
-	count, err := d.RelayQueue.SelectQueueEntryCount(ctx, nil, userID.Domain())
+	count, err := d.RelayQueue.SelectQueueEntryCount(ctx, userID.Domain())
 	if err != nil {
 		return 0, fmt.Errorf("d.SelectQueueEntryCount: %w", err)
 	}

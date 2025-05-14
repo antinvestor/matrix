@@ -1,7 +1,7 @@
 package config
 
 type SyncAPI struct {
-	Matrix *Global `yaml:"-"`
+	Global *Global `yaml:"-"`
 
 	Database DatabaseOptions `yaml:"database,omitempty"`
 

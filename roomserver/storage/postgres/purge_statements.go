@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,126 +16,154 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 )
 
-const purgeEventJSONSQL = "" +
-	"DELETE FROM roomserver_event_json WHERE event_nid = ANY(" +
-	"	SELECT event_nid FROM roomserver_events WHERE room_nid = $1" +
-	")"
+// SQL queries for purging rooms
+const (
+	purgeEventJSONSQL = `
+		DELETE FROM roomserver_event_json WHERE event_nid = ANY(
+			SELECT event_nid FROM roomserver_events WHERE room_nid = $1
+		)
+	`
 
-const purgeEventsSQL = "" +
-	"DELETE FROM roomserver_events WHERE room_nid = $1"
+	purgeEventsSQL = `
+		DELETE FROM roomserver_events WHERE room_nid = $1
+	`
 
-const purgeInvitesSQL = "" +
-	"DELETE FROM roomserver_invites WHERE room_nid = $1"
+	purgeInvitesSQL = `
+		DELETE FROM roomserver_invites WHERE room_nid = $1
+	`
 
-const purgeMembershipsSQL = "" +
-	"DELETE FROM roomserver_membership WHERE room_nid = $1"
+	purgeMembershipsSQL = `
+		DELETE FROM roomserver_membership WHERE room_nid = $1
+	`
 
-const purgePreviousEventsSQL = "" +
-	"DELETE FROM roomserver_previous_events WHERE event_nids && ANY(" +
-	"	SELECT ARRAY_AGG(event_nid) FROM roomserver_events WHERE room_nid = $1" +
-	")"
+	purgePreviousEventsSQL = `
+		DELETE FROM roomserver_previous_events WHERE event_nids && ANY(
+			SELECT ARRAY_AGG(event_nid) FROM roomserver_events WHERE room_nid = $1
+		)
+	`
 
-// This removes the majority of prev events and is way faster than the above.
-// The above query is still needed to delete the remaining prev events.
-const purgePreviousEvents2SQL = "" +
-	"DELETE FROM roomserver_previous_events rpe WHERE EXISTS(SELECT event_id FROM roomserver_events re WHERE room_nid = $1 AND re.event_id = rpe.previous_event_id)"
+	// This removes the majority of prev events and is way faster than the above.
+	// The above query is still needed to delete the remaining prev events.
+	purgePreviousEvents2SQL = `
+		DELETE FROM roomserver_previous_events rpe WHERE EXISTS(
+			SELECT event_id FROM roomserver_events re WHERE room_nid = $1 AND re.event_id = rpe.previous_event_id
+		)
+	`
 
-const purgePublishedSQL = "" +
-	"DELETE FROM roomserver_published WHERE room_id = $1"
+	purgePublishedSQL = `
+		DELETE FROM roomserver_published WHERE room_id = $1
+	`
 
-const purgeRedactionsSQL = "" +
-	"DELETE FROM roomserver_redactions WHERE redaction_event_id = ANY(" +
-	"	SELECT event_id FROM roomserver_events WHERE room_nid = $1" +
-	")"
+	purgeRedactionsSQL = `
+		DELETE FROM roomserver_redactions WHERE redaction_event_id = ANY(
+			SELECT event_id FROM roomserver_events WHERE room_nid = $1
+		)
+	`
 
-const purgeRoomAliasesSQL = "" +
-	"DELETE FROM roomserver_room_aliases WHERE room_id = $1"
+	purgeRoomAliasesSQL = `
+		DELETE FROM roomserver_room_aliases WHERE room_id = $1
+	`
 
-const purgeRoomSQL = "" +
-	"DELETE FROM roomserver_rooms WHERE room_nid = $1"
+	purgeRoomSQL = `
+		DELETE FROM roomserver_rooms WHERE room_nid = $1
+	`
 
-const purgeStateBlockEntriesSQL = "" +
-	"DELETE FROM roomserver_state_block WHERE state_block_nid = ANY(" +
-	"	SELECT DISTINCT UNNEST(state_block_nids) FROM roomserver_state_snapshots WHERE room_nid = $1" +
-	")"
+	purgeStateBlockEntriesSQL = `
+		DELETE FROM roomserver_state_block WHERE state_block_nid = ANY(
+			SELECT DISTINCT UNNEST(state_block_nids) FROM roomserver_state_snapshots WHERE room_nid = $1
+		)
+	`
 
-const purgeStateSnapshotEntriesSQL = "" +
-	"DELETE FROM roomserver_state_snapshots WHERE room_nid = $1"
+	purgeStateSnapshotEntriesSQL = `
+		DELETE FROM roomserver_state_snapshots WHERE room_nid = $1
+	`
+)
 
+// purgeStatements holds the SQL queries for purging rooms
 type purgeStatements struct {
-	purgeEventJSONStmt            *sql.Stmt
-	purgeEventsStmt               *sql.Stmt
-	purgeInvitesStmt              *sql.Stmt
-	purgeMembershipsStmt          *sql.Stmt
-	purgePreviousEventsStmt       *sql.Stmt
-	purgePreviousEvents2Stmt      *sql.Stmt
-	purgePublishedStmt            *sql.Stmt
-	purgeRedactionStmt            *sql.Stmt
-	purgeRoomAliasesStmt          *sql.Stmt
-	purgeRoomStmt                 *sql.Stmt
-	purgeStateBlockEntriesStmt    *sql.Stmt
-	purgeStateSnapshotEntriesStmt *sql.Stmt
+	cm sqlutil.ConnectionManager
+
+	// SQL query string fields
+	purgeEventJSONSQL            string
+	purgeEventsSQL               string
+	purgeInvitesSQL              string
+	purgeMembershipsSQL          string
+	purgePreviousEventsSQL       string
+	purgePreviousEvents2SQL      string
+	purgePublishedSQL            string
+	purgeRedactionsSQL           string
+	purgeRoomAliasesSQL          string
+	purgeRoomSQL                 string
+	purgeStateBlockEntriesSQL    string
+	purgeStateSnapshotEntriesSQL string
 }
 
-func PreparePurgeStatements(db *sql.DB) (*purgeStatements, error) {
-	s := &purgeStatements{}
+// NewPostgresPurgeTable creates a new instance of the purge statements.
+func NewPostgresPurgeTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Purge, error) {
+	s := &purgeStatements{
+		cm: cm,
 
-	return s, sqlutil.StatementList{
-		{&s.purgeEventJSONStmt, purgeEventJSONSQL},
-		{&s.purgeEventsStmt, purgeEventsSQL},
-		{&s.purgeInvitesStmt, purgeInvitesSQL},
-		{&s.purgeMembershipsStmt, purgeMembershipsSQL},
-		{&s.purgePublishedStmt, purgePublishedSQL},
-		{&s.purgePreviousEventsStmt, purgePreviousEventsSQL},
-		{&s.purgePreviousEvents2Stmt, purgePreviousEvents2SQL},
-		{&s.purgeRedactionStmt, purgeRedactionsSQL},
-		{&s.purgeRoomAliasesStmt, purgeRoomAliasesSQL},
-		{&s.purgeRoomStmt, purgeRoomSQL},
-		{&s.purgeStateBlockEntriesStmt, purgeStateBlockEntriesSQL},
-		{&s.purgeStateSnapshotEntriesStmt, purgeStateSnapshotEntriesSQL},
-	}.Prepare(db)
+		purgeEventJSONSQL:            purgeEventJSONSQL,
+		purgeEventsSQL:               purgeEventsSQL,
+		purgeInvitesSQL:              purgeInvitesSQL,
+		purgeMembershipsSQL:          purgeMembershipsSQL,
+		purgePreviousEventsSQL:       purgePreviousEventsSQL,
+		purgePreviousEvents2SQL:      purgePreviousEvents2SQL,
+		purgePublishedSQL:            purgePublishedSQL,
+		purgeRedactionsSQL:           purgeRedactionsSQL,
+		purgeRoomAliasesSQL:          purgeRoomAliasesSQL,
+		purgeRoomSQL:                 purgeRoomSQL,
+		purgeStateBlockEntriesSQL:    purgeStateBlockEntriesSQL,
+		purgeStateSnapshotEntriesSQL: purgeStateSnapshotEntriesSQL,
+	}
+
+	return s, nil
 }
 
+// PurgeRoom purges a room and all associated data from the database.
 func (s *purgeStatements) PurgeRoom(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, roomID string,
+	ctx context.Context, roomNID types.RoomNID, roomID string,
 ) error {
+	// Get a connection for writing
+	db := s.cm.Connection(ctx, false)
 
 	// purge by roomID
-	purgeByRoomID := []*sql.Stmt{
-		s.purgeRoomAliasesStmt,
-		s.purgePublishedStmt,
+	purgeByRoomIDQueries := []string{
+		s.purgeRoomAliasesSQL,
+		s.purgePublishedSQL,
 	}
-	for _, stmt := range purgeByRoomID {
-		_, err := sqlutil.TxStmt(txn, stmt).ExecContext(ctx, roomID)
-		if err != nil {
+
+	for _, query := range purgeByRoomIDQueries {
+		if err := db.Exec(query, roomID).Error; err != nil {
 			return err
 		}
 	}
 
 	// purge by roomNID
-	purgeByRoomNID := []*sql.Stmt{
-		s.purgeStateBlockEntriesStmt,
-		s.purgeStateSnapshotEntriesStmt,
-		s.purgeInvitesStmt,
-		s.purgeMembershipsStmt,
-		s.purgePreviousEvents2Stmt, // Fast purge the majority of events
-		s.purgePreviousEventsStmt,  // Slow purge the remaining events
-		s.purgeEventJSONStmt,
-		s.purgeRedactionStmt,
-		s.purgeEventsStmt,
-		s.purgeRoomStmt,
+	purgeByRoomNIDQueries := []string{
+		s.purgeStateBlockEntriesSQL,
+		s.purgeStateSnapshotEntriesSQL,
+		s.purgeInvitesSQL,
+		s.purgeMembershipsSQL,
+		s.purgePreviousEvents2SQL, // Fast purge the majority of events
+		s.purgePreviousEventsSQL,  // Slow purge the remaining events
+		s.purgeEventJSONSQL,
+		s.purgeRedactionsSQL,
+		s.purgeEventsSQL,
+		s.purgeRoomSQL,
 	}
-	for _, stmt := range purgeByRoomNID {
-		_, err := sqlutil.TxStmt(txn, stmt).ExecContext(ctx, roomNID)
-		if err != nil {
+
+	for _, query := range purgeByRoomNIDQueries {
+		if err := db.Exec(query, roomNID).Error; err != nil {
 			return err
 		}
 	}
+
 	return nil
 }

@@ -1,4 +1,4 @@
-// Copyright 2021 The Matrix.org Foundation C.I.C.
+// Copyright 2021 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,14 +16,15 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/pitabwire/frame"
 )
 
+// Schema for the notary server keys JSON table
 const notaryServerKeysJSONSchema = `
 CREATE SEQUENCE IF NOT EXISTS federationsender_notary_server_keys_json_pkey;
 CREATE TABLE IF NOT EXISTS federationsender_notary_server_keys_json (
@@ -34,32 +35,52 @@ CREATE TABLE IF NOT EXISTS federationsender_notary_server_keys_json (
 );
 `
 
+// Schema revert for the notary server keys JSON table
+const notaryServerKeysJSONSchemaRevert = `
+DROP TABLE IF EXISTS federationsender_notary_server_keys_json;
+DROP SEQUENCE IF EXISTS federationsender_notary_server_keys_json_pkey;
+`
+
+// SQL for inserting server keys JSON
 const insertServerKeysJSONSQL = "" +
 	"INSERT INTO federationsender_notary_server_keys_json (response_json, server_name, valid_until) VALUES ($1, $2, $3)" +
 	" RETURNING notary_id"
 
-type notaryServerKeysStatements struct {
-	db                       *sql.DB
-	insertServerKeysJSONStmt *sql.Stmt
+// notaryServerKeysTable stores the JSON responses from server key requests
+type notaryServerKeysTable struct {
+	cm sqlutil.ConnectionManager
+	// SQL query string fields, initialise at construction
+	insertServerKeysJSONSQL string
 }
 
-func NewPostgresNotaryServerKeysTable(ctx context.Context, db *sql.DB) (s *notaryServerKeysStatements, err error) {
-	s = &notaryServerKeysStatements{
-		db: db,
+// NewPostgresNotaryServerKeysTable creates a new postgres notary server keys table
+func NewPostgresNotaryServerKeysTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.FederationNotaryServerKeysJSON, error) {
+	s := &notaryServerKeysTable{
+		cm:                      cm,
+		insertServerKeysJSONSQL: insertServerKeysJSONSQL,
 	}
-	_, err = db.Exec(notaryServerKeysJSONSchema)
+
+	// Perform schema migration
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "federationapi_notary_server_keys_json_table_schema_001",
+		Patch:       notaryServerKeysJSONSchema,
+		RevertPatch: notaryServerKeysJSONSchemaRevert,
+	})
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.insertServerKeysJSONStmt, insertServerKeysJSONSQL},
-	}.Prepare(db)
+	return s, nil
 }
 
-func (s *notaryServerKeysStatements) InsertJSONResponse(
-	ctx context.Context, txn *sql.Tx, keyQueryResponseJSON gomatrixserverlib.ServerKeys, serverName spec.ServerName, validUntil spec.Timestamp,
+// InsertJSONResponse inserts a JSON server key response
+func (s *notaryServerKeysTable) InsertJSONResponse(
+	ctx context.Context, keyQueryResponseJSON gomatrixserverlib.ServerKeys, serverName spec.ServerName, validUntil spec.Timestamp,
 ) (tables.NotaryID, error) {
 	var notaryID tables.NotaryID
-	return notaryID, txn.Stmt(s.insertServerKeysJSONStmt).QueryRowContext(ctx, string(keyQueryResponseJSON.Raw), serverName, validUntil).Scan(&notaryID)
+
+	db := s.cm.Connection(ctx, false)
+	result := db.Raw(s.insertServerKeysJSONSQL, string(keyQueryResponseJSON.Raw), serverName, validUntil).Row()
+	err := result.Scan(&notaryID)
+	return notaryID, err
 }

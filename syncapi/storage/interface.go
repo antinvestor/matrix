@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ type DatabaseTransaction interface {
 
 	ExcludeEventsFromSearchIndex(ctx context.Context, events []string) error
 
-	// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
+	// GetStateEvent returns the Global state event of a given type for a given room with a given state key
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
 	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*rstypes.HeaderedEvent, error)
@@ -164,7 +164,7 @@ type Database interface {
 	// RetireInviteEvent removes an old invite event from the database. Returns the new position of the retired invite.
 	// Returns an error if there was a problem communicating with the database.
 	RetireInviteEvent(ctx context.Context, inviteEventID string) (types.StreamPosition, error)
-	// AddPeek adds a new peek to our DB for a given room by a given user's device.
+	// AddPeek adds a new peek to our Cm for a given room by a given user's device.
 	// Returns an error if there was a problem communicating with the database.
 	AddPeek(ctx context.Context, RoomID, UserID, DeviceID string) (types.StreamPosition, error)
 	// DeletePeek removes an existing peek from the database for a given room by a user's device.

@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/pitabwire/frame"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
@@ -13,25 +15,24 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 )
 
-func newSyncDB(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (storage.Database, func()) {
+func newSyncDB(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.Database {
 	t.Helper()
 
-	cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	syncDB, err := storage.NewSyncServerDatasource(ctx, cm, &cfg.SyncAPI.Database)
+	cm := sqlutil.NewConnectionManager(svc)
+	syncDB, err := storage.NewSyncServerDatabase(ctx, cm)
 	if err != nil {
-		t.Fatalf("failed to create sync DB: %s", err)
+		t.Fatalf("failed to create sync Cm: %s", err)
 	}
 
-	return syncDB, closeDB
+	return syncDB
 }
 
 func TestFilterTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		tab, closeDB := newSyncDB(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		tab := newSyncDB(ctx, svc, t, testOpts)
 
 		// initially create a filter
 		filter := &synctypes.Filter{}
@@ -72,9 +73,9 @@ func TestIgnores(t *testing.T) {
 	bob := test.NewUser(t)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		syncDB, closeDB := newSyncDB(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		syncDB := newSyncDB(ctx, svc, t, testOpts)
 
 		tab, err := syncDB.NewDatabaseTransaction(ctx)
 		if err != nil {

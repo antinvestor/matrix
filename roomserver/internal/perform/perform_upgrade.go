@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -512,7 +512,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, send
 		}
 
 		var event gomatrixserverlib.PDU
-		event, err = builder.Build(evTime, userDomain, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey)
+		event, err = builder.Build(evTime, userDomain, r.Cfg.Global.KeyID, r.Cfg.Global.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed to build new %q event: %w", builder.Type, err)
 
@@ -575,7 +575,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, send
 		return nil, fmt.Errorf("failed to set new %q event content: %w", proto.Type, err)
 	}
 	// Get the sender domain.
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+	identity, err := r.Cfg.Global.SigningIdentityFor(senderDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing identity for %q: %w", senderDomain, err)
 	}

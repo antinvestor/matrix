@@ -1,4 +1,4 @@
-// Copyright 2021 The Matrix.org Foundation C.I.C.
+// Copyright 2021 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@ package internal
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/userapi/api"
@@ -32,7 +32,7 @@ func (a *UserInternalAPI) PerformLoginTokenCreation(ctx context.Context, req *ap
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot create a login token for a remote user (server name %s)", domain)
 	}
 	tokenMeta, err := a.DB.CreateLoginToken(ctx, &req.Data)
@@ -55,7 +55,7 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 	tokenData, err := a.DB.GetLoginTokenDataByToken(ctx, req.Token)
 	if err != nil {
 		res.Data = nil
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil
 		}
 		return err
@@ -64,12 +64,12 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot return a login token for a remote user (server name %s)", domain)
 	}
-	if _, err := a.DB.GetAccountByLocalpart(ctx, localpart, domain); err != nil {
+	if _, err = a.DB.GetAccountByLocalpart(ctx, localpart, domain); err != nil {
 		res.Data = nil
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil
 		}
 		return err

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -79,7 +79,7 @@ func (p *SyncAPIProducer) SendToDevice(
 	// device. If the event isn't targeted locally then we can't expand the
 	// wildcard as we don't know about the remote devices, so instead we leave it
 	// as-is, so that the federation sender can send it on with the wildcard intact.
-	if p.Config.Matrix.IsLocalServerName(domain) && deviceID == "*" {
+	if p.Config.Global.IsLocalServerName(domain) && deviceID == "*" {
 		var res userapi.QueryDevicesResponse
 		err = p.UserAPI.QueryDevices(ctx, &userapi.QueryDevicesRequest{
 			UserID: userID,

@@ -1,4 +1,4 @@
-// Copyright 2021 The Matrix.org Foundation C.I.C.
+// Copyright 2021 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ type openIDTokenResponse struct {
 	ExpiresIn        int64  `json:"expires_in"`
 }
 
-// CreateOpenIDToken creates a new OpenID Connect (OIDC) token that a Matrix user
+// CreateOpenIDToken creates a new OpenID Connect (OIDC) token that a Global user
 // can supply to an OpenID Relying Party to verify their identity
 func CreateOpenIDToken(
 	req *http.Request,

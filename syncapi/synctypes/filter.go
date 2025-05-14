@@ -91,7 +91,7 @@ func (filter *Filter) Validate() error {
 	return nil
 }
 
-// DefaultFilter returns the default filter used by the Matrix server if no filter is provided in
+// DefaultFilter returns the default filter used by the Global server if no filter is provided in
 // the request
 func DefaultFilter() Filter {
 	return Filter{
@@ -111,7 +111,7 @@ func DefaultFilter() Filter {
 	}
 }
 
-// DefaultEventFilter returns the default event filter used by the Matrix server if no filter is
+// DefaultEventFilter returns the default event filter used by the Global server if no filter is
 // provided in the request
 func DefaultEventFilter() EventFilter {
 	return EventFilter{
@@ -124,7 +124,7 @@ func DefaultEventFilter() EventFilter {
 	}
 }
 
-// DefaultStateFilter returns the default state event filter used by the Matrix server if no filter
+// DefaultStateFilter returns the default state event filter used by the Global server if no filter
 // is provided in the request
 func DefaultStateFilter() StateFilter {
 	return StateFilter{
@@ -140,7 +140,7 @@ func DefaultStateFilter() StateFilter {
 	}
 }
 
-// DefaultRoomEventFilter returns the default room event filter used by the Matrix server if no
+// DefaultRoomEventFilter returns the default room event filter used by the Global server if no
 // filter is provided in the request
 func DefaultRoomEventFilter() RoomEventFilter {
 	return RoomEventFilter{

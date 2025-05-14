@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package shared
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -33,7 +32,7 @@ func (d *Database) FetchKeys(
 	ctx context.Context,
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 ) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
-	return d.ServerSigningKeys.BulkSelectServerKeys(ctx, nil, requests)
+	return d.ServerSigningKeys.BulkSelectServerKeys(ctx, requests)
 }
 
 // StoreKeys implements gomatrixserverlib.KeyDatabase
@@ -41,10 +40,10 @@ func (d *Database) StoreKeys(
 	ctx context.Context,
 	keyMap map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	return d.Cm.Do(ctx, func(ctx context.Context) error {
 		var lastErr error
 		for request, keys := range keyMap {
-			if err := d.ServerSigningKeys.UpsertServerKeys(ctx, txn, request, keys); err != nil {
+			if err := d.ServerSigningKeys.UpsertServerKeys(ctx, request, keys); err != nil {
 				// Rather than returning immediately on error we try to insert the
 				// remaining keys.
 				// Since we are inserting the keys outside of a transaction it is

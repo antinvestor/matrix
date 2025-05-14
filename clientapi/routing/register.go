@@ -344,7 +344,7 @@ func UserIDIsWithinApplicationServiceNamespace(
 		return false
 	}
 
-	if !cfg.Matrix.IsLocalServerName(domain) {
+	if !cfg.Global.IsLocalServerName(domain) {
 		return false
 	}
 
@@ -384,7 +384,7 @@ func UsernameMatchesMultipleExclusiveNamespaces(
 	cfg *config.ClientAPI,
 	username string,
 ) bool {
-	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+	userID := userutil.MakeUserID(username, cfg.Global.ServerName)
 
 	// Check namespaces and see if more than one match
 	matchCount := 0
@@ -404,7 +404,7 @@ func UsernameMatchesExclusiveNamespaces(
 	cfg *config.ClientAPI,
 	username string,
 ) bool {
-	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+	userID := userutil.MakeUserID(username, cfg.Global.ServerName)
 	return cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(userID)
 }
 
@@ -433,7 +433,7 @@ func validateApplicationService(
 		}
 	}
 
-	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+	userID := userutil.MakeUserID(username, cfg.Global.ServerName)
 
 	// Ensure the desired username is within at least one of the application service's namespaces.
 	if !UserIDIsWithinApplicationServiceNamespace(cfg, userID, matchedApplicationService) {
@@ -455,7 +455,7 @@ func validateApplicationService(
 	}
 
 	// Check username application service is trying to register is valid
-	if err := internal.ValidateApplicationServiceUsername(username, cfg.Matrix.ServerName); err != nil {
+	if err := internal.ValidateApplicationServiceUsername(username, cfg.Global.ServerName); err != nil {
 		return "", internal.UsernameResponse(err)
 	}
 
@@ -481,10 +481,10 @@ func Register(
 
 	var r registerRequest
 	host := spec.ServerName(req.Host)
-	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
+	if v := cfg.Global.VirtualHostForHTTPHost(host); v != nil {
 		r.ServerName = v.ServerName
 	} else {
-		r.ServerName = cfg.Matrix.ServerName
+		r.ServerName = cfg.Global.ServerName
 	}
 	sessionID := gjson.GetBytes(reqBody, "auth.session").String()
 	if sessionID == "" {
@@ -587,7 +587,7 @@ func handleGuestRegistration(
 ) util.JSONResponse {
 	registrationEnabled := !cfg.RegistrationDisabled
 	guestsEnabled := !cfg.GuestsDisabled
-	if v := cfg.Matrix.VirtualHost(r.ServerName); v != nil {
+	if v := cfg.Global.VirtualHost(r.ServerName); v != nil {
 		registrationEnabled, guestsEnabled = v.RegistrationAllowed()
 	}
 
@@ -612,7 +612,7 @@ func handleGuestRegistration(
 		}
 	}
 	token, err := tokens.GenerateLoginToken(tokens.TokenOptions{
-		ServerPrivateKey: cfg.Matrix.PrivateKey.Seed(),
+		ServerPrivateKey: cfg.Global.PrivateKey.Seed(),
 		ServerName:       string(res.Account.ServerName),
 		UserID:           res.Account.UserID,
 	})
@@ -656,7 +656,7 @@ func localpartMatchesExclusiveNamespaces(
 	cfg *config.ClientAPI,
 	localpart string,
 ) bool {
-	userID := userutil.MakeUserID(localpart, cfg.Matrix.ServerName)
+	userID := userutil.MakeUserID(localpart, cfg.Global.ServerName)
 	return cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(userID)
 }
 
@@ -691,7 +691,7 @@ func handleRegistrationFlow(
 	}
 
 	registrationEnabled := !cfg.RegistrationDisabled
-	if v := cfg.Matrix.VirtualHost(r.ServerName); v != nil {
+	if v := cfg.Global.VirtualHost(r.ServerName); v != nil {
 		registrationEnabled, _ = v.RegistrationAllowed()
 	}
 	if !registrationEnabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
@@ -1010,15 +1010,15 @@ func RegisterAvailable(
 
 	// Squash username to all lowercase letters
 	username = strings.ToLower(username)
-	domain := cfg.Matrix.ServerName
+	domain := cfg.Global.ServerName
 	host := spec.ServerName(req.Host)
-	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
+	if v := cfg.Global.VirtualHostForHTTPHost(host); v != nil {
 		domain = v.ServerName
 	}
-	if u, l, err := cfg.Matrix.SplitLocalID('@', username); err == nil {
+	if u, l, err := cfg.Global.SplitLocalID('@', username); err == nil {
 		username, domain = u, l
 	}
-	for _, v := range cfg.Matrix.VirtualHosts {
+	for _, v := range cfg.Global.VirtualHosts {
 		if v.ServerName == domain && !v.AllowRegistration {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
@@ -1092,7 +1092,7 @@ func handleSharedSecretRegistration(ctx context.Context, cfg *config.ClientAPI, 
 	// downcase capitals
 	ssrr.User = strings.ToLower(ssrr.User)
 
-	if err = internal.ValidateUsername(ssrr.User, cfg.Matrix.ServerName); err != nil {
+	if err = internal.ValidateUsername(ssrr.User, cfg.Global.ServerName); err != nil {
 		return *internal.UsernameResponse(err)
 	}
 	if err = internal.ValidatePassword(ssrr.Password); err != nil {
@@ -1104,5 +1104,5 @@ func handleSharedSecretRegistration(ctx context.Context, cfg *config.ClientAPI, 
 	if ssrr.Admin {
 		accType = userapi.AccountTypeAdmin
 	}
-	return completeRegistration(req.Context(), userAPI, ssrr.User, cfg.Matrix.ServerName, ssrr.DisplayName, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
+	return completeRegistration(req.Context(), userAPI, ssrr.User, cfg.Global.ServerName, ssrr.DisplayName, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
 }

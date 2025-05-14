@@ -358,7 +358,7 @@ func sendInvite(
 		}, err
 	}
 
-	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	identity, err := cfg.Global.SigningIdentityFor(device.UserDomain())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -494,7 +494,7 @@ func buildMembershipEvent(
 // loadProfile lookups the profile of a given user from the database and returns
 // it if the user is local to this server, or returns an empty profile if not.
 // Returns an error if the retrieval failed or if the first parameter isn't a
-// valid Matrix ID.
+// valid Global ID.
 func loadProfile(
 	ctx context.Context,
 	userID string,
@@ -508,7 +508,7 @@ func loadProfile(
 	}
 
 	var profile *authtypes.Profile
-	if cfg.Matrix.IsLocalServerName(serverName) {
+	if cfg.Global.IsLocalServerName(serverName) {
 		profile, err = appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, profileAPI)
 	} else {
 		profile = &authtypes.Profile{}

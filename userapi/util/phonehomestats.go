@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ type phoneHomeStats struct {
 	stats      map[string]interface{}
 	serverName spec.ServerName
 	startTime  time.Time
-	cfg        *config.Dendrite
+	cfg        *config.Matrix
 	db         storage.Statistics
 	isMonolith bool
 	client     *http.Client
@@ -48,7 +48,7 @@ type timestampToRUUsage struct {
 	usage     syscall.Rusage
 }
 
-func StartPhoneHomeCollector(ctx context.Context, startTime time.Time, cfg *config.Dendrite, statsDB storage.Statistics) {
+func StartPhoneHomeCollector(ctx context.Context, startTime time.Time, cfg *config.Matrix, statsDB storage.Statistics) {
 
 	p := phoneHomeStats{
 		startTime:  startTime,
@@ -121,7 +121,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 	p.stats["daily_active_rooms"] = activeRooms
 	p.stats["daily_active_e2ee_rooms"] = activeE2EERooms
 
-	// user stats and DB engine
+	// user stats and Cm engine
 	userStats, db, err := p.db.UserStatistics(iCtx)
 	if err != nil {
 		logrus.WithError(err).Warn("unable to query userstats, using default values")
@@ -155,7 +155,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 		logrus.WithError(err).Error("Unable to create phone-home statistics request")
 		return
 	}
-	request.Header.Set("User-Agent", "Dendrite/"+internal.VersionString())
+	request.Header.Set("User-Agent", "Matrix/"+internal.VersionString())
 
 	_, err = p.client.Do(request)
 	if err != nil {

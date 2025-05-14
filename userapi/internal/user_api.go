@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -102,14 +102,14 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot update account data of remote users (server name %s)", domain)
 	}
 	if req.DataType == "" {
 		return fmt.Errorf("data type must not be empty")
 	}
 	if err := a.DB.SaveAccountData(ctx, local, domain, req.RoomID, req.DataType, req.AccountData); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("a.DB.SaveAccountData failed")
+		util.GetLogger(ctx).WithError(err).Error("a.Cm.SaveAccountData failed")
 		return fmt.Errorf("failed to save account data: %w", err)
 	}
 	var ignoredUsers *synctypes.IgnoredUsers
@@ -144,7 +144,7 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: SplitID failure")
 		return nil
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return nil
 	}
 
@@ -176,7 +176,7 @@ func postRegisterJoinRooms(ctx context.Context, cfg *config.UserAPI, acc *api.Ac
 	// If the user is a normal user, add user to room specified in the configuration "auto_join_rooms".
 	if acc.AccountType != api.AccountTypeAppService && acc.AppServiceID == "" {
 		for room := range cfg.AutoJoinRooms {
-			userID := userutil.MakeUserID(acc.Localpart, cfg.Matrix.ServerName)
+			userID := userutil.MakeUserID(acc.Localpart, cfg.Global.ServerName)
 			err := addUserToRoom(ctx, rsAPI, cfg.AutoJoinRooms[room], acc.Localpart, userID)
 			if err != nil {
 				logrus.WithFields(logrus.Fields{
@@ -213,9 +213,9 @@ func addUserToRoom(
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
 	serverName := req.ServerName
 	if serverName == "" {
-		serverName = a.Config.Matrix.ServerName
+		serverName = a.Config.Global.ServerName
 	}
-	if !a.Config.Matrix.IsLocalServerName(serverName) {
+	if !a.Config.Global.IsLocalServerName(serverName) {
 		return fmt.Errorf("server name %s is not local", serverName)
 	}
 	acc, err := a.DB.CreateAccount(ctx, req.Localpart, serverName, req.Password, req.AppServiceID, req.AccountType)
@@ -258,7 +258,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	}
 
 	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, serverName, req.DisplayName); err != nil {
-		return fmt.Errorf("a.DB.SetDisplayName: %w", err)
+		return fmt.Errorf("a.Cm.SetDisplayName: %w", err)
 	}
 
 	postRegisterJoinRooms(ctx, a.Config, acc, a.RSAPI)
@@ -269,7 +269,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 }
 
 func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
-	if !a.Config.Matrix.IsLocalServerName(req.ServerName) {
+	if !a.Config.Global.IsLocalServerName(req.ServerName) {
 		return fmt.Errorf("server name %s is not local", req.ServerName)
 	}
 	if err := a.DB.SetPassword(ctx, req.Localpart, req.ServerName, req.Password); err != nil {
@@ -287,9 +287,9 @@ func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.Pe
 func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.PerformDeviceCreationRequest, res *api.PerformDeviceCreationResponse) error {
 	serverName := req.ServerName
 	if serverName == "" {
-		serverName = a.Config.Matrix.ServerName
+		serverName = a.Config.Global.ServerName
 	}
-	if !a.Config.Matrix.IsLocalServerName(serverName) {
+	if !a.Config.Global.IsLocalServerName(serverName) {
 		return fmt.Errorf("server name %s is not local", serverName)
 	}
 	// If a device ID was specified, check if it already exists and
@@ -298,7 +298,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	isExisting := false
 	if req.DeviceID != nil && *req.DeviceID != "" {
 		existingDev, err := a.DB.GetDeviceByID(ctx, req.Localpart, req.ServerName, *req.DeviceID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if err != nil && !sqlutil.ErrorIsNoRows(err) {
 			return err
 		}
 		isExisting = existingDev.ID == *req.DeviceID
@@ -327,7 +327,7 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot PerformDeviceDeletion of remote users (server name %s)", domain)
 	}
 	deletedDeviceIDs := req.DeviceIDs
@@ -397,7 +397,7 @@ func (a *UserInternalAPI) PerformLastSeenUpdate(
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("server name %s is not local", domain)
 	}
 	if err := a.DB.UpdateDeviceLastSeen(ctx, localpart, domain, req.DeviceID, req.RemoteAddr, req.UserAgent); err != nil {
@@ -412,11 +412,11 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("server name %s is not local", domain)
 	}
 	dev, err := a.DB.GetDeviceByID(ctx, localpart, domain, req.DeviceID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		res.DeviceExists = false
 		return nil
 	} else if err != nil {
@@ -466,12 +466,12 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, userID string) (*aut
 	if err != nil {
 		return nil, err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return nil, ErrIsRemoteServer
 	}
 	prof, err := a.DB.GetProfileByLocalpart(ctx, local, domain)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, appserviceAPI.ErrProfileNotExists
 		}
 		return nil, err
@@ -514,7 +514,7 @@ func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevice
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot query devices of remote users (server name %s)", domain)
 	}
 	devs, err := a.DB.GetDevicesByLocalpart(ctx, local, domain)
@@ -531,7 +531,7 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot query account data of remote users (server name %s)", domain)
 	}
 	if req.DataType != "" {
@@ -578,7 +578,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 	}
 	device, err := a.DB.GetDeviceByAccessToken(ctx, req.AccessToken)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil
 		}
 		return err
@@ -587,7 +587,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return nil
 	}
 	acc, err := a.DB.GetAccountByLocalpart(ctx, localPart, domain)
@@ -629,7 +629,7 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 		AccountType:  api.AccountTypeAppService,
 	}
 
-	localpart, domain, err := userutil.ParseUsernameParam(appServiceUserID, a.Config.Matrix)
+	localpart, domain, err := userutil.ParseUsernameParam(appServiceUserID, a.Config.Global)
 	if err != nil {
 		return nil, err
 	}
@@ -656,9 +656,9 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *api.PerformAccountDeactivationRequest, res *api.PerformAccountDeactivationResponse) error {
 	serverName := req.ServerName
 	if serverName == "" {
-		serverName = a.Config.Matrix.ServerName
+		serverName = a.Config.Global.ServerName
 	}
-	if !a.Config.Matrix.IsLocalServerName(serverName) {
+	if !a.Config.Global.IsLocalServerName(serverName) {
 		return fmt.Errorf("server name %q not locally configured", serverName)
 	}
 
@@ -782,7 +782,7 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 	version, algorithm, authData, etag, deleted, err := a.DB.GetKeyBackup(ctx, req.UserID, req.Version)
 	res.Version = version
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return res, nil
 		}
 		if errors.Is(err, strconv.ErrSyntax) {

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,8 @@ package internal
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
 )
@@ -31,7 +30,7 @@ func (a *UserInternalAPI) PerformEnsureSSOAccountExists(ctx context.Context, req
 		ServerName: req.ServerName,
 	}, &qAccRes)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !sqlutil.ErrorIsNoRows(err) {
 
 			return err
 		}

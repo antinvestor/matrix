@@ -27,7 +27,7 @@ import (
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
@@ -74,7 +74,7 @@ func OnIncomingMessagesRequest(
 	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
 	srp *sync.RequestPool,
-	lazyLoadCache caching.LazyLoadCache,
+	lazyLoadCache cacheutil.LazyLoadCache,
 ) util.JSONResponse {
 	var err error
 
@@ -570,7 +570,7 @@ func (r *messagesReq) backfill(ctx context.Context, roomID string, backwardsExtr
 		RoomID:               roomID,
 		BackwardsExtremities: backwardsExtremities,
 		Limit:                limit,
-		ServerName:           r.cfg.Matrix.ServerName,
+		ServerName:           r.cfg.Global.ServerName,
 		VirtualHost:          r.device.UserDomain(),
 	}, &res)
 	if err != nil {

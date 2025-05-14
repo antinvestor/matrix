@@ -50,7 +50,7 @@ func (f utcFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 // Logrus hook which wraps another hook and filters log entries according to their level.
-// (Note that we cannot use solely logrus.SetLevel, because Dendrite supports multiple
+// (Note that we cannot use solely logrus.SetLevel, because Matrix supports multiple
 // levels of logging at the same time.)
 type logLevelHook struct {
 	level logrus.Level

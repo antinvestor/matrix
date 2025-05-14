@@ -59,8 +59,8 @@ func GetTags(
 }
 
 // PutTag implements PUT /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
-// Put functionality works by getting existing data from the DB (if any), adding
-// the tag to the "map" and saving the new "map" to the DB
+// Put functionality works by getting existing data from the Cm (if any), adding
+// the tag to the "map" and saving the new "map" to the Cm
 func PutTag(
 	req *http.Request,
 	userAPI api.ClientUserAPI,
@@ -113,7 +113,7 @@ func PutTag(
 
 // DeleteTag implements DELETE /_matrix/client/r0/user/{userID}/rooms/{roomID}/tags/{tag}
 // Delete functionality works by obtaining the saved tags, removing the intended tag from
-// the "map" and then saving the new "map" in the DB
+// the "map" and then saving the new "map" in the Cm
 func DeleteTag(
 	req *http.Request,
 	userAPI api.ClientUserAPI,

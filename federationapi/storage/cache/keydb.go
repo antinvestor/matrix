@@ -6,17 +6,17 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 )
 
 // A Database implements gomatrixserverlib.KeyDatabase and is used to store
 // the public keys for other matrix servers.
 type KeyDatabase struct {
 	inner gomatrixserverlib.KeyDatabase
-	cache caching.ServerKeyCache
+	cache cacheutil.ServerKeyCache
 }
 
-func NewKeyDatabase(inner gomatrixserverlib.KeyDatabase, cache caching.ServerKeyCache) (*KeyDatabase, error) {
+func NewKeyDatabase(inner gomatrixserverlib.KeyDatabase, cache cacheutil.ServerKeyCache) (*KeyDatabase, error) {
 	if inner == nil {
 		return nil, errors.New("inner database can't be nil")
 	}
@@ -46,7 +46,7 @@ func (d *KeyDatabase) FetchKeys(
 			delete(requests, req)
 		}
 	}
-	// Don't bother hitting the DB if we got everything from cache.
+	// Don't bother hitting the Cm if we got everything from cache.
 	if len(requests) == 0 {
 		return results, nil
 	}

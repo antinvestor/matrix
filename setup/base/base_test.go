@@ -14,7 +14,6 @@ import (
 
 	"github.com/pitabwire/frame"
 
-	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal"
@@ -35,9 +34,8 @@ func TestLandingPage_Tcp(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	// Hack to get a free port to use in test
 	s := httptest.NewServer(nil)

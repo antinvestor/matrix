@@ -2,7 +2,8 @@
 
 <!-- Please read https://antinvestor.github.io/matrix/development/contributing before submitting your pull request -->
 
-* [ ] I have added Go unit tests or [Complement integration tests](https://github.com/antinvestor/complement) for this PR
+* [ ] I have added Go unit tests or [Complement integration tests](https://github.com/antinvestor/complement) for this
+  PR
   _or_ I have justified why this PR doesn't need tests
 * [ ] Pull request includes
   a [sign off below using a legally identifiable name](https://antinvestor.github.io/matrix/development/contributing#sign-off)

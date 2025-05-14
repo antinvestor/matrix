@@ -54,8 +54,8 @@ func NewOutputNotificationDataConsumer(
 ) *OutputNotificationDataConsumer {
 	s := &OutputNotificationDataConsumer{
 		jetstream: js,
-		durable:   cfg.Matrix.JetStream.Durable("SyncAPINotificationDataConsumer"),
-		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputNotificationData),
+		durable:   cfg.Global.JetStream.Durable("SyncAPINotificationDataConsumer"),
+		topic:     cfg.Global.JetStream.Prefixed(jetstream.OutputNotificationData),
 		db:        store,
 		notifier:  notifier,
 		stream:    stream,

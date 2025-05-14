@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import (
 
 // oidcDiscoveryMaxStaleness indicates how stale the Discovery
 // information is allowed to be. This will very rarely change, so
-// we're just making sure even a Matrix that isn't restarting often
+// we're just making sure even a Global that isn't restarting often
 // is picking this up eventually.
 const oidcDiscoveryMaxStaleness = 24 * time.Hour
 

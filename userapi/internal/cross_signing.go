@@ -1,4 +1,4 @@
-// Copyright 2021 The Matrix.org Foundation C.I.C.
+// Copyright 2021 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,10 +18,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -221,7 +221,7 @@ func (a *UserInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.
 	// Store the keys.
 	if err := a.KeyDatabase.StoreCrossSigningKeysForUser(ctx, req.UserID, toStore); err != nil {
 		res.Error = &api.KeyError{
-			Err: fmt.Sprintf("a.DB.StoreCrossSigningKeysForUser: %s", err),
+			Err: fmt.Sprintf("a.Cm.StoreCrossSigningKeysForUser: %s", err),
 		}
 		return
 	}
@@ -239,7 +239,7 @@ func (a *UserInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.
 			for sigKeyID, sigBytes := range forSigUserID {
 				if err := a.KeyDatabase.StoreCrossSigningSigsForTarget(ctx, sigUserID, sigKeyID, req.UserID, targetKeyID, sigBytes); err != nil {
 					res.Error = &api.KeyError{
-						Err: fmt.Sprintf("a.DB.StoreCrossSigningSigsForTarget: %s", err),
+						Err: fmt.Sprintf("a.Cm.StoreCrossSigningSigsForTarget: %s", err),
 					}
 					return
 				}
@@ -376,7 +376,7 @@ func (a *UserInternalAPI) processSelfSignatures(
 						if err := a.KeyDatabase.StoreCrossSigningSigsForTarget(
 							ctx, originUserID, originKeyID, targetUserID, targetKeyID, originSig,
 						); err != nil {
-							return fmt.Errorf("a.DB.StoreCrossSigningKeysForTarget: %w", err)
+							return fmt.Errorf("a.Cm.StoreCrossSigningKeysForTarget: %w", err)
 						}
 					}
 				}
@@ -387,7 +387,7 @@ func (a *UserInternalAPI) processSelfSignatures(
 						if err := a.KeyDatabase.StoreCrossSigningSigsForTarget(
 							ctx, originUserID, originKeyID, targetUserID, targetKeyID, originSig,
 						); err != nil {
-							return fmt.Errorf("a.DB.StoreCrossSigningKeysForTarget: %w", err)
+							return fmt.Errorf("a.Cm.StoreCrossSigningKeysForTarget: %w", err)
 						}
 					}
 				}
@@ -445,7 +445,7 @@ func (a *UserInternalAPI) processOtherSignatures(
 						if err := a.KeyDatabase.StoreCrossSigningSigsForTarget(
 							ctx, userID, originKeyID, targetUserID, targetKeyID, originSig,
 						); err != nil {
-							return fmt.Errorf("a.DB.StoreCrossSigningKeysForTarget: %w", err)
+							return fmt.Errorf("a.Cm.StoreCrossSigningKeysForTarget: %w", err)
 						}
 					}
 				}
@@ -479,7 +479,7 @@ func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 			}
 
 			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, keyID)
-			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			if err != nil && !sqlutil.ErrorIsNoRows(err) {
 				logrus.WithError(err).Errorf("Failed to get cross-signing signatures for user %q key %q", targetUserID, keyID)
 				continue
 			}
@@ -525,9 +525,9 @@ func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 func (a *UserInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySignaturesRequest, res *api.QuerySignaturesResponse) {
 	for targetUserID, forTargetUser := range req.TargetIDs {
 		keyMap, err := a.KeyDatabase.CrossSigningKeysForUser(ctx, targetUserID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if err != nil && !sqlutil.ErrorIsNoRows(err) {
 			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("a.DB.CrossSigningKeysForUser: %s", err),
+				Err: fmt.Sprintf("a.Cm.CrossSigningKeysForUser: %s", err),
 			}
 			continue
 		}
@@ -557,9 +557,9 @@ func (a *UserInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySig
 		for _, targetKeyID := range forTargetUser {
 			// Get own signatures only.
 			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, targetUserID, targetUserID, targetKeyID)
-			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			if err != nil && !sqlutil.ErrorIsNoRows(err) {
 				res.Error = &api.KeyError{
-					Err: fmt.Sprintf("a.DB.CrossSigningSigsForTarget: %s", err),
+					Err: fmt.Sprintf("a.Cm.CrossSigningSigsForTarget: %s", err),
 				}
 				return
 			}

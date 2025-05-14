@@ -35,7 +35,7 @@ func (r *FederationInternalAPI) PerformDirectoryLookup(
 
 	dir, err := r.federation.LookupRoomAlias(
 		ctx,
-		r.cfg.Matrix.ServerName,
+		r.cfg.Global.ServerName,
 		request.ServerName,
 		request.RoomAlias,
 	)
@@ -81,7 +81,7 @@ func (r *FederationInternalAPI) PerformJoin(
 	seenSet := make(map[spec.ServerName]bool)
 	var uniqueList []spec.ServerName
 	for _, srv := range request.ServerNames {
-		if seenSet[srv] || r.cfg.Matrix.IsLocalServerName(srv) {
+		if seenSet[srv] || r.cfg.Global.IsLocalServerName(srv) {
 			continue
 		}
 		seenSet[srv] = true
@@ -162,8 +162,8 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		ServerName: serverName,
 		Content:    content,
 		Unsigned:   unsigned,
-		PrivateKey: r.cfg.Matrix.PrivateKey,
-		KeyID:      r.cfg.Matrix.KeyID,
+		PrivateKey: r.cfg.Global.PrivateKey,
+		KeyID:      r.cfg.Global.KeyID,
 		KeyRing:    r.keyRing,
 		EventProvider: federatedEventProvider(ctx, r.federation, r.keyRing, user.Domain(), serverName, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
@@ -357,7 +357,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	// request.
 	respPeek, err := r.federation.Peek(
 		ctx,
-		r.cfg.Matrix.ServerName,
+		r.cfg.Global.ServerName,
 		serverName,
 		roomID,
 		peekID,
@@ -387,7 +387,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 		return r.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}
 	authEvents, stateEvents, err := gomatrixserverlib.CheckStateResponse(
-		ctx, &respPeek, respPeek.RoomVersion, r.keyRing, federatedEventProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName, userIDProvider), userIDProvider,
+		ctx, &respPeek, respPeek.RoomVersion, r.keyRing, federatedEventProvider(ctx, r.federation, r.keyRing, r.cfg.Global.ServerName, serverName, userIDProvider), userIDProvider,
 	)
 	if err != nil {
 		return fmt.Errorf("error checking state returned from peeking: %w", err)
@@ -410,7 +410,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	// logrus.Warnf("got respPeek %#v", respPeek)
 	// Send the newly returned state to the roomserver to update our local view.
 	if err = roomserverAPI.SendEventWithState(
-		ctx, r.rsAPI, r.cfg.Matrix.ServerName,
+		ctx, r.rsAPI, r.cfg.Global.ServerName,
 		roomserverAPI.KindNew,
 		// use the authorized state from CheckStateResponse
 		&fclient.RespState{
@@ -510,8 +510,8 @@ func (r *FederationInternalAPI) PerformLeave(
 		event, err := leaveEB.Build(
 			time.Now(),
 			userID.Domain(),
-			r.cfg.Matrix.KeyID,
-			r.cfg.Matrix.PrivateKey,
+			r.cfg.Global.KeyID,
+			r.cfg.Global.PrivateKey,
 		)
 		if err != nil {
 			logrus.WithError(err).Warnf("respMakeLeave.LeaveEvent.Build failed")
@@ -667,9 +667,9 @@ func (r *FederationInternalAPI) PerformBroadcastEDU(
 
 	edu := &gomatrixserverlib.EDU{
 		Type:   "org.matrix.dendrite.wakeup",
-		Origin: string(r.cfg.Matrix.ServerName),
+		Origin: string(r.cfg.Global.ServerName),
 	}
-	if err = r.queues.SendEDU(ctx, edu, r.cfg.Matrix.ServerName, destinations); err != nil {
+	if err = r.queues.SendEDU(ctx, edu, r.cfg.Global.ServerName, destinations); err != nil {
 		return fmt.Errorf("r.queues.SendEDU: %w", err)
 	}
 	r.MarkServersAlive(ctx, destinations)

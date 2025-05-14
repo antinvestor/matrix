@@ -23,7 +23,7 @@ import (
 	"github.com/antinvestor/matrix/setup/jetstream"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/consumers"
@@ -42,22 +42,26 @@ import (
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	dendriteCfg *config.Dendrite,
-	cm *sqlutil.Connections,
-	natsInstance *jetstream.NATSInstance,
+	dendriteCfg *config.Matrix,
+	cm sqlutil.ConnectionManager,
+	qm *jetstream.NATSInstance,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
-	caches caching.LazyLoadCache,
+	caches cacheutil.LazyLoadCache,
 	enableMetrics bool,
 ) {
-	js, natsClient := natsInstance.Prepare(ctx, &dendriteCfg.Global.JetStream)
+	js, natsClient := qm.Prepare(ctx, &dendriteCfg.Global.JetStream)
 
-	syncDB, err := storage.NewSyncServerDatasource(ctx, cm, &dendriteCfg.SyncAPI.Database)
+	syncCm, err := cm.FromOptions(ctx, &dendriteCfg.SyncAPI.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to obtain sync db connection manager")
+	}
+	syncDB, err := storage.NewSyncServerDatabase(ctx, syncCm)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
-	eduCache := caching.NewTypingCache()
+	eduCache := cacheutil.NewTypingCache()
 	notifier := notifier.NewNotifier(rsAPI)
 	streams := streams.NewSyncStreamProviders(ctx, syncDB, userAPI, rsAPI, eduCache, caches, notifier)
 	notifier.SetCurrentPosition(streams.Latest(ctx))

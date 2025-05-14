@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,15 +20,14 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/postgres"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 // NewDatabase opens a new database
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (Database, error) {
-	if !dbProperties.ConnectionString.IsPostgres() {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache cacheutil.FederationCache, isLocalServerName func(spec.ServerName) bool) (Database, error) {
+	if !cm.DS().IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type")
 	}
-	return postgres.NewDatabase(ctx, conMan, dbProperties, cache, isLocalServerName)
+	return postgres.NewDatabase(ctx, cm, cache, isLocalServerName)
 }

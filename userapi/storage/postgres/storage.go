@@ -21,7 +21,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/storage/shared"
 
 	// Import the postgres database driver.
@@ -29,135 +28,127 @@ import (
 )
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
-	db, writer, err := conMan.Connection(ctx, dbProperties)
-	if err != nil {
-		return nil, err
-	}
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, serverName spec.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 
-	m := sqlutil.NewMigrator(db)
-	if err = m.Up(ctx); err != nil {
-		return nil, err
-	}
-
-	registationTokensTable, err := NewPostgresRegistrationTokensTable(ctx, db)
+	registationTokensTable, err := NewPostgresRegistrationTokensTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresRegistrationsTokenTable: %w", err)
 	}
-	accountsTable, err := NewPostgresAccountsTable(ctx, db, serverName)
+	accountsTbl, err := NewPostgresAccountsTable(ctx, cm, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresAccountsTable: %w", err)
 	}
-	accountDataTable, err := NewPostgresAccountDataTable(ctx, db)
+	accountDataTbl, err := NewPostgresAccountDataTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresAccountDataTable: %w", err)
 	}
-	devicesTable, err := NewPostgresDevicesTable(ctx, db, serverName)
+	devicesTbl, err := NewPostgresDevicesTable(ctx, cm, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresDevicesTable: %w", err)
 	}
-	keyBackupTable, err := NewPostgresKeyBackupTable(ctx, db)
+	keyBackupTbl, err := NewPostgresKeyBackupTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresKeyBackupTable: %w", err)
 	}
-	keyBackupVersionTable, err := NewPostgresKeyBackupVersionTable(ctx, db)
+	keyBackupVersionTbl, err := NewPostgresKeyBackupVersionTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresKeyBackupVersionTable: %w", err)
 	}
-	loginTokenTable, err := NewPostgresLoginTokenTable(ctx, db)
+	loginTokenTbl, err := NewPostgresLoginTokenTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresLoginTokenTable: %w", err)
 	}
-	openIDTable, err := NewPostgresOpenIDTable(db, serverName)
+	openIDTbl, err := NewPostgresOpenIDTable(ctx, cm, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresOpenIDTable: %w", err)
 	}
-	profilesTable, err := NewPostgresProfilesTable(db, serverNoticesLocalpart)
+	profileTbl, err := NewPostgresProfilesTable(ctx, cm, serverNoticesLocalpart)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresProfilesTable: %w", err)
 	}
-	threePIDTable, err := NewPostgresThreePIDTable(ctx, db)
+	threePIDTbl, err := NewPostgresThreePIDTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresThreePIDTable: %w", err)
 	}
-	pusherTable, err := NewPostgresPusherTable(ctx, db)
+	pusherTbl, err := NewPostgresPusherTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresPusherTable: %w", err)
 	}
-	notificationsTable, err := NewPostgresNotificationTable(ctx, db)
+	notificationsTbl, err := NewPostgresNotificationTable(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotificationTable: %w", err)
 	}
-	statsTable, err := NewPostgresStatsTable(ctx, db, serverName)
+	statsTbl, err := NewPostgresStatsTable(ctx, cm, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresStatsTable: %w", err)
 	}
 
-	m = sqlutil.NewMigrator(db)
-	if err = m.Up(ctx); err != nil {
+	err = cm.Migrate(ctx)
+	if err != nil {
 		return nil, err
 	}
 
 	return &shared.Database{
-		AccountDatas:          accountDataTable,
-		Accounts:              accountsTable,
-		Devices:               devicesTable,
-		KeyBackups:            keyBackupTable,
-		KeyBackupVersions:     keyBackupVersionTable,
-		LoginTokens:           loginTokenTable,
-		OpenIDTokens:          openIDTable,
-		Profiles:              profilesTable,
-		ThreePIDs:             threePIDTable,
-		Pushers:               pusherTable,
-		Notifications:         notificationsTable,
+		Cm:                    cm,
+		AccountDatas:          accountDataTbl,
+		Accounts:              accountsTbl,
+		Devices:               devicesTbl,
+		KeyBackups:            keyBackupTbl,
+		KeyBackupVersions:     keyBackupVersionTbl,
+		LoginTokens:           loginTokenTbl,
+		OpenIDTokens:          openIDTbl,
+		Profiles:              profileTbl,
+		ThreePIDs:             threePIDTbl,
+		Pushers:               pusherTbl,
+		Notifications:         notificationsTbl,
 		RegistrationTokens:    registationTokensTable,
-		Stats:                 statsTable,
+		Stats:                 statsTbl,
 		ServerName:            serverName,
-		DB:                    db,
-		Writer:                writer,
 		LoginTokenLifetime:    loginTokenLifetime,
 		BcryptCost:            bcryptCost,
 		OpenIDTokenLifetimeMS: openIDTokenLifetimeMS,
 	}, nil
 }
 
-func NewKeyDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.KeyDatabase, error) {
-	db, writer, err := conMan.Connection(ctx, dbProperties)
+func NewKeyDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (*shared.KeyDatabase, error) {
+
+	otk, err := NewPostgresOneTimeKeysTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	otk, err := NewPostgresOneTimeKeysTable(ctx, db)
+	dk, err := NewPostgresDeviceKeysTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	dk, err := NewPostgresDeviceKeysTable(ctx, db)
+	kc, err := NewPostgresKeyChangesTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	kc, err := NewPostgresKeyChangesTable(ctx, db)
+	sdl, err := NewPostgresStaleDeviceListsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	sdl, err := NewPostgresStaleDeviceListsTable(ctx, db)
+	csk, err := NewPostgresCrossSigningKeysTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	csk, err := NewPostgresCrossSigningKeysTable(ctx, db)
+	css, err := NewPostgresCrossSigningSigsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	css, err := NewPostgresCrossSigningSigsTable(ctx, db)
+
+	err = cm.Migrate(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &shared.KeyDatabase{
+		Cm:                    cm,
 		OneTimeKeysTable:      otk,
 		DeviceKeysTable:       dk,
 		KeyChangesTable:       kc,
 		StaleDeviceListsTable: sdl,
 		CrossSigningKeysTable: csk,
 		CrossSigningSigsTable: css,
-		Writer:                writer,
 	}, nil
 }

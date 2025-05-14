@@ -68,7 +68,7 @@ func NewOutputRoomEventConsumer(
 	return &OutputRoomEventConsumer{
 		cfg:       cfg,
 		jetstream: js,
-		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputAppserviceEvent),
+		topic:     cfg.Global.JetStream.Prefixed(jetstream.OutputAppserviceEvent),
 		rsAPI:     rsAPI,
 	}
 }
@@ -84,7 +84,7 @@ func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 		token := jetstream.Tokenise(as.ID)
 		if err := jetstream.Consumer(
 			ctx, s.jetstream, s.topic,
-			s.cfg.Matrix.JetStream.Durable("Appservice_"+token),
+			s.cfg.Global.JetStream.Durable("Appservice_"+token),
 			50, // maximum number of events to send in a single transaction
 			func(ctx context.Context, msgs []*nats.Msg) bool {
 				return s.onMessage(ctx, state, msgs)
@@ -93,12 +93,12 @@ func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 		); err != nil {
 			return fmt.Errorf("failed to create %q consumer: %w", token, err)
 		}
-		durableNames = append(durableNames, s.cfg.Matrix.JetStream.Durable("Appservice_"+token))
+		durableNames = append(durableNames, s.cfg.Global.JetStream.Durable("Appservice_"+token))
 	}
 	// Cleanup any consumers still existing on the OutputRoomEvent stream
 	// to avoid messages not being deleted
 	for _, consumerName := range durableNames {
-		err := s.jetstream.DeleteConsumer(s.cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent), consumerName+"Pull")
+		err := s.jetstream.DeleteConsumer(s.cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent), consumerName+"Pull")
 		if err != nil && err != nats.ErrConsumerNotFound {
 			return err
 		}

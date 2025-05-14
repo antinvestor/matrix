@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -56,10 +56,10 @@ func NewOutputReceiptEventConsumer(
 	return &OutputReceiptEventConsumer{
 		ctx:          ctx,
 		jetstream:    js,
-		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		durable:      cfg.Matrix.JetStream.Durable("UserAPIReceiptConsumer"),
+		topic:        cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		durable:      cfg.Global.JetStream.Durable("UserAPIReceiptConsumer"),
 		db:           store,
-		serverName:   cfg.Matrix.ServerName,
+		serverName:   cfg.Global.ServerName,
 		syncProducer: syncProducer,
 		pgClient:     pgClient,
 	}

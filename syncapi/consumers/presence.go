@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -59,9 +59,9 @@ func NewPresenceConsumer(
 	return &PresenceConsumer{
 		nats:          nats,
 		jetstream:     js,
-		durable:       cfg.Matrix.JetStream.Durable("SyncAPIPresenceConsumer"),
-		presenceTopic: cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
-		requestTopic:  cfg.Matrix.JetStream.Prefixed(jetstream.RequestPresence),
+		durable:       cfg.Global.JetStream.Durable("SyncAPIPresenceConsumer"),
+		presenceTopic: cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		requestTopic:  cfg.Global.JetStream.Prefixed(jetstream.RequestPresence),
 		db:            db,
 		notifier:      notifier,
 		stream:        stream,
@@ -124,7 +124,7 @@ func (s *PresenceConsumer) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if !s.cfg.Matrix.Presence.EnableInbound && !s.cfg.Matrix.Presence.EnableOutbound {
+	if !s.cfg.Global.Presence.EnableInbound && !s.cfg.Global.Presence.EnableOutbound {
 		return nil
 	}
 	return jetstream.Consumer(

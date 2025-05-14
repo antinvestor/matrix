@@ -17,7 +17,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/storage/cache"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/sirupsen/logrus"
@@ -40,7 +40,7 @@ func NewFederationInternalAPI(
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	federation fclient.FederationClient,
 	statistics *statistics.Statistics,
-	caches *caching.Caches,
+	caches *cacheutil.Caches,
 	queues *queue.OutgoingQueues,
 	keyRing *gomatrixserverlib.KeyRing,
 ) *FederationInternalAPI {
@@ -55,13 +55,13 @@ func NewFederationInternalAPI(
 			KeyDatabase: serverKeyDB,
 		}
 
-		pubKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
+		pubKey := cfg.Global.PrivateKey.Public().(ed25519.PublicKey)
 		addDirectFetcher := func() {
 			keyRing.KeyFetchers = append(
 				keyRing.KeyFetchers,
 				&gomatrixserverlib.DirectKeyFetcher{
 					Client:            federation,
-					IsLocalServerName: cfg.Matrix.IsLocalServerName,
+					IsLocalServerName: cfg.Global.IsLocalServerName,
 					LocalPublicKey:    []byte(pubKey),
 				},
 			)
@@ -140,7 +140,7 @@ func failBlacklistableError(ctx context.Context, err error, stats *statistics.Se
 	if !ok {
 		return stats.Failure(ctx)
 	}
-	if mxerr.Code == 401 { // invalid signature in X-Matrix header
+	if mxerr.Code == 401 { // invalid signature in X-Global header
 		return stats.Failure(ctx)
 	}
 	if mxerr.Code >= 500 && mxerr.Code < 600 { // internal server errors

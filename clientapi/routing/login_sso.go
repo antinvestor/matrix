@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -154,7 +154,7 @@ func syncCallbackURLWithConfig(cfg *config.LoginSSO, req *http.Request, expected
 	}
 
 	// Find the v3mux base, handling both `redirect` and
-	// `redirect/{idp}` and not hard-coding the Matrix version.
+	// `redirect/{idp}` and not hard-coding the Global version.
 	i := strings.Index(u.Path, expectedPath)
 	if i < 0 {
 		return nil, fmt.Errorf("cannot find %q to replace in URL %q", expectedPath, u.Path)

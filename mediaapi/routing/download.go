@@ -125,7 +125,7 @@ func Download(
 ) {
 	// This happens if we call Download for a federation request
 	if federationRequest && origin == "" {
-		origin = cfg.Matrix.ServerName
+		origin = cfg.Global.ServerName
 	}
 	dReq := &downloadRequest{
 		MediaMetadata: &types.MediaMetadata{
@@ -139,7 +139,7 @@ func Download(
 		}),
 		DownloadFilename:  customFilename,
 		multipartResponse: federationRequest,
-		origin:            cfg.Matrix.ServerName,
+		origin:            cfg.Global.ServerName,
 		fedClient:         fedClient,
 	}
 
@@ -277,7 +277,7 @@ func (r *downloadRequest) doDownload(
 		return nil, fmt.Errorf("db.GetMediaMetadata: %w", err)
 	}
 	if mediaMetadata == nil {
-		if r.MediaMetadata.Origin == cfg.Matrix.ServerName {
+		if r.MediaMetadata.Origin == cfg.Global.ServerName {
 			// If we do not have a record and the origin is local, the file is not found
 			return nil, nil
 		}
@@ -751,7 +751,7 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 		}
 		// NOTE: It should really not be possible to fail the uniqueness test here so
 		// there is no need to handle that separately
-		return errors.New("failed to store file metadata in DB")
+		return errors.New("failed to store file metadata in Cm")
 	}
 
 	go func() {

@@ -98,10 +98,10 @@ func (r *FederationInternalAPI) handleLocalKeys(
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) {
 	for req := range requests {
-		if !r.cfg.Matrix.IsLocalServerName(req.ServerName) {
+		if !r.cfg.Global.IsLocalServerName(req.ServerName) {
 			continue
 		}
-		if req.KeyID == r.cfg.Matrix.KeyID {
+		if req.KeyID == r.cfg.Global.KeyID {
 			// We found a key request that is supposed to be for our own
 			// keys. Remove it from the request list so we don't hit the
 			// database or the fetchers for it.
@@ -110,15 +110,15 @@ func (r *FederationInternalAPI) handleLocalKeys(
 			// Insert our own key into the response.
 			results[req] = gomatrixserverlib.PublicKeyLookupResult{
 				VerifyKey: gomatrixserverlib.VerifyKey{
-					Key: spec.Base64Bytes(r.cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)),
+					Key: spec.Base64Bytes(r.cfg.Global.PrivateKey.Public().(ed25519.PublicKey)),
 				},
 				ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
-				ValidUntilTS: spec.AsTimestamp(time.Now().Add(r.cfg.Matrix.KeyValidityPeriod)),
+				ValidUntilTS: spec.AsTimestamp(time.Now().Add(r.cfg.Global.KeyValidityPeriod)),
 			}
 		} else {
 			// The key request doesn't match our current key. Let's see
 			// if it matches any of our old verify keys.
-			for _, oldVerifyKey := range r.cfg.Matrix.OldVerifyKeys {
+			for _, oldVerifyKey := range r.cfg.Global.OldVerifyKeys {
 				if req.KeyID == oldVerifyKey.KeyID {
 					// We found a key request that is supposed to be an expired
 					// key.

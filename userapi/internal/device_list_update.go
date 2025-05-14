@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,13 +25,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antinvestor/gomatrixserverlib/fclient"
-	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -422,7 +422,12 @@ func (u *DeviceListUpdater) worker(ctx context.Context, ch chan spec.ServerName,
 			serversToRetry = serversToRetry[:0]
 
 			deviceListUpdaterServersRetrying.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Set(float64(len(retries)))
-			time.Sleep(time.Second * 2)
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second * 2):
+			}
 
 			// -2, so we have space for incoming device list updates over federation
 			maxServers := (cap(ch) - len(ch)) - 2
@@ -560,7 +565,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 			}
 		case gomatrix.HTTPError:
 			// The remote server returned an error, give it some time to recover.
-			// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
+			// This is to avoid spamming remote servers, which may not be Global servers anymore.
 			if e.Code >= 300 {
 				logger.WithError(e).Debug("GetUserDevices returned gomatrix.HTTPError")
 				return hourWaitTime, err

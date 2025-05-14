@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -13,7 +13,7 @@ import (
 
 type TypingStreamProvider struct {
 	DefaultStreamProvider
-	EDUCache *caching.EDUCache
+	EDUCache *cacheutil.EDUCache
 }
 
 func (p *TypingStreamProvider) CompleteSync(

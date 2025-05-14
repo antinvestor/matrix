@@ -40,7 +40,7 @@ func Consumer(
 	sub, err := js.PullSubscribe(subj, name, opts...)
 	if err != nil {
 		sentry.CaptureException(err)
-		return fmt.Errorf("nats.SubscribeSync: %w", err)
+		return fmt.Errorf("nats.SubscribeSync: [%v] %w", subj, err)
 	}
 	go func() {
 		for {
@@ -48,7 +48,7 @@ func Consumer(
 			// carrying on doing anything, so stop the listener.
 			select {
 			case <-ctx.Done():
-				if err := sub.Unsubscribe(); err != nil {
+				if err = sub.Unsubscribe(); err != nil {
 					logrus.WithContext(ctx).Warnf("Failed to unsubscribe %q", durable)
 				}
 				return

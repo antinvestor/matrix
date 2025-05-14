@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@ package perform
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -120,7 +120,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			return nil, err
 		}
 
-		identity, err = r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+		identity, err = r.Cfg.Global.SigningIdentityFor(senderDomain)
 		if err != nil {
 			continue
 		}
@@ -158,7 +158,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 	if err != nil {
 		return nil, err
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(fullUserID.Domain()) {
+	if !r.Cfg.Global.IsLocalServerName(fullUserID.Domain()) {
 		return nil, fmt.Errorf("can only evacuate local users using this endpoint")
 	}
 
@@ -168,7 +168,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 	}
 
 	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, *fullUserID, spec.Invite)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return nil, err
 	}
 
@@ -316,7 +316,7 @@ func (r *Admin) PerformAdminDownloadState(
 		Depth:        depth,
 	}
 
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+	identity, err := r.Cfg.Global.SigningIdentityFor(senderDomain)
 	if err != nil {
 		return err
 	}
@@ -341,10 +341,10 @@ func (r *Admin) PerformAdminDownloadState(
 	inputReq.InputRoomEvents = append(inputReq.InputRoomEvents, api.InputRoomEvent{
 		Kind:          api.KindNew,
 		Event:         ev,
-		Origin:        r.Cfg.Matrix.ServerName,
+		Origin:        r.Cfg.Global.ServerName,
 		HasState:      true,
 		StateEventIDs: stateIDs,
-		SendAsServer:  string(r.Cfg.Matrix.ServerName),
+		SendAsServer:  string(r.Cfg.Global.ServerName),
 	})
 
 	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)

@@ -38,8 +38,8 @@ import (
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	cfg *config.Dendrite,
-	natsInstance *jetstream.NATSInstance,
+	cfg *config.Matrix,
+	qm *jetstream.NATSInstance,
 	federation fclient.FederationClient,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
@@ -51,7 +51,7 @@ func AddPublicRoutes(
 	partitionCli *partitionv1.PartitionClient,
 	enableMetrics bool,
 ) {
-	js, natsClient := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+	js, natsClient := qm.Prepare(ctx, &cfg.Global.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream:              js,

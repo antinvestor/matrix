@@ -9,11 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pitabwire/frame"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage"
@@ -49,7 +51,9 @@ func (d dummyQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.Room
 
 // nolint:gocyclo
 func main() {
-	ctx := context.Background()
+
+	ctx, svc := frame.NewService("resolve-state")
+
 	cfg := setup.ParseFlags(true)
 	cfg.Logging = append(cfg.Logging[:0], config.LogrusHook{
 		Type:  "std",
@@ -68,21 +72,24 @@ func main() {
 		}
 	}
 
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-
 	dbOpts := cfg.RoomServer.Database
 	if dbOpts.ConnectionString == "" {
 		dbOpts = cfg.Global.DatabaseOptions
 	}
 
+	cm, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &dbOpts)
+	if err != nil {
+		panic(err)
+	}
+
 	cfg.Global.Cache.MaxAge = time.Minute * 5
-	caches, err := caching.NewCache(&cfg.Global.Cache)
+	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to create cache")
 	}
 
 	fmt.Println("Opening database")
-	roomserverDB, err := storage.Open(ctx, cm, &dbOpts, caches)
+	roomserverDB, err := storage.NewDatabase(ctx, cm, caches)
 	if err != nil {
 		panic(err)
 	}

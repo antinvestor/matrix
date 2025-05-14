@@ -17,7 +17,7 @@ package roomserver
 import (
 	"context"
 
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
@@ -34,18 +34,24 @@ import (
 // you may wish to call `SetFederationAPI` on the returned struct to avoid nil-dereference errors.
 func NewInternalAPI(
 	ctx context.Context,
-	cfg *config.Dendrite,
-	cm *sqlutil.Connections,
-	natsInstance *jetstream.NATSInstance,
-	caches caching.RoomServerCaches,
+	cfg *config.Matrix,
+	cm sqlutil.ConnectionManager,
+	qm *jetstream.NATSInstance,
+	caches cacheutil.RoomServerCaches,
 	enableMetrics bool,
 ) api.RoomserverInternalAPI {
-	roomserverDB, err := storage.Open(ctx, cm, &cfg.RoomServer.Database, caches)
+
+	roomserverCm, err := cm.FromOptions(ctx, &cfg.RoomServer.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("could not obtain connection manager for roomserver")
+	}
+
+	roomserverDB, err := storage.NewDatabase(ctx, roomserverCm, caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	js, nc := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+	js, nc := qm.Prepare(ctx, &cfg.Global.JetStream)
 
 	return internal.NewRoomserverAPI(
 		ctx, cfg, roomserverDB, js, nc, caches, enableMetrics,

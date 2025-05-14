@@ -68,9 +68,9 @@ func NewOutputRoomEventConsumer(
 		db:            store,
 		queues:        queues,
 		rsAPI:         rsAPI,
-		durable:       cfg.Matrix.JetStream.Durable("FederationAPIRoomServerConsumer"),
-		topic:         cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		topicPresence: cfg.Matrix.JetStream.Prefixed(jetstream.RequestPresence),
+		durable:       cfg.Global.JetStream.Durable("FederationAPIRoomServerConsumer"),
+		topic:         cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		topicPresence: cfg.Global.JetStream.Prefixed(jetstream.RequestPresence),
 	}
 }
 
@@ -211,7 +211,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, ore api.Ou
 	}
 
 	// If we added new hosts, inform them about our known presence events for this room
-	if s.cfg.Matrix.Presence.EnableOutbound && len(addsJoinedHosts) > 0 && ore.Event.Type() == spec.MRoomMember && ore.Event.StateKey() != nil {
+	if s.cfg.Global.Presence.EnableOutbound && len(addsJoinedHosts) > 0 && ore.Event.Type() == spec.MRoomMember && ore.Event.StateKey() != nil {
 		membership, _ := ore.Event.Membership()
 		if membership == spec.Join {
 			s.sendPresence(ctx, ore.Event.RoomID().String(), addsJoinedHosts)
@@ -306,13 +306,13 @@ func (s *OutputRoomEventConsumer) sendPresence(ctx context.Context, roomID strin
 
 	edu := &gomatrixserverlib.EDU{
 		Type:   spec.MPresence,
-		Origin: string(s.cfg.Matrix.ServerName),
+		Origin: string(s.cfg.Global.ServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
 		log.WithError(err).Error("failed to marshal EDU JSON")
 		return
 	}
-	if err := s.queues.SendEDU(ctx, edu, s.cfg.Matrix.ServerName, joined); err != nil {
+	if err := s.queues.SendEDU(ctx, edu, s.cfg.Global.ServerName, joined); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 	}
 }

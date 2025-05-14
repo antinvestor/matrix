@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,7 @@ package routing
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -26,7 +24,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserver "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
@@ -53,7 +51,7 @@ func Context(
 	rsAPI roomserver.SyncRoomserverAPI,
 	syncDB storage.Database,
 	roomID, eventID string,
-	lazyLoadCache caching.LazyLoadCache,
+	lazyLoadCache cacheutil.LazyLoadCache,
 ) util.JSONResponse {
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
@@ -125,7 +123,7 @@ func Context(
 
 	id, requestedEvent, err := snapshot.SelectContextEvent(ctx, roomID, eventID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound(fmt.Sprintf("Event %s not found", eventID)),
@@ -165,7 +163,7 @@ func Context(
 	}
 
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, roomID, filter)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		logrus.WithError(err).Error("unable to fetch before events")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -174,7 +172,7 @@ func Context(
 	}
 
 	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, roomID, filter)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		logrus.WithError(err).Error("unable to fetch after events")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -315,7 +313,7 @@ func applyLazyLoadMembers(
 	snapshot storage.DatabaseTransaction,
 	roomID string,
 	events []synctypes.ClientEvent,
-	lazyLoadCache caching.LazyLoadCache,
+	lazyLoadCache cacheutil.LazyLoadCache,
 ) ([]*rstypes.HeaderedEvent, error) {
 	eventSenders := make(map[string]struct{})
 	// get members who actually send an event

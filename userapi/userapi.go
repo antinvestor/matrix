@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,9 +45,9 @@ import (
 // using its `SetFederationAPI` method, other you may get nil-dereference errors.
 func NewInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Dendrite,
-	cm *sqlutil.Connections,
-	natsInstance *jetstream.NATSInstance,
+	dendriteCfg *config.Matrix,
+	cm sqlutil.ConnectionManager,
+	qm *jetstream.NATSInstance,
 	rsAPI rsapi.UserRoomserverAPI,
 	fedClient fedsenderapi.KeyserverFederationAPI,
 	profileCli *profilev1.ProfileClient,
@@ -56,27 +56,34 @@ func NewInternalAPI(
 ) *internal.UserInternalAPI {
 
 	var err error
-	js, _ := natsInstance.Prepare(ctx, &dendriteCfg.Global.JetStream)
+	js, _ := qm.Prepare(ctx, &dendriteCfg.Global.JetStream)
 	appServices := dendriteCfg.Derived.ApplicationServices
 
 	pgClient := pushgateway.NewHTTPClient(dendriteCfg.UserAPI.PushGatewayDisableTLSValidation)
 
+	userapiCm, err := cm.FromOptions(ctx, &dendriteCfg.UserAPI.AccountDatabase)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to obtain accounts db connection manager :%v", err)
+	}
 	db, err := storage.NewUserDatabase(
 		ctx,
 		profileCli,
-		cm,
-		&dendriteCfg.UserAPI.AccountDatabase,
+		userapiCm,
 		dendriteCfg.Global.ServerName,
 		dendriteCfg.UserAPI.BCryptCost,
 		dendriteCfg.UserAPI.OpenIDTokenLifetimeMS,
 		api.DefaultLoginTokenLifetime,
-		dendriteCfg.UserAPI.Matrix.ServerNotices.LocalPart,
+		dendriteCfg.UserAPI.Global.ServerNotices.LocalPart,
 	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
-	keyDB, err := storage.NewKeyDatabase(ctx, cm, &dendriteCfg.KeyServer.Database)
+	keyCm, err := cm.FromOptions(ctx, &dendriteCfg.KeyServer.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to obtain key db connection manager")
+	}
+	keyDB, err := storage.NewKeyDatabase(ctx, keyCm)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key db")
 	}
@@ -112,12 +119,12 @@ func NewInternalAPI(
 	updater := internal.NewDeviceListUpdater(ctx, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn)
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
-	if err := updater.CleanUp(ctx); err != nil {
+	if err = updater.CleanUp(ctx); err != nil {
 		logrus.WithError(err).Error("failed to cleanup stale device lists")
 	}
 
 	go func() {
-		if err := updater.Start(ctx); err != nil {
+		if err = updater.Start(ctx); err != nil {
 			logrus.WithError(err).Panicf("failed to start device list updater")
 		}
 	}()
@@ -125,38 +132,45 @@ func NewInternalAPI(
 	dlConsumer := consumers.NewDeviceListUpdateConsumer(
 		ctx, &dendriteCfg.UserAPI, js, updater,
 	)
-	if err := dlConsumer.Start(ctx); err != nil {
+	if err = dlConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start device list consumer")
 	}
 
 	sigConsumer := consumers.NewSigningKeyUpdateConsumer(
 		ctx, &dendriteCfg.UserAPI, js, userAPI,
 	)
-	if err := sigConsumer.Start(ctx); err != nil {
+	if err = sigConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start signing key consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
 		ctx, &dendriteCfg.UserAPI, js, db, syncProducer, pgClient,
 	)
-	if err := receiptConsumer.Start(ctx); err != nil {
+	if err = receiptConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start user API receipt consumer")
 	}
 
 	eventConsumer := consumers.NewOutputRoomEventConsumer(
 		ctx, &dendriteCfg.UserAPI, js, db, pgClient, rsAPI, syncProducer,
 	)
-	if err := eventConsumer.Start(ctx); err != nil {
+	if err = eventConsumer.Start(ctx); err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
 	}
 
 	var cleanOldNotifs func()
 	cleanOldNotifs = func() {
-		logrus.Infof("Cleaning old notifications")
-		if err := db.DeleteOldNotifications(ctx); err != nil {
-			logrus.WithError(err).Error("Failed to clean old notifications")
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			// Context is still valid, continue with operation
+
+			logrus.Infof("Cleaning old notifications")
+			if err = db.DeleteOldNotifications(ctx); err != nil {
+				logrus.WithError(err).Error("Failed to clean old notifications")
+			}
+			time.AfterFunc(time.Hour, cleanOldNotifs)
 		}
-		time.AfterFunc(time.Hour, cleanOldNotifs)
 	}
 	time.AfterFunc(time.Minute, cleanOldNotifs)
 

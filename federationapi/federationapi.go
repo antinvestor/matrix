@@ -32,7 +32,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	userAPI "github.com/antinvestor/matrix/userapi/api"
 
@@ -45,8 +45,8 @@ import (
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	dendriteConfig *config.Dendrite,
-	natsInstance *jetstream.NATSInstance,
+	dendriteConfig *config.Matrix,
+	qm *jetstream.NATSInstance,
 	userAPI userAPI.FederationUserAPI,
 	federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
@@ -56,15 +56,15 @@ func AddPublicRoutes(
 ) {
 	cfg := &dendriteConfig.FederationAPI
 	mscCfg := &dendriteConfig.MSCs
-	js, _ := natsInstance.Prepare(ctx, &cfg.Matrix.JetStream)
+	js, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
-		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
-		TopicDeviceListUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
-		TopicSigningKeyUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		TopicReceiptEvent:      cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		TopicTypingEvent:       cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		TopicPresenceEvent:     cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		TopicDeviceListUpdate:  cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		TopicSigningKeyUpdate:  cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
 		Config:                 cfg,
 		UserAPI:                userAPI,
 	}
@@ -93,18 +93,22 @@ func AddPublicRoutes(
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Dendrite,
-	cm *sqlutil.Connections,
-	natsInstance *jetstream.NATSInstance,
+	dendriteCfg *config.Matrix,
+	cm sqlutil.ConnectionManager,
+	qm *jetstream.NATSInstance,
 	federation fclient.FederationClient,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
-	caches *caching.Caches,
+	caches *cacheutil.Caches,
 	keyRing *gomatrixserverlib.KeyRing,
 	resetBlacklist bool,
 ) *internal.FederationInternalAPI {
 	cfg := &dendriteCfg.FederationAPI
 
-	federationDB, err := storage.NewDatabase(ctx, cm, &cfg.Database, caches, dendriteCfg.Global.IsLocalServerName)
+	federationCm, err := cm.FromOptions(ctx, &cfg.Database)
+	if err != nil {
+		logrus.WithError(err).Panic("failed to obtain federation sender db connection manager")
+	}
+	federationDB, err := storage.NewDatabase(ctx, federationCm, caches, dendriteCfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
@@ -115,14 +119,14 @@ func NewInternalAPI(
 
 	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1, cfg.P2PFederationRetriesUntilAssumedOffline+1, cfg.EnableRelays)
 
-	js, nats := natsInstance.Prepare(ctx, &cfg.Matrix.JetStream)
+	js, nats := qm.Prepare(ctx, &cfg.Global.JetStream)
 
-	signingInfo := dendriteCfg.Global.SigningIdentities()
+	signingInfo := cfg.Global.SigningIdentities()
 
 	queues := queue.NewOutgoingQueues(ctx,
 		federationDB,
-		cfg.Matrix.DisableFederation,
-		cfg.Matrix.ServerName, federation, &stats,
+		cfg.Global.DisableFederation,
+		cfg.Global.ServerName, federation, &stats,
 		signingInfo,
 	)
 
@@ -166,11 +170,18 @@ func NewInternalAPI(
 
 	var cleanExpiredEDUs func()
 	cleanExpiredEDUs = func() {
-		logrus.Infof("Cleaning expired EDUs")
-		if err := federationDB.DeleteExpiredEDUs(ctx); err != nil {
-			logrus.WithError(err).Error("Failed to clean expired EDUs")
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+
+			logrus.Infof("Cleaning expired EDUs")
+			if err = federationDB.DeleteExpiredEDUs(ctx); err != nil {
+				logrus.WithError(err).Error("Failed to clean expired EDUs")
+			}
+			time.AfterFunc(time.Hour, cleanExpiredEDUs)
 		}
-		time.AfterFunc(time.Hour, cleanExpiredEDUs)
 	}
 	time.AfterFunc(time.Minute, cleanExpiredEDUs)
 

@@ -59,7 +59,7 @@ func MakeLeave(
 	}
 
 	createLeaveTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
-		identity, signErr := cfg.Matrix.SigningIdentityFor(request.Destination())
+		identity, signErr := cfg.Global.SigningIdentityFor(request.Destination())
 		if signErr != nil {
 			util.GetLogger(httpReq.Context()).WithError(signErr).Errorf("obtaining signing identity for %s failed", request.Destination())
 			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
@@ -108,7 +108,7 @@ func MakeLeave(
 		RoomID:             roomID,
 		RoomVersion:        roomVersion,
 		RequestOrigin:      request.Origin(),
-		LocalServerName:    cfg.Matrix.ServerName,
+		LocalServerName:    cfg.Global.ServerName,
 		LocalServerInRoom:  res.RoomExists && res.IsInRoom,
 		BuildEventTemplate: createLeaveTemplate,
 		UserIDQuerier: func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
@@ -348,14 +348,14 @@ func SendLeave(
 
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has left
-	// the room, so set SendAsServer to cfg.Matrix.ServerName
+	// the room, so set SendAsServer to cfg.Global.ServerName
 	var response api.InputRoomEventsResponse
 	rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
 		InputRoomEvents: []api.InputRoomEvent{
 			{
 				Kind:          api.KindNew,
 				Event:         &types.HeaderedEvent{PDU: event},
-				SendAsServer:  string(cfg.Matrix.ServerName),
+				SendAsServer:  string(cfg.Global.ServerName),
 				TransactionID: nil,
 			},
 		},

@@ -96,9 +96,9 @@ func CreateInvitesFrom3PIDInvites(
 		rsAPI,
 		api.KindNew,
 		evs,
-		cfg.Matrix.ServerName, // TODO: which virtual host?
+		cfg.Global.ServerName, // TODO: which virtual host?
 		"TODO",
-		cfg.Matrix.ServerName,
+		cfg.Global.ServerName,
 		nil,
 		false,
 	); err != nil {
@@ -161,7 +161,7 @@ func ExchangeThirdPartyInvite(
 	if err != nil || targetUserID == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The event's state key isn't a Matrix user ID"),
+			JSON: spec.BadJSON("The event's state key isn't a Global user ID"),
 		}
 	}
 	targetDomain := targetUserID.Domain()
@@ -241,7 +241,7 @@ func ExchangeThirdPartyInvite(
 		},
 		request.Destination(),
 		request.Origin(),
-		cfg.Matrix.ServerName,
+		cfg.Global.ServerName,
 		nil,
 		false,
 	); err != nil {
@@ -273,7 +273,7 @@ func createInviteFrom3PIDInvite(
 		return nil, err
 	}
 
-	if server != cfg.Matrix.ServerName {
+	if server != cfg.Global.ServerName {
 		return nil, errNotLocalUser
 	}
 
@@ -381,8 +381,8 @@ func buildMembershipEvent(
 	builder := verImpl.NewEventBuilderFromProtoEvent(protoEvent)
 
 	event, err := builder.Build(
-		time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID,
-		cfg.Matrix.PrivateKey,
+		time.Now(), cfg.Global.ServerName, cfg.Global.KeyID,
+		cfg.Global.PrivateKey,
 	)
 
 	return event, err
@@ -411,7 +411,7 @@ func sendToRemoteServer(
 	}
 
 	for _, server := range remoteServers {
-		err = federation.ExchangeThirdPartyInvite(ctx, cfg.Matrix.ServerName, server, proto)
+		err = federation.ExchangeThirdPartyInvite(ctx, cfg.Global.ServerName, server, proto)
 		if err == nil {
 			return
 		}

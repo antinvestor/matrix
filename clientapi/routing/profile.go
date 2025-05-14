@@ -115,7 +115,7 @@ func SetAvatarURL(
 		}
 	}
 
-	if !cfg.Matrix.IsLocalServerName(domain) {
+	if !cfg.Global.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("userID does not belong to a locally configured domain"),
@@ -204,7 +204,7 @@ func SetDisplayName(
 		}
 	}
 
-	if !cfg.Matrix.IsLocalServerName(domain) {
+	if !cfg.Global.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("userID does not belong to a locally configured domain"),
@@ -325,8 +325,8 @@ func getProfile(
 		return nil, err
 	}
 
-	if !cfg.Matrix.IsLocalServerName(domain) {
-		profile, fedErr := federation.LookupProfile(ctx, cfg.Matrix.ServerName, domain, userID, "")
+	if !cfg.Global.IsLocalServerName(domain) {
+		profile, fedErr := federation.LookupProfile(ctx, cfg.Global.ServerName, domain, userID, "")
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {
 				if x.Code == http.StatusNotFound {

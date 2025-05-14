@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,15 +20,12 @@ import (
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/postgres"
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 // NewMediaAPIDatasource opens a database connection.
-func NewMediaAPIDatasource(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (Database, error) {
-	switch {
-	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(ctx, conMan, dbProperties)
-	default:
-		return nil, fmt.Errorf("unexpected database type")
+func NewMediaAPIDatasource(ctx context.Context, cm sqlutil.ConnectionManager) (Database, error) {
+	if cm.DS().IsPostgres() {
+		return postgres.NewDatabase(ctx, cm)
 	}
+	return nil, fmt.Errorf("unexpected database type")
 }

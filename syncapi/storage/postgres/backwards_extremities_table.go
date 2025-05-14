@@ -16,13 +16,14 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
+	"github.com/pitabwire/frame"
 )
 
+// Schema for creating the backward extremities table
 const backwardExtremitiesSchema = `
 -- Stores output room events received from the roomserver.
 CREATE TABLE IF NOT EXISTS syncapi_backward_extremities (
@@ -36,52 +37,79 @@ CREATE TABLE IF NOT EXISTS syncapi_backward_extremities (
 );
 `
 
-const insertBackwardExtremitySQL = "" +
-	"INSERT INTO syncapi_backward_extremities (room_id, event_id, prev_event_id)" +
-	" VALUES ($1, $2, $3)" +
-	" ON CONFLICT DO NOTHING"
+// Revert schema for backward extremities table
+const backwardExtremitiesSchemaRevert = `
+DROP TABLE IF EXISTS syncapi_backward_extremities;
+`
 
-const selectBackwardExtremitiesForRoomSQL = "" +
-	"SELECT event_id, prev_event_id FROM syncapi_backward_extremities WHERE room_id = $1"
+// SQL query for inserting a backward extremity
+const insertBackwardExtremitySQL = `
+INSERT INTO syncapi_backward_extremities (room_id, event_id, prev_event_id)
+VALUES ($1, $2, $3)
+ON CONFLICT DO NOTHING
+`
 
-const deleteBackwardExtremitySQL = "" +
-	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1 AND prev_event_id = $2"
+// SQL query for selecting backward extremities for a room
+const selectBackwardExtremitiesForRoomSQL = `
+SELECT event_id, prev_event_id FROM syncapi_backward_extremities WHERE room_id = $1
+`
 
-const purgeBackwardExtremitiesSQL = "" +
-	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1"
+// SQL query for deleting a backward extremity
+const deleteBackwardExtremitySQL = `
+DELETE FROM syncapi_backward_extremities WHERE room_id = $1 AND prev_event_id = $2
+`
 
-type backwardExtremitiesStatements struct {
-	insertBackwardExtremityStmt          *sql.Stmt
-	selectBackwardExtremitiesForRoomStmt *sql.Stmt
-	deleteBackwardExtremityStmt          *sql.Stmt
-	purgeBackwardExtremitiesStmt         *sql.Stmt
+// SQL query for purging backward extremities
+const purgeBackwardExtremitiesSQL = `
+DELETE FROM syncapi_backward_extremities WHERE room_id = $1
+`
+
+// backwardExtremitiesTable represents a table storing backward extremities
+type backwardExtremitiesTable struct {
+	cm                                  sqlutil.ConnectionManager
+	insertBackwardExtremitySQL          string
+	selectBackwardExtremitiesForRoomSQL string
+	deleteBackwardExtremitySQL          string
+	purgeBackwardExtremitiesSQL         string
 }
 
-func NewPostgresBackwardsExtremitiesTable(ctx context.Context, db *sql.DB) (tables.BackwardsExtremities, error) {
-	s := &backwardExtremitiesStatements{}
-	_, err := db.Exec(backwardExtremitiesSchema)
+// NewPostgresBackwardsExtremitiesTable creates a new backward extremities table
+func NewPostgresBackwardsExtremitiesTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.BackwardsExtremities, error) {
+
+	// Perform the migration
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "syncapi_backward_extremities_table_schema_001",
+		Patch:       backwardExtremitiesSchema,
+		RevertPatch: backwardExtremitiesSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertBackwardExtremityStmt, insertBackwardExtremitySQL},
-		{&s.selectBackwardExtremitiesForRoomStmt, selectBackwardExtremitiesForRoomSQL},
-		{&s.deleteBackwardExtremityStmt, deleteBackwardExtremitySQL},
-		{&s.purgeBackwardExtremitiesStmt, purgeBackwardExtremitiesSQL},
-	}.Prepare(db)
+
+	t := &backwardExtremitiesTable{
+		cm:                                  cm,
+		insertBackwardExtremitySQL:          insertBackwardExtremitySQL,
+		selectBackwardExtremitiesForRoomSQL: selectBackwardExtremitiesForRoomSQL,
+		deleteBackwardExtremitySQL:          deleteBackwardExtremitySQL,
+		purgeBackwardExtremitiesSQL:         purgeBackwardExtremitiesSQL,
+	}
+
+	return t, nil
 }
 
-func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
-	ctx context.Context, txn *sql.Tx, roomID, eventID string, prevEventID string,
+func (t *backwardExtremitiesTable) InsertsBackwardExtremity(
+	ctx context.Context, roomID, eventID string, prevEventID string,
 ) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.insertBackwardExtremityStmt).ExecContext(ctx, roomID, eventID, prevEventID)
+	db := t.cm.Connection(ctx, false)
+	err = db.Exec(t.insertBackwardExtremitySQL, roomID, eventID, prevEventID).Error
 	return
 }
 
-func (s *backwardExtremitiesStatements) SelectBackwardExtremitiesForRoom(
-	ctx context.Context, txn *sql.Tx, roomID string,
+func (t *backwardExtremitiesTable) SelectBackwardExtremitiesForRoom(
+	ctx context.Context, roomID string,
 ) (bwExtrems map[string][]string, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectBackwardExtremitiesForRoomStmt).QueryContext(ctx, roomID)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectBackwardExtremitiesForRoomSQL, roomID).Rows()
 	if err != nil {
 		return
 	}
@@ -100,16 +128,18 @@ func (s *backwardExtremitiesStatements) SelectBackwardExtremitiesForRoom(
 	return bwExtrems, rows.Err()
 }
 
-func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
-	ctx context.Context, txn *sql.Tx, roomID, knownEventID string,
+func (t *backwardExtremitiesTable) DeleteBackwardExtremity(
+	ctx context.Context, roomID, knownEventID string,
 ) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.deleteBackwardExtremityStmt).ExecContext(ctx, roomID, knownEventID)
+	db := t.cm.Connection(ctx, false)
+	err = db.Exec(t.deleteBackwardExtremitySQL, roomID, knownEventID).Error
 	return
 }
 
-func (s *backwardExtremitiesStatements) PurgeBackwardExtremities(
-	ctx context.Context, txn *sql.Tx, roomID string,
+func (t *backwardExtremitiesTable) PurgeBackwardExtremities(
+	ctx context.Context, roomID string,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeBackwardExtremitiesStmt).ExecContext(ctx, roomID)
+	db := t.cm.Connection(ctx, false)
+	err := db.Exec(t.purgeBackwardExtremitiesSQL, roomID).Error
 	return err
 }

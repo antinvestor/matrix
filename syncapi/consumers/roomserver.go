@@ -16,7 +16,6 @@ package consumers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -72,8 +71,8 @@ func NewOutputRoomEventConsumer(
 		ctx:          ctx,
 		cfg:          cfg,
 		jetstream:    js,
-		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		durable:      cfg.Matrix.JetStream.Durable("SyncAPIRoomServerConsumer"),
+		topic:        cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		durable:      cfg.Global.JetStream.Durable("SyncAPIRoomServerConsumer"),
 		db:           store,
 		notifier:     notifier,
 		pduStream:    pduStream,
@@ -387,7 +386,7 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *rst
 		if err != nil || userID == nil {
 			return sp, fmt.Errorf("failed getting userID for sender: %w", err)
 		}
-		if !s.cfg.Matrix.IsLocalServerName(userID.Domain()) {
+		if !s.cfg.Global.IsLocalServerName(userID.Domain()) {
 			return sp, nil
 		}
 
@@ -414,7 +413,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if err != nil || userID == nil {
 		return
 	}
-	if !s.cfg.Matrix.IsLocalServerName(userID.Domain()) {
+	if !s.cfg.Global.IsLocalServerName(userID.Domain()) {
 		return
 	}
 
@@ -442,7 +441,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	pduPos, err := s.db.RetireInviteEvent(ctx, msg.EventID)
 	// It's possible we just haven't heard of this invite yet, so
 	// we should not panic if we try to retire it.
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,

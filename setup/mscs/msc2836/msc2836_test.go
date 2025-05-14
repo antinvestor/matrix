@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
+
 	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -184,7 +186,11 @@ func TestMSC2836(t *testing.T) {
 			eventH.EventID(): eventH,
 		},
 	}
-	router := injectEvents(t, nopUserAPI, nopRsAPI, []*types.HeaderedEvent{
+
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
+	router := injectEvents(ctx, svc, cfg, t, nopUserAPI, nopRsAPI, []*types.HeaderedEvent{
 		eventA, eventB, eventC, eventD, eventE, eventF, eventG, eventH,
 	})
 	cancel := runServer(t, router)
@@ -558,17 +564,13 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 	return nil
 }
 
-func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
+func injectEvents(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*types.HeaderedEvent) *mux.Router {
 	t.Helper()
-
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	t.Cleanup(closeRig)
 
 	cfg.Global.ServerName = "localhost"
 	cfg.MSCs.MSCs = []string{"msc2836"}
 
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(svc)
 	routers := httputil.NewRouters()
 	err := msc2836.Enable(ctx, cfg, cm, routers, rsAPI, nil, userAPI, nil)
 	if err != nil {

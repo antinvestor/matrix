@@ -3,12 +3,13 @@ package streams
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
+	"github.com/antinvestor/matrix/internal/sqlutil"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/internal"
@@ -35,7 +36,7 @@ type PDUStreamProvider struct {
 	DefaultStreamProvider
 
 	// userID+deviceID -> lazy loading cache
-	lazyLoadCache caching.LazyLoadCache
+	lazyLoadCache cacheutil.LazyLoadCache
 	rsAPI         roomserverAPI.SyncRoomserverAPI
 	notifier      *notifier.Notifier
 }
@@ -75,7 +76,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	// Extract room state and recent events for all rooms the user is joined to.
 	joinedRoomIDs, err := snapshot.RoomIDsWithMembership(ctx, req.Device.UserID, spec.Join)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.RoomIDsWithMembership failed")
+		req.Log.WithError(err).Error("p.Cm.RoomIDsWithMembership failed")
 		return from
 	}
 
@@ -124,7 +125,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	// Add peeked rooms.
 	peeks, err := snapshot.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.PeeksInRange failed")
+		req.Log.WithError(err).Error("p.Cm.PeeksInRange failed")
 		return from
 	}
 	if len(peeks) > 0 {
@@ -182,12 +183,12 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	if req.WantFullState {
 		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
-			req.Log.WithError(err).Error("p.DB.GetStateDeltasForFullStateSync failed")
+			req.Log.WithError(err).Error("p.Cm.GetStateDeltasForFullStateSync failed")
 			return from
 		}
 	} else {
 		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
-			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
+			req.Log.WithError(err).Error("p.Cm.GetStateDeltas failed")
 			return from
 		}
 	}
@@ -264,7 +265,7 @@ func (p *PDUStreamProvider) getRecentEvents(ctx context.Context, stateDeltas []t
 			&eventFilter, true, true,
 		)
 		if err != nil {
-			if !errors.Is(err, sql.ErrNoRows) {
+			if !sqlutil.ErrorIsNoRows(err) {
 				return nil, err
 			}
 		}
@@ -295,7 +296,7 @@ func (p *PDUStreamProvider) getRecentEvents(ctx context.Context, stateDeltas []t
 			&filter, true, true,
 		)
 		if err != nil {
-			if !errors.Is(err, sql.ErrNoRows) {
+			if !sqlutil.ErrorIsNoRows(err) {
 				return nil, err
 			}
 		}
@@ -363,7 +364,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 			ctx, snapshot, delta.RoomID, true, limited, stateFilter,
 			device, recentEvents, delta.StateEvents,
 		)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if err != nil && !sqlutil.ErrorIsNoRows(err) {
 			return r.From, fmt.Errorf("p.lazyLoadMembers: %w", err)
 		}
 	}
@@ -392,7 +393,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 
 	prevBatch, err := snapshot.GetBackwardTopologyPos(ctx, events)
 	if err != nil {
-		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
+		return r.From, fmt.Errorf("p.Cm.GetBackwardTopologyPos: %w", err)
 	}
 
 	eventFormat := synctypes.FormatSync
@@ -608,7 +609,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			false, limited, stateFilter,
 			device, recentEvents, stateEvents,
 		)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if err != nil && !sqlutil.ErrorIsNoRows(err) {
 			return nil, err
 		}
 	}
@@ -722,7 +723,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, snapshot storage.DatabaseTransaction, req *types.SyncRequest, eventFilter *synctypes.RoomEventFilter) error {
 	ignores, err := snapshot.IgnoresForUser(ctx, req.Device.UserID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil
 		}
 		return err
