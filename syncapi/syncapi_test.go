@@ -465,7 +465,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 			gotEventIDs[j] = ev.EventID
 		}
 
-		if since == "s1_0_0_0_0_0_0_0_0" {
+		if since == "s0_0_0_0_0_0_0_0_0" || since == "s1_0_0_0_0_0_0_0_0" {
 			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
 		} else {
 			t.Logf("since; matching %v for got : %v and want : %v", since, len(gotEventIDs), len(room.Events()[i:]))

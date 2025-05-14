@@ -173,7 +173,7 @@ func testKickUsers(ctx context.Context, t *testing.T, rsAPI api.RoomserverIntern
 		if !reflect.DeepEqual(membershipRes, membershipRes2) {
 			return
 		}
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 200)
 	}
 
 	t.Errorf("memberships didn't change in time")
