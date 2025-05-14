@@ -238,9 +238,9 @@ func TestPurgeRoom(t *testing.T) {
 	bob := test.NewUser(t)
 	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
 
-	roomID, err := spec.NewRoomID(room.ID)
-	if err != nil {
-		t.Fatal(err)
+	roomID, err0 := spec.NewRoomID(room.ID)
+	if err0 != nil {
+		t.Fatal(err0)
 	}
 
 	// Invite Bob
@@ -740,6 +740,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
 
@@ -761,17 +762,19 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				}
 				testRoom := tc.prepareRoomFunc(t)
 				// Create the room
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, testRoom.Events(), "test", "test", "test", nil, false); err != nil {
+				if err = api.SendEvents(ctx, rsAPI, api.KindNew, testRoom.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Errorf("failed to send events: %v", err)
 				}
 
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, allowedByRoomExists.Events(), "test", "test", "test", nil, false); err != nil {
+				if err = api.SendEvents(ctx, rsAPI, api.KindNew, allowedByRoomExists.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Errorf("failed to send events: %v", err)
 				}
 
 				roomID, _ := spec.NewRoomID(testRoom.ID)
 				userID, _ := spec.NewUserID(bob.ID, true)
-				got, err := rsAPI.QueryRestrictedJoinAllowed(ctx, *roomID, spec.SenderID(userID.String()))
+
+				var got string
+				got, err = rsAPI.QueryRestrictedJoinAllowed(ctx, *roomID, spec.SenderID(userID.String()))
 				if tc.wantError && err == nil {
 					t.Fatal("expected error, got none")
 				}
