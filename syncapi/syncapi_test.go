@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -146,10 +147,10 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 	}
 	natsInstance := jetstream.NATSInstance{}
 
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 	msgs := toNATSMsgs(t, cfg, room.Events()...)
 	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
+
+	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 	testrig.MustPublishMsgs(t, jsctx, msgs...)
 
 	testCases := []struct {
@@ -217,11 +218,15 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 
 func TestSyncAPIEventFormatPowerLevels(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		testSyncEventFormatPowerLevels(t, testOpts)
+
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		testSyncEventFormatPowerLevels(ctx, svc, cfg, t, testOpts)
 	})
 }
 
-func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption) {
+func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, _ test.DependancyOption) {
 	user := test.NewUser(t)
 	setRoomVersion := func(t *testing.T, r *test.Room) { r.Version = gomatrixserverlib.RoomVersionPseudoIDs }
 	room := test.NewRoom(t, user, setRoomVersion)
@@ -239,9 +244,6 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 		},
 	}, test.WithStateKey(""))
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-
 	routers := httputil.NewRouters()
 	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := caching.NewCache(&cfg.Global.Cache)
@@ -250,10 +252,10 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 	}
 	natsInstance := jetstream.NATSInstance{}
 
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 	msgs := toNATSMsgs(t, cfg, room.Events()...)
 	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
+
+	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 	testrig.MustPublishMsgs(t, jsctx, msgs...)
 
 	testCases := []struct {
@@ -299,7 +301,7 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 		}
 		if tc.wantJoinedRooms != nil {
 			var res types.Response
-			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+			if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
 				t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
 			}
 			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
@@ -320,7 +322,7 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 				},
 			}, test.WithStateKey(""))
 
-			msgs := toNATSMsgs(t, cfg, event)
+			msgs = toNATSMsgs(t, cfg, event)
 			testrig.MustPublishMsgs(t, jsctx, msgs...)
 
 			syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
@@ -400,8 +402,6 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 	}
 	natsInstance := jetstream.NATSInstance{}
 
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 	// order is:
 	// m.room.create
 	// m.room.member
@@ -411,6 +411,9 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 	msgs := toNATSMsgs(t, cfg, room.Events()...)
 	sinceTokens := make([]string, len(msgs))
 	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
+
+	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+
 	for i, msg := range msgs {
 		testrig.MustPublishMsgs(t, jsctx, msg)
 		time.Sleep(100 * time.Millisecond)
@@ -506,8 +509,6 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 	cfg.Global.Presence.EnableInbound = true
 	natsInstance := jetstream.NATSInstance{}
 
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, caching.DisableMetrics)
 	w := httptest.NewRecorder()
 	routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
@@ -975,9 +976,9 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 
 	natsInstance := jetstream.NATSInstance{}
 
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, caching.DisableMetrics)
+
+	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 
 	producer := producers.SyncAPIProducer{
 		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
@@ -1212,12 +1213,9 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 	thirdMsg := room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world3!"})
 	room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world4!"})
 
-	if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+	if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 		t.Fatalf("failed to send events: %v", err)
 	}
-
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 	syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
 		// wait for the last sent eventID to come down sync
@@ -1383,8 +1381,6 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	// Use an actual roomserver for this
 	natsInstance := jetstream.NATSInstance{}
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)

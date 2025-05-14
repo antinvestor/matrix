@@ -194,8 +194,6 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 	natsInstance := jetstream.NATSInstance{}
 	cfg.FederationAPI.PreferDirectFetch = true
 	cfg.FederationAPI.KeyPerspectives = nil
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 	serverA := spec.ServerName("server.a")
 	serverAKeyID := gomatrixserverlib.KeyID("ed25519:servera")
@@ -283,6 +281,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 	}
 	msg.Header.Set(jetstream.UserID, key.UserID)
 
+	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 	testrig.MustPublishMsgs(t, jsctx, msg)
 	time.Sleep(500 * time.Millisecond)
 	fc.fedClientMutex.Lock()
