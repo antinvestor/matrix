@@ -2,8 +2,9 @@ package tables_test
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"testing"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -104,11 +105,11 @@ func NewPostgresInvitesTable(ctx context.Context, cm sqlutil.ConnectionManager) 
 		return nil, err
 	}
 
-	// Initialize the table struct with just the connection manager
+	// Initialise the table struct with just the connection manager
 	t := &inviteTable{
 		cm: cm,
 
-		// Initialize SQL query strings from constants
+		// Initialise SQL query strings from constants
 		insertInviteEventSQL:               insertInviteEventSQL,
 		selectInviteActiveForUserInRoomSQL: selectInviteActiveForUserInRoomSQL,
 		updateInviteRetiredSQL:             updateInviteRetiredSQL,

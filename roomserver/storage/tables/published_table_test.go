@@ -3,9 +3,10 @@ package tables_test
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"sort"
 	"testing"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

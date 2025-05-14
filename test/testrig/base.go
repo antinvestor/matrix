@@ -17,9 +17,10 @@ package testrig
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"testing"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/pitabwire/util"
 

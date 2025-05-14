@@ -17,11 +17,12 @@ package sync
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"math"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/pitabwire/util"

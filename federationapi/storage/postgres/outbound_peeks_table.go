@@ -16,8 +16,9 @@ package postgres
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"time"
+
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/types"
@@ -71,7 +72,7 @@ const deleteOutboundPeeksSQL = "" +
 // outboundPeeksTable stores information about outbound peeks to other servers
 type outboundPeeksTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	insertOutboundPeekSQL  string
 	selectOutboundPeekSQL  string
 	selectOutboundPeeksSQL string

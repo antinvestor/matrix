@@ -6,13 +6,14 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

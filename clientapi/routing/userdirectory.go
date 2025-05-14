@@ -18,9 +18,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"net/http"
 	"strings"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"

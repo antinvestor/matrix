@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -588,7 +589,7 @@ func Test_Notification(t *testing.T) {
 	})
 }
 
-func mustCreateKeyDatabase(ctx context.Context, svc *frame.Service, t *testing.T, testOpts test.DependancyOption) storage.KeyDatabase {
+func mustCreateKeyDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.KeyDatabase {
 
 	cm := sqlutil.NewConnectionManager(svc)
 	db, err := storage.NewKeyDatabase(ctx, cm)

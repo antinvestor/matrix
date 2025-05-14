@@ -424,7 +424,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 			continue
 		}
 		var res types.Response
-		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
 			t.Errorf("failed to decode response body: %s", err)
 		}
 		sinceTokens[i] = res.NextBatch.String()

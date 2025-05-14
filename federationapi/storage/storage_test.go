@@ -2,10 +2,11 @@ package storage_test
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

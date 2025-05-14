@@ -19,6 +19,7 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"fmt"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	//"github.com/antinvestor/matrix/roomserver/internal"

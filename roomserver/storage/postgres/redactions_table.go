@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/pitabwire/frame"
@@ -82,11 +83,11 @@ func NewPostgresRedactionsTable(ctx context.Context, cm sqlutil.ConnectionManage
 		return nil, err
 	}
 
-	// Initialize the table struct with just the connection manager
+	// Initialise the table struct with just the connection manager
 	t := &redactionsTable{
 		cm: cm,
 
-		// Initialize SQL query strings from constants
+		// Initialise SQL query strings from constants
 		insertRedactionSQL:                         insertRedactionSQL,
 		selectRedactionInfoByRedactionEventIDSQL:   selectRedactionInfoByRedactionEventIDSQL,
 		selectRedactionInfoByEventBeingRedactedSQL: selectRedactionInfoByEventBeingRedactedSQL,

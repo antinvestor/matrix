@@ -18,11 +18,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/antinvestor/matrix/setup/config"
 	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

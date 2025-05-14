@@ -3,11 +3,12 @@ package consumers
 import (
 	"context"
 	"crypto/ed25519"
-	"github.com/pitabwire/frame"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

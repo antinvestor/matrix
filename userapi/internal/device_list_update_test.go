@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"net/url"
@@ -27,6 +26,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

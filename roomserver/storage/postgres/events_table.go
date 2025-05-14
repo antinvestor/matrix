@@ -18,13 +18,14 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"sort"
+
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
-	"sort"
 )
 
 // The events table holds metadata for each event, the actual JSON is stored
@@ -286,7 +287,7 @@ func (s *eventStatements) BulkSelectSnapshotsFromEventIDs(
 	var stateNID types.StateSnapshotNID
 	result := make(map[types.StateSnapshotNID][]string)
 	for rows.Next() {
-		if err := rows.Scan(&stateNID, &eventID); err != nil {
+		if err = rows.Scan(&eventID, &stateNID); err != nil {
 			return nil, err
 		}
 		result[stateNID] = append(result[stateNID], eventID)
@@ -517,7 +518,7 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 		eventID          string
 	)
 	for ; rows.Next(); i++ {
-		if err := rows.Scan(
+		if err = rows.Scan(
 			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventID,
 		); err != nil {
 			return nil, err
@@ -721,24 +722,11 @@ func (s *eventStatements) SelectRoomsWithEventTypeNID(
 	var roomNIDs []types.RoomNID
 	var roomNID types.RoomNID
 	for rows.Next() {
-		if err := rows.Scan(&roomNID); err != nil {
+		if err = rows.Scan(&roomNID); err != nil {
 			return nil, err
 		}
 		roomNIDs = append(roomNIDs, roomNID)
 	}
 
 	return roomNIDs, rows.Err()
-}
-
-// Helper function to convert state key tuples to arrays of event type NIDs and state key NIDs
-func stateKeyTuplesToArrays(stateKeyTuples []types.StateKeyTuple) (typeNIDs, stateKeyNIDs []int64) {
-	if len(stateKeyTuples) > 0 {
-		typeNIDs = make([]int64, len(stateKeyTuples))
-		stateKeyNIDs = make([]int64, len(stateKeyTuples))
-		for i := range stateKeyTuples {
-			typeNIDs[i] = int64(stateKeyTuples[i].EventTypeNID)
-			stateKeyNIDs[i] = int64(stateKeyTuples[i].EventStateKeyNID)
-		}
-	}
-	return
 }

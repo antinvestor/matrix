@@ -17,8 +17,9 @@ package query
 import (
 	"context"
 	"encoding/json"
-	"github.com/pitabwire/frame"
 	"testing"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

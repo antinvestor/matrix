@@ -20,9 +20,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"gorm.io/gorm"
 	"sort"
 	"strings"
+
+	"gorm.io/gorm"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
@@ -268,7 +269,7 @@ func NewPostgresEventsTable(_ context.Context, cm sqlutil.ConnectionManager) (ta
 	t := &outputRoomEventsTable{
 		cm: cm,
 
-		// Initialize SQL query fields
+		// Initialise SQL query fields
 		insertEventSQL:                insertEventSQL,
 		selectEventsSQL:               selectEventsSQL,
 		selectEventsWithFilterSQL:     selectEventsWithFilterSQL,

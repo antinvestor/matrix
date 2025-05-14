@@ -56,7 +56,7 @@ const deleteAllAssumedOfflineSQL = "" +
 // assumedOfflineTable stores the list of assumed offline servers
 type assumedOfflineTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	insertAssumedOfflineSQL    string
 	selectAssumedOfflineSQL    string
 	deleteAssumedOfflineSQL    string

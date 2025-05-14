@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
@@ -90,7 +91,7 @@ const deleteUnusedServerKeysJSONSQL = `
 // notaryServerKeysMetadataTable stores the metadata for notary server keys
 type notaryServerKeysMetadataTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	upsertServerKeysSQL                   string
 	selectNotaryKeyResponsesSQL           string
 	selectNotaryKeyResponsesWithKeyIDsSQL string

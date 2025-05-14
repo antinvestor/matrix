@@ -2,9 +2,10 @@ package shared_test
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"reflect"
 	"testing"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -14,7 +15,7 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 )
 
-func newSyncDB(ctx context.Context, svc *frame.Service, t *testing.T, testOpts test.DependancyOption) storage.Database {
+func newSyncDB(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.Database {
 	t.Helper()
 
 	cm := sqlutil.NewConnectionManager(svc)

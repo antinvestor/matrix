@@ -97,11 +97,11 @@ func NewPostgresEventStateKeysTable(ctx context.Context, cm sqlutil.ConnectionMa
 		return nil, err
 	}
 
-	// Initialize the table struct with just the connection manager
+	// Initialise the table struct with just the connection manager
 	t := &eventStateKeysTable{
 		cm: cm,
 
-		// Initialize SQL query strings from constants
+		// Initialise SQL query strings from constants
 		insertEventStateKeyNIDSQL:     insertEventStateKeyNIDSQL,
 		selectEventStateKeyNIDSQL:     selectEventStateKeyNIDSQL,
 		bulkSelectEventStateKeyNIDSQL: bulkSelectEventStateKeyNIDSQL,

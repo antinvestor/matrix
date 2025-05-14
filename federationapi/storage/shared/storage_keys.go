@@ -17,6 +17,7 @@ package shared
 
 import (
 	"context"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 )

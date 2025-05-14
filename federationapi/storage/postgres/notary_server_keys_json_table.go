@@ -49,7 +49,7 @@ const insertServerKeysJSONSQL = "" +
 // notaryServerKeysTable stores the JSON responses from server key requests
 type notaryServerKeysTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	insertServerKeysJSONSQL string
 }
 

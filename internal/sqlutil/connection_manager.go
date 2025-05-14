@@ -18,10 +18,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"sync"
+
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/frame" // assumed path; adjust if needed
 	"gorm.io/gorm"
-	"sync"
 )
 
 type ConnectionManager interface {

@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -79,11 +80,11 @@ func NewPostgresEventJSONTable(ctx context.Context, cm sqlutil.ConnectionManager
 		return nil, err
 	}
 
-	// Initialize the table struct with just the connection manager
+	// Initialise the table struct with just the connection manager
 	t := &eventJSONTable{
 		cm: cm,
 
-		// Initialize SQL query strings from constants
+		// Initialise SQL query strings from constants
 		insertEventJSONSQL:     insertEventJSONSQL,
 		bulkSelectEventJSONSQL: bulkSelectEventJSONSQL,
 	}

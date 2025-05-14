@@ -1,12 +1,13 @@
 package internal
 
 import (
-	"github.com/antinvestor/matrix/test"
 	"net/http"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/antinvestor/matrix/test"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

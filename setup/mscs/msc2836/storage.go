@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+
+	"github.com/antinvestor/matrix/internal"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -124,7 +127,7 @@ type Database interface {
 // postgresDB implements the Database interface using Postgres
 type postgresDB struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	insertEdgeSQL                         string
 	insertNodeSQL                         string
 	selectChildrenForParentOldestFirstSQL string
@@ -150,7 +153,7 @@ func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (Database, e
 	return db, nil
 }
 
-func newPostgresDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (Database, error) {
+func newPostgresDatabase(_ context.Context, cm sqlutil.ConnectionManager) (Database, error) {
 	// Create migration patch
 	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "msc2836_tables_schema_001",
@@ -267,7 +270,7 @@ func (p *postgresDB) ChildrenForParent(ctx context.Context, eventID, relType str
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "ChildrenForParent: rows.close() failed")
 
 	var children []eventInfo
 	for rows.Next() {

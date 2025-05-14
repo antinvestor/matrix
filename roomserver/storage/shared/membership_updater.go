@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 	"fmt"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"

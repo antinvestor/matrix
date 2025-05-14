@@ -630,7 +630,7 @@ func (d *Database) MembershipUpdater(
 	var err error
 	var updater *MembershipUpdater
 	err = d.Cm.Do(ctx, func(ctx context.Context) error {
-		ctx, updater, err = NewMembershipUpdater(ctx, d, roomID, targetUserID, targetLocal, roomVersion)
+		_, updater, err = NewMembershipUpdater(ctx, d, roomID, targetUserID, targetLocal, roomVersion)
 		return err
 	})
 	return ctx, updater, err

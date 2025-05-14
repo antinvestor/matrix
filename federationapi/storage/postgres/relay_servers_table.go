@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -64,7 +65,7 @@ const deleteAllRelayServersSQL = "" +
 // relayServersTable stores information about relay servers
 type relayServersTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	insertRelayServersSQL    string
 	selectRelayServersSQL    string
 	deleteRelayServersSQL    string

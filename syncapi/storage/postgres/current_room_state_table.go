@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
@@ -175,7 +176,7 @@ func NewPostgresCurrentRoomStateTable(_ context.Context, cm sqlutil.ConnectionMa
 	t := &currentRoomStateTable{
 		cm: cm,
 
-		// Initialize SQL query fields
+		// Initialise SQL query fields
 		upsertRoomStateSQL:                upsertRoomStateSQL,
 		deleteRoomStateByEventIDSQL:       deleteRoomStateByEventIDSQL,
 		deleteRoomStateForRoomSQL:         deleteRoomStateForRoomSQL,
@@ -492,7 +493,7 @@ func (t *currentRoomStateTable) SelectSharedUsers(
 	return result, rows.Err()
 }
 
-// SelectRoomHeroes returns up to 5 users joined or invited to a room. 
+// SelectRoomHeroes returns up to 5 users joined or invited to a room.
 func (t *currentRoomStateTable) SelectRoomHeroes(ctx context.Context, roomID, excludeUserID string, memberships []string) ([]string, error) {
 	db := t.cm.Connection(ctx, true)
 	rows, err := db.Raw(t.selectRoomHeroesSQL, roomID, pq.Array(memberships), excludeUserID).Rows()

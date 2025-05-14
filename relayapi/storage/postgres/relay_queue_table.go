@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -89,7 +90,7 @@ func NewPostgresRelayQueueTable(
 	t := &relayQueueTable{
 		cm: cm,
 
-		// Initialize SQL query struct fields
+		// Initialise SQL query struct fields
 		insertQueueEntrySQL:      insertQueueEntrySQL,
 		deleteQueueEntriesSQL:    deleteQueueEntriesSQL,
 		selectQueueEntriesSQL:    selectQueueEntriesSQL,

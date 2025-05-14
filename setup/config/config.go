@@ -430,7 +430,7 @@ func (errs ConfigErrors) Error() string {
 // Add appends an error to the list of errors in this configErrors.
 // It is a wrapper to the builtin append and hides pointers from
 // the client code.
-// This method is safe to use with an uninitialized configErrors because
+// This method is safe to use with an uninitialise configErrors because
 // if it is nil, it will be properly allocated.
 func (errs *ConfigErrors) Add(str string) {
 	*errs = append(*errs, str)

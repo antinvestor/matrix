@@ -16,6 +16,7 @@ package distributed
 
 import (
 	"context"
+
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"

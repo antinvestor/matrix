@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
@@ -116,7 +117,7 @@ func NewPostgresTopologyTable(ctx context.Context, cm sqlutil.ConnectionManager)
 	t := &outputRoomEventsTopologyTable{
 		cm: cm,
 
-		// Initialize SQL query fields
+		// Initialise SQL query fields
 		insertEventInTopologySQL:                 insertEventInTopologySQL,
 		selectEventIDsInRangeASCSQL:              selectEventIDsInRangeASCSQL,
 		selectEventIDsInRangeDESCSQL:             selectEventIDsInRangeDESCSQL,

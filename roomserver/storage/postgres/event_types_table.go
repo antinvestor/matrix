@@ -115,11 +115,11 @@ func NewPostgresEventTypesTable(ctx context.Context, cm sqlutil.ConnectionManage
 		return nil, err
 	}
 
-	// Initialize the table struct with just the connection manager
+	// Initialise the table struct with just the connection manager
 	t := &eventTypesTable{
 		cm: cm,
 
-		// Initialize SQL query strings from constants
+		// Initialise SQL query strings from constants
 		insertEventTypeNIDSQL:     insertEventTypeNIDSQL,
 		selectEventTypeNIDSQL:     selectEventTypeNIDSQL,
 		bulkSelectEventTypeNIDSQL: bulkSelectEventTypeNIDSQL,

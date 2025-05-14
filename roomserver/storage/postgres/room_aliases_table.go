@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -85,11 +86,11 @@ func NewPostgresRoomAliasesTable(ctx context.Context, cm sqlutil.ConnectionManag
 		return nil, err
 	}
 
-	// Initialize the table struct with the connection manager
+	// Initialise the table struct with the connection manager
 	t := &roomAliasesTable{
 		cm: cm,
 
-		// Initialize SQL query strings from constants
+		// Initialise SQL query strings from constants
 		insertRoomAliasSQL:          insertRoomAliasSQL,
 		selectRoomIDFromAliasSQL:    selectRoomIDFromAliasSQL,
 		selectAliasesFromRoomIDSQL:  selectAliasesFromRoomIDSQL,

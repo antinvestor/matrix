@@ -16,8 +16,9 @@ package postgres
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"time"
+
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/types"
@@ -72,7 +73,7 @@ const deleteInboundPeeksSQL = "" +
 // inboundPeeksTable stores information about inbound peeks from other servers
 type inboundPeeksTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	insertInboundPeekSQL  string
 	selectInboundPeekSQL  string
 	selectInboundPeeksSQL string

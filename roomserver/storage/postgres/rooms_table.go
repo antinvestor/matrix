@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -123,11 +124,11 @@ func NewPostgresRoomsTable(ctx context.Context, cm sqlutil.ConnectionManager) (t
 		return nil, err
 	}
 
-	// Initialize the table struct with just the connection manager
+	// Initialise the table struct with just the connection manager
 	t := &roomsTable{
 		cm: cm,
 
-		// Initialize SQL query strings from constants
+		// Initialise SQL query strings from constants
 		insertRoomNIDSQL:                  insertRoomNIDSQL,
 		selectRoomNIDSQL:                  selectRoomNIDSQL,
 		selectRoomNIDForUpdateSQL:         selectRoomNIDForUpdateSQL,

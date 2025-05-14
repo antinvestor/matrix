@@ -17,11 +17,12 @@ package userapi_test
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"

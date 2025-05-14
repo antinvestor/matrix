@@ -57,7 +57,7 @@ const deleteAllBlacklistSQL = "" +
 // blacklistTable stores the list of blacklisted servers
 type blacklistTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	insertBlacklistSQL    string
 	selectBlacklistSQL    string
 	deleteBlacklistSQL    string

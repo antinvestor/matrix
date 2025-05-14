@@ -4,11 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/sirupsen/logrus"
 

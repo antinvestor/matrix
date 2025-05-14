@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -74,7 +75,7 @@ const upsertServerSigningKeysSQL = "" +
 // serverSigningKeysTable stores the signing keys for servers
 type serverSigningKeysTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	bulkSelectServerKeysSQL string
 	upsertServerKeysSQL     string
 }

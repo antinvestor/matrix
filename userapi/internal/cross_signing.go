@@ -19,8 +19,9 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"strings"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"

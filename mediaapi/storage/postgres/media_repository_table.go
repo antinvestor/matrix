@@ -79,7 +79,7 @@ type mediaStatements struct {
 }
 
 func NewPostgresMediaRepositoryTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.MediaRepository, error) {
-	// Create the table using standardized migration approach
+	// Create the table using standardised migration approach
 	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "mediaapi_media_repository_table_schema_001",
 		Patch:       mediaSchema,
@@ -89,7 +89,7 @@ func NewPostgresMediaRepositoryTable(ctx context.Context, cm sqlutil.ConnectionM
 		return nil, err
 	}
 
-	// Initialize the statements
+	// Initialise the statements
 	s := &mediaStatements{
 		cm:                    cm,
 		insertMediaStmt:       insertMediaSQL,

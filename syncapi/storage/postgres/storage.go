@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/shared"
 )
@@ -31,7 +32,7 @@ type SyncServerDatasource struct {
 func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 
-	// Initialize all tables with the connection manager
+	// Initialise all tables with the connection manager
 	accountData, err := NewPostgresAccountDataTable(ctx, cm)
 	if err != nil {
 		return nil, err

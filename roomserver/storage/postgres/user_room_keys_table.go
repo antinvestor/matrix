@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"crypto/ed25519"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"

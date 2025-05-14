@@ -87,7 +87,7 @@ const deleteExpiredEDUsSQL = "" +
 // queueEDUTable implements the tables.FederationQueueEDUs interface using postgres
 type queueEDUTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	insertQueueEDUSQL                   string
 	deleteQueueEDUSQL                   string
 	selectQueueEDUSQL                   string

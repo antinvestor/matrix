@@ -18,11 +18,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/frame"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"

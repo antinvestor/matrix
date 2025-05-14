@@ -7,14 +7,15 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

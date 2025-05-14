@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -82,11 +83,11 @@ func NewPostgresPublishedTable(ctx context.Context, cm sqlutil.ConnectionManager
 		return nil, err
 	}
 
-	// Initialize the table struct with just the connection manager
+	// Initialise the table struct with just the connection manager
 	t := &publishedTable{
 		cm: cm,
 
-		// Initialize SQL query strings from constants
+		// Initialise SQL query strings from constants
 		upsertPublishedSQL:        upsertPublishedSQL,
 		selectAllPublishedSQL:     selectAllPublishedSQL,
 		selectPublishedSQL:        selectPublishedSQL,

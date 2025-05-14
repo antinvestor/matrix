@@ -63,7 +63,7 @@ const selectJSONSQL = "" +
 // queueJSONTable stores JSON for federation queue
 type queueJSONTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	insertJSONSQL string
 	deleteJSONSQL string
 	selectJSONSQL string

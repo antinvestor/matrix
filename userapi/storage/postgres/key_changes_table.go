@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"

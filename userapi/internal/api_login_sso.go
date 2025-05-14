@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"

@@ -3,8 +3,9 @@ package helpers
 import (
 	"context"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"sort"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

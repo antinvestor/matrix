@@ -16,6 +16,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal"
@@ -75,7 +76,7 @@ func NewPostgresRelayQueueJSONTable(ctx context.Context, cm sqlutil.ConnectionMa
 	t := &relayQueueJSONTable{
 		cm: cm,
 
-		// Initialize SQL query struct fields
+		// Initialise SQL query struct fields
 		insertQueueJSONSQL: insertQueueJSONSQL,
 		deleteQueueJSONSQL: deleteQueueJSONSQL,
 		selectQueueJSONSQL: selectQueueJSONSQL,

@@ -16,6 +16,7 @@ package tables
 
 import (
 	"context"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/mediaapi/types"
 )

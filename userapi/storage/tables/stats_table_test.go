@@ -3,10 +3,11 @@ package tables_test
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

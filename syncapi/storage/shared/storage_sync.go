@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"math"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/tidwall/gjson"

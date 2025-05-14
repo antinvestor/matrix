@@ -1,9 +1,10 @@
 package sqlutil_test
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/antinvestor/matrix/test/testrig"
 

@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"

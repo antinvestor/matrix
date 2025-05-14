@@ -18,8 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

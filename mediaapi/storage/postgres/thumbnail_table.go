@@ -82,7 +82,7 @@ type thumbnailStatements struct {
 }
 
 func NewPostgresThumbnailsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.Thumbnails, error) {
-	// Create the table using standardized migration approach
+	// Create the table using standardised migration approach
 	err := cm.Collect(&frame.MigrationPatch{
 		Name:        "mediaapi_thumbnail_table_schema_001",
 		Patch:       thumbnailSchema,
@@ -92,7 +92,7 @@ func NewPostgresThumbnailsTable(ctx context.Context, cm sqlutil.ConnectionManage
 		return nil, err
 	}
 
-	// Initialize the statements
+	// Initialise the statements
 	s := &thumbnailStatements{
 		cm:                   cm,
 		insertThumbnailStmt:  insertThumbnailSQL,

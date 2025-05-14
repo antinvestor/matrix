@@ -17,6 +17,7 @@ package input
 import (
 	"context"
 	"fmt"
+
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 

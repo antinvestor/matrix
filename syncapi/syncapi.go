@@ -53,6 +53,9 @@ func AddPublicRoutes(
 	js, natsClient := natsInstance.Prepare(ctx, &dendriteCfg.Global.JetStream)
 
 	syncCm, err := cm.FromOptions(ctx, &dendriteCfg.SyncAPI.Database)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to obtain sync db connection manager")
+	}
 	syncDB, err := storage.NewSyncServerDatabase(ctx, syncCm)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")

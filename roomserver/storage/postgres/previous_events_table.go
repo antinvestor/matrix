@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -81,11 +82,11 @@ func NewPostgresPreviousEventsTable(ctx context.Context, cm sqlutil.ConnectionMa
 		return nil, err
 	}
 
-	// Initialize the table struct with just the connection manager
+	// Initialise the table struct with just the connection manager
 	t := &previousEventsTable{
 		cm: cm,
 
-		// Initialize SQL query strings from constants
+		// Initialise SQL query strings from constants
 		insertPreviousEventSQL:       insertPreviousEventSQL,
 		selectPreviousEventExistsSQL: selectPreviousEventExistsSQL,
 	}

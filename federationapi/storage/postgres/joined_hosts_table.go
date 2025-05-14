@@ -17,6 +17,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -88,7 +89,7 @@ const selectJoinedHostsForRoomsExcludingBlacklistedSQL = "" +
 // joinedHostsTable stores information about which servers are joined to which rooms
 type joinedHostsTable struct {
 	cm sqlutil.ConnectionManager
-	// SQL query string fields, initialized at construction
+	// SQL query string fields, initialise at construction
 	insertJoinedHostsSQL                             string
 	deleteJoinedHostsSQL                             string
 	deleteJoinedHostsForRoomSQL                      string

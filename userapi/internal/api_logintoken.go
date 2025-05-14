@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"fmt"
+
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
