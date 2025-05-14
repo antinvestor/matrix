@@ -264,11 +264,16 @@ func NewPostgresStatsTable(ctx context.Context, cm sqlutil.ConnectionManager, se
 func (s *statsTable) startTimers(ctx context.Context) {
 	var updateStatsFunc func()
 	updateStatsFunc = func() {
-		logrus.Infof("Executing UpdateUserDailyVisits")
-		if err := s.UpdateUserDailyVisits(ctx, time.Now(), s.lastUpdate); err != nil {
-			logrus.WithError(err).Error("failed to update daily user visits")
+
+		select {
+		case <-ctx.Done():
+		default:
+			logrus.Infof("Executing UpdateUserDailyVisits")
+			if err := s.UpdateUserDailyVisits(ctx, time.Now(), s.lastUpdate); err != nil {
+				logrus.WithError(err).Error("failed to update daily user visits")
+			}
+			time.AfterFunc(time.Hour*3, updateStatsFunc)
 		}
-		time.AfterFunc(time.Hour*3, updateStatsFunc)
 	}
 	time.AfterFunc(time.Minute*5, updateStatsFunc)
 }

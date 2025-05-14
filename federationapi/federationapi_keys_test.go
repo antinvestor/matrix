@@ -22,7 +22,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/routing"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/setup/config"
 )
 
@@ -31,7 +31,7 @@ type server struct {
 	validity  time.Duration             // key validity duration from now
 	config    *config.FederationAPI     // skeleton config, from TestMain
 	fedclient fclient.FederationClient  // uses MockRoundTripper
-	cache     *caching.Caches           // server-specific cache
+	cache     *cacheutil.Caches         // server-specific cache
 	api       api.FederationInternalAPI // server-specific server key API
 }
 
@@ -119,14 +119,14 @@ func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *confi
 
 		s.config = &cfg.FederationAPI
 
-		s.cache, err = caching.NewCache(&config.CacheOptions{
+		s.cache, err = cacheutil.NewCache(&config.CacheOptions{
 			ConnectionString: globalCfg.Cache.ConnectionString,
 		})
 		if err != nil {
 			panic("can't create cache : " + err.Error())
 		}
 
-		natsInstance := jetstream.NATSInstance{}
+		qm := jetstream.NATSInstance{}
 
 		// Create a transport which redirects federation requests to
 		// the mock round tripper. Since we're not *really* listening for
@@ -139,7 +139,7 @@ func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *confi
 
 		// Finally, build the server key APIs.
 
-		s.api = NewInternalAPI(ctx, &cfg, cm, &natsInstance, s.fedclient, nil, s.cache, nil, true)
+		s.api = NewInternalAPI(ctx, &cfg, cm, &qm, s.fedclient, nil, s.cache, nil, true)
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -155,13 +155,13 @@ func TestLocalRoomMembers(t *testing.T) {
 		defer svc.Stop(ctx)
 
 		cm := sqlutil.NewConnectionManager(svc)
-		natsInstance := &jetstream.NATSInstance{}
+		qm := &jetstream.NATSInstance{}
 
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		db, err := storage.NewUserDatabase(ctx, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 		assert.NoError(t, err)
@@ -307,12 +307,12 @@ func BenchmarkLocalRoomMembers(b *testing.B) {
 	defer svc.Stop(ctx)
 
 	cm := sqlutil.NewConnectionManager(svc)
-	natsInstance := &jetstream.NATSInstance{}
-	caches, err := caching.NewCache(&cfg.Global.Cache)
+	qm := &jetstream.NATSInstance{}
+	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 	db, err := storage.NewUserDatabase(ctx, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 	assert.NoError(b, err)

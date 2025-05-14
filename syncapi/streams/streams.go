@@ -3,7 +3,7 @@ package streams
 import (
 	"context"
 
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/notifier"
@@ -27,7 +27,7 @@ type Streams struct {
 func NewSyncStreamProviders(ctx context.Context,
 	d storage.Database, userAPI userapi.SyncUserAPI,
 	rsAPI rsapi.SyncRoomserverAPI,
-	eduCache *caching.EDUCache, lazyLoadCache caching.LazyLoadCache, notifier *notifier.Notifier,
+	eduCache *cacheutil.EDUCache, lazyLoadCache cacheutil.LazyLoadCache, notifier *notifier.Notifier,
 ) *Streams {
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{

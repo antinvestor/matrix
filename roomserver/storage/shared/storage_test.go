@@ -11,7 +11,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
@@ -26,7 +26,7 @@ import (
 func mustCreateRoomServerDatabase(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, _ test.DependancyOption) *shared.Database {
 	t.Helper()
 
-	cache, err := caching.NewCache(&cfg.Global.Cache)
+	cache, err := cacheutil.NewCache(&cfg.Global.Cache)
 
 	if err != nil {
 		t.Fatalf("Could not create cache %s", err)

@@ -17,7 +17,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/storage/cache"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/sirupsen/logrus"
@@ -40,7 +40,7 @@ func NewFederationInternalAPI(
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	federation fclient.FederationClient,
 	statistics *statistics.Statistics,
-	caches *caching.Caches,
+	caches *cacheutil.Caches,
 	queues *queue.OutgoingQueues,
 	keyRing *gomatrixserverlib.KeyRing,
 ) *FederationInternalAPI {

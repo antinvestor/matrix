@@ -29,7 +29,7 @@ import (
 	"github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/federationapi"
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/internal/transactions"
@@ -70,8 +70,8 @@ func (m *Monolith) AddAllPublicRoutes(
 	cfg *config.Matrix,
 	routers httputil.Routers,
 	cm sqlutil.ConnectionManager,
-	natsInstance *jetstream.NATSInstance,
-	caches *caching.Caches,
+	qm *jetstream.NATSInstance,
+	caches *cacheutil.Caches,
 
 	enableMetrics bool,
 ) {
@@ -80,15 +80,15 @@ func (m *Monolith) AddAllPublicRoutes(
 		userDirectoryProvider = m.UserAPI
 	}
 	clientapi.AddPublicRoutes(
-		ctx, routers, cfg, natsInstance, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
+		ctx, routers, cfg, qm, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationAPI, m.UserAPI, userDirectoryProvider,
 		m.ExtPublicRoomsProvider, m.PartitionCli, enableMetrics,
 	)
 	federationapi.AddPublicRoutes(
-		ctx, routers, cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
+		ctx, routers, cfg, qm, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
 	)
 	mediaapi.AddPublicRoutes(ctx, routers, cm, cfg, m.UserAPI, m.Client, m.FedClient, m.KeyRing)
-	syncapi.AddPublicRoutes(ctx, routers, cfg, cm, natsInstance, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
+	syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
 
 	if m.RelayAPI != nil {
 		relayapi.AddPublicRoutes(routers, cfg, m.KeyRing, m.RelayAPI)

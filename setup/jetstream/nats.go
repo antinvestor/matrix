@@ -44,6 +44,24 @@ func (s *NATSInstance) Prepare(ctx context.Context, cfg *config.JetStream) (nats
 
 }
 
+// Cleanup closes the NATS connection and performs any other necessary cleanup.
+// This should be called when you're done with the NATS instance, especially in tests
+// to prevent goroutine leaks and deadlocks.
+func (s *NATSInstance) Cleanup() {
+	if s.nc != nil {
+		// Drain connection (gracefully close while allowing in-flight messages to complete)
+		err := s.nc.Drain()
+		if err != nil {
+			// If drain fails, force close
+			s.nc.Close()
+			logrus.WithError(err).Warn("Error draining NATS connection, connection was force closed")
+		}
+		// Reset connection and jetstream fields
+		s.nc = nil
+		s.js = nil
+	}
+}
+
 // nolint:gocyclo
 func setupNATS(ctx context.Context, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn, error) {
 	if nc == nil {
@@ -153,12 +171,12 @@ func setupNATS(ctx context.Context, cfg *config.JetStream, nc *natsclient.Conn) 
 		streamName := cfg.Prefixed(stream)
 		for _, consumer := range consumers {
 			consumerName := cfg.Prefixed(consumer) + "Pull"
-			consumerInfo, err := s.ConsumerInfo(streamName, consumerName)
-			if err != nil || consumerInfo == nil {
+			consumerInfo, err0 := s.ConsumerInfo(streamName, consumerName)
+			if err0 != nil || consumerInfo == nil {
 				continue
 			}
-			if err = s.DeleteConsumer(streamName, consumerName); err != nil {
-				logrus.WithError(err).Errorf("Unable to clean up old consumer %q for stream %q", consumer, stream)
+			if err0 = s.DeleteConsumer(streamName, consumerName); err0 != nil {
+				logrus.WithError(err0).Errorf("Unable to clean up old consumer %q for stream %q", consumer, stream)
 			}
 		}
 	}

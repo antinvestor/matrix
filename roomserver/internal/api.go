@@ -14,7 +14,7 @@ import (
 
 	asAPI "github.com/antinvestor/matrix/appservice/api"
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/input"
@@ -46,7 +46,7 @@ type RoomserverInternalAPI struct {
 	*perform.Creator
 	DB                     storage.Database
 	Cfg                    *config.Matrix
-	Cache                  caching.RoomServerCaches
+	Cache                  cacheutil.RoomServerCaches
 	ServerName             spec.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
 	ServerACLs             *acls.ServerACLs
@@ -64,7 +64,7 @@ type RoomserverInternalAPI struct {
 
 func NewRoomserverAPI(
 	ctx context.Context, dendriteCfg *config.Matrix, roomserverDB storage.Database,
-	js nats.JetStreamContext, nc *nats.Conn, caches caching.RoomServerCaches, enableMetrics bool,
+	js nats.JetStreamContext, nc *nats.Conn, caches cacheutil.RoomServerCaches, enableMetrics bool,
 ) *RoomserverInternalAPI {
 	var perspectiveServerNames []spec.ServerName
 	for _, kp := range dendriteCfg.FederationAPI.KeyPerspectives {

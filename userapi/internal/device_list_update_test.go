@@ -36,7 +36,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	api2 "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/statistics"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	roomserver "github.com/antinvestor/matrix/roomserver/api"
@@ -170,7 +170,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 	}
 	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
-	updater := NewDeviceListUpdater(ctx, db, ap, producer, nil, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+	updater := NewDeviceListUpdater(ctx, db, ap, producer, nil, 1, nil, "localhost", cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 	event := gomatrixserverlib.DeviceListUpdateEvent{
 		DeviceDisplayName: "Foo Bar",
 		Deleted:           false,
@@ -246,7 +246,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 			`)),
 		}, nil
 	})
-	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 2, nil, "example.test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 2, nil, "example.test", cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 	if err := updater.Start(ctx); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
@@ -320,7 +320,7 @@ func TestDebounce(t *testing.T) {
 		incomingFedReq <- struct{}{}
 		return <-fedCh, nil
 	})
-	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 1, nil, "example.test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 1, nil, "example.test", cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 	if err := updater.Start(ctx); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
@@ -423,7 +423,7 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 
 		updater := NewDeviceListUpdater(ctx, db, nil,
 			nil, nil,
-			0, rsAPI, "test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+			0, rsAPI, "test", cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		if err := updater.CleanUp(ctx); err != nil {
 			t.Error(err)
 		}

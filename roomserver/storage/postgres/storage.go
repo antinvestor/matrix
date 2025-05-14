@@ -20,7 +20,7 @@ import (
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
 )
@@ -31,7 +31,7 @@ type Database struct {
 }
 
 // NewDatabase a postgres database.
-func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache caching.RoomServerCaches) (*Database, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache cacheutil.RoomServerCaches) (*Database, error) {
 	var d Database
 
 	eventsJSON, err := NewPostgresEventJSONTable(ctx, cm)

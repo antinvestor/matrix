@@ -9,7 +9,7 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/internal"
@@ -36,7 +36,7 @@ type PDUStreamProvider struct {
 	DefaultStreamProvider
 
 	// userID+deviceID -> lazy loading cache
-	lazyLoadCache caching.LazyLoadCache
+	lazyLoadCache cacheutil.LazyLoadCache
 	rsAPI         roomserverAPI.SyncRoomserverAPI
 	notifier      *notifier.Notifier
 }

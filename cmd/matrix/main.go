@@ -26,7 +26,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/jetstream"
@@ -172,16 +172,16 @@ func main() {
 	cm := sqlutil.NewConnectionManager(service)
 	routers := httputil.NewRouters()
 
-	globalCfg.Cache.EnablePrometheus = caching.EnableMetrics
-	caches, err := caching.NewCache(&globalCfg.Cache)
+	globalCfg.Cache.EnablePrometheus = cacheutil.EnableMetrics
+	caches, err := cacheutil.NewCache(&globalCfg.Cache)
 	if err != nil {
 		log.WithError(err).Panicf("failed to create cache")
 	}
 
-	natsInstance := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
+	qm := jetstream.NATSInstance{}
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.EnableMetrics)
 	fsAPI := federationapi.NewInternalAPI(
-		ctx, cfg, cm, &natsInstance, federationClient, rsAPI, caches, nil, false,
+		ctx, cfg, cm, &qm, federationClient, rsAPI, caches, nil, false,
 	)
 
 	keyRing := fsAPI.KeyRing()
@@ -191,8 +191,8 @@ func main() {
 	// dependency. Other components also need updating after their dependencies are up.
 	rsAPI.SetFederationAPI(ctx, fsAPI, keyRing)
 
-	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, federationClient, profileCli, caching.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
-	asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, userAPI, rsAPI)
+	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &qm, rsAPI, federationClient, profileCli, cacheutil.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+	asAPI := appservice.NewInternalAPI(ctx, cfg, &qm, userAPI, rsAPI)
 
 	rsAPI.SetAppserviceAPI(ctx, asAPI)
 	rsAPI.SetUserAPI(ctx, userAPI)
@@ -214,7 +214,7 @@ func main() {
 		PartitionCli: partitionCli,
 		ProfileCli:   profileCli,
 	}
-	monolith.AddAllPublicRoutes(ctx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
+	monolith.AddAllPublicRoutes(ctx, cfg, routers, cm, &qm, caches, cacheutil.EnableMetrics)
 
 	if len(cfg.MSCs.MSCs) > 0 {
 		err = mscs.Enable(ctx, cfg, cm, routers, &monolith, caches)

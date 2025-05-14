@@ -24,7 +24,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserver "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
@@ -51,7 +51,7 @@ func Context(
 	rsAPI roomserver.SyncRoomserverAPI,
 	syncDB storage.Database,
 	roomID, eventID string,
-	lazyLoadCache caching.LazyLoadCache,
+	lazyLoadCache cacheutil.LazyLoadCache,
 ) util.JSONResponse {
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
@@ -313,7 +313,7 @@ func applyLazyLoadMembers(
 	snapshot storage.DatabaseTransaction,
 	roomID string,
 	events []synctypes.ClientEvent,
-	lazyLoadCache caching.LazyLoadCache,
+	lazyLoadCache cacheutil.LazyLoadCache,
 ) ([]*rstypes.HeaderedEvent, error) {
 	eventSenders := make(map[string]struct{})
 	// get members who actually send an event

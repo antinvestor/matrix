@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/syncapi/notifier"
@@ -34,7 +34,7 @@ type OutputTypingEventConsumer struct {
 	jetstream nats.JetStreamContext
 	durable   string
 	topic     string
-	eduCache  *caching.EDUCache
+	eduCache  *cacheutil.EDUCache
 	stream    streams.StreamProvider
 	notifier  *notifier.Notifier
 }
@@ -45,7 +45,7 @@ func NewOutputTypingEventConsumer(
 	_ context.Context,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
-	eduCache *caching.EDUCache,
+	eduCache *cacheutil.EDUCache,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
 ) *OutputTypingEventConsumer {

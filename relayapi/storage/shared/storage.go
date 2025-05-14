@@ -22,7 +22,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 )
@@ -30,7 +30,7 @@ import (
 type Database struct {
 	Cm                sqlutil.ConnectionManager
 	IsLocalServerName func(spec.ServerName) bool
-	Cache             caching.FederationCache
+	Cache             cacheutil.FederationCache
 	RelayQueue        tables.RelayQueue
 	RelayQueueJSON    tables.RelayQueueJSON
 }

@@ -20,7 +20,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/federationapi/producers"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/api"
@@ -62,7 +62,7 @@ func NewRelayInternalAPI(
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,
 	relayingEnabled bool,
-	caches caching.FederationCache,
+	caches cacheutil.FederationCache,
 ) api.RelayInternalAPI {
 
 	relayCm, err := cm.FromOptions(ctx, &cfg.RelayAPI.Database)

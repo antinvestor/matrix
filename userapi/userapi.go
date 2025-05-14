@@ -47,7 +47,7 @@ func NewInternalAPI(
 	ctx context.Context,
 	dendriteCfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
-	natsInstance *jetstream.NATSInstance,
+	qm *jetstream.NATSInstance,
 	rsAPI rsapi.UserRoomserverAPI,
 	fedClient fedsenderapi.KeyserverFederationAPI,
 	profileCli *profilev1.ProfileClient,
@@ -56,7 +56,7 @@ func NewInternalAPI(
 ) *internal.UserInternalAPI {
 
 	var err error
-	js, _ := natsInstance.Prepare(ctx, &dendriteCfg.Global.JetStream)
+	js, _ := qm.Prepare(ctx, &dendriteCfg.Global.JetStream)
 	appServices := dendriteCfg.Derived.ApplicationServices
 
 	pgClient := pushgateway.NewHTTPClient(dendriteCfg.UserAPI.PushGatewayDisableTLSValidation)

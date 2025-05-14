@@ -23,7 +23,7 @@ import (
 	"github.com/antinvestor/matrix/setup/jetstream"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/consumers"
@@ -44,13 +44,13 @@ func AddPublicRoutes(
 	routers httputil.Routers,
 	dendriteCfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
-	natsInstance *jetstream.NATSInstance,
+	qm *jetstream.NATSInstance,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
-	caches caching.LazyLoadCache,
+	caches cacheutil.LazyLoadCache,
 	enableMetrics bool,
 ) {
-	js, natsClient := natsInstance.Prepare(ctx, &dendriteCfg.Global.JetStream)
+	js, natsClient := qm.Prepare(ctx, &dendriteCfg.Global.JetStream)
 
 	syncCm, err := cm.FromOptions(ctx, &dendriteCfg.SyncAPI.Database)
 	if err != nil {
@@ -61,7 +61,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
-	eduCache := caching.NewTypingCache()
+	eduCache := cacheutil.NewTypingCache()
 	notifier := notifier.NewNotifier(rsAPI)
 	streams := streams.NewSyncStreamProviders(ctx, syncDB, userAPI, rsAPI, eduCache, caches, notifier)
 	notifier.SetCurrentPosition(streams.Latest(ctx))

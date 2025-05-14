@@ -25,13 +25,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antinvestor/gomatrixserverlib/fclient"
-	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -422,7 +422,12 @@ func (u *DeviceListUpdater) worker(ctx context.Context, ch chan spec.ServerName,
 			serversToRetry = serversToRetry[:0]
 
 			deviceListUpdaterServersRetrying.With(prometheus.Labels{"worker_id": strconv.Itoa(workerID)}).Set(float64(len(retries)))
-			time.Sleep(time.Second * 2)
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second * 2):
+			}
 
 			// -2, so we have space for incoming device list updates over federation
 			maxServers := (cap(ch) - len(ch)) - 2

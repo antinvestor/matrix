@@ -90,6 +90,8 @@ type Global struct {
 	// Configuration for the caches.
 	Cache CacheOptions `yaml:"cache"`
 
+	Queue QueueOptions `yaml:"queue"`
+
 	DistributedAPI DistributedAPI `yaml:"distributed_api"`
 }
 
@@ -367,6 +369,47 @@ func (c *CacheOptions) Verify(configErrs *ConfigErrors) {
 	checkPositive(configErrs, "max_size_estimated", int64(c.EstimatedMaxSize))
 
 	checkNotEmpty(configErrs, "global.cache.connection_string", string(c.ConnectionString))
+}
+
+type QueueOptions struct {
+	Reference string `yaml:"reference"`
+	// The connection string,
+	ConnectionString DataSource `env:"QUEUE_URI" yaml:"connection_string"`
+
+	// The prefix to use for stream names for this homeserver - really only
+	// useful if running more than one Matrix on the same NATS deployment.
+	TopicPrefix string `yaml:"topic_prefix"`
+	Concurrency int    `yaml:"concurrency"`
+}
+
+func (q *QueueOptions) LoadEnv() error {
+
+	err := frame.ConfigFillFromEnv(q)
+	if err != nil {
+		q.ConnectionString = DataSource(os.Getenv("QUEUE_URI"))
+	}
+
+	if !q.ConnectionString.IsQueue() {
+		log.WithField("queue_uri", q.ConnectionString).Warn("Invalid queue uri in the config")
+	}
+	return nil
+}
+
+func (q *QueueOptions) Defaults(opts DefaultOpts) {
+	connectionUriStr := string(opts.QueueConnectionStr)
+	if connectionUriStr != "" {
+		q.ConnectionString = DataSource(connectionUriStr)
+	}
+
+	q.ConnectionString = opts.CacheConnectionStr
+	q.TopicPrefix = "Matrix_"
+	q.Concurrency = 50
+}
+
+func (q *QueueOptions) Verify(configErrs *ConfigErrors) {
+	checkNotEmpty(configErrs, "global.queue.topic_prefix", q.TopicPrefix)
+
+	checkNotEmpty(configErrs, "global.queue.connection_string", string(q.ConnectionString))
 }
 
 // ReportStats configures opt-in phone-home statistics reporting.

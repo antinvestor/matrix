@@ -35,7 +35,7 @@ import (
 func NewInternalAPI(
 	ctx context.Context,
 	cfg *config.Matrix,
-	natsInstance *jetstream.NATSInstance,
+	qm *jetstream.NATSInstance,
 	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceInternalAPI {
@@ -66,7 +66,7 @@ func NewInternalAPI(
 
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
 	// We can't add ASes at runtime so this is safe to do.
-	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+	js, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
 	consumer := consumers.NewOutputRoomEventConsumer(
 		ctx, &cfg.AppServiceAPI,
 		js, rsAPI,

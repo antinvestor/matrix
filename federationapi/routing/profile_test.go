@@ -28,7 +28,7 @@ import (
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	fedAPI "github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/federationapi/routing"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/jetstream"
@@ -58,17 +58,17 @@ func TestHandleQueryProfile(t *testing.T) {
 		routers := httputil.NewRouters()
 
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
-		natsInstance := jetstream.NATSInstance{}
+		qm := jetstream.NATSInstance{}
 		routers.Federation = fedMux
 		cfg.FederationAPI.Global.ServerName = testOrigin
 		cfg.FederationAPI.Global.Metrics.Enabled = false
 		fedClient := fakeFedClient{}
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, &natsInstance, &fedClient, nil, nil, keyRing, true)
+		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, &qm, &fedClient, nil, nil, keyRing, true)
 		userapi := fakeUserAPI{}
 
-		routing.Setup(routers, cfg, nil, fedapi, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, caching.DisableMetrics)
+		routing.Setup(routers, cfg, nil, fedapi, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, cacheutil.DisableMetrics)
 
 		handler := fedMux.Get(routing.QueryProfileRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)

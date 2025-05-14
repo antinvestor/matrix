@@ -209,8 +209,8 @@ func TestProcessTransactionRequestPDUInvalidSignature(t *testing.T) {
 
 func createTransactionWithEDU(ctx context.Context, cfg *config.Matrix, edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext) {
 
-	natsInstance := &jetstream.NATSInstance{}
-	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+	qm := &jetstream.NATSInstance{}
+	js, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
 		TopicReceiptEvent:      cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),

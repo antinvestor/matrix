@@ -24,14 +24,14 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/federationapi/types"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 )
 
 type Database struct {
 	Cm                       sqlutil.ConnectionManager
 	IsLocalServerName        func(spec.ServerName) bool
-	Cache                    caching.FederationCache
+	Cache                    cacheutil.FederationCache
 	FederationQueuePDUs      tables.FederationQueuePDUs
 	FederationQueueEDUs      tables.FederationQueueEDUs
 	FederationQueueJSON      tables.FederationQueueJSON

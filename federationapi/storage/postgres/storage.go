@@ -20,7 +20,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/shared"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 )
 
@@ -30,7 +30,7 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache cacheutil.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
 	var d Database
 
 	blacklist, err := NewPostgresBlacklistTable(ctx, cm)

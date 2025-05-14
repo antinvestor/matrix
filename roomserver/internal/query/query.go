@@ -34,7 +34,7 @@ import (
 
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
@@ -45,7 +45,7 @@ import (
 
 type Queryer struct {
 	DB                storage.Database
-	Cache             caching.RoomServerCaches
+	Cache             cacheutil.RoomServerCaches
 	IsLocalServerName func(spec.ServerName) bool
 	ServerACLs        *acls.ServerACLs
 	Cfg               *config.Matrix

@@ -155,12 +155,27 @@ func (d DataSource) IsPostgres() bool {
 	return keyValueRegex.MatchString(string(d))
 }
 
+func (d DataSource) IsDB() bool {
+	return d.IsPostgres() || d.IsSQLite()
+}
+
 func (d DataSource) IsRedis() bool {
 	return strings.HasPrefix(string(d), "redis://")
+}
+func (d DataSource) IsCache() bool {
+	return d.IsRedis()
 }
 
 func (d DataSource) IsNats() bool {
 	return strings.HasPrefix(string(d), "nats://")
+}
+
+func (d DataSource) IsMem() bool {
+	return strings.HasPrefix(string(d), "mem://")
+}
+
+func (d DataSource) IsQueue() bool {
+	return d.IsMem() || d.IsNats()
 }
 
 // A Topic in kafka.

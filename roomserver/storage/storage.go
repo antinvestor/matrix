@@ -18,13 +18,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 )
 
 // NewDatabase opens a database connection.
-func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache caching.RoomServerCaches) (Database, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache cacheutil.RoomServerCaches) (Database, error) {
 	if !cm.DS().IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type : %v", cm.DS())
 	}

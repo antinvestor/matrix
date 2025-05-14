@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/postgres"
 )
@@ -28,7 +28,7 @@ import (
 func NewDatabase(
 	ctx context.Context,
 	cm sqlutil.ConnectionManager,
-	cache caching.FederationCache,
+	cache cacheutil.FederationCache,
 	isLocalServerName func(spec.ServerName) bool,
 ) (Database, error) {
 	switch {

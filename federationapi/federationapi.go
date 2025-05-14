@@ -32,7 +32,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	userAPI "github.com/antinvestor/matrix/userapi/api"
 
@@ -46,7 +46,7 @@ func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
 	dendriteConfig *config.Matrix,
-	natsInstance *jetstream.NATSInstance,
+	qm *jetstream.NATSInstance,
 	userAPI userAPI.FederationUserAPI,
 	federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
@@ -56,7 +56,7 @@ func AddPublicRoutes(
 ) {
 	cfg := &dendriteConfig.FederationAPI
 	mscCfg := &dendriteConfig.MSCs
-	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+	js, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
 		TopicReceiptEvent:      cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
@@ -95,10 +95,10 @@ func NewInternalAPI(
 	ctx context.Context,
 	dendriteCfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
-	natsInstance *jetstream.NATSInstance,
+	qm *jetstream.NATSInstance,
 	federation fclient.FederationClient,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
-	caches *caching.Caches,
+	caches *cacheutil.Caches,
 	keyRing *gomatrixserverlib.KeyRing,
 	resetBlacklist bool,
 ) *internal.FederationInternalAPI {
@@ -119,7 +119,7 @@ func NewInternalAPI(
 
 	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1, cfg.P2PFederationRetriesUntilAssumedOffline+1, cfg.EnableRelays)
 
-	js, nats := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+	js, nats := qm.Prepare(ctx, &cfg.Global.JetStream)
 
 	signingInfo := cfg.Global.SigningIdentities()
 

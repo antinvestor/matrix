@@ -17,7 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -35,7 +35,7 @@ const redactionsArePermanent = true
 
 type Database struct {
 	EventDatabase
-	Cache              caching.RoomServerCaches
+	Cache              cacheutil.RoomServerCaches
 	RoomsTable         tables.Rooms
 	StateSnapshotTable tables.StateSnapshot
 	StateBlockTable    tables.StateBlock
@@ -51,7 +51,7 @@ type Database struct {
 // EventDatabase contains all tables needed to work with events
 type EventDatabase struct {
 	Cm                  sqlutil.ConnectionManager
-	Cache               caching.RoomServerCaches
+	Cache               cacheutil.RoomServerCaches
 	EventsTable         tables.Events
 	EventJSONTable      tables.EventJSON
 	EventTypesTable     tables.EventTypes
