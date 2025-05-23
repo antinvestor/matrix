@@ -58,6 +58,8 @@ type ClientAPI struct {
 	RateLimiting RateLimiting `yaml:"rate_limiting"`
 
 	MSCs *MSCs `yaml:"-"`
+
+	Queues ClientQueues `yaml:"queues"`
 }
 
 func (c *ClientAPI) Defaults(opts DefaultOpts) {
@@ -71,6 +73,7 @@ func (c *ClientAPI) Defaults(opts DefaultOpts) {
 	c.RegistrationDisabled = true
 	c.OpenRegistrationWithoutVerificationEnabled = false
 	c.RateLimiting.Defaults()
+	c.Queues.Defaults(opts)
 }
 
 func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
@@ -246,4 +249,16 @@ func (r *RateLimiting) Defaults() {
 	r.Enabled = true
 	r.Threshold = 5
 	r.CooloffMS = 500
+}
+
+type ClientQueues struct {
+	InputFulltextReindex QueueOptions `yaml:"input_fulltext_reindex"`
+}
+
+func (q *ClientQueues) Defaults(opts DefaultOpts) {
+	q.InputFulltextReindex = QueueOptions{Prefix: opts.QueuePrefix, QReference: "ClientAPIInputFulltextReindex", DS: "mem://ClientAPIInputFulltextReindex"}
+}
+
+func (q *ClientQueues) Verify(configErrs *ConfigErrors) {
+	checkNotEmpty(configErrs, "client_api.queues.input_fulltext_reindex", string(q.InputFulltextReindex.DS))
 }

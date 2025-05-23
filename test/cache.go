@@ -42,7 +42,7 @@ import (
 //		return "", nil, err
 //	}
 //
-//	connStr, err := container.ConnectionString(ctx)
+//	connStr, err := container.DS(ctx)
 //	if err != nil {
 //		return "", nil, err
 //	}

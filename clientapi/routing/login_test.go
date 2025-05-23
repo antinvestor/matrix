@@ -2,6 +2,7 @@ package routing
 
 import (
 	"encoding/json"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,7 +16,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/test"
@@ -35,7 +35,7 @@ func TestLogin(t *testing.T) {
 		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		qm := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 		// add a vhost
 		cfg.Global.VirtualHosts = append(cfg.Global.VirtualHosts, &config.VirtualHost{
 			SigningIdentity: fclient.SigningIdentity{ServerName: "vh1"},
@@ -47,10 +47,10 @@ func TestLogin(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		// Needed for /login
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
 		Setup(ctx, routers, cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, nil, cacheutil.DisableMetrics)

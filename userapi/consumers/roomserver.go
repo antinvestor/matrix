@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/tidwall/gjson"
@@ -35,10 +35,8 @@ import (
 type OutputRoomEventConsumer struct {
 	cfg          *config.UserAPI
 	rsAPI        rsapi.UserRoomserverAPI
-	jetstream    nats.JetStreamContext
-	durable      string
+	qm           queueutil.QueueManager
 	db           storage.UserDatabase
-	topic        string
 	pgClient     pushgateway.Client
 	syncProducer *producers.SyncAPI
 	msgCounts    map[spec.ServerName]userAPITypes.MessageStats
@@ -49,20 +47,18 @@ type OutputRoomEventConsumer struct {
 }
 
 func NewOutputRoomEventConsumer(
-	_ context.Context,
+	ctx context.Context,
 	cfg *config.UserAPI,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
 	store storage.UserDatabase,
 	pgClient pushgateway.Client,
 	rsAPI rsapi.UserRoomserverAPI,
 	syncProducer *producers.SyncAPI,
-) *OutputRoomEventConsumer {
-	return &OutputRoomEventConsumer{
+) error {
+	c := &OutputRoomEventConsumer{
 		cfg:          cfg,
-		jetstream:    js,
+		qm:           qm,
 		db:           store,
-		durable:      cfg.Global.JetStream.Durable("UserAPIRoomServerConsumer"),
-		topic:        cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		pgClient:     pgClient,
 		rsAPI:        rsAPI,
 		syncProducer: syncProducer,
@@ -72,34 +68,25 @@ func NewOutputRoomEventConsumer(
 		countsLock:   sync.Mutex{},
 		serverName:   cfg.Global.ServerName,
 	}
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputRoomEvent, c)
 }
 
-func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
-	if err := jetstream.Consumer(
-		ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
+func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	// Only handle events we care about
 
 	var event *rstypes.HeaderedEvent
 	var isNewRoomEvent bool
-	switch rsapi.OutputType(msg.Header.Get(jetstream.RoomEventType)) {
+	switch rsapi.OutputType(metadata[jetstream.RoomEventType]) {
+
 	case rsapi.OutputTypeNewRoomEvent:
 		isNewRoomEvent = true
 		fallthrough
 	case rsapi.OutputTypeNewInviteEvent:
 		var output rsapi.OutputEvent
-		if err := json.Unmarshal(msg.Data, &output); err != nil {
+		if err := json.Unmarshal(message, &output); err != nil {
 			// If the message was invalid, log it and move on to the next message in the stream
 			log.WithError(err).Errorf("roomserver output log: message parse failure")
-			return true
+			return nil
 		}
 		if isNewRoomEvent {
 			event = output.NewRoomEvent.Event
@@ -109,7 +96,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 
 		if event == nil {
 			log.Errorf("userapi consumer: expected event")
-			return true
+			return nil
 		}
 
 		log.WithFields(log.Fields{
@@ -117,25 +104,23 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 			"event_type": event.Type(),
 		}).Tracef("Received message from roomserver: %#v", output)
 	default:
-		return true
+		return nil
 	}
 
 	if s.cfg.Global.ReportStats.Enabled {
 		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID().String())
 	}
 
-	metadata, err := msg.Metadata()
-	if err != nil {
-		return true
-	}
+	//TODO: previously this was extracted from message metadata, figure a way too pass in a stable position
+	timeNow := time.Now()
 
-	if err := s.processMessage(ctx, event, uint64(spec.AsTimestamp(metadata.Timestamp))); err != nil {
+	if err := s.processMessage(ctx, event, uint64(spec.AsTimestamp(timeNow))); err != nil {
 		log.WithFields(log.Fields{
 			"event_id": event.EventID(),
 		}).WithError(err).Errorf("userapi consumer: process room event failure")
 	}
 
-	return true
+	return nil
 }
 
 func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context, eventType, eventSender, roomID string) {

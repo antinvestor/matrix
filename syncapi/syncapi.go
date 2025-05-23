@@ -16,11 +16,11 @@ package syncapi
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 
 	"github.com/antinvestor/matrix/internal/cacheutil"
@@ -44,15 +44,16 @@ func AddPublicRoutes(
 	routers httputil.Routers,
 	dendriteCfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
-	qm *jetstream.NATSInstance,
+	qm queueutil.QueueManager,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
 	caches cacheutil.LazyLoadCache,
 	enableMetrics bool,
 ) {
-	js, natsClient := qm.Prepare(ctx, &dendriteCfg.Global.JetStream)
 
-	syncCm, err := cm.FromOptions(ctx, &dendriteCfg.SyncAPI.Database)
+	cfgSyncAPI := dendriteCfg.SyncAPI
+
+	syncCm, err := cm.FromOptions(ctx, &cfgSyncAPI.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to obtain sync db connection manager")
 	}
@@ -62,94 +63,98 @@ func AddPublicRoutes(
 	}
 
 	eduCache := cacheutil.NewTypingCache()
-	notifier := notifier.NewNotifier(rsAPI)
-	streams := streams.NewSyncStreamProviders(ctx, syncDB, userAPI, rsAPI, eduCache, caches, notifier)
-	notifier.SetCurrentPosition(streams.Latest(ctx))
-	if err = notifier.Load(ctx, syncDB); err != nil {
+	ntf := notifier.NewNotifier(rsAPI)
+	strms := streams.NewSyncStreamProviders(ctx, syncDB, userAPI, rsAPI, eduCache, caches, ntf)
+	ntf.SetCurrentPosition(strms.Latest(ctx))
+	if err = ntf.Load(ctx, syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
 	}
 
+	err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputPresenceEvent)
+
 	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
-		Topic:     dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
-		JetStream: js,
+		Topic: cfgSyncAPI.Queues.OutputPresenceEvent.Ref(),
+		Qm:    qm,
 	}
-	presenceConsumer := consumers.NewPresenceConsumer(
-		ctx, &dendriteCfg.SyncAPI, js, natsClient, syncDB,
-		notifier, streams.PresenceStreamProvider,
+	presenceConsumer, err := consumers.NewPresenceConsumer(
+		ctx, &cfgSyncAPI, qm, syncDB,
+		ntf, strms.PresenceStreamProvider,
 		userAPI,
 	)
 
-	requestPool := sync.NewRequestPool(ctx, syncDB, &dendriteCfg.SyncAPI, userAPI, rsAPI, streams, notifier, federationPresenceProducer, presenceConsumer, enableMetrics)
-
-	if err = presenceConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
-	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
-		ctx, &dendriteCfg.SyncAPI, dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
-		js, rsAPI, syncDB, notifier,
-		streams.DeviceListStreamProvider,
+	requestPool := sync.NewRequestPool(ctx, syncDB, &cfgSyncAPI, userAPI, rsAPI, strms, ntf, federationPresenceProducer, presenceConsumer, enableMetrics)
+
+	err = consumers.NewOutputKeyChangeEventConsumer(
+		ctx, &cfgSyncAPI, qm, rsAPI, syncDB, ntf,
+		strms.DeviceListStreamProvider,
 	)
-	if err = keyChangeConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panicf("failed to start key change consumer")
 	}
 
 	var asProducer *producers.AppserviceEventProducer
 	if len(dendriteCfg.AppServiceAPI.Derived.ApplicationServices) > 0 {
 		asProducer = &producers.AppserviceEventProducer{
-			JetStream: js, Topic: dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputAppserviceEvent),
+			Qm: qm, Topic: &dendriteCfg.AppServiceAPI.Queues.OutputAppserviceEvent,
 		}
 	}
 
-	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		ctx, &dendriteCfg.SyncAPI, js, syncDB, notifier, streams.PDUStreamProvider,
-		streams.InviteStreamProvider, rsAPI, asProducer,
+	err = consumers.NewOutputRoomEventConsumer(
+		ctx, &cfgSyncAPI, qm, syncDB, ntf, strms.PDUStreamProvider,
+		strms.InviteStreamProvider, rsAPI, asProducer,
 	)
-	if err = roomConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
-	clientConsumer := consumers.NewOutputClientDataConsumer(
-		ctx, &dendriteCfg.SyncAPI, js, natsClient, syncDB, notifier,
-		streams.AccountDataStreamProvider,
+	err = consumers.NewOutputClientDataConsumer(
+		ctx, &cfgSyncAPI, qm, syncDB, ntf,
+		strms.AccountDataStreamProvider,
 	)
-	if err = clientConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
 	}
 
-	notificationConsumer := consumers.NewOutputNotificationDataConsumer(
-		ctx, &dendriteCfg.SyncAPI, js, syncDB, notifier, streams.NotificationDataStreamProvider,
+	err = consumers.NewOutputNotificationDataConsumer(
+		ctx, &cfgSyncAPI, qm, syncDB, ntf, strms.NotificationDataStreamProvider,
 	)
-	if err = notificationConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panicf("failed to start notification data consumer")
 	}
 
-	typingConsumer := consumers.NewOutputTypingEventConsumer(
-		ctx, &dendriteCfg.SyncAPI, js, eduCache, notifier, streams.TypingStreamProvider,
+	err = consumers.NewOutputTypingEventConsumer(
+		ctx, &cfgSyncAPI, qm, eduCache, ntf, strms.TypingStreamProvider,
 	)
-	if err = typingConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
-	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		ctx, &dendriteCfg.SyncAPI, js, syncDB, userAPI, notifier, streams.SendToDeviceStreamProvider,
+	err = consumers.NewOutputSendToDeviceEventConsumer(
+		ctx, &cfgSyncAPI, qm, syncDB, userAPI, ntf, strms.SendToDeviceStreamProvider,
 	)
-	if err = sendToDeviceConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
-	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
-		ctx, &dendriteCfg.SyncAPI, js, syncDB, notifier, streams.ReceiptStreamProvider,
+	err = consumers.NewOutputReceiptEventConsumer(
+		ctx, &cfgSyncAPI, qm, syncDB, ntf, strms.ReceiptStreamProvider,
 	)
-	if err = receiptConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
 	rateLimits := httputil.NewRateLimits(&dendriteCfg.ClientAPI.RateLimiting)
 
-	routing.Setup(
-		routers.Client, requestPool, syncDB, userAPI,
-		rsAPI, &dendriteCfg.SyncAPI, caches,
+	err = routing.Setup(
+		routers.Client, routers.Validator, requestPool, syncDB, userAPI,
+		rsAPI, &cfgSyncAPI, caches,
 		rateLimits,
 	)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to start receipts consumer")
+	}
 }

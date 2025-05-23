@@ -44,7 +44,7 @@ type UserInternalAPI interface {
 	QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) (err error)
 }
 
-// api functions required by the appservice api
+// AppserviceUserAPI api functions required by the appservice api
 type AppserviceUserAPI interface {
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
@@ -55,12 +55,12 @@ type RoomserverUserAPI interface {
 	QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) (err error)
 }
 
-// api functions required by the media api
+// MediaUserAPI api functions required by the media api
 type MediaUserAPI interface {
 	QueryAcccessTokenAPI
 }
 
-// api functions required by the federation api
+// FederationUserAPI api functions required by the federation api
 type FederationUserAPI interface {
 	UploadDeviceKeysAPI
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
@@ -72,7 +72,7 @@ type FederationUserAPI interface {
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 }
 
-// api functions required by the sync api
+// SyncUserAPI api functions required by the sync api
 type SyncUserAPI interface {
 	QueryAcccessTokenAPI
 	SyncKeyAPI

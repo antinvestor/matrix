@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"strconv"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -28,14 +29,13 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/syncapi/types"
-	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 )
 
-// OutputReceiptConsumer consumes events that originate in the clientapi.
+// OutputPresenceConsumer consumes events that originate in the clientapi.
 type OutputPresenceConsumer struct {
-	jetstream               nats.JetStreamContext
+	qm                      queueutil.QueueManager
 	durable                 string
 	db                      storage.Database
 	queues                  *queue.OutgoingQueues
@@ -47,61 +47,49 @@ type OutputPresenceConsumer struct {
 
 // NewOutputPresenceConsumer creates a new OutputPresenceConsumer. Call Start() to begin consuming events.
 func NewOutputPresenceConsumer(
-	_ context.Context,
+	ctx context.Context,
 	cfg *config.FederationAPI,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
-) *OutputPresenceConsumer {
-	return &OutputPresenceConsumer{
-		jetstream:               js,
+) error {
+	c := &OutputPresenceConsumer{
+		qm:                      qm,
 		queues:                  queues,
 		db:                      store,
 		isLocalServerName:       cfg.Global.IsLocalServerName,
-		durable:                 cfg.Global.JetStream.Durable("FederationAPIPresenceConsumer"),
-		topic:                   cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		outboundPresenceEnabled: cfg.Global.Presence.EnableOutbound,
 		rsAPI:                   rsAPI,
 	}
-}
 
-// Start consuming from the clientapi
-func (t *OutputPresenceConsumer) Start(ctx context.Context) error {
-	if !t.outboundPresenceEnabled {
-		return nil
-	}
-	return jetstream.Consumer(
-		ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
-		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
-	)
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputPresenceEvent, c)
 }
 
 // onMessage is called in response to a message received on the presence
 // events topic from the client api.
-func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
+func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	// only send presence events which originated from us
-	userID := msg.Header.Get(jetstream.UserID)
+	userID := metadata[jetstream.UserID]
 	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		log.WithError(err).WithField("user_id", userID).Error("failed to extract domain from receipt sender")
-		return true
+		return nil
 	}
 	if !t.isLocalServerName(serverName) {
-		return true
+		return nil
 	}
 
 	parsedUserID, err := spec.NewUserID(userID, true)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).WithField("user_id", userID).Error("invalid user ID")
-		return true
+		return nil
 	}
 
 	roomIDs, err := t.rsAPI.QueryRoomsForUser(ctx, *parsedUserID, "join")
 	if err != nil {
 		log.WithError(err).Error("failed to calculate joined rooms for user")
-		return true
+		return nil
 	}
 
 	roomIDStrs := make([]string, len(roomIDs))
@@ -109,27 +97,27 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		roomIDStrs[i] = roomID.String()
 	}
 
-	presence := msg.Header.Get("presence")
+	presence := metadata["presence"]
 
-	ts, err := strconv.Atoi(msg.Header.Get("last_active_ts"))
+	ts, err := strconv.Atoi(metadata["last_active_ts"])
 	if err != nil {
-		return true
+		return nil
 	}
 
 	// send this presence to all servers who share rooms with this user.
 	joined, err := t.db.GetJoinedHostsForRooms(ctx, roomIDStrs, true, true)
 	if err != nil {
 		log.WithError(err).Error("failed to get joined hosts")
-		return true
+		return nil
 	}
 
 	if len(joined) == 0 {
-		return true
+		return nil
 	}
 
 	var statusMsg *string = nil
-	if data, ok := msg.Header["status_msg"]; ok && len(data) > 0 {
-		status := msg.Header.Get("status_msg")
+	if data, ok := metadata["status_msg"]; ok && len(data) > 0 {
+		status := metadata["status_msg"]
 		statusMsg = &status
 	}
 
@@ -153,14 +141,14 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
 		log.WithError(err).Error("failed to marshal EDU JSON")
-		return true
+		return nil
 	}
 
 	log.Tracef("sending presence EDU to %d servers", len(joined))
 	if err = t.queues.SendEDU(ctx, edu, serverName, joined); err != nil {
 		log.WithError(err).Error("failed to send EDU")
-		return false
+		return err
 	}
 
-	return true
+	return nil
 }

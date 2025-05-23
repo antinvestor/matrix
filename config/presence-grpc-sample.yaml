@@ -1,0 +1,34 @@
+# Sample Configuration for Matrix with gRPC Presence Enabled
+
+# Global settings
+global:
+  server_name: "example.com"
+  jetstream:
+    url: "nats://localhost:4222"
+
+# SyncAPI configuration
+syncapi:
+  database:
+    connection_string: "postgresql://user:password@localhost/syncapi"
+  matrix:
+    # gRPC Presence Configuration
+    presence_grpc_enabled: true        # Enable gRPC presence service
+    presence_grpc_port: 7563           # Port for gRPC presence service
+    enable_nats_for_presence: true     # Keep NATS during transition period
+    #enable_nats_for_presence: false   # Uncomment to disable NATS once gRPC is stable
+
+# ClientAPI configuration
+clientapi:
+  database:
+    connection_string: "postgresql://user:password@localhost/clientapi"
+  matrix:
+    # gRPC Presence Configuration
+    presence_grpc_enabled: true        # Enable gRPC clients
+
+# FederationAPI configuration
+federationapi:
+  database:
+    connection_string: "postgresql://user:password@localhost/federationapi"
+  matrix:
+    # gRPC Presence Configuration
+    presence_grpc_enabled: true        # Enable gRPC clients

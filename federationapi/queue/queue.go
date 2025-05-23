@@ -24,7 +24,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/getsentry/sentry-go"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
@@ -298,13 +297,13 @@ func (oqs *OutgoingQueues) SendEDU(
 
 	ephemeralJSON, err := json.Marshal(e)
 	if err != nil {
-		sentry.CaptureException(err)
+
 		return fmt.Errorf("json.Marshal: %w", err)
 	}
 
 	nid, err := oqs.db.StoreJSON(ctx, string(ephemeralJSON))
 	if err != nil {
-		sentry.CaptureException(err)
+
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
 

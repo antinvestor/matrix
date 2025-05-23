@@ -11,16 +11,25 @@ type queues struct {
 }
 
 func (c *queues) RegisterPublisher(ctx context.Context, opts *config.QueueOptions) error {
-	return c.service.AddPublisher(ctx, opts.Reference, string(opts.ConnectionString))
+	return c.service.AddPublisher(ctx, opts.Ref(), string(opts.DS))
 }
-func (c *queues) RegisterSubscriber(_ context.Context, opts *config.QueueOptions, handler frame.SubscribeWorker) error {
-	dbOpts := frame.RegisterSubscriber(opts.Reference, string(opts.ConnectionString), opts.Concurrency, handler)
+
+func (c *queues) GetPublisher(ref string) (frame.Publisher, error) {
+	return c.service.GetPublisher(ref)
+}
+
+func (c *queues) Publish(ctx context.Context, reference string, payload any, headers ...map[string]string) error {
+	return c.service.Publish(ctx, reference, payload, headers...)
+}
+
+func (c *queues) RegisterSubscriber(_ context.Context, opts *config.QueueOptions, optHandler ...frame.SubscribeWorker) error {
+	dbOpts := frame.RegisterSubscriber(opts.Ref(), string(opts.DS), optHandler...)
 	c.service.Init(dbOpts)
 	return nil
 }
 
-func (c *queues) Publish(ctx context.Context, reference string, payload any) error {
-	return c.service.Publish(ctx, reference, payload)
+func (c *queues) GetSubscriber(ref string) (frame.Subscriber, error) {
+	return c.service.GetSubscriber(ref)
 }
 
 // NewQueueManager ensures a default internal Queue exists

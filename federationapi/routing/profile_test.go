@@ -17,6 +17,7 @@ package routing_test
 import (
 	"context"
 	"encoding/hex"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"io"
 	"net/http/httptest"
 	"net/url"
@@ -31,7 +32,6 @@ import (
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/setup/signing"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
@@ -58,14 +58,14 @@ func TestHandleQueryProfile(t *testing.T) {
 		routers := httputil.NewRouters()
 
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
-		qm := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 		routers.Federation = fedMux
 		cfg.FederationAPI.Global.ServerName = testOrigin
 		cfg.FederationAPI.Global.Metrics.Enabled = false
 		fedClient := fakeFedClient{}
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, &qm, &fedClient, nil, nil, keyRing, true)
+		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, qm, &fedClient, nil, nil, keyRing, true, nil)
 		userapi := fakeUserAPI{}
 
 		routing.Setup(routers, cfg, nil, fedapi, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, cacheutil.DisableMetrics)

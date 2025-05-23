@@ -16,11 +16,11 @@ package roomserver
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -36,7 +36,7 @@ func NewInternalAPI(
 	ctx context.Context,
 	cfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
-	qm *jetstream.NATSInstance,
+	qm queueutil.QueueManager,
 	caches cacheutil.RoomServerCaches,
 	enableMetrics bool,
 ) api.RoomserverInternalAPI {
@@ -51,9 +51,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	js, nc := qm.Prepare(ctx, &cfg.Global.JetStream)
-
 	return internal.NewRoomserverAPI(
-		ctx, cfg, roomserverDB, js, nc, caches, enableMetrics,
+		ctx, cfg, roomserverDB, qm, caches, enableMetrics,
 	)
 }

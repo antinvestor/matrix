@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/gorilla/mux"
-	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/constraints"
@@ -23,7 +23,6 @@ import (
 	"github.com/antinvestor/matrix/internal/httputil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
@@ -409,8 +408,11 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 	}
 }
 
-func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, natsClient *nats.Conn) util.JSONResponse {
-	_, err := natsClient.RequestMsg(nats.NewMsg(cfg.Global.JetStream.Prefixed(jetstream.InputFulltextReindex)), time.Second*10)
+func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, qm queueutil.QueueManager) util.JSONResponse {
+
+	ctx := req.Context()
+	err := qm.Publish(ctx, cfg.Queues.InputFulltextReindex.Ref(), []byte{})
+
 	if err != nil {
 		logrus.WithError(err).Error("failed to publish nats message")
 		return util.JSONResponse{

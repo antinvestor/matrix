@@ -6,13 +6,13 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"io"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test/testrig"
@@ -126,7 +126,7 @@ func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *confi
 			panic("can't create cache : " + err.Error())
 		}
 
-		qm := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 
 		// Create a transport which redirects federation requests to
 		// the mock round tripper. Since we're not *really* listening for
@@ -139,7 +139,7 @@ func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *confi
 
 		// Finally, build the server key APIs.
 
-		s.api = NewInternalAPI(ctx, &cfg, cm, &qm, s.fedclient, nil, s.cache, nil, true)
+		s.api = NewInternalAPI(ctx, &cfg, cm, qm, s.fedclient, nil, s.cache, nil, true, nil)
 	}
 }
 

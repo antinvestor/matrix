@@ -180,16 +180,17 @@ func (r *Admin) PerformAdminEvacuateUser(
 			Leaver: *fullUserID,
 		}
 		leaveRes := &api.PerformLeaveResponse{}
-		outputEvents, err := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)
-		if err != nil {
-			return nil, err
+		outputEvents, err0 := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)
+		if err0 != nil {
+			return nil, err0
 		}
 		affected = append(affected, roomID)
 		if len(outputEvents) == 0 {
 			continue
 		}
-		if err := r.Inputer.OutputProducer.ProduceRoomEvents(roomID, outputEvents); err != nil {
-			return nil, err
+		err0 = r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, outputEvents)
+		if err0 != nil {
+			return nil, err0
 		}
 	}
 	return affected, nil
@@ -213,7 +214,7 @@ func (r *Admin) PerformAdminPurgeRoom(
 
 	logrus.WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
 
-	return r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
+	return r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypePurgeRoom,
 			PurgeRoom: &api.OutputPurgeRoom{

@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -28,15 +28,12 @@ import (
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/producers"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
-	"github.com/getsentry/sentry-go"
-	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -45,9 +42,8 @@ type OutputRoomEventConsumer struct {
 	ctx          context.Context
 	cfg          *config.SyncAPI
 	rsAPI        api.SyncRoomserverAPI
-	jetstream    nats.JetStreamContext
-	durable      string
-	topic        string
+	qm           queueutil.QueueManager
+	topic        *config.QueueOptions
 	db           storage.Database
 	pduStream    streams.StreamProvider
 	inviteStream streams.StreamProvider
@@ -59,20 +55,18 @@ type OutputRoomEventConsumer struct {
 func NewOutputRoomEventConsumer(
 	ctx context.Context,
 	cfg *config.SyncAPI,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	pduStream streams.StreamProvider,
 	inviteStream streams.StreamProvider,
 	rsAPI api.SyncRoomserverAPI,
 	asProducer *producers.AppserviceEventProducer,
-) *OutputRoomEventConsumer {
-	return &OutputRoomEventConsumer{
+) error {
+	c := &OutputRoomEventConsumer{
 		ctx:          ctx,
 		cfg:          cfg,
-		jetstream:    js,
-		topic:        cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		durable:      cfg.Global.JetStream.Durable("SyncAPIRoomServerConsumer"),
+		qm:           qm,
 		db:           store,
 		notifier:     notifier,
 		pduStream:    pduStream,
@@ -80,28 +74,21 @@ func NewOutputRoomEventConsumer(
 		rsAPI:        rsAPI,
 		asProducer:   asProducer,
 	}
+
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputRoomEvent, c)
 }
 
-// Start consuming from room servers
-func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		s.ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
-
-// onMessage is called when the sync server receives a new event from the room server output log.
+// Handle is called when the sync server receives a new event from the room server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
+func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	// Parse out the event JSON
 	var err error
 	var output api.OutputEvent
-	if err = json.Unmarshal(msg.Data, &output); err != nil {
+	if err = json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return true
+		return nil
 	}
 
 	switch output.Type {
@@ -113,12 +100,12 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 			// in the special case where the event redacts itself, just pass the message through because
 			// we will never see the other part of the pair
 			if event.Redacts() != event.EventID() {
-				return true
+				return nil
 			}
 		}
 		err = s.onNewRoomEvent(ctx, *output.NewRoomEvent)
 		if err == nil && s.asProducer != nil {
-			if err = s.asProducer.ProduceRoomEvents(msg); err != nil {
+			if err = s.asProducer.ProduceRoomEvents(ctx, message, metadata); err != nil {
 				log.WithError(err).Warn("failed to produce OutputAppserviceEvent")
 			}
 		}
@@ -138,7 +125,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		err = s.onPurgeRoom(ctx, *output.PurgeRoom)
 		if err != nil {
 			log.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from sync API")
-			return true // non-fatal, as otherwise we end up in a loop of trying to purge the room
+			return nil // non-fatal, as otherwise we end up in a loop of trying to purge the room
 		}
 	default:
 		log.WithField("type", output.Type).Debug(
@@ -148,16 +135,15 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	if err != nil {
 		if errors.As(err, new(base64.CorruptInputError)) {
 			// no matter how often we retry this event, we will always get this error, discard the event
-			return true
+			return nil
 		}
 		log.WithFields(log.Fields{
 			"type": output.Type,
 		}).WithError(err).Error("roomserver output log: failed to process event")
-		sentry.CaptureException(err)
-		return false
+		return err
 	}
 
-	return true
+	return nil
 }
 
 func (s *OutputRoomEventConsumer) onRedactEvent(

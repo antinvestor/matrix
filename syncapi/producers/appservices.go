@@ -15,19 +15,17 @@
 package producers
 
 import (
-	"github.com/nats-io/nats.go"
+	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/setup/config"
 )
 
 // AppserviceEventProducer produces events for the appservice API to consume
 type AppserviceEventProducer struct {
-	Topic     string
-	JetStream nats.JetStreamContext
+	Topic *config.QueueOptions
+	Qm    queueutil.QueueManager
 }
 
-func (a *AppserviceEventProducer) ProduceRoomEvents(
-	msg *nats.Msg,
-) error {
-	msg.Subject = a.Topic
-	_, err := a.JetStream.PublishMsg(msg)
-	return err
+func (a *AppserviceEventProducer) ProduceRoomEvents(ctx context.Context, message any, header map[string]string) error {
+	return a.Qm.Publish(ctx, a.Topic.Ref(), message, header)
 }

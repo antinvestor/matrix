@@ -18,12 +18,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"strconv"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/setup/jetstream"
@@ -37,7 +37,7 @@ type SyncAPIProducer struct {
 	TopicSendToDeviceEvent string
 	TopicTypingEvent       string
 	TopicPresenceEvent     string
-	JetStream              nats.JetStreamContext
+	Qm                     queueutil.QueueManager
 	ServerName             spec.ServerName
 	UserAPI                userapi.ClientUserAPI
 }
@@ -46,19 +46,17 @@ func (p *SyncAPIProducer) SendReceipt(
 	ctx context.Context,
 	userID, roomID, eventID, receiptType string, timestamp spec.Timestamp,
 ) error {
-	m := &nats.Msg{
-		Subject: p.TopicReceiptEvent,
-		Header:  nats.Header{},
+
+	h := map[string]string{
+		jetstream.UserID:  userID,
+		jetstream.RoomID:  roomID,
+		jetstream.EventID: eventID,
+		"type":            receiptType,
+		"timestamp":       fmt.Sprintf("%d", timestamp),
 	}
-	m.Header.Set(jetstream.UserID, userID)
-	m.Header.Set(jetstream.RoomID, roomID)
-	m.Header.Set(jetstream.EventID, eventID)
-	m.Header.Set("type", receiptType)
-	m.Header.Set("timestamp", fmt.Sprintf("%d", timestamp))
 
 	log.WithFields(log.Fields{}).Tracef("Producing to topic '%s'", p.TopicReceiptEvent)
-	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
-	return err
+	return p.Qm.Publish(ctx, p.TopicReceiptEvent, "", h)
 }
 
 func (p *SyncAPIProducer) SendToDevice(
@@ -107,17 +105,12 @@ func (p *SyncAPIProducer) SendToDevice(
 			},
 		}
 
-		eventJSON, err := json.Marshal(ote)
-		if err != nil {
-			log.WithError(err).Error("sendToDevice failed json.Marshal")
-			return err
+		h := map[string]string{
+			"sender":         sender,
+			jetstream.UserID: userID,
 		}
-		m := nats.NewMsg(p.TopicSendToDeviceEvent)
-		m.Data = eventJSON
-		m.Header.Set("sender", sender)
-		m.Header.Set(jetstream.UserID, userID)
 
-		if _, err = p.JetStream.PublishMsg(m, nats.Context(ctx)); err != nil {
+		if err = p.Qm.Publish(ctx, p.TopicSendToDeviceEvent, ote, h); err != nil {
 			if i < len(devices)-1 {
 				log.WithError(err).Warn("sendToDevice failed to PublishMsg, trying further devices")
 				continue
@@ -132,31 +125,29 @@ func (p *SyncAPIProducer) SendToDevice(
 func (p *SyncAPIProducer) SendTyping(
 	ctx context.Context, userID, roomID string, typing bool, timeoutMS int64,
 ) error {
-	m := &nats.Msg{
-		Subject: p.TopicTypingEvent,
-		Header:  nats.Header{},
-	}
-	m.Header.Set(jetstream.UserID, userID)
-	m.Header.Set(jetstream.RoomID, roomID)
-	m.Header.Set("typing", strconv.FormatBool(typing))
-	m.Header.Set("timeout_ms", strconv.Itoa(int(timeoutMS)))
 
-	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
-	return err
+	h := map[string]string{
+		jetstream.UserID: userID,
+		jetstream.RoomID: roomID,
+		"typing":         strconv.FormatBool(typing),
+		"timeout_ms":     strconv.Itoa(int(timeoutMS)),
+	}
+	return p.Qm.Publish(ctx, p.TopicTypingEvent, "", h)
 }
 
 func (p *SyncAPIProducer) SendPresence(
 	ctx context.Context, userID string, presence types.Presence, statusMsg *string,
 ) error {
-	m := nats.NewMsg(p.TopicPresenceEvent)
-	m.Header.Set(jetstream.UserID, userID)
-	m.Header.Set("presence", presence.String())
+
+	h := map[string]string{
+		jetstream.UserID: userID,
+		"presence":       presence.String(),
+	}
 	if statusMsg != nil {
-		m.Header.Set("status_msg", *statusMsg)
+		h["status_msg"] = *statusMsg
 	}
 
-	m.Header.Set("last_active_ts", strconv.Itoa(int(spec.AsTimestamp(time.Now()))))
+	h["last_active_ts"] = strconv.Itoa(int(spec.AsTimestamp(time.Now())))
 
-	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
-	return err
+	return p.Qm.Publish(ctx, p.TopicPresenceEvent, "", h)
 }

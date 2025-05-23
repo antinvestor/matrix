@@ -3,18 +3,17 @@ package routing
 import (
 	"bytes"
 	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/appservice"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/jetstream"
-
-	"github.com/antinvestor/matrix/appservice"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
@@ -40,11 +39,11 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		qm := jetstream.NATSInstance{}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.DisableMetrics)
+		qm := queueutil.NewQueueManager(svc)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil) // creates the rs.Inputer etc
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
-		asAPI := appservice.NewInternalAPI(ctx, cfg, &qm, userAPI, rsAPI)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		asAPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI)
 
 		// Create the users in the userapi
 		for _, u := range []*test.User{alice, bob, charlie} {

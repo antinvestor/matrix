@@ -56,7 +56,7 @@ type RequestPool struct {
 }
 
 type PresencePublisher interface {
-	SendPresence(userID string, presence types.Presence, statusMsg *string) error
+	SendPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string) error
 }
 
 type PresenceConsumer interface {
@@ -219,7 +219,8 @@ func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Pr
 		}
 	}
 
-	if err := rp.producer.SendPresence(userID, presenceToSet, newPresence.ClientFields.StatusMsg); err != nil {
+	err = rp.producer.SendPresence(ctx, userID, presenceToSet, newPresence.ClientFields.StatusMsg)
+	if err != nil {
 		logrus.WithError(err).Error("Unable to publish presence message from sync")
 		return
 	}

@@ -29,7 +29,7 @@ import (
 // AppServiceInternalAPI is used to query user and room alias data from application
 // services
 type AppServiceInternalAPI interface {
-	// Check whether a room alias exists within any application service namespaces
+	// RoomAliasExists Check whether a room alias exists within any application service namespaces
 	RoomAliasExists(
 		ctx context.Context,
 		req *RoomAliasExistsRequest,

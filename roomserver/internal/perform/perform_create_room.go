@@ -29,7 +29,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/getsentry/sentry-go"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 )
@@ -529,7 +528,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			case nil:
 			default:
 				util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
-				sentry.CaptureException(err)
+
 				return "", &util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},

@@ -15,14 +15,16 @@
 package federationapi
 
 import (
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"net/http"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/sirupsen/logrus"
 
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
@@ -46,7 +48,7 @@ func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
 	dendriteConfig *config.Matrix,
-	qm *jetstream.NATSInstance,
+	qm queueutil.QueueManager,
 	userAPI userAPI.FederationUserAPI,
 	federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
@@ -55,16 +57,42 @@ func AddPublicRoutes(
 	enableMetrics bool,
 ) {
 	cfg := &dendriteConfig.FederationAPI
+	cfgUserApi := &dendriteConfig.UserAPI
 	mscCfg := &dendriteConfig.MSCs
-	js, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
+
+	err := qm.RegisterPublisher(ctx, &cfg.Queues.OutputReceiptEvent)
+	if err != nil {
+		logrus.WithError(err).Panic("failed to register receipt event publisher")
+	}
+	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputSendToDeviceEvent)
+	if err != nil {
+		logrus.WithError(err).Panic("failed to register send to device event publisher")
+	}
+	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputTypingEvent)
+	if err != nil {
+		logrus.WithError(err).Panic("failed to register typing event publisher")
+	}
+	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputPresenceEvent)
+	if err != nil {
+		logrus.WithError(err).Panic("failed to register presence event publisher")
+	}
+	err = qm.RegisterPublisher(ctx, &cfgUserApi.Queues.InputDeviceListUpdate)
+	if err != nil {
+		logrus.WithError(err).Panic("failed to register input device list update event publisher")
+	}
+	err = qm.RegisterPublisher(ctx, &cfgUserApi.Queues.InputSigningKeyUpdate)
+	if err != nil {
+		logrus.WithError(err).Panic("failed to register input signing key event publisher")
+	}
+
 	producer := &producers.SyncAPIProducer{
-		JetStream:              js,
-		TopicReceiptEvent:      cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		TopicTypingEvent:       cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		TopicPresenceEvent:     cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
-		TopicDeviceListUpdate:  cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
-		TopicSigningKeyUpdate:  cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		Qm:                     qm,
+		TopicReceiptEvent:      cfg.Queues.OutputReceiptEvent.Ref(),
+		TopicSendToDeviceEvent: cfg.Queues.OutputSendToDeviceEvent.Ref(),
+		TopicTypingEvent:       cfg.Queues.OutputTypingEvent.Ref(),
+		TopicPresenceEvent:     cfg.Queues.OutputPresenceEvent.Ref(),
+		TopicDeviceListUpdate:  cfgUserApi.Queues.InputDeviceListUpdate.Ref(),
+		TopicSigningKeyUpdate:  cfgUserApi.Queues.InputSigningKeyUpdate.Ref(),
 		Config:                 cfg,
 		UserAPI:                userAPI,
 	}
@@ -95,12 +123,13 @@ func NewInternalAPI(
 	ctx context.Context,
 	dendriteCfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
-	qm *jetstream.NATSInstance,
+	qm queueutil.QueueManager,
 	federation fclient.FederationClient,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	caches *cacheutil.Caches,
 	keyRing *gomatrixserverlib.KeyRing,
 	resetBlacklist bool,
+	presenceCli presencev1connect.PresenceServiceClient,
 ) *internal.FederationInternalAPI {
 	cfg := &dendriteCfg.FederationAPI
 
@@ -113,13 +142,17 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
 
+	if presenceCli == nil {
+		presenceCli = presencev1connect.NewPresenceServiceClient(
+			http.DefaultClient, cfg.Global.SyncAPIPresenceURI,
+		)
+	}
+
 	if resetBlacklist {
 		_ = federationDB.RemoveAllServersFromBlacklist(ctx)
 	}
 
 	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1, cfg.P2PFederationRetriesUntilAssumedOffline+1, cfg.EnableRelays)
-
-	js, nats := qm.Prepare(ctx, &cfg.Global.JetStream)
 
 	signingInfo := cfg.Global.SigningIdentities()
 
@@ -130,41 +163,42 @@ func NewInternalAPI(
 		signingInfo,
 	)
 
-	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		ctx, cfg, js, nats, queues, federationDB, rsAPI,
+	err = consumers.NewOutputRoomEventConsumer(
+		ctx, cfg, qm, queues, federationDB, rsAPI, presenceCli,
 	)
-	if err = rsConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
 	}
-	tsConsumer := consumers.NewOutputSendToDeviceConsumer(
-		ctx, cfg, js, queues, federationDB,
+
+	err = consumers.NewOutputSendToDeviceConsumer(
+		ctx, cfg, qm, queues, federationDB,
 	)
-	if err = tsConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start send-to-device consumer")
 	}
-	receiptConsumer := consumers.NewOutputReceiptConsumer(
-		ctx, cfg, js, queues, federationDB,
+	err = consumers.NewOutputReceiptConsumer(
+		ctx, cfg, qm, queues, federationDB,
 	)
-	if err = receiptConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start receipt consumer")
 	}
-	typingConsumer := consumers.NewOutputTypingConsumer(
-		ctx, cfg, js, queues, federationDB,
+	err = consumers.NewOutputTypingConsumer(
+		ctx, cfg, qm, queues, federationDB,
 	)
-	if err = typingConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start typing consumer")
 	}
-	keyConsumer := consumers.NewKeyChangeConsumer(
-		ctx, &dendriteCfg.KeyServer, js, queues, federationDB, rsAPI,
+	err = consumers.NewKeyChangeConsumer(
+		ctx, &dendriteCfg.KeyServer, qm, queues, federationDB, rsAPI,
 	)
-	if err = keyConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")
 	}
 
-	presenceConsumer := consumers.NewOutputPresenceConsumer(
-		ctx, cfg, js, queues, federationDB, rsAPI,
+	err = consumers.NewOutputPresenceConsumer(
+		ctx, cfg, qm, queues, federationDB, rsAPI,
 	)
-	if err = presenceConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start presence consumer")
 	}
 

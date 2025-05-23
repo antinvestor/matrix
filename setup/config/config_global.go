@@ -93,6 +93,8 @@ type Global struct {
 	Queue QueueOptions `yaml:"queue"`
 
 	DistributedAPI DistributedAPI `yaml:"distributed_api"`
+
+	SyncAPIPresenceURI string `yaml:"sync_api_presence_uri"`
 }
 
 func (c *Global) Defaults(opts DefaultOpts) {
@@ -117,6 +119,8 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	c.ReportStats.Defaults()
 	c.Cache.Defaults(opts)
 	c.DistributedAPI.Defaults()
+
+	c.SyncAPIPresenceURI = fmt.Sprintf("http://localhost%s", c.Port())
 }
 
 func (c *Global) LoadEnv() error {
@@ -372,25 +376,25 @@ func (c *CacheOptions) Verify(configErrs *ConfigErrors) {
 }
 
 type QueueOptions struct {
-	Reference string `yaml:"reference"`
+	Prefix     string `yaml:"prefix"`
+	QReference string `yaml:"reference"`
 	// The connection string,
-	ConnectionString DataSource `env:"QUEUE_URI" yaml:"connection_string"`
+	DS DataSource `yaml:"uri"`
+}
 
-	// The prefix to use for stream names for this homeserver - really only
-	// useful if running more than one Matrix on the same NATS deployment.
-	TopicPrefix string `yaml:"topic_prefix"`
-	Concurrency int    `yaml:"concurrency"`
+func (q *QueueOptions) Ref() string {
+	return fmt.Sprintf("%s%s", q.Prefix, q.QReference)
 }
 
 func (q *QueueOptions) LoadEnv() error {
 
 	err := frame.ConfigFillFromEnv(q)
 	if err != nil {
-		q.ConnectionString = DataSource(os.Getenv("QUEUE_URI"))
+		q.DS = DataSource(os.Getenv("QUEUE_URI"))
 	}
 
-	if !q.ConnectionString.IsQueue() {
-		log.WithField("queue_uri", q.ConnectionString).Warn("Invalid queue uri in the config")
+	if !q.DS.IsQueue() {
+		log.WithField("queue_uri", q.DS).Warn("Invalid queue uri in the config")
 	}
 	return nil
 }
@@ -398,18 +402,17 @@ func (q *QueueOptions) LoadEnv() error {
 func (q *QueueOptions) Defaults(opts DefaultOpts) {
 	connectionUriStr := string(opts.QueueConnectionStr)
 	if connectionUriStr != "" {
-		q.ConnectionString = DataSource(connectionUriStr)
+		q.DS = DataSource(connectionUriStr)
 	}
 
-	q.ConnectionString = opts.CacheConnectionStr
-	q.TopicPrefix = "Matrix_"
-	q.Concurrency = 50
+	q.DS = opts.CacheConnectionStr
+	q.Prefix = "Matrix_"
 }
 
 func (q *QueueOptions) Verify(configErrs *ConfigErrors) {
-	checkNotEmpty(configErrs, "global.queue.topic_prefix", q.TopicPrefix)
+	checkNotEmpty(configErrs, "global.queue.topic_prefix", q.Prefix)
 
-	checkNotEmpty(configErrs, "global.queue.connection_string", string(q.ConnectionString))
+	checkNotEmpty(configErrs, "global.queue.connection_string", string(q.DS))
 }
 
 // ReportStats configures opt-in phone-home statistics reporting.

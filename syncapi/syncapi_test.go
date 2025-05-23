@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -20,7 +21,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/gorilla/mux"
-	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 
@@ -32,7 +32,6 @@ import (
 	"github.com/antinvestor/matrix/clientapi/producers"
 	"github.com/antinvestor/matrix/roomserver"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
@@ -146,13 +145,12 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
-	qm := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 
 	msgs := toNATSMsgs(t, cfg, room.Events()...)
-	AddPublicRoutes(ctx, routers, cfg, cm, &qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
-	jsctx, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
-	testrig.MustPublishMsgs(t, jsctx, msgs...)
+	testrig.MustPublishMsgs(ctx, t, qm, msgs...)
 
 	testCases := []struct {
 		name            string
@@ -251,13 +249,12 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
-	qm := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 
 	msgs := toNATSMsgs(t, cfg, room.Events()...)
-	AddPublicRoutes(ctx, routers, cfg, cm, &qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
-	jsctx, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
-	testrig.MustPublishMsgs(t, jsctx, msgs...)
+	testrig.MustPublishMsgs(ctx, t, qm, msgs...)
 
 	testCases := []struct {
 		name            string
@@ -324,7 +321,7 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 			}, test.WithStateKey(""))
 
 			msgs = toNATSMsgs(t, cfg, event)
-			testrig.MustPublishMsgs(t, jsctx, msgs...)
+			testrig.MustPublishMsgs(ctx, t, qm, msgs...)
 
 			syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
 				// wait for the last sent eventID to come down sync
@@ -401,7 +398,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
-	qm := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 
 	// order is:
 	// m.room.create
@@ -411,12 +408,10 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 	// m.room.history_visibility
 	msgs := toNATSMsgs(t, cfg, room.Events()...)
 	sinceTokens := make([]string, len(msgs))
-	AddPublicRoutes(ctx, routers, cfg, cm, &qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
-
-	jsctx, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
 	for i, msg := range msgs {
-		testrig.MustPublishMsgs(t, jsctx, msg)
+		testrig.MustPublishMsgs(ctx, t, qm, msg)
 		time.Sleep(100 * time.Millisecond)
 		w := httptest.NewRecorder()
 		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
@@ -508,9 +503,9 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 	}
 	cfg.Global.Presence.EnableOutbound = true
 	cfg.Global.Presence.EnableInbound = true
-	qm := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 
-	AddPublicRoutes(ctx, routers, cfg, cm, &qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
 	w := httptest.NewRecorder()
 	routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 		"access_token": alice.AccessToken,
@@ -627,12 +622,12 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		qm := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 
 		// Use the actual internal roomserver API
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		AddPublicRoutes(ctx, routers, cfg, cm, &qm, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
 
 		for _, tc := range testCases {
 			testname := fmt.Sprintf("%s - %s", tc.historyVisibility, userType)
@@ -898,13 +893,13 @@ func TestGetMembership(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		qm := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 
 		// Use an actual roomserver for this
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
-		AddPublicRoutes(ctx, routers, cfg, cm, &qm, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -975,15 +970,19 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
 
-	qm := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 
-	AddPublicRoutes(ctx, routers, cfg, cm, &qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
 
-	jsctx, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
+	cfgSyncAPI := cfg.SyncAPI
+	err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputSendToDeviceEvent)
+	if err != nil {
+		t.Fatalf("failed to register publisher: %v", err)
+	}
 
 	producer := producers.SyncAPIProducer{
-		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		JetStream:              jsctx,
+		TopicSendToDeviceEvent: cfgSyncAPI.Queues.OutputSendToDeviceEvent.Ref(),
+		Qm:                     qm,
 	}
 
 	msgCounter := 0
@@ -1201,11 +1200,11 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 	}
 
 	// Use an actual roomserver for this
-	qm := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.DisableMetrics)
+	qm := queueutil.NewQueueManager(svc)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 
-	AddPublicRoutes(ctx, routers, cfg, cm, &qm, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches, cacheutil.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches, cacheutil.DisableMetrics)
 
 	room := test.NewRoom(t, user)
 
@@ -1381,13 +1380,13 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 	}
 
 	// Use an actual roomserver for this
-	qm := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 
 	room := test.NewRoom(t, user)
-	AddPublicRoutes(ctx, routers, cfg, cm, &qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
 	if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 		t.Fatalf("failed to send events: %v", err)
@@ -1487,8 +1486,8 @@ func syncUntil(t *testing.T,
 	}
 }
 
-func toNATSMsgs(t *testing.T, cfg *config.Matrix, input ...*rstypes.HeaderedEvent) []*nats.Msg {
-	result := make([]*nats.Msg, len(input))
+func toNATSMsgs(t *testing.T, cfg *config.Matrix, input ...*rstypes.HeaderedEvent) []*testrig.QMsg {
+	result := make([]*testrig.QMsg, len(input))
 	for i, ev := range input {
 		var addsStateIDs []string
 		if ev.StateKey() != nil {

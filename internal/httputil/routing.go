@@ -15,6 +15,8 @@
 package httputil
 
 import (
+	"connectrpc.com/connect"
+	"connectrpc.com/validate"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -40,6 +42,7 @@ func URLDecodeMapValues(vmap map[string]string) (map[string]string, error) {
 }
 
 type Routers struct {
+	Validator     connect.Interceptor
 	Client        *mux.Router
 	Federation    *mux.Router
 	Keys          *mux.Router
@@ -51,7 +54,15 @@ type Routers struct {
 }
 
 func NewRouters() Routers {
+
+	// Create the validation interceptor provided by connectrpc.com/validate.
+	validator, err := validate.NewInterceptor()
+	if err != nil {
+		panic("error creating validation interceptor: " + err.Error())
+	}
+
 	r := Routers{
+		Validator:     validator,
 		Client:        mux.NewRouter().SkipClean(true).PathPrefix(PublicClientPathPrefix).Subrouter().UseEncodedPath(),
 		Federation:    mux.NewRouter().SkipClean(true).PathPrefix(PublicFederationPathPrefix).Subrouter().UseEncodedPath(),
 		Keys:          mux.NewRouter().SkipClean(true).PathPrefix(PublicKeyPathPrefix).Subrouter().UseEncodedPath(),

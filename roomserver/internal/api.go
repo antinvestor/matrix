@@ -3,12 +3,11 @@ package internal
 import (
 	"context"
 	"crypto/ed25519"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/getsentry/sentry-go"
-	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 
@@ -52,10 +51,7 @@ type RoomserverInternalAPI struct {
 	ServerACLs             *acls.ServerACLs
 	fsAPI                  fsAPI.RoomserverFederationAPI
 	asAPI                  asAPI.AppServiceInternalAPI
-	NATSClient             *nats.Conn
-	JetStream              nats.JetStreamContext
-	Durable                string
-	InputRoomEventTopic    string // JetStream topic for new input room events
+	Qm                     queueutil.QueueManager
 	OutputProducer         *producers.RoomEventProducer
 	PerspectiveServerNames []spec.ServerName
 	enableMetrics          bool
@@ -64,7 +60,7 @@ type RoomserverInternalAPI struct {
 
 func NewRoomserverAPI(
 	ctx context.Context, dendriteCfg *config.Matrix, roomserverDB storage.Database,
-	js nats.JetStreamContext, nc *nats.Conn, caches cacheutil.RoomServerCaches, enableMetrics bool,
+	qm queueutil.QueueManager, caches cacheutil.RoomServerCaches, enableMetrics bool,
 ) *RoomserverInternalAPI {
 	var perspectiveServerNames []spec.ServerName
 	for _, kp := range dendriteCfg.FederationAPI.KeyPerspectives {
@@ -72,10 +68,11 @@ func NewRoomserverAPI(
 	}
 
 	serverACLs := acls.NewServerACLs(ctx, roomserverDB)
+
 	producer := &producers.RoomEventProducer{
-		Topic:     dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		JetStream: js,
-		ACLs:      serverACLs,
+		Topic: dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		Qm:    qm,
+		ACLs:  serverACLs,
 	}
 	a := &RoomserverInternalAPI{
 		DB:                     roomserverDB,
@@ -83,11 +80,8 @@ func NewRoomserverAPI(
 		Cache:                  caches,
 		ServerName:             dendriteCfg.Global.ServerName,
 		PerspectiveServerNames: perspectiveServerNames,
-		InputRoomEventTopic:    dendriteCfg.Global.JetStream.Prefixed(jetstream.InputRoomEvent),
 		OutputProducer:         producer,
-		JetStream:              js,
-		NATSClient:             nc,
-		Durable:                dendriteCfg.Global.JetStream.Durable("RoomserverInputConsumer"),
+		Qm:                     qm,
 		ServerACLs:             serverACLs,
 		enableMetrics:          enableMetrics,
 		defaultRoomVersion:     dendriteCfg.RoomServer.DefaultRoomVersion,
@@ -112,23 +106,19 @@ func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAP
 		FSAPI:             fsAPI,
 	}
 
-	r.Inputer = &input.Inputer{
-		Cfg:                 &r.Cfg.RoomServer,
-		DB:                  r.DB,
-		InputRoomEventTopic: r.InputRoomEventTopic,
-		OutputProducer:      r.OutputProducer,
-		JetStream:           r.JetStream,
-		NATSClient:          r.NATSClient,
-		Durable:             nats.Durable(r.Durable),
-		ServerName:          r.ServerName,
-		SigningIdentity:     r.SigningIdentityFor,
-		FSAPI:               fsAPI,
-		RSAPI:               r,
-		KeyRing:             keyRing,
-		ACLs:                r.ServerACLs,
-		Queryer:             r.Queryer,
-		EnableMetrics:       r.enableMetrics,
+	inputer, err := input.NewInputer(
+		ctx, &r.Cfg.RoomServer, r.DB, r.Qm,
+		r.ServerName,
+		nil,
+		fsAPI, r,
+		keyRing, r.ServerACLs, r.OutputProducer, r.Queryer,
+		nil, r.enableMetrics)
+	if err != nil {
+		logrus.WithError(err).Panic("failed to start roomserver input API")
 	}
+
+	r.Inputer = inputer
+
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,
 		Cfg:     &r.Cfg.RoomServer,
@@ -201,10 +191,6 @@ func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAP
 		Cfg:   &r.Cfg.RoomServer,
 		RSAPI: r,
 	}
-
-	if err := r.Start(ctx); err != nil {
-		logrus.WithError(err).Panic("failed to start roomserver input API")
-	}
 }
 
 func (r *RoomserverInternalAPI) SetUserAPI(_ context.Context, userAPI userapi.RoomserverUserAPI) {
@@ -235,7 +221,7 @@ func (r *RoomserverInternalAPI) HandleInvite(
 	if err != nil {
 		return err
 	}
-	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID().String(), outputEvents)
+	return r.OutputProducer.ProduceRoomEvents(ctx, inviteEvent.RoomID().String(), outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformCreateRoom(
@@ -258,13 +244,13 @@ func (r *RoomserverInternalAPI) PerformLeave(
 ) error {
 	outputEvents, err := r.Leaver.PerformLeave(ctx, req, res)
 	if err != nil {
-		sentry.CaptureException(err)
+
 		return err
 	}
 	if len(outputEvents) == 0 {
 		return nil
 	}
-	return r.OutputProducer.ProduceRoomEvents(req.RoomID, outputEvents)
+	return r.OutputProducer.ProduceRoomEvents(ctx, req.RoomID, outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformForget(

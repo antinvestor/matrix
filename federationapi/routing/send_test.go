@@ -17,6 +17,7 @@ package routing_test
 import (
 	"encoding/hex"
 	"encoding/json"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"net/http/httptest"
 	"testing"
 
@@ -28,7 +29,6 @@ import (
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/setup/signing"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
@@ -55,11 +55,11 @@ func TestHandleSend(t *testing.T) {
 		routers := httputil.NewRouters()
 
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
-		qm := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 		routers.Federation = fedMux
 		cfg.FederationAPI.Global.ServerName = testOrigin
 		cfg.FederationAPI.Global.Metrics.Enabled = false
-		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, &qm, nil, nil, nil, nil, true)
+		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, qm, nil, nil, nil, nil, true, nil)
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
 

@@ -19,7 +19,7 @@ type dummyPublisher struct {
 	count int
 }
 
-func (d *dummyPublisher) SendPresence(userID string, presence types.Presence, statusMsg *string) error {
+func (d *dummyPublisher) SendPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.count++

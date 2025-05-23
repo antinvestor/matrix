@@ -44,9 +44,12 @@ type AppServiceAPI struct {
 	LegacyPaths bool `yaml:"legacy_paths"`
 
 	ConfigFiles []string `yaml:"config_files"`
+
+	Queues AppServiceQueues `yaml:"queues"`
 }
 
 func (c *AppServiceAPI) Defaults(opts DefaultOpts) {
+	c.Queues.Defaults(opts)
 }
 
 func (c *AppServiceAPI) Verify(configErrs *ConfigErrors) {
@@ -429,4 +432,19 @@ func IsValidRegex(regexString string) bool {
 	_, err := regexp.Compile(regexString)
 
 	return err == nil
+}
+
+type AppServiceQueues struct {
+
+	// durable - Appservice_
+	OutputAppserviceEvent QueueOptions `yaml:"output_appservice_event"`
+}
+
+func (q *AppServiceQueues) Defaults(opts DefaultOpts) {
+	q.OutputAppserviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "AppServiceOutputAppserviceEvent", DS: "mem://AppServiceOutputAppserviceEvent"}
+
+}
+
+func (q *AppServiceQueues) Verify(configErrs *ConfigErrors) {
+	checkNotEmpty(configErrs, "appservice.queues.output_appservice_event", string(q.OutputAppserviceEvent.DS))
 }

@@ -16,11 +16,12 @@ package consumers
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/userapi/storage"
@@ -34,9 +35,7 @@ import (
 // OutputReceiptEventConsumer consumes events that originated in the clientAPI.
 type OutputReceiptEventConsumer struct {
 	ctx          context.Context
-	jetstream    nats.JetStreamContext
-	durable      string
-	topic        string
+	qm           queueutil.QueueManager
 	db           storage.UserDatabase
 	serverName   spec.ServerName
 	syncProducer *producers.SyncAPI
@@ -48,44 +47,35 @@ type OutputReceiptEventConsumer struct {
 func NewOutputReceiptEventConsumer(
 	ctx context.Context,
 	cfg *config.UserAPI,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
 	store storage.UserDatabase,
 	syncProducer *producers.SyncAPI,
 	pgClient pushgateway.Client,
-) *OutputReceiptEventConsumer {
-	return &OutputReceiptEventConsumer{
+) error {
+	c := &OutputReceiptEventConsumer{
 		ctx:          ctx,
-		jetstream:    js,
-		topic:        cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		durable:      cfg.Global.JetStream.Durable("UserAPIReceiptConsumer"),
+		qm:           qm,
 		db:           store,
 		serverName:   cfg.Global.ServerName,
 		syncProducer: syncProducer,
 		pgClient:     pgClient,
 	}
+
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputReceiptEvent, c)
 }
 
-// Start consuming receipts events.
-func (s *OutputReceiptEventConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		s.ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
+func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
-func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
-
-	userID := msg.Header.Get(jetstream.UserID)
-	roomID := msg.Header.Get(jetstream.RoomID)
-	readPos := msg.Header.Get(jetstream.EventID)
-	evType := msg.Header.Get("type")
+	userID := metadata[jetstream.UserID]
+	roomID := metadata[jetstream.RoomID]
+	readPos := metadata[jetstream.EventID]
+	evType := metadata["type"]
 
 	if readPos == "" || (evType != "m.read" && evType != "m.read.private") {
-		return true
+		return nil
 	}
 
-	log := log.WithFields(log.Fields{
+	log := logrus.WithFields(logrus.Fields{
 		"room_id": roomID,
 		"user_id": userID,
 	})
@@ -93,35 +83,33 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		log.WithError(err).Error("userapi clientapi consumer: SplitID failure")
-		return true
+		return nil
 	}
 	if domain != s.serverName {
-		return true
+		return nil
 	}
 
-	metadata, err := msg.Metadata()
-	if err != nil {
-		return false
-	}
+	//TODO: previously this was extracted from message metadata, figure a way too pass in a stable position
+	timeNow := time.Now()
 
-	updated, err := s.db.SetNotificationsRead(ctx, localpart, domain, roomID, uint64(spec.AsTimestamp(metadata.Timestamp)), true)
+	updated, err := s.db.SetNotificationsRead(ctx, localpart, domain, roomID, uint64(spec.AsTimestamp(timeNow)), true)
 	if err != nil {
 		log.WithError(err).Error("userapi EDU consumer")
-		return false
+		return err
 	}
 
 	if err = s.syncProducer.GetAndSendNotificationData(ctx, userID, roomID); err != nil {
 		log.WithError(err).Error("userapi EDU consumer: GetAndSendNotificationData failed")
-		return false
+		return err
 	}
 
 	if !updated {
-		return true
+		return nil
 	}
 	if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, domain, s.db); err != nil {
 		log.WithError(err).Error("userapi EDU consumer: NotifyUserCounts failed")
-		return false
+		return err
 	}
 
-	return true
+	return nil
 }

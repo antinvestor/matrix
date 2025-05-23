@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -22,7 +23,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi"
 	uapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
@@ -36,7 +36,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/userapi"
 
@@ -156,13 +155,13 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		}
 
 		// Create required internal APIs
-		qm := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 		cm := sqlutil.NewConnectionManager(svc)
 
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
-		asAPI := appservice.NewInternalAPI(ctx, cfg, &qm, usrAPI, rsAPI)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		asAPI := appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
 
 		runCases(t, asAPI)
 	})
@@ -251,12 +250,12 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
 	// Create required internal APIs
-	qm := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 	cm := sqlutil.NewConnectionManager(svc)
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
-	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, &qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
-	asAPI := appservice.NewInternalAPI(ctx, cfg, &qm, usrAPI, rsAPI)
+	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
 
 	t.Run("UserIDExists", func(t *testing.T) {
 		testUserIDExists(t, asAPI, "@as-testing:test", true)
@@ -357,7 +356,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		defer svc.Stop(ctx)
 
 		cm := sqlutil.NewConnectionManager(svc)
-		qm := &jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 
 		evChan := make(chan struct{})
 		// create a dummy AS url, handling the events
@@ -441,7 +440,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		defer svc.Stop(ctx)
 
 		cm := sqlutil.NewConnectionManager(svc)
-		qm := &jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 
 		evChan := make(chan struct{})
 
@@ -474,7 +473,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		// create a dummy AS url, handling the events
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var txn consumers.ApplicationServiceTransaction
-			err := json.NewDecoder(r.Body).Decode(&txn)
+			err = json.NewDecoder(r.Body).Decode(&txn)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -536,36 +535,15 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		// Create a dummy application service
 		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
 
-		// Prepare AS Streams on the old topic to validate that they get deleted
-		jsCtx, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
-
-		token := jetstream.Tokenise(as.ID)
-		if err := jetstream.Consumer(
-			ctx, jsCtx, cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
-			cfg.Global.JetStream.Durable("Appservice_"+token),
-			50, // maximum number of events to send in a single transaction
-			func(ctx context.Context, msgs []*nats.Msg) bool {
-				return true
-			},
-		); err != nil {
-			t.Fatal(err)
-		}
-
 		// Start the syncAPI to have `/joined_members` available
 		syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, usrAPI, rsAPI, caches, cacheutil.DisableMetrics)
 
 		// start the consumer
 		appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
 
-		// At this point, the old JetStream consumers should be deleted
-		for consumer := range jsCtx.Consumers(cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent)) {
-			if consumer.Name == cfg.Global.JetStream.Durable("Appservice_"+token)+"Pull" {
-				t.Fatalf("Consumer still exists")
-			}
-		}
-
 		// Create the room, this triggers the AS to receive an invite for Bob.
-		if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+		err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false)
+		if err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 

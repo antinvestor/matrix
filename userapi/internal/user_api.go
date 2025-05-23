@@ -122,7 +122,7 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 			return err
 		}
 	}
-	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
+	if err = a.SyncProducer.SendAccountData(ctx, req.UserID, eventutil.AccountData{
 		RoomID:       req.RoomID,
 		Type:         req.DataType,
 		IgnoredUsers: ignoredUsers,
@@ -243,7 +243,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	}
 
 	// Inform the SyncAPI about the newly created push_rules
-	if err = a.SyncProducer.SendAccountData(acc.UserID, eventutil.AccountData{
+	if err = a.SyncProducer.SendAccountData(ctx, acc.UserID, eventutil.AccountData{
 		Type: "m.push_rules",
 	}); err != nil {
 		util.GetLogger(ctx).WithFields(logrus.Fields{

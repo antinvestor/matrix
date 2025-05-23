@@ -16,20 +16,19 @@ package producers
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
-	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
 
 // KeyChange produces key change events for the sync API and federation sender to consume
 type KeyChange struct {
-	Topic     string
-	JetStream JetStreamPublisher
-	DB        storage.KeyChangeDatabase
+	Topic string
+	Qm    queueutil.QueueManager
+	DB    storage.KeyChangeDatabase
 }
 
 // ProduceKeyChanges creates new change events for each key
@@ -41,19 +40,12 @@ func (p *KeyChange) ProduceKeyChanges(ctx context.Context, keys []api.DeviceMess
 			return err
 		}
 		key.DeviceChangeID = id
-		value, err := json.Marshal(key)
-		if err != nil {
-			return err
+
+		header := map[string]string{
+			jetstream.UserID: key.UserID,
 		}
 
-		m := &nats.Msg{
-			Subject: p.Topic,
-			Header:  nats.Header{},
-		}
-		m.Header.Set(jetstream.UserID, key.UserID)
-		m.Data = value
-
-		_, err = p.JetStream.PublishMsg(m)
+		err = p.Qm.Publish(ctx, p.Topic, key, header)
 		if err != nil {
 			return err
 		}
@@ -83,19 +75,11 @@ func (p *KeyChange) ProduceSigningKeyUpdate(ctx context.Context, key api.CrossSi
 	}
 	output.DeviceChangeID = id
 
-	value, err := json.Marshal(output)
-	if err != nil {
-		return err
+	header := map[string]string{
+		jetstream.UserID: key.UserID,
 	}
 
-	m := &nats.Msg{
-		Subject: p.Topic,
-		Header:  nats.Header{},
-	}
-	m.Header.Set(jetstream.UserID, key.UserID)
-	m.Data = value
-
-	_, err = p.JetStream.PublishMsg(m)
+	err = p.Qm.Publish(ctx, p.Topic, output, header)
 	if err != nil {
 		return err
 	}

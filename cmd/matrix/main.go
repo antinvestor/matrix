@@ -15,7 +15,10 @@
 package main
 
 import (
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"net/http"
 	"strings"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
@@ -29,7 +32,6 @@ import (
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/getsentry/sentry-go"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -178,10 +180,15 @@ func main() {
 		log.WithError(err).Panicf("failed to create cache")
 	}
 
-	qm := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &qm, caches, cacheutil.EnableMetrics)
+	qm := queueutil.NewQueueManager(service)
+
+	presenceCli := presencev1connect.NewPresenceServiceClient(
+		http.DefaultClient, cfg.Global.SyncAPIPresenceURI,
+	)
+
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.EnableMetrics)
 	fsAPI := federationapi.NewInternalAPI(
-		ctx, cfg, cm, &qm, federationClient, rsAPI, caches, nil, false,
+		ctx, cfg, cm, qm, federationClient, rsAPI, caches, nil, false, presenceCli,
 	)
 
 	keyRing := fsAPI.KeyRing()
@@ -191,8 +198,8 @@ func main() {
 	// dependency. Other components also need updating after their dependencies are up.
 	rsAPI.SetFederationAPI(ctx, fsAPI, keyRing)
 
-	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &qm, rsAPI, federationClient, profileCli, cacheutil.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
-	asAPI := appservice.NewInternalAPI(ctx, cfg, &qm, userAPI, rsAPI)
+	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, federationClient, profileCli, cacheutil.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI)
 
 	rsAPI.SetAppserviceAPI(ctx, asAPI)
 	rsAPI.SetUserAPI(ctx, userAPI)
@@ -213,8 +220,10 @@ func main() {
 
 		PartitionCli: partitionCli,
 		ProfileCli:   profileCli,
+
+		PresenceCli: presenceCli,
 	}
-	monolith.AddAllPublicRoutes(ctx, cfg, routers, cm, &qm, caches, cacheutil.EnableMetrics)
+	monolith.AddAllPublicRoutes(ctx, cfg, routers, cm, qm, caches, cacheutil.EnableMetrics)
 
 	if len(cfg.MSCs.MSCs) > 0 {
 		err = mscs.Enable(ctx, cfg, cm, routers, &monolith, caches)

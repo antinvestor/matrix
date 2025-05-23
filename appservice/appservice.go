@@ -16,10 +16,10 @@ package appservice
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"sync"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/sirupsen/logrus"
 
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
@@ -35,7 +35,7 @@ import (
 func NewInternalAPI(
 	ctx context.Context,
 	cfg *config.Matrix,
-	qm *jetstream.NATSInstance,
+	qm queueutil.QueueManager,
 	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceInternalAPI {
@@ -66,12 +66,11 @@ func NewInternalAPI(
 
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
 	// We can't add ASes at runtime so this is safe to do.
-	js, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
-	consumer := consumers.NewOutputRoomEventConsumer(
+	err := consumers.NewOutputRoomEventConsumer(
 		ctx, &cfg.AppServiceAPI,
-		js, rsAPI,
+		qm, rsAPI,
 	)
-	if err := consumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
 	}
 

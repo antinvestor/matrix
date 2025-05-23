@@ -2,6 +2,7 @@ package input_test
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"testing"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/input"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 )
@@ -24,8 +24,8 @@ func TestSingleTransactionOnInput(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(svc)
 
-		qm := &jetstream.NATSInstance{}
-		js, jc := qm.Prepare(ctx, &cfg.Global.JetStream)
+		qm := queueutil.NewQueueManager(svc)
+
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
@@ -52,11 +52,11 @@ func TestSingleTransactionOnInput(t *testing.T) {
 			Event: &types.HeaderedEvent{PDU: event},
 		}
 
-		inputter := &input.Inputer{
-			JetStream:  js,
-			NATSClient: jc,
-			Cfg:        &cfg.RoomServer,
+		inputter, err := input.NewInputer(ctx, &cfg.RoomServer, nil, qm, "", nil, nil, nil, nil, nil, nil, nil, nil, false)
+		if err != nil {
+			t.Fatal(err)
 		}
+
 		res := &api.InputRoomEventsResponse{}
 		inputter.InputRoomEvents(
 			ctx,
@@ -68,7 +68,8 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		)
 		// If we fail here then it's because we've hit the test deadline,
 		// so we probably deadlocked
-		if err := res.Err(); err != nil {
+		err = res.Err()
+		if err != nil {
 			t.Fatal(err)
 		}
 	})

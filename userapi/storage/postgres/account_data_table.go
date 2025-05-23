@@ -113,8 +113,8 @@ func (t *accountDataTable) SelectAccountData(
 	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 ) (
-	/* global */ map[string]json.RawMessage,
-	/* rooms */ map[string]map[string]json.RawMessage,
+/* global */ map[string]json.RawMessage,
+/* rooms */ map[string]map[string]json.RawMessage,
 	error,
 ) {
 	db := t.cm.Connection(ctx, true)

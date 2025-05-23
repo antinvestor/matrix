@@ -3,6 +3,7 @@ package consumers
 import (
 	"context"
 	"crypto/ed25519"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"reflect"
 	"sync"
 	"testing"
@@ -16,7 +17,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/bcrypt"
@@ -155,7 +155,7 @@ func TestLocalRoomMembers(t *testing.T) {
 		defer svc.Stop(ctx)
 
 		cm := sqlutil.NewConnectionManager(svc)
-		qm := &jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -307,7 +307,7 @@ func BenchmarkLocalRoomMembers(b *testing.B) {
 	defer svc.Stop(ctx)
 
 	cm := sqlutil.NewConnectionManager(svc)
-	qm := &jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)

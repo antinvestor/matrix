@@ -33,8 +33,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/getsentry/sentry-go"
-
 	"github.com/pitabwire/util"
 )
 
@@ -394,7 +392,7 @@ func sendInvite(
 	case nil:
 	default:
 		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
-		sentry.CaptureException(err)
+
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

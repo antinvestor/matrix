@@ -17,23 +17,20 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/userapi/api"
 )
 
 // SigningKeyUpdateConsumer consumes signing key updates that came in over federation.
 type SigningKeyUpdateConsumer struct {
-	jetstream         nats.JetStreamContext
-	durable           string
-	topic             string
+	qm                queueutil.QueueManager
 	userAPI           api.UploadDeviceKeysAPI
 	cfg               *config.UserAPI
 	isLocalServerName func(spec.ServerName) bool
@@ -41,48 +38,39 @@ type SigningKeyUpdateConsumer struct {
 
 // NewSigningKeyUpdateConsumer creates a new SigningKeyUpdateConsumer. Call Start() to begin consuming from key servers.
 func NewSigningKeyUpdateConsumer(
-	_ context.Context,
+	ctx context.Context,
 	cfg *config.UserAPI,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
 	userAPI api.UploadDeviceKeysAPI,
-) *SigningKeyUpdateConsumer {
-	return &SigningKeyUpdateConsumer{
-		jetstream:         js,
-		durable:           cfg.Global.JetStream.Prefixed("KeyServerSigningKeyConsumer"),
-		topic:             cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+) error {
+	c := &SigningKeyUpdateConsumer{
+		qm:                qm,
 		userAPI:           userAPI,
 		cfg:               cfg,
 		isLocalServerName: cfg.Global.IsLocalServerName,
 	}
+
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.InputSigningKeyUpdate, c)
 }
 
-// Start consuming from key servers
-func (t *SigningKeyUpdateConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		ctx, t.jetstream, t.topic, t.durable, 1,
-		t.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
-
-// onMessage is called in response to a message received on the
+// Handle is called in response to a message received on the
 // signing key update events topic from the key server.
-func (t *SigningKeyUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
+func (t *SigningKeyUpdateConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	var updatePayload api.CrossSigningKeyUpdate
-	if err := json.Unmarshal(msg.Data, &updatePayload); err != nil {
+	if err := json.Unmarshal(message, &updatePayload); err != nil {
 		logrus.WithError(err).Errorf("Failed to read from signing key update input topic")
-		return true
+		return nil
 	}
-	origin := spec.ServerName(msg.Header.Get("origin"))
+	origin := spec.ServerName(metadata["origin"])
 	if _, serverName, err := gomatrixserverlib.SplitID('@', updatePayload.UserID); err != nil {
 		logrus.WithError(err).Error("failed to split user id")
-		return true
+		return nil
 	} else if t.isLocalServerName(serverName) {
 		logrus.Warn("dropping device key update from ourself")
-		return true
+		return nil
 	} else if serverName != origin {
 		logrus.Warnf("dropping device key update, %s != %s", serverName, origin)
-		return true
+		return nil
 	}
 
 	keys := fclient.CrossSigningKeys{}
@@ -100,8 +88,8 @@ func (t *SigningKeyUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	t.userAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
 	if uploadRes.Error != nil {
 		logrus.WithError(uploadRes.Error).Error("failed to upload device keys")
-		return true
+		return nil
 	}
 
-	return true
+	return nil
 }

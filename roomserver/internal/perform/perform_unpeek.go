@@ -54,7 +54,7 @@ func (r *Unpeeker) PerformUnpeek(
 }
 
 func (r *Unpeeker) performUnpeekRoomByID(
-	_ context.Context,
+	ctx context.Context,
 	roomID, userID, deviceID string,
 ) (err error) {
 	// Get the domain part of the room ID.
@@ -68,7 +68,7 @@ func (r *Unpeeker) performUnpeekRoomByID(
 	// it will have been overwritten with a room ID by performPeekRoomByAlias.
 	// We should now include this in the response so that the CS API can
 	// return the right room ID.
-	return r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
+	return r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeRetirePeek,
 			RetirePeek: &api.OutputRetirePeek{

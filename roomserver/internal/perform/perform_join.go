@@ -26,7 +26,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/getsentry/sentry-go"
 	"github.com/pitabwire/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -66,7 +65,7 @@ func (r *Joiner) PerformJoin(
 	roomID, joinedVia, err = r.performJoin(ctx, req)
 	if err != nil {
 		logger.WithError(err).Error("Failed to join room")
-		sentry.CaptureException(err)
+
 		return "", "", err
 	}
 	logger.Info("User joined room successfully")

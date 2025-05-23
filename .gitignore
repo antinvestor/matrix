@@ -88,3 +88,5 @@ go.work*
 runtime/
 mediaapi/routing/testdata/
 
+gen/
+

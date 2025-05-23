@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"connectrpc.com/connect"
 	"net/http"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -36,15 +37,17 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	csMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
+	csMux *mux.Router, validator connect.Interceptor, srp *sync.RequestPool, syncDB storage.Database,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
 	lazyLoadCache cacheutil.LazyLoadCache,
 	rateLimits *httputil.RateLimits,
-) {
+) error {
+
 	v1unstablemux := csMux.PathPrefix("/{apiversion:(?:v1|unstable)}/").Subrouter()
 	v3mux := csMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
+	internalMux := csMux.PathPrefix("/internal/").Subrouter()
 
 	// TODO: Add AS support for all handlers below.
 	v3mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -198,4 +201,6 @@ func Setup(
 			return GetMemberships(req, device, vars["roomID"], syncDB, rsAPI, membership, notMembership, at)
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	return SetupPresenceServer(internalMux, validator, syncDB, userAPI)
 }

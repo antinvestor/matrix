@@ -46,6 +46,8 @@ type FederationAPI struct {
 
 	// Should we prefer direct key fetches over perspective ones?
 	PreferDirectFetch bool `yaml:"prefer_direct_fetch"`
+
+	Queues FederationAPIQueues `yaml:"queues"`
 }
 
 func (c *FederationAPI) Defaults(opts DefaultOpts) {
@@ -69,7 +71,7 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 		},
 	}
 	c.Database.ConnectionString = opts.DatabaseConnectionStr
-
+	c.Queues.Defaults(opts)
 }
 
 func (c *FederationAPI) Verify(configErrs *ConfigErrors) {
@@ -117,4 +119,38 @@ type KeyPerspectiveTrustKey struct {
 	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
 	// The public key in base64 unpadded format
 	PublicKey string `yaml:"public_key"`
+}
+
+type FederationAPIQueues struct {
+
+	// durable - FederationAPIPresenceConsumer
+	OutputPresenceEvent QueueOptions `yaml:"output_presence_event"`
+
+	// durable - FederationAPIReceiptConsumer
+	OutputReceiptEvent QueueOptions `yaml:"output_receipt_event"`
+
+	// durable - FederationAPIRoomServerConsumer
+	OutputRoomEvent QueueOptions `yaml:"output_room_event"`
+
+	// durable - FederationAPIESendToDeviceConsumer
+	OutputSendToDeviceEvent QueueOptions `yaml:"output_send_to_device_event"`
+
+	// durable - FederationAPITypingConsumer
+	OutputTypingEvent QueueOptions `yaml:"output_typing_event"`
+}
+
+func (q *FederationAPIQueues) Defaults(opts DefaultOpts) {
+	q.OutputPresenceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIPresenceConsumer", DS: "mem://FederationAPIOutputPresenceEvent"}
+	q.OutputReceiptEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIReceiptConsumer", DS: "mem://FederationAPIOutputReceiptEvent"}
+	q.OutputRoomEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIRoomServerConsumer", DS: "mem://FederationAPIOutputRoomEvent"}
+	q.OutputSendToDeviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIESendToDeviceConsumer", DS: "mem://FederationAPIOutputSendToDeviceEvent"}
+	q.OutputTypingEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPITypingConsumer", DS: "mem://FederationAPIOutputTypingEvent"}
+}
+
+func (q *FederationAPIQueues) Verify(configErrs *ConfigErrors) {
+	checkNotEmpty(configErrs, "federation_api.queues.output_presence_event", string(q.OutputPresenceEvent.DS))
+	checkNotEmpty(configErrs, "federation_api.queues.output_receipt_event", string(q.OutputReceiptEvent.DS))
+	checkNotEmpty(configErrs, "federation_api.queues.output_room_event", string(q.OutputRoomEvent.DS))
+	checkNotEmpty(configErrs, "federation_api.queues.output_send_to_device_event", string(q.OutputSendToDeviceEvent.DS))
+	checkNotEmpty(configErrs, "federation_api.queues.output_typing_event", string(q.OutputTypingEvent.DS))
 }

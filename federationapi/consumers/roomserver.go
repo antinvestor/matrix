@@ -20,95 +20,86 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
-	"time"
 
-	"github.com/antinvestor/gomatrixserverlib/spec"
-	syncAPITypes "github.com/antinvestor/matrix/syncapi/types"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
-
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/jetstream"
+	log "github.com/sirupsen/logrus"
+
+	syncAPITypes "github.com/antinvestor/matrix/syncapi/types"
+
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
+	presenceV1 "buf.build/gen/go/antinvestor/presence/protocolbuffers/go"
+	"connectrpc.com/connect"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	cfg           *config.FederationAPI
-	rsAPI         api.FederationRoomserverAPI
-	jetstream     nats.JetStreamContext
-	natsClient    *nats.Conn
-	durable       string
-	db            storage.Database
-	queues        *queue.OutgoingQueues
-	topic         string
-	topicPresence string
+	cfg            *config.FederationAPI
+	rsAPI          api.FederationRoomserverAPI
+	qm             queueutil.QueueManager
+	db             storage.Database
+	queues         *queue.OutgoingQueues
+	presenceClient presencev1connect.PresenceServiceClient
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
 	ctx context.Context,
 	cfg *config.FederationAPI,
-	js nats.JetStreamContext,
-	natsClient *nats.Conn,
+	qm queueutil.QueueManager,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 	rsAPI api.FederationRoomserverAPI,
-) *OutputRoomEventConsumer {
-	return &OutputRoomEventConsumer{
-		cfg:           cfg,
-		jetstream:     js,
-		natsClient:    natsClient,
-		db:            store,
-		queues:        queues,
-		rsAPI:         rsAPI,
-		durable:       cfg.Global.JetStream.Durable("FederationAPIRoomServerConsumer"),
-		topic:         cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		topicPresence: cfg.Global.JetStream.Prefixed(jetstream.RequestPresence),
+	presenceClient presencev1connect.PresenceServiceClient,
+) error {
+	c := &OutputRoomEventConsumer{
+		cfg:            cfg,
+		qm:             qm,
+		db:             store,
+		queues:         queues,
+		rsAPI:          rsAPI,
+		presenceClient: presenceClient,
 	}
+
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputRoomEvent, c)
 }
 
-// Start consuming from room servers
-func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
-
-// onMessage is called when the federation server receives a new event from the room server output log.
+// Handle is called when the federation server receives a new event from the room server output log.
 // It is unsafe to call this with messages for the same room in multiple gorountines
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
-	receivedType := api.OutputType(msg.Header.Get(jetstream.RoomEventType))
+func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+	receivedType := api.OutputType(metadata[jetstream.RoomEventType])
 
 	// Only handle events we care about, avoids unneeded unmarshalling
 	switch receivedType {
 	case api.OutputTypeNewRoomEvent, api.OutputTypeNewInboundPeek, api.OutputTypePurgeRoom:
 	default:
-		return true
+		return nil
 	}
 
 	// Parse out the event JSON
 	var output api.OutputEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
+	err := json.Unmarshal(message, &output)
+	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return true
+		return nil
 	}
 
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
 		ev := output.NewRoomEvent.Event
-		if err := s.processMessage(ctx, *output.NewRoomEvent, output.NewRoomEvent.RewritesState); err != nil {
+		err = s.processMessage(ctx, *output.NewRoomEvent, output.NewRoomEvent.RewritesState)
+		if err != nil {
 			// panic rather than continue with an inconsistent database
 			log.WithFields(log.Fields{
 				"event_id":   ev.EventID(),
@@ -120,17 +111,19 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		}
 
 	case api.OutputTypeNewInboundPeek:
-		if err := s.processInboundPeek(ctx, *output.NewInboundPeek); err != nil {
+		err = s.processInboundPeek(ctx, *output.NewInboundPeek)
+		if err != nil {
 			log.WithFields(log.Fields{
 				"event":      output.NewInboundPeek,
 				log.ErrorKey: err,
 			}).Panicf("roomserver output log: remote peek event failure")
-			return false
+			return err
 		}
 
 	case api.OutputTypePurgeRoom:
 		log.WithField("room_id", output.PurgeRoom.RoomID).Warn("Purging room from federation API")
-		if err := s.db.PurgeRoom(ctx, output.PurgeRoom.RoomID); err != nil {
+		err = s.db.PurgeRoom(ctx, output.PurgeRoom.RoomID)
+		if err != nil {
 			log.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from federation API")
 		} else {
 			log.WithField("room_id", output.PurgeRoom.RoomID).Warn("Room purged from federation API")
@@ -142,7 +135,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		)
 	}
 
-	return true
+	return nil
 }
 
 // processInboundPeek starts tracking a new federated inbound peek (replacing the existing one if any)
@@ -268,33 +261,26 @@ func (s *OutputRoomEventConsumer) sendPresence(ctx context.Context, roomID strin
 	// send every presence we know about to the remote server
 	content := types.Presence{}
 	for _, ev := range queryRes.JoinEvents {
-		msg := nats.NewMsg(s.topicPresence)
-		msg.Header.Set(jetstream.UserID, ev.Sender)
 
-		var presence *nats.Msg
-		presence, err = s.natsClient.RequestMsg(msg, time.Second*10)
-		if err != nil {
-			log.WithError(err).Errorf("unable to get presence")
+		resp, err0 := s.presenceClient.GetPresence(ctx, connect.NewRequest(&presenceV1.GetPresenceRequest{
+			UserId: ev.Sender,
+		}))
+		if err0 != nil {
+			log.WithError(err0).Errorf("unable to get presence")
 			continue
 		}
 
-		statusMsg := presence.Header.Get("status_msg")
-		e := presence.Header.Get("error")
-		if e != "" {
-			continue
-		}
-		var lastActive int
-		lastActive, err = strconv.Atoi(presence.Header.Get("last_active_ts"))
-		if err != nil {
-			continue
-		}
+		presence := resp.Msg
+		statusMsg := presence.GetStatusMsg()
+
+		lastActive := presence.GetLastActiveTs()
 
 		p := syncAPITypes.PresenceInternal{LastActiveTS: spec.Timestamp(lastActive)}
 
 		content.Push = append(content.Push, types.PresenceContent{
 			CurrentlyActive: p.CurrentlyActive(),
 			LastActiveAgo:   p.LastActiveAgo(),
-			Presence:        presence.Header.Get("presence"),
+			Presence:        presence.GetPresence(),
 			StatusMsg:       &statusMsg,
 			UserID:          ev.Sender,
 		})
@@ -501,7 +487,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 
 	// At this point the missing events are neither the event itself nor are
 	// they present in our local database. Our only option is to fetch them
-	// from the roomserver using the query API.
+	// from the room server using the query API.
 	eventReq := api.QueryEventsByIDRequest{EventIDs: missing, RoomID: event.RoomID().String()}
 	var eventResp api.QueryEventsByIDResponse
 	if err := s.rsAPI.QueryEventsByID(ctx, &eventReq, &eventResp); err != nil {

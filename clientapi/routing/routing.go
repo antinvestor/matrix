@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"context"
 	"net/http"
 	"strings"
@@ -24,14 +25,10 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/gorilla/mux"
-	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
-
-	"github.com/antinvestor/matrix/setup/base"
-	userapi "github.com/antinvestor/matrix/userapi/api"
 
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/api"
@@ -42,8 +39,9 @@ import (
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/transactions"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/setup/base"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
 type WellKnownClientHomeserver struct {
@@ -78,8 +76,8 @@ func Setup(
 	transactionsCache *transactions.Cache,
 	federationSender federationAPI.ClientFederationAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	natsClient *nats.Conn,
 	partitionCli *partitionv1.PartitionClient,
+	presenceCli presencev1connect.PresenceServiceClient,
 	enableMetrics bool,
 ) {
 	cfg := &dendriteCfg.ClientAPI
@@ -96,6 +94,12 @@ func Setup(
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
 	ssoAuth := auth.NewAuthenticator(&cfg.LoginSSO, partitionCli)
+
+	if presenceCli == nil {
+		presenceCli = presencev1connect.NewPresenceServiceClient(
+			http.DefaultClient, cfg.Global.SyncAPIPresenceURI,
+		)
+	}
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
@@ -247,7 +251,7 @@ func Setup(
 
 	dendriteAdminRouter.Handle("/admin/fulltext/reindex",
 		httputil.MakeAdminAPI("admin_fultext_reindex", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminReindex(req, cfg, device, natsClient)
+			return AdminReindex(req, cfg, device, syncProducer.Qm)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -1536,7 +1540,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetPresence(req, device, natsClient, cfg.Global.JetStream.Prefixed(jetstream.RequestPresence), vars["userId"])
+			return GetPresence(req, device, presenceCli, vars["userId"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

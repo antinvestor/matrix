@@ -2,10 +2,9 @@ package producers
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal/eventutil"
@@ -13,40 +12,25 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage"
 )
 
-type JetStreamPublisher interface {
-	PublishMsg(*nats.Msg, ...nats.PubOpt) (*nats.PubAck, error)
-}
-
 // SyncAPI produces messages for the Sync API server to consume.
 type SyncAPI struct {
 	db                    storage.Notification
-	producer              JetStreamPublisher
+	qm                    queueutil.QueueManager
 	clientDataTopic       string
 	notificationDataTopic string
 }
 
-func NewSyncAPI(db storage.UserDatabase, js JetStreamPublisher, clientDataTopic string, notificationDataTopic string) *SyncAPI {
+func NewSyncAPI(db storage.UserDatabase, qm queueutil.QueueManager, clientDataTopic string, notificationDataTopic string) *SyncAPI {
 	return &SyncAPI{
 		db:                    db,
-		producer:              js,
+		qm:                    qm,
 		clientDataTopic:       clientDataTopic,
 		notificationDataTopic: notificationDataTopic,
 	}
 }
 
 // SendAccountData sends account data to the Sync API server.
-func (p *SyncAPI) SendAccountData(userID string, data eventutil.AccountData) error {
-	m := &nats.Msg{
-		Subject: p.clientDataTopic,
-		Header:  nats.Header{},
-	}
-	m.Header.Set(jetstream.UserID, userID)
-
-	var err error
-	m.Data, err = json.Marshal(data)
-	if err != nil {
-		return err
-	}
+func (p *SyncAPI) SendAccountData(ctx context.Context, userID string, data eventutil.AccountData) error {
 
 	log.WithFields(log.Fields{
 		"user_id":   userID,
@@ -54,8 +38,15 @@ func (p *SyncAPI) SendAccountData(userID string, data eventutil.AccountData) err
 		"data_type": data.Type,
 	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
 
-	_, err = p.producer.PublishMsg(m)
-	return err
+	header := map[string]string{
+		jetstream.UserID: userID,
+	}
+
+	err := p.qm.Publish(ctx, p.clientDataTopic, data, header)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetAndSendNotificationData reads the database and sends data about unread
@@ -71,7 +62,7 @@ func (p *SyncAPI) GetAndSendNotificationData(ctx context.Context, userID, roomID
 		return err
 	}
 
-	return p.sendNotificationData(userID, &eventutil.NotificationData{
+	return p.sendNotificationData(ctx, userID, &eventutil.NotificationData{
 		RoomID:                  roomID,
 		UnreadHighlightCount:    int(nhighlight),
 		UnreadNotificationCount: int(ntotal),
@@ -79,24 +70,20 @@ func (p *SyncAPI) GetAndSendNotificationData(ctx context.Context, userID, roomID
 }
 
 // sendNotificationData sends data about unread notifications to the Sync API server.
-func (p *SyncAPI) sendNotificationData(userID string, data *eventutil.NotificationData) error {
-	m := &nats.Msg{
-		Subject: p.notificationDataTopic,
-		Header:  nats.Header{},
-	}
-	m.Header.Set(jetstream.UserID, userID)
-
-	var err error
-	m.Data, err = json.Marshal(data)
-	if err != nil {
-		return err
-	}
+func (p *SyncAPI) sendNotificationData(ctx context.Context, userID string, data *eventutil.NotificationData) error {
 
 	log.WithFields(log.Fields{
 		"user_id": userID,
 		"room_id": data.RoomID,
 	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
 
-	_, err = p.producer.PublishMsg(m)
-	return err
+	header := map[string]string{
+		jetstream.UserID: userID,
+	}
+
+	err := p.qm.Publish(ctx, p.notificationDataTopic, data, header)
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,7 +21,6 @@ import (
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
@@ -191,7 +191,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
-	qm := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 	cfg.FederationAPI.PreferDirectFetch = true
 	cfg.FederationAPI.KeyPerspectives = nil
 
@@ -242,7 +242,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 			},
 		},
 	}
-	fsapi := federationapi.NewInternalAPI(ctx, cfg, cm, &qm, fc, fedRSApi, caches, nil, false)
+	fsapi := federationapi.NewInternalAPI(ctx, cfg, cm, qm, fc, fedRSApi, caches, nil, false, nil)
 
 	var resp api.PerformJoinResponse
 	fsapi.PerformJoin(ctx, &api.PerformJoinRequest{
@@ -269,20 +269,16 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 			KeyJSON:     []byte(`{}`),
 		},
 	}
-	b, err := json.Marshal(key)
-	if err != nil {
-		t.Fatalf("Failed to marshal device message: %s", err)
+
+	msg := &testrig.QMsg{
+		Subject: cfg.KeyServer.Queues.OutputKeyChangeEvent.Ref(),
+		Header: map[string]string{
+			jetstream.UserID: key.UserID,
+		},
+		Data: key,
 	}
 
-	msg := &nats.Msg{
-		Subject: cfg.Global.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
-		Header:  nats.Header{},
-		Data:    b,
-	}
-	msg.Header.Set(jetstream.UserID, key.UserID)
-
-	jsctx, _ := qm.Prepare(ctx, &cfg.Global.JetStream)
-	testrig.MustPublishMsgs(t, jsctx, msg)
+	testrig.MustPublishMsgs(ctx, t, qm, msg)
 	time.Sleep(500 * time.Millisecond)
 	fc.fedClientMutex.Lock()
 	defer fc.fedClientMutex.Unlock()
@@ -332,10 +328,10 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.ServerName = spec.ServerName("localhost")
 	cfg.Global.PrivateKey = privKey
 	keyRing := &test.NopJSONVerifier{}
-	qm := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(ctx, routers, cfg, &qm, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, cacheutil.DisableMetrics)
+	federationapi.AddPublicRoutes(ctx, routers, cfg, qm, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, cacheutil.DisableMetrics)
 	baseURL, cancel := test.ListenAndServe(ctx, t, routers.Federation, true)
 	defer cancel()
 	serverName := spec.ServerName(strings.TrimPrefix(baseURL, "https://"))
@@ -466,7 +462,7 @@ func TestNotaryServer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		qm := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 		fc := &fedClient{
 			keys: map[spec.ServerName]struct {
 				key   ed25519.PrivateKey
@@ -483,7 +479,7 @@ func TestNotaryServer(t *testing.T) {
 			},
 		}
 
-		fedAPI := federationapi.NewInternalAPI(ctx, cfg, cm, &qm, fc, nil, caches, nil, true)
+		fedAPI := federationapi.NewInternalAPI(ctx, cfg, cm, qm, fc, nil, caches, nil, true, nil)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {

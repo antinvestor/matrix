@@ -17,11 +17,10 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/getsentry/sentry-go"
-	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -37,9 +36,7 @@ import (
 
 // OutputSendToDeviceEventConsumer consumes events that originated in the EDU server.
 type OutputSendToDeviceEventConsumer struct {
-	jetstream         nats.JetStreamContext
-	durable           string
-	topic             string
+	qm                queueutil.QueueManager
 	db                storage.Database
 	userAPI           api.SyncKeyAPI
 	isLocalServerName func(spec.ServerName) bool
@@ -50,54 +47,44 @@ type OutputSendToDeviceEventConsumer struct {
 // NewOutputSendToDeviceEventConsumer creates a new OutputSendToDeviceEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputSendToDeviceEventConsumer(
-	_ context.Context,
+	ctx context.Context,
 	cfg *config.SyncAPI,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
 	store storage.Database,
 	userAPI api.SyncKeyAPI,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
-) *OutputSendToDeviceEventConsumer {
-	return &OutputSendToDeviceEventConsumer{
-		jetstream:         js,
-		topic:             cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		durable:           cfg.Global.JetStream.Durable("SyncAPISendToDeviceConsumer"),
+) error {
+	c := &OutputSendToDeviceEventConsumer{
+		qm:                qm,
 		db:                store,
 		userAPI:           userAPI,
 		isLocalServerName: cfg.Global.IsLocalServerName,
 		notifier:          notifier,
 		stream:            stream,
 	}
+
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputSendToDeviceEvent, c)
 }
 
-// Start consuming send-to-device events.
-func (s *OutputSendToDeviceEventConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
-
-func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
-	userID := msg.Header.Get(jetstream.UserID)
+func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+	userID := metadata[jetstream.UserID]
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		sentry.CaptureException(err)
+
 		log.WithError(err).Errorf("send-to-device: failed to split user id, dropping message")
-		return true
+		return nil
 	}
 	if !s.isLocalServerName(domain) {
 		log.Tracef("ignoring send-to-device event with destination %s", domain)
-		return true
+		return nil
 	}
 
 	var output types.OutputSendToDeviceEvent
-	if err = json.Unmarshal(msg.Data, &output); err != nil {
+	if err = json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("send-to-device: message parse failure")
-		sentry.CaptureException(err)
-		return true
+		return err
 	}
 
 	logger := util.GetLogger(ctx).WithFields(log.Fields{
@@ -118,7 +105,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 				UserID: output.Sender, Domain: senderDomain, DeviceID: requestingDeviceID,
 			}, &struct{}{}); err != nil {
 				logger.WithError(err).Errorf("failed to mark as stale if needed")
-				return false
+				return err
 			}
 		}
 	}
@@ -127,9 +114,9 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 		ctx, output.UserID, output.DeviceID, output.SendToDeviceEvent,
 	)
 	if err != nil {
-		sentry.CaptureException(err)
+
 		log.WithError(err).Errorf("send-to-device: failed to store message")
-		return false
+		return err
 	}
 
 	s.stream.Advance(streamPos)
@@ -139,5 +126,5 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 		types.StreamingToken{SendToDevicePosition: streamPos},
 	)
 
-	return true
+	return nil
 }

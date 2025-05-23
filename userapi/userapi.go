@@ -16,6 +16,7 @@ package userapi
 
 import (
 	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"time"
 
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
@@ -26,7 +27,6 @@ import (
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/consumers"
 	"github.com/antinvestor/matrix/userapi/internal"
@@ -47,7 +47,7 @@ func NewInternalAPI(
 	ctx context.Context,
 	dendriteCfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
-	qm *jetstream.NATSInstance,
+	qm queueutil.QueueManager,
 	rsAPI rsapi.UserRoomserverAPI,
 	fedClient fedsenderapi.KeyserverFederationAPI,
 	profileCli *profilev1.ProfileClient,
@@ -56,12 +56,15 @@ func NewInternalAPI(
 ) *internal.UserInternalAPI {
 
 	var err error
-	js, _ := qm.Prepare(ctx, &dendriteCfg.Global.JetStream)
+
+	cfgUsrApi := dendriteCfg.UserAPI
+	cfgSyncApi := dendriteCfg.SyncAPI
+	cfgKeySrv := dendriteCfg.KeyServer
 	appServices := dendriteCfg.Derived.ApplicationServices
 
-	pgClient := pushgateway.NewHTTPClient(dendriteCfg.UserAPI.PushGatewayDisableTLSValidation)
+	pgClient := pushgateway.NewHTTPClient(cfgUsrApi.PushGatewayDisableTLSValidation)
 
-	userapiCm, err := cm.FromOptions(ctx, &dendriteCfg.UserAPI.AccountDatabase)
+	userapiCm, err := cm.FromOptions(ctx, &cfgUsrApi.AccountDatabase)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to obtain accounts db connection manager :%v", err)
 	}
@@ -79,7 +82,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}
 
-	keyCm, err := cm.FromOptions(ctx, &dendriteCfg.KeyServer.Database)
+	keyCm, err := cm.FromOptions(ctx, &cfgKeySrv.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to obtain key db connection manager")
 	}
@@ -88,19 +91,35 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to key db")
 	}
 
+	err = qm.RegisterPublisher(ctx, &cfgSyncApi.Queues.OutputClientData)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to register publisher for client data")
+	}
+
+	err = qm.RegisterPublisher(ctx, &cfgSyncApi.Queues.OutputNotificationData)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to register publisher for notification data")
+	}
+
 	syncProducer := producers.NewSyncAPI(
-		db, js,
+		db, qm,
 		// TODO: user API should handle syncs for account data. Right now,
 		// it's handled by clientapi, and hence uses its topic. When user
 		// API handles it for all account data, we can remove it from
 		// here.
-		dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputClientData),
-		dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputNotificationData),
+		cfgSyncApi.Queues.OutputClientData.Ref(),
+		cfgSyncApi.Queues.OutputNotificationData.Ref(),
 	)
+
+	err = qm.RegisterPublisher(ctx, &cfgKeySrv.Queues.OutputKeyChangeEvent)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to register publisher for key change events")
+	}
+
 	keyChangeProducer := &producers.KeyChange{
-		Topic:     dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
-		JetStream: js,
-		DB:        keyDB,
+		Topic: cfgKeySrv.Queues.OutputKeyChangeEvent.Ref(),
+		Qm:    qm,
+		DB:    keyDB,
 	}
 
 	userAPI := &internal.UserInternalAPI{
@@ -129,31 +148,31 @@ func NewInternalAPI(
 		}
 	}()
 
-	dlConsumer := consumers.NewDeviceListUpdateConsumer(
-		ctx, &dendriteCfg.UserAPI, js, updater,
+	err = consumers.NewDeviceListUpdateConsumer(
+		ctx, &dendriteCfg.UserAPI, qm, updater,
 	)
-	if err = dlConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start device list consumer")
 	}
 
-	sigConsumer := consumers.NewSigningKeyUpdateConsumer(
-		ctx, &dendriteCfg.UserAPI, js, userAPI,
+	err = consumers.NewSigningKeyUpdateConsumer(
+		ctx, &dendriteCfg.UserAPI, qm, userAPI,
 	)
-	if err = sigConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start signing key consumer")
 	}
 
-	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
-		ctx, &dendriteCfg.UserAPI, js, db, syncProducer, pgClient,
+	err = consumers.NewOutputReceiptEventConsumer(
+		ctx, &dendriteCfg.UserAPI, qm, db, syncProducer, pgClient,
 	)
-	if err = receiptConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start user API receipt consumer")
 	}
 
-	eventConsumer := consumers.NewOutputRoomEventConsumer(
-		ctx, &dendriteCfg.UserAPI, js, db, pgClient, rsAPI, syncProducer,
+	err = consumers.NewOutputRoomEventConsumer(
+		ctx, &dendriteCfg.UserAPI, qm, db, pgClient, rsAPI, syncProducer,
 	)
-	if err = eventConsumer.Start(ctx); err != nil {
+	if err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
 	}
 

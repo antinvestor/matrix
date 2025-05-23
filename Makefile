@@ -1,4 +1,3 @@
-
 ENV_LOCAL_TEST=\
   TESTING_DATABASE_URI=postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable \
   POSTGRES_PASSWORD=s3cr3t \
@@ -38,6 +37,13 @@ doc:    ## generate godocs and start a local documentation webserver on port 808
 
 goimports:
 	find . -name \*.go -not -path .git -exec goimports -w {} \;
+
+.PHONY: build generate-grpc
+
+generate-grpc:
+	@echo "Generating gRPC code..."
+	@cd apis && ./generate.sh
+	@echo "gRPC code generation completed"
 
 # this command will start docker components that we set in docker-compose.yml
 docker-setup: ## sets up docker container images

@@ -15,10 +15,10 @@
 package producers
 
 import (
-	"encoding/json"
+	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -34,21 +34,15 @@ var keyContentFields = map[string]string{
 }
 
 type RoomEventProducer struct {
-	Topic     string
-	ACLs      *acls.ServerACLs
-	JetStream nats.JetStreamContext
+	Topic string
+	ACLs  *acls.ServerACLs
+	Qm    queueutil.QueueManager
 }
 
-func (r *RoomEventProducer) ProduceRoomEvents(roomID string, updates []api.OutputEvent) error {
+func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string, updates []api.OutputEvent) error {
 	var err error
 	for _, update := range updates {
-		msg := nats.NewMsg(r.Topic)
-		msg.Header.Set(jetstream.RoomEventType, string(update.Type))
-		msg.Header.Set(jetstream.RoomID, roomID)
-		msg.Data, err = json.Marshal(update)
-		if err != nil {
-			return err
-		}
+
 		logger := log.WithFields(log.Fields{
 			"room_id": roomID,
 			"type":    update.Type,
@@ -85,8 +79,15 @@ func (r *RoomEventProducer) ProduceRoomEvents(roomID string, updates []api.Outpu
 				defer r.ACLs.OnServerACLUpdate(strippedEvent)
 			}
 		}
+
+		h := map[string]string{
+			jetstream.RoomEventType: string(update.Type),
+			jetstream.RoomID:        roomID,
+		}
+
 		logger.Tracef("Producing to topic '%s'", r.Topic)
-		if _, err := r.JetStream.PublishMsg(msg); err != nil {
+		err = r.Qm.Publish(ctx, r.Topic, update, h)
+		if err != nil {
 			logger.WithError(err).Errorf("Failed to produce to topic '%s': %s", r.Topic, err)
 			return err
 		}

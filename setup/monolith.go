@@ -15,7 +15,9 @@
 package setup
 
 import (
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"context"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/matrix/syncapi"
 	userAPI "github.com/antinvestor/matrix/userapi/api"
@@ -38,7 +40,6 @@ import (
 	relayAPI "github.com/antinvestor/matrix/relayapi/api"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/pitabwire/frame"
 )
 
@@ -59,6 +60,8 @@ type Monolith struct {
 
 	PartitionCli *partitionv1.PartitionClient
 	ProfileCli   *profilev1.ProfileClient
+
+	PresenceCli presencev1connect.PresenceServiceClient
 	// Optional
 	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
 	ExtUserDirectoryProvider userAPI.QuerySearchProfilesAPI
@@ -70,7 +73,7 @@ func (m *Monolith) AddAllPublicRoutes(
 	cfg *config.Matrix,
 	routers httputil.Routers,
 	cm sqlutil.ConnectionManager,
-	qm *jetstream.NATSInstance,
+	qm queueutil.QueueManager,
 	caches *cacheutil.Caches,
 
 	enableMetrics bool,
@@ -82,7 +85,7 @@ func (m *Monolith) AddAllPublicRoutes(
 	clientapi.AddPublicRoutes(
 		ctx, routers, cfg, qm, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationAPI, m.UserAPI, userDirectoryProvider,
-		m.ExtPublicRoomsProvider, m.PartitionCli, enableMetrics,
+		m.ExtPublicRoomsProvider, m.PartitionCli, m.PresenceCli, enableMetrics,
 	)
 	federationapi.AddPublicRoutes(
 		ctx, routers, cfg, qm, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
