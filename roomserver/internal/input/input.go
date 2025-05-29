@@ -275,7 +275,7 @@ func (r *Inputer) InputRoomEvents(
 	// input we submitted. The last error value we receive will
 	// be the one returned as the error string.
 	defer func(replySub frame.Subscriber, ctx context.Context) {
-		err := replySub.Stop(ctx)
+		err = replySub.Stop(ctx)
 		if err != nil {
 			logrus.WithError(err).Error("Roomserver failed to stop subscriber")
 		}

@@ -42,7 +42,7 @@ import (
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	dendriteCfg *config.Matrix,
+	cfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	qm queueutil.QueueManager,
 	userAPI userapi.SyncUserAPI,
@@ -51,7 +51,7 @@ func AddPublicRoutes(
 	enableMetrics bool,
 ) {
 
-	cfgSyncAPI := dendriteCfg.SyncAPI
+	cfgSyncAPI := cfg.SyncAPI
 
 	syncCm, err := cm.FromOptions(ctx, &cfgSyncAPI.Database)
 	if err != nil {
@@ -71,9 +71,12 @@ func AddPublicRoutes(
 	}
 
 	err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputPresenceEvent)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to register publisher for output presence event")
+	}
 
 	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
-		Topic: cfgSyncAPI.Queues.OutputPresenceEvent.Ref(),
+		Topic: &cfgSyncAPI.Queues.OutputPresenceEvent,
 		Qm:    qm,
 	}
 	presenceConsumer, err := consumers.NewPresenceConsumer(
@@ -97,9 +100,15 @@ func AddPublicRoutes(
 	}
 
 	var asProducer *producers.AppserviceEventProducer
-	if len(dendriteCfg.AppServiceAPI.Derived.ApplicationServices) > 0 {
+	if len(cfg.AppServiceAPI.Derived.ApplicationServices) > 0 {
+
+		err = qm.RegisterPublisher(ctx, &cfg.AppServiceAPI.Queues.OutputAppserviceEvent)
+		if err != nil {
+			logrus.WithError(err).Panicf("failed to register publisher for output appservice event")
+		}
+
 		asProducer = &producers.AppserviceEventProducer{
-			Qm: qm, Topic: &dendriteCfg.AppServiceAPI.Queues.OutputAppserviceEvent,
+			Qm: qm, Topic: &cfg.AppServiceAPI.Queues.OutputAppserviceEvent,
 		}
 	}
 
@@ -147,7 +156,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
-	rateLimits := httputil.NewRateLimits(&dendriteCfg.ClientAPI.RateLimiting)
+	rateLimits := httputil.NewRateLimits(&cfg.ClientAPI.RateLimiting)
 
 	err = routing.Setup(
 		routers.Client, routers.Validator, requestPool, syncDB, userAPI,

@@ -470,6 +470,8 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	switch input.Kind {
+	default:
+		return fmt.Errorf("unknown input.Kind: %s", input.Kind)
 	case api.KindNew:
 		if err = r.updateLatestEvents(
 			ctx,                 // context

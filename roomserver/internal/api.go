@@ -23,7 +23,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
@@ -59,32 +58,37 @@ type RoomserverInternalAPI struct {
 }
 
 func NewRoomserverAPI(
-	ctx context.Context, dendriteCfg *config.Matrix, roomserverDB storage.Database,
+	ctx context.Context, cfg *config.Matrix, roomserverDB storage.Database,
 	qm queueutil.QueueManager, caches cacheutil.RoomServerCaches, enableMetrics bool,
 ) *RoomserverInternalAPI {
 	var perspectiveServerNames []spec.ServerName
-	for _, kp := range dendriteCfg.FederationAPI.KeyPerspectives {
+	for _, kp := range cfg.FederationAPI.KeyPerspectives {
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
 	}
 
 	serverACLs := acls.NewServerACLs(ctx, roomserverDB)
 
+	err := qm.RegisterPublisher(ctx, &cfg.SyncAPI.Queues.OutputRoomEvent)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to register publisher for output room event")
+	}
+
 	producer := &producers.RoomEventProducer{
-		Topic: dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		Topic: &cfg.SyncAPI.Queues.OutputRoomEvent,
 		Qm:    qm,
 		ACLs:  serverACLs,
 	}
 	a := &RoomserverInternalAPI{
 		DB:                     roomserverDB,
-		Cfg:                    dendriteCfg,
+		Cfg:                    cfg,
 		Cache:                  caches,
-		ServerName:             dendriteCfg.Global.ServerName,
+		ServerName:             cfg.Global.ServerName,
 		PerspectiveServerNames: perspectiveServerNames,
 		OutputProducer:         producer,
 		Qm:                     qm,
 		ServerACLs:             serverACLs,
 		enableMetrics:          enableMetrics,
-		defaultRoomVersion:     dendriteCfg.RoomServer.DefaultRoomVersion,
+		defaultRoomVersion:     cfg.RoomServer.DefaultRoomVersion,
 		// perform-er structs + queryer struct get initialised when we have a federation sender to use
 	}
 	return a

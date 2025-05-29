@@ -45,7 +45,7 @@ import (
 // using its `SetFederationAPI` method, other you may get nil-dereference errors.
 func NewInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Matrix,
+	cfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	qm queueutil.QueueManager,
 	rsAPI rsapi.UserRoomserverAPI,
@@ -57,10 +57,10 @@ func NewInternalAPI(
 
 	var err error
 
-	cfgUsrApi := dendriteCfg.UserAPI
-	cfgSyncApi := dendriteCfg.SyncAPI
-	cfgKeySrv := dendriteCfg.KeyServer
-	appServices := dendriteCfg.Derived.ApplicationServices
+	cfgUsrApi := cfg.UserAPI
+	cfgSyncApi := cfg.SyncAPI
+	cfgKeySrv := cfg.KeyServer
+	appServices := cfg.Derived.ApplicationServices
 
 	pgClient := pushgateway.NewHTTPClient(cfgUsrApi.PushGatewayDisableTLSValidation)
 
@@ -72,11 +72,11 @@ func NewInternalAPI(
 		ctx,
 		profileCli,
 		userapiCm,
-		dendriteCfg.Global.ServerName,
-		dendriteCfg.UserAPI.BCryptCost,
-		dendriteCfg.UserAPI.OpenIDTokenLifetimeMS,
+		cfg.Global.ServerName,
+		cfg.UserAPI.BCryptCost,
+		cfg.UserAPI.OpenIDTokenLifetimeMS,
 		api.DefaultLoginTokenLifetime,
-		dendriteCfg.UserAPI.Global.ServerNotices.LocalPart,
+		cfg.UserAPI.Global.ServerNotices.LocalPart,
 	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
@@ -117,7 +117,7 @@ func NewInternalAPI(
 	}
 
 	keyChangeProducer := &producers.KeyChange{
-		Topic: cfgKeySrv.Queues.OutputKeyChangeEvent.Ref(),
+		Topic: &cfgKeySrv.Queues.OutputKeyChangeEvent,
 		Qm:    qm,
 		DB:    keyDB,
 	}
@@ -127,15 +127,15 @@ func NewInternalAPI(
 		KeyDatabase:          keyDB,
 		SyncProducer:         syncProducer,
 		KeyChangeProducer:    keyChangeProducer,
-		Config:               &dendriteCfg.UserAPI,
+		Config:               &cfg.UserAPI,
 		AppServices:          appServices,
 		RSAPI:                rsAPI,
-		DisableTLSValidation: dendriteCfg.UserAPI.PushGatewayDisableTLSValidation,
+		DisableTLSValidation: cfg.UserAPI.PushGatewayDisableTLSValidation,
 		PgClient:             pgClient,
 		FedClient:            fedClient,
 	}
 
-	updater := internal.NewDeviceListUpdater(ctx, keyDB, userAPI, keyChangeProducer, fedClient, dendriteCfg.UserAPI.WorkerCount, rsAPI, dendriteCfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn)
+	updater := internal.NewDeviceListUpdater(ctx, keyDB, userAPI, keyChangeProducer, fedClient, cfg.UserAPI.WorkerCount, rsAPI, cfg.Global.ServerName, enableMetrics, blacklistedOrBackingOffFn)
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
 	if err = updater.CleanUp(ctx); err != nil {
@@ -149,28 +149,28 @@ func NewInternalAPI(
 	}()
 
 	err = consumers.NewDeviceListUpdateConsumer(
-		ctx, &dendriteCfg.UserAPI, qm, updater,
+		ctx, &cfg.UserAPI, qm, updater,
 	)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start device list consumer")
 	}
 
 	err = consumers.NewSigningKeyUpdateConsumer(
-		ctx, &dendriteCfg.UserAPI, qm, userAPI,
+		ctx, &cfg.UserAPI, qm, userAPI,
 	)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start signing key consumer")
 	}
 
 	err = consumers.NewOutputReceiptEventConsumer(
-		ctx, &dendriteCfg.UserAPI, qm, db, syncProducer, pgClient,
+		ctx, &cfg.UserAPI, qm, db, syncProducer, pgClient,
 	)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start user API receipt consumer")
 	}
 
 	err = consumers.NewOutputRoomEventConsumer(
-		ctx, &dendriteCfg.UserAPI, qm, db, pgClient, rsAPI, syncProducer,
+		ctx, &cfg.UserAPI, qm, db, pgClient, rsAPI, syncProducer,
 	)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
@@ -193,8 +193,8 @@ func NewInternalAPI(
 	}
 	time.AfterFunc(time.Minute, cleanOldNotifs)
 
-	if dendriteCfg.Global.ReportStats.Enabled {
-		go util.StartPhoneHomeCollector(ctx, time.Now(), dendriteCfg, db)
+	if cfg.Global.ReportStats.Enabled {
+		go util.StartPhoneHomeCollector(ctx, time.Now(), cfg, db)
 	}
 
 	return userAPI

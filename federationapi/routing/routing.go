@@ -55,7 +55,7 @@ const (
 // nolint: gocyclo
 func Setup(
 	routers httputil.Routers,
-	dendriteCfg *config.Matrix,
+	mcfg *config.Matrix,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fsAPI *fedInternal.FederationInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
@@ -67,7 +67,7 @@ func Setup(
 	fedMux := routers.Federation
 	keyMux := routers.Keys
 	wkMux := routers.WellKnown
-	cfg := &dendriteCfg.FederationAPI
+	cfg := &mcfg.FederationAPI
 
 	if enableMetrics {
 		prometheus.MustRegister(

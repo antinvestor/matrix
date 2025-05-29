@@ -22,10 +22,8 @@ func (c *queues) Publish(ctx context.Context, reference string, payload any, hea
 	return c.service.Publish(ctx, reference, payload, headers...)
 }
 
-func (c *queues) RegisterSubscriber(_ context.Context, opts *config.QueueOptions, optHandler ...frame.SubscribeWorker) error {
-	dbOpts := frame.RegisterSubscriber(opts.Ref(), string(opts.DS), optHandler...)
-	c.service.Init(dbOpts)
-	return nil
+func (c *queues) RegisterSubscriber(ctx context.Context, opts *config.QueueOptions, optHandler ...frame.SubscribeWorker) error {
+	return c.service.AddSubscriber(ctx, opts.Ref(), string(opts.DS), optHandler...)
 }
 
 func (c *queues) GetSubscriber(ref string) (frame.Subscriber, error) {

@@ -121,7 +121,7 @@ func AddPublicRoutes(
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Matrix,
+	mcfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	qm queueutil.QueueManager,
 	federation fclient.FederationClient,
@@ -131,13 +131,13 @@ func NewInternalAPI(
 	resetBlacklist bool,
 	presenceCli presencev1connect.PresenceServiceClient,
 ) *internal.FederationInternalAPI {
-	cfg := &dendriteCfg.FederationAPI
+	cfg := &mcfg.FederationAPI
 
 	federationCm, err := cm.FromOptions(ctx, &cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to obtain federation sender db connection manager")
 	}
-	federationDB, err := storage.NewDatabase(ctx, federationCm, caches, dendriteCfg.Global.IsLocalServerName)
+	federationDB, err := storage.NewDatabase(ctx, federationCm, caches, cfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
@@ -189,7 +189,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start typing consumer")
 	}
 	err = consumers.NewKeyChangeConsumer(
-		ctx, &dendriteCfg.KeyServer, qm, queues, federationDB, rsAPI,
+		ctx, &mcfg.KeyServer, qm, queues, federationDB, rsAPI,
 	)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")

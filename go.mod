@@ -18,13 +18,13 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
-	github.com/jackc/pgx/v5 v5.7.4
+	github.com/jackc/pgx/v5 v5.7.5
 	github.com/lib/pq v1.10.9
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pitabwire/frame v1.35.2
+	github.com/pitabwire/frame v1.35.9
 	github.com/pitabwire/util v0.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
@@ -36,16 +36,16 @@ require (
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	golang.org/x/crypto v0.38.0
-	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
+	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6
 	golang.org/x/image v0.26.0
 	golang.org/x/oauth2 v0.29.0
 	golang.org/x/sync v0.14.0
 	golang.org/x/term v0.32.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v3 v3.0.1
-	gorm.io/gorm v1.26.1
+	gorm.io/gorm v1.30.0
 	gotest.tools/v3 v3.5.2
-	maunium.net/go/mautrix v0.23.3
+	maunium.net/go/mautrix v0.24.0
 )
 
 require (
@@ -89,8 +89,8 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.6.0 // indirect
 	github.com/panjf2000/ants/v2 v2.11.3 // indirect
-	github.com/petermattis/goid v0.0.0-20250319124200-ccd6737f222a // indirect
-	github.com/pitabwire/natspubsub v0.2.0 // indirect
+	github.com/petermattis/goid v0.0.0-20250508124226-395b08cebbdb // indirect
+	github.com/pitabwire/natspubsub v0.2.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
@@ -101,7 +101,7 @@ require (
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
-	go.mau.fi/util v0.8.6 // indirect
+	go.mau.fi/util v0.8.7 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel v1.36.0 // indirect
@@ -119,11 +119,11 @@ require (
 	google.golang.org/api v0.228.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250428153025-10db94c68c34 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250425173222-7b384671a197 // indirect
-	google.golang.org/grpc v1.72.1 // indirect
+	google.golang.org/grpc v1.72.2 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
 	gorm.io/datatypes v1.2.5 // indirect
 	gorm.io/driver/mysql v1.5.7 // indirect
-	gorm.io/driver/postgres v1.5.11 // indirect
+	gorm.io/driver/postgres v1.6.0 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )

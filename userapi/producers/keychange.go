@@ -17,6 +17,7 @@ package producers
 import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/userapi/api"
@@ -26,7 +27,7 @@ import (
 
 // KeyChange produces key change events for the sync API and federation sender to consume
 type KeyChange struct {
-	Topic string
+	Topic *config.QueueOptions
 	Qm    queueutil.QueueManager
 	DB    storage.KeyChangeDatabase
 }
@@ -45,7 +46,7 @@ func (p *KeyChange) ProduceKeyChanges(ctx context.Context, keys []api.DeviceMess
 			jetstream.UserID: key.UserID,
 		}
 
-		err = p.Qm.Publish(ctx, p.Topic, key, header)
+		err = p.Qm.Publish(ctx, p.Topic.Ref(), key, header)
 		if err != nil {
 			return err
 		}
@@ -56,7 +57,7 @@ func (p *KeyChange) ProduceKeyChanges(ctx context.Context, keys []api.DeviceMess
 		logrus.WithFields(logrus.Fields{
 			"user_id":         userID,
 			"num_key_changes": count,
-		}).Tracef("Produced to key change topic '%s'", p.Topic)
+		}).Tracef("Produced to key change topic '%s'", p.Topic.Ref())
 	}
 	return nil
 }
@@ -79,7 +80,7 @@ func (p *KeyChange) ProduceSigningKeyUpdate(ctx context.Context, key api.CrossSi
 		jetstream.UserID: key.UserID,
 	}
 
-	err = p.Qm.Publish(ctx, p.Topic, output, header)
+	err = p.Qm.Publish(ctx, p.Topic.Ref(), output, header)
 	if err != nil {
 		return err
 	}

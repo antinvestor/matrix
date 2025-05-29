@@ -561,16 +561,18 @@ func (r *downloadRequest) getThumbnailFile(
 	thumbPath := string(thumbnailer.GetThumbnailPath(types.Path(filePath), thumbnail.ThumbnailSize))
 	thumbFile, err := os.Open(string(thumbPath))
 	if err != nil {
-		thumbFile.Close() // nolint: errcheck
+		if thumbFile != nil {
+			_ = thumbFile.Close() // nolint: errcheck
+		}
 		return nil, nil, fmt.Errorf("os.Open: %w", err)
 	}
 	thumbStat, err := thumbFile.Stat()
 	if err != nil {
-		thumbFile.Close() // nolint: errcheck
+		_ = thumbFile.Close() // nolint: errcheck
 		return nil, nil, fmt.Errorf("thumbFile.Stat: %w", err)
 	}
 	if types.FileSizeBytes(thumbStat.Size()) != thumbnail.MediaMetadata.FileSizeBytes {
-		thumbFile.Close() // nolint: errcheck
+		_ = thumbFile.Close() // nolint: errcheck
 		return nil, nil, errors.New("thumbnail file sizes on disk and in database differ")
 	}
 	return thumbFile, thumbnail, nil

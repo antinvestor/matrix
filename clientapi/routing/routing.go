@@ -66,7 +66,7 @@ type WellKnownClientResponse struct {
 func Setup(
 	ctx context.Context,
 	routers httputil.Routers,
-	dendriteCfg *config.Matrix,
+	mcfg *config.Matrix,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	userAPI userapi.ClientUserAPI,
@@ -80,8 +80,8 @@ func Setup(
 	presenceCli presencev1connect.PresenceServiceClient,
 	enableMetrics bool,
 ) {
-	cfg := &dendriteCfg.ClientAPI
-	mscCfg := &dendriteCfg.MSCs
+	cfg := &mcfg.ClientAPI
+	mscCfg := &cfg.MSCs
 	publicAPIMux := routers.Client
 	wkMux := routers.WellKnown
 	synapseAdminRouter := routers.SynapseAdmin
@@ -346,7 +346,7 @@ func Setup(
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	if mscCfg.Enabled("msc2753") {
+	if (*mscCfg).Enabled("msc2753") {
 		v3mux.Handle("/peek/{roomIDOrAlias}",
 			httputil.MakeAuthAPI(spec.Peek, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 				if r := rateLimits.Limit(req, device); r != nil {
@@ -966,7 +966,7 @@ func Setup(
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
 	// PUT requests, so we need to allow this method
 
-	threePIDClient := base.CreateClient(dendriteCfg, nil) // TODO: Move this somewhere else, e.g. pass in as parameter
+	threePIDClient := base.CreateClient(mcfg, nil) // TODO: Move this somewhere else, e.g. pass in as parameter
 
 	v3mux.Handle("/account/3pid",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

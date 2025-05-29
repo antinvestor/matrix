@@ -17,6 +17,7 @@ package producers
 import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/setup/config"
 	"strconv"
 	"time"
 
@@ -27,7 +28,7 @@ import (
 
 // FederationAPIPresenceProducer produces events for the federation API server to consume
 type FederationAPIPresenceProducer struct {
-	Topic string
+	Topic *config.QueueOptions
 	Qm    queueutil.QueueManager
 }
 
@@ -45,5 +46,5 @@ func (f *FederationAPIPresenceProducer) SendPresence(ctx context.Context,
 		header["status_msg"] = *statusMsg
 	}
 
-	return f.Qm.Publish(ctx, f.Topic, []byte{}, header)
+	return f.Qm.Publish(ctx, f.Topic.Ref(), []byte{}, header)
 }

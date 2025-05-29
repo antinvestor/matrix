@@ -17,6 +17,7 @@ package producers
 import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	log "github.com/sirupsen/logrus"
@@ -34,7 +35,7 @@ var keyContentFields = map[string]string{
 }
 
 type RoomEventProducer struct {
-	Topic string
+	Topic *config.QueueOptions
 	ACLs  *acls.ServerACLs
 	Qm    queueutil.QueueManager
 }
@@ -86,7 +87,7 @@ func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string
 		}
 
 		logger.Tracef("Producing to topic '%s'", r.Topic)
-		err = r.Qm.Publish(ctx, r.Topic, update, h)
+		err = r.Qm.Publish(ctx, r.Topic.Ref(), update, h)
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to produce to topic '%s': %s", r.Topic, err)
 			return err

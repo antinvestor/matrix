@@ -35,7 +35,7 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
 	routers httputil.Routers,
-	dendriteCfg *config.Matrix,
+	cfg *config.Matrix,
 	keyRing gomatrixserverlib.JSONVerifier,
 	relayAPI api.RelayInternalAPI,
 ) {
@@ -47,7 +47,7 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		routers.Federation,
-		&dendriteCfg.FederationAPI,
+		&cfg.FederationAPI,
 		relay,
 		keyRing,
 	)

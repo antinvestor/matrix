@@ -247,8 +247,8 @@ func (r *FederationInternalAPI) PerformOutboundPeek(
 ) error {
 	// Look up the supported room versions.
 	var supportedVersions []gomatrixserverlib.RoomVersion
-	for version := range version.SupportedRoomVersions() {
-		supportedVersions = append(supportedVersions, version)
+	for v := range version.SupportedRoomVersions() {
+		supportedVersions = append(supportedVersions, v)
 	}
 
 	// Deduplicate the server names we were provided but keep the ordering

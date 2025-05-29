@@ -411,7 +411,13 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, qm queueutil.QueueManager) util.JSONResponse {
 
 	ctx := req.Context()
-	err := qm.Publish(ctx, cfg.Queues.InputFulltextReindex.Ref(), []byte{})
+
+	err := qm.RegisterPublisher(ctx, &cfg.Queues.InputFulltextReindex)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to register publisher for receipt event")
+	}
+
+	err = qm.Publish(ctx, cfg.Queues.InputFulltextReindex.Ref(), []byte{})
 
 	if err != nil {
 		logrus.WithError(err).Error("failed to publish nats message")
