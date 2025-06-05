@@ -28,6 +28,7 @@ import (
 const (
 	roomVersionsCache byte = iota + 1
 	serverKeysCache
+	roomLocksCache
 	roomNIDsCache
 	roomIDsCache
 	roomEventsCache
@@ -50,19 +51,22 @@ const (
 // different implementations as long as they satisfy the Cache
 // interface.
 type Caches struct {
-	RoomVersions            Cache[string, gomatrixserverlib.RoomVersion]           // room ID -> room version
-	ServerKeys              Cache[string, gomatrixserverlib.PublicKeyLookupResult] // server name -> server keys
-	RoomServerRoomNIDs      Cache[string, types.RoomNID]                           // room ID -> room NID
-	RoomServerRoomIDs       Cache[types.RoomNID, string]                           // room NID -> room ID
-	RoomServerEvents        Cache[int64, *types.HeaderedEvent]                     // event NID -> event
-	RoomServerStateKeys     Cache[types.EventStateKeyNID, string]                  // eventStateKey NID -> event state key
-	RoomServerStateKeyNIDs  Cache[string, types.EventStateKeyNID]                  // event state key -> eventStateKey NID
-	RoomServerEventTypeNIDs Cache[string, types.EventTypeNID]                      // eventType -> eventType NID
-	RoomServerEventTypes    Cache[types.EventTypeNID, string]                      // eventType NID -> eventType
-	FederationPDUs          Cache[int64, *types.HeaderedEvent]                     // queue NID -> PDU
-	FederationEDUs          Cache[int64, *gomatrixserverlib.EDU]                   // queue NID -> EDU
-	RoomHierarchies         Cache[string, fclient.RoomHierarchyResponse]           // room ID -> space response
-	LazyLoading             Cache[lazyLoadingCacheKey, string]                     // composite key -> event ID
+	RoomVersions Cache[string, gomatrixserverlib.RoomVersion]           // room ID -> room version
+	ServerKeys   Cache[string, gomatrixserverlib.PublicKeyLookupResult] // server name -> server keys
+
+	RoomServerRoomLocks CacheLock[string, int64] // room ID -> time of lock acquisition
+
+	RoomServerRoomNIDs      Cache[string, types.RoomNID]                 // room ID -> room NID
+	RoomServerRoomIDs       Cache[types.RoomNID, string]                 // room NID -> room ID
+	RoomServerEvents        Cache[int64, *types.HeaderedEvent]           // event NID -> event
+	RoomServerStateKeys     Cache[types.EventStateKeyNID, string]        // eventStateKey NID -> event state key
+	RoomServerStateKeyNIDs  Cache[string, types.EventStateKeyNID]        // event state key -> eventStateKey NID
+	RoomServerEventTypeNIDs Cache[string, types.EventTypeNID]            // eventType -> eventType NID
+	RoomServerEventTypes    Cache[types.EventTypeNID, string]            // eventType NID -> eventType
+	FederationPDUs          Cache[int64, *types.HeaderedEvent]           // queue NID -> PDU
+	FederationEDUs          Cache[int64, *gomatrixserverlib.EDU]         // queue NID -> EDU
+	RoomHierarchies         Cache[string, fclient.RoomHierarchyResponse] // room ID -> space response
+	LazyLoading             Cache[lazyLoadingCacheKey, string]           // composite key -> event ID
 }
 
 // Cache is the interface that an implementation must satisfy.
@@ -70,6 +74,12 @@ type Cache[K keyable, T any] interface {
 	Get(ctx context.Context, key K) (value T, ok bool)
 	Set(ctx context.Context, key K, value T) error
 	Unset(ctx context.Context, key K) error
+}
+
+type CacheLock[K keyable, T any] interface {
+	TryLock(ctx context.Context, key K, ttl time.Duration) (bool, error)
+	ExtendLock(ctx context.Context, key K, ttl time.Duration) (bool, error)
+	Unlock(ctx context.Context, key K) error
 }
 
 type keyable interface {

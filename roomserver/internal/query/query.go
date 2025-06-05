@@ -1093,8 +1093,9 @@ func (r *Queryer) QueryUserIDForSender(ctx context.Context, roomID spec.RoomID, 
 	}
 
 	if userKeys, ok := result[roomID]; ok {
-		if userID, ok := userKeys[string(senderID)]; ok {
-			return spec.NewUserID(userID, true)
+		localUserID, ok0 := userKeys[string(senderID)]
+		if ok0 {
+			return spec.NewUserID(localUserID, true)
 		}
 	}
 

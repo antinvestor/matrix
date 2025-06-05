@@ -49,6 +49,7 @@ func NewRedisCache(redisAddr string, maxAge time.Duration) (*Caches, error) {
 	return &Caches{
 		RoomVersions:            &RedisCachePartition[string, gomatrixserverlib.RoomVersion]{client, roomVersionsCache, false, maxAge},
 		ServerKeys:              &RedisCachePartition[string, gomatrixserverlib.PublicKeyLookupResult]{client, serverKeysCache, true, maxAge},
+		RoomServerRoomLocks:     &RedisCachePartition[string, int64]{client, roomLocksCache, false, maxAge},
 		RoomServerRoomNIDs:      &RedisCachePartition[string, types.RoomNID]{client, roomNIDsCache, false, maxAge},
 		RoomServerRoomIDs:       &RedisCachePartition[types.RoomNID, string]{client, roomIDsCache, false, maxAge},
 		RoomServerEvents:        &RedisCachePartition[int64, *types.HeaderedEvent]{client, roomEventsCache, true, maxAge},
@@ -63,9 +64,13 @@ func NewRedisCache(redisAddr string, maxAge time.Duration) (*Caches, error) {
 	}, nil
 }
 
+func (c *RedisCachePartition[K, V]) getPrefixedKey(key K) string {
+	return fmt.Sprintf("%c%v", c.Prefix, key)
+}
+
 // Set value in Redis with JSON serialisation
 func (c *RedisCachePartition[K, V]) Set(ctx context.Context, key K, value V) error {
-	bkey := fmt.Sprintf("%c%v", c.Prefix, key)
+	bkey := c.getPrefixedKey(key)
 	val, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("failed to marshal value: %w", err)
@@ -75,7 +80,7 @@ func (c *RedisCachePartition[K, V]) Set(ctx context.Context, key K, value V) err
 
 // Get value from Redis with JSON deserialisation
 func (c *RedisCachePartition[K, V]) Get(ctx context.Context, key K) (V, bool) {
-	bkey := fmt.Sprintf("%c%v", c.Prefix, key)
+	bkey := c.getPrefixedKey(key)
 	result, err := c.client.Get(ctx, bkey).Result()
 	if err != nil {
 
@@ -87,7 +92,8 @@ func (c *RedisCachePartition[K, V]) Get(ctx context.Context, key K) (V, bool) {
 		return empty, false
 	}
 	var value V
-	if err := json.Unmarshal([]byte(result), &value); err != nil {
+	err = json.Unmarshal([]byte(result), &value)
+	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal value: %v", err))
 	}
 	return value, true
@@ -95,6 +101,23 @@ func (c *RedisCachePartition[K, V]) Get(ctx context.Context, key K) (V, bool) {
 
 // Unset key from Redis
 func (c *RedisCachePartition[K, V]) Unset(ctx context.Context, key K) error {
-	bkey := fmt.Sprintf("%c%v", c.Prefix, key)
+	bkey := c.getPrefixedKey(key)
 	return c.client.Del(ctx, bkey).Err()
+}
+
+func (c *RedisCachePartition[K, V]) TryLock(ctx context.Context, key K, ttl time.Duration) (bool, error) {
+	bkey := c.getPrefixedKey(key)
+	return c.client.SetNX(ctx, bkey, time.Now().Unix(), ttl).Result()
+}
+func (c *RedisCachePartition[K, V]) ExtendLock(ctx context.Context, key K, ttl time.Duration) (bool, error) {
+	bkey := c.getPrefixedKey(key)
+	return c.client.Expire(ctx, bkey, ttl).Result()
+}
+func (c *RedisCachePartition[K, V]) Unlock(ctx context.Context, key K) error {
+	bkey := c.getPrefixedKey(key)
+	_, err := c.client.Del(ctx, bkey).Result()
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -772,13 +772,13 @@ func (v *StateResolution) CalculateAndStoreStateAfterEvents(
 			// 4) The number of state data blocks is small enough that we can just
 			// add the state event as a block of size one to the end of the blocks.
 			metrics.algorithm = "single_delta"
-			stateNID, err := v.db.AddState(
+			stateNID, err0 := v.db.AddState(
 				ctx, v.roomInfo.RoomNID, stateBlockNIDs, []types.StateEntry{prevState.StateEntry},
 			)
-			if err != nil {
-				err = fmt.Errorf("v.db.AddState: %w", err)
+			if err0 != nil {
+				err0 = fmt.Errorf("v.db.AddState: %w", err0)
 			}
-			return metrics.stop(stateNID, err)
+			return metrics.stop(stateNID, err0)
 		}
 		// If there are too many deltas then we need to calculate the full state
 		// So fall through to calculateAndStoreStateAfterManyEvents
