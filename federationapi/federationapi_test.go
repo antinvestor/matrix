@@ -30,7 +30,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/internal"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	userapi "github.com/antinvestor/matrix/userapi/api"
@@ -273,7 +273,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 	msg := &testrig.QMsg{
 		Subject: cfg.KeyServer.Queues.OutputKeyChangeEvent.Ref(),
 		Header: map[string]string{
-			jetstream.UserID: key.UserID,
+			queueutil.UserID: key.UserID,
 		},
 		Data: key,
 	}

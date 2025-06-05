@@ -25,7 +25,6 @@ import (
 
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/jetstream"
 )
 
 var keyContentFields = map[string]string{
@@ -82,8 +81,8 @@ func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string
 		}
 
 		h := map[string]string{
-			jetstream.RoomEventType: string(update.Type),
-			jetstream.RoomID:        roomID,
+			queueutil.RoomEventType: string(update.Type),
+			queueutil.RoomID:        roomID,
 		}
 
 		logger.Tracef("Producing to topic '%s'", r.Topic)

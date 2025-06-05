@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -176,6 +177,37 @@ func (d DataSource) IsMem() bool {
 
 func (d DataSource) IsQueue() bool {
 	return d.IsMem() || d.IsNats()
+}
+
+func (d DataSource) ToURI() (*url.URL, error) {
+	return url.Parse(string(d))
+}
+func (d DataSource) ExtendPath(epath ...string) (DataSource, error) {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d, err
+	}
+
+	nuPathPieces := []string{nuUri.Path}
+	nuPathPieces = append(nuPathPieces, epath...)
+
+	nuUri.Path = path.Join(nuPathPieces...)
+
+	return DataSource(nuUri.String()), nil
+}
+
+func (d DataSource) ExtendQuery(key, value string) (DataSource, error) {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d, err
+	}
+
+	q := nuUri.Query()
+	q.Set(key, value)
+
+	nuUri.RawQuery = q.Encode()
+
+	return DataSource(nuUri.String()), nil
 }
 
 // A Topic in kafka.

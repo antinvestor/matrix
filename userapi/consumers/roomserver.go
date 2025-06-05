@@ -21,7 +21,7 @@ import (
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
@@ -76,7 +76,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 
 	var event *rstypes.HeaderedEvent
 	var isNewRoomEvent bool
-	switch rsapi.OutputType(metadata[jetstream.RoomEventType]) {
+	switch rsapi.OutputType(metadata[queueutil.RoomEventType]) {
 
 	case rsapi.OutputTypeNewRoomEvent:
 		isNewRoomEvent = true

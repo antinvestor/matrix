@@ -20,24 +20,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/antinvestor/matrix/roomserver/types"
-	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/pitabwire/frame"
-	"sync"
-
-	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
-
 	fedapi "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/internal/actor"
 	"github.com/antinvestor/matrix/roomserver/internal/query"
 	"github.com/antinvestor/matrix/roomserver/producers"
 	"github.com/antinvestor/matrix/roomserver/storage"
+	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
+	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/frame"
+	"github.com/sirupsen/logrus"
 )
 
 // Inputer is responsible for consuming from the roomserver input
@@ -78,11 +76,9 @@ type Inputer struct {
 	KeyRing         gomatrixserverlib.JSONVerifier
 	ACLs            *acls.ServerACLs
 	OutputProducer  *producers.RoomEventProducer
-	workers         sync.Map // room ID -> *worker
-
-	Queryer       *query.Queryer
-	UserAPI       userapi.RoomserverUserAPI
-	EnableMetrics bool
+	Queryer         *query.Queryer
+	UserAPI         userapi.RoomserverUserAPI
+	EnableMetrics   bool
 }
 
 func NewInputer(
@@ -117,9 +113,117 @@ func NewInputer(
 		EnableMetrics:   enableMetrics,
 	}
 
-	err := c.Qm.RegisterSubscriber(ctx, &c.Cfg.Queues.InputRoomEvent, c)
+	actorSyst := actor.NewRoomActorSystem(ctx, &cfg.ActorSystem, qm, c)
+	err := actorSyst.Start(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tempWorker := &transientInputer{
+		opts:        &c.Cfg.Queues.InputRoomEvent,
+		qm:          qm,
+		inp:         c,
+		actorSystem: actorSyst,
+	}
+
+	err = c.Qm.RegisterSubscriber(ctx, &c.Cfg.Queues.InputRoomEvent, tempWorker)
 
 	return c, err
+}
+
+type transientInputer struct {
+	opts        *config.QueueOptions
+	qm          queueutil.QueueManager
+	inp         *Inputer
+	actorSystem *actor.RoomActorSystem
+}
+
+func (ti *transientInputer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+
+	roomId, err := spec.NewRoomID(metadata["room_id"])
+	if err != nil {
+		return err
+	}
+
+	roomOpts, err := cleanQOpts(roomId, ti.opts)
+	if err != nil {
+		return err
+	}
+
+	err = ti.actorSystem.EnsureRoomActorExists(ctx, roomId, roomOpts.DS)
+	if err != nil {
+		return err
+	}
+
+	if !roomOpts.DS.IsNats() {
+		var publisher frame.Publisher
+		publisher, err = ti.qm.GetPublisher(roomOpts.Ref())
+		if err != nil {
+			err = ti.qm.RegisterPublisher(ctx, roomOpts)
+			if err != nil {
+				return err
+			}
+			publisher, err = ti.qm.GetPublisher(roomOpts.Ref())
+			if err != nil {
+				return err
+			}
+		}
+
+		err = publisher.Publish(ctx, message, metadata)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+func cleanQOpts(roomId *spec.RoomID, opts *config.QueueOptions) (*config.QueueOptions, error) {
+
+	var err error
+	ds := opts.DS
+	if ds.IsNats() {
+
+		subject := fmt.Sprintf("InputEvtRoomID.%s", queueutil.Tokenise(roomId.String()))
+		durable := fmt.Sprintf("InputEvtRoomID_%s", queueutil.Tokenise(roomId.String()))
+		ds, err = ds.ExtendQuery("subject", subject)
+		if err != nil {
+			return nil, err
+		}
+
+		ds, err = ds.ExtendQuery("consumer_filter_subject", subject)
+		if err != nil {
+			return nil, err
+		}
+		ds, err = ds.ExtendQuery("consumer_durable_name", durable)
+		if err != nil {
+			return nil, err
+		}
+		ds, err = ds.ExtendQuery("consumer_deliver_policy", "all")
+		if err != nil {
+			return nil, err
+		}
+		ds, err = ds.ExtendQuery("consumer_ack_policy", "explicit")
+		if err != nil {
+			return nil, err
+		}
+		ds, err = ds.ExtendQuery("consumer_headers_only", "false")
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		ds, err = opts.DS.ExtendPath(queueutil.Tokenise(roomId.String()))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &config.QueueOptions{
+		QReference: roomId.String(),
+		Prefix:     actor.RoomActorQPrefix,
+		DS:         ds,
+	}, nil
 }
 
 // Handle is called by the worker for the room. It must only be called
@@ -227,10 +331,10 @@ func (r *Inputer) queueInputRoomEvents(
 	// send it into the input queue.
 	for _, e := range request.InputRoomEvents {
 
-		roomID := e.Event.RoomID().String()
+		roomID := e.Event.RoomID()
 
 		header := map[string]string{
-			"room_id":      roomID,
+			"room_id":      roomID.String(),
 			"virtual_host": string(request.VirtualHost),
 		}
 
@@ -238,12 +342,23 @@ func (r *Inputer) queueInputRoomEvents(
 			header["sync"] = replyTo
 		}
 
-		err = r.Qm.Publish(ctx, r.Cfg.Queues.InputRoomEvent.Ref(), e, header)
+		roomOpts, err0 := cleanQOpts(&roomID, &r.Cfg.Queues.InputRoomEvent)
+		if err0 != nil {
+			return nil, err0
+		}
+
+		err = r.Qm.EnsurePublisherOk(ctx, roomOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		err = r.Qm.Publish(ctx, roomOpts.Ref(), e, header)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"room_id":  roomID,
 				"event_id": e.Event.EventID(),
-				"subj":     r.Cfg.Queues.InputRoomEvent.Ref(),
+				"subj_ref": roomOpts.Ref(),
+				"subj_uri": roomOpts.DS,
 			}).Error("Roomserver failed to queue async event")
 			return nil, fmt.Errorf("r.Qm.Publish: %w", err)
 		}

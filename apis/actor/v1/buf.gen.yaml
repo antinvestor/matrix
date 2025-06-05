@@ -1,0 +1,13 @@
+version: v2
+inputs:
+  - directory: ./
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: ./
+    opt:
+      - paths=source_relative
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/antinvestor/matrix/apis/actor/v1

@@ -22,7 +22,7 @@ import (
 
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -58,8 +58,8 @@ func NewOutputTypingEventConsumer(
 }
 
 func (s *OutputTypingEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
-	roomID := metadata[jetstream.RoomID]
-	userID := metadata[jetstream.UserID]
+	roomID := metadata[queueutil.RoomID]
+	userID := metadata[queueutil.UserID]
 	typing, err := strconv.ParseBool(metadata["typing"])
 	if err != nil {
 		log.WithError(err).Errorf("output log: typing parse failure")

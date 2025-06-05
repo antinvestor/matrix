@@ -147,10 +147,14 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 	}
 	qm := queueutil.NewQueueManager(svc)
 
-	msgs := toNATSMsgs(t, cfg, room.Events()...)
+	msgs := toQueueMsgs(t, room.Events()...)
+
 	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
-	testrig.MustPublishMsgs(ctx, t, qm, msgs...)
+	err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI, qm, msgs...)
+	if err != nil {
+		t.Fatalf("failed to publish events: %v", err)
+	}
 
 	testCases := []struct {
 		name            string
@@ -251,10 +255,13 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 	}
 	qm := queueutil.NewQueueManager(svc)
 
-	msgs := toNATSMsgs(t, cfg, room.Events()...)
+	msgs := toQueueMsgs(t, room.Events()...)
 	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
-	testrig.MustPublishMsgs(ctx, t, qm, msgs...)
+	err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI, qm, msgs...)
+	if err != nil {
+		t.Fatalf("failed to publish events: %v", err)
+	}
 
 	testCases := []struct {
 		name            string
@@ -320,8 +327,11 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 				},
 			}, test.WithStateKey(""))
 
-			msgs = toNATSMsgs(t, cfg, event)
-			testrig.MustPublishMsgs(ctx, t, qm, msgs...)
+			msgs = toQueueMsgs(t, event)
+			err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI, qm, msgs...)
+			if err != nil {
+				t.Fatalf("failed to publish events: %v", err)
+			}
 
 			syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
 				// wait for the last sent eventID to come down sync
@@ -406,12 +416,17 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 	// m.room.power_levels
 	// m.room.join_rules
 	// m.room.history_visibility
-	msgs := toNATSMsgs(t, cfg, room.Events()...)
+	msgs := toQueueMsgs(t, room.Events()...)
 	sinceTokens := make([]string, len(msgs))
 	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
 	for i, msg := range msgs {
-		testrig.MustPublishMsgs(ctx, t, qm, msg)
+
+		err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI, qm, msg)
+		if err != nil {
+			t.Fatalf("failed to publish events: %v", err)
+		}
+
 		time.Sleep(100 * time.Millisecond)
 		w := httptest.NewRecorder()
 		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
@@ -1486,14 +1501,15 @@ func syncUntil(t *testing.T,
 	}
 }
 
-func toNATSMsgs(t *testing.T, cfg *config.Matrix, input ...*rstypes.HeaderedEvent) []*testrig.QMsg {
+func toQueueMsgs(t *testing.T, input ...*rstypes.HeaderedEvent) []*testrig.QMsg {
 	result := make([]*testrig.QMsg, len(input))
+
 	for i, ev := range input {
 		var addsStateIDs []string
 		if ev.StateKey() != nil {
 			addsStateIDs = append(addsStateIDs, ev.EventID())
 		}
-		result[i] = testrig.NewOutputEventMsg(t, cfg, ev.RoomID().String(), rsapi.OutputEvent{
+		result[i] = testrig.NewOutputEventMsg(t, ev.RoomID().String(), rsapi.OutputEvent{
 			Type: rsapi.OutputTypeNewRoomEvent,
 			NewRoomEvent: &rsapi.OutputNewRoomEvent{
 				Event:             ev,

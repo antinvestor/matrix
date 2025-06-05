@@ -26,7 +26,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage"
 	fedTypes "github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	syncTypes "github.com/antinvestor/matrix/syncapi/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -62,9 +62,9 @@ func NewOutputReceiptConsumer(
 func (t *OutputReceiptConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
 	receipt := syncTypes.OutputReceiptEvent{
-		UserID:  metadata[jetstream.UserID],
-		RoomID:  metadata[jetstream.RoomID],
-		EventID: metadata[jetstream.EventID],
+		UserID:  metadata[queueutil.UserID],
+		RoomID:  metadata[queueutil.RoomID],
+		EventID: metadata[queueutil.EventID],
 		Type:    metadata["type"],
 	}
 

@@ -30,7 +30,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	log "github.com/sirupsen/logrus"
 
 	syncAPITypes "github.com/antinvestor/matrix/syncapi/types"
@@ -77,7 +77,7 @@ func NewOutputRoomEventConsumer(
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
 func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
-	receivedType := api.OutputType(metadata[jetstream.RoomEventType])
+	receivedType := api.OutputType(metadata[queueutil.RoomEventType])
 
 	// Only handle events we care about, avoids unneeded unmarshalling
 	switch receivedType {

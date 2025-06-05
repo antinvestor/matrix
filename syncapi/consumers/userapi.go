@@ -23,7 +23,7 @@ import (
 
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -63,7 +63,7 @@ func NewOutputNotificationDataConsumer(
 // multiple goroutines, or else the sync stream position may race and
 // be incorrectly calculated.
 func (s *OutputNotificationDataConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
-	userID := metadata[jetstream.UserID]
+	userID := metadata[queueutil.UserID]
 
 	// Parse out the event JSON
 	var data eventutil.NotificationData

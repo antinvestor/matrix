@@ -3,6 +3,7 @@ package input_test
 import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/userapi"
 	"testing"
 	"time"
 
@@ -32,6 +33,10 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
+
+		// Needed to create accounts
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, nil)
+		rsAPI.SetUserAPI(ctx, userAPI)
 
 		deadline, _ := t.Deadline()
 		if maxVal := time.Now().Add(time.Second * 3); deadline.Before(maxVal) {

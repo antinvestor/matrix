@@ -120,9 +120,6 @@ func TestRequestPool_updatePresence(t *testing.T) {
 		consumer: consumer,
 		cfg: &config.SyncAPI{
 			Global: &config.Global{
-				JetStream: config.JetStream{
-					TopicPrefix: "Matrix",
-				},
 				Presence: config.PresenceOptions{
 					EnableInbound:  true,
 					EnableOutbound: true,

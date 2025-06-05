@@ -892,14 +892,15 @@ func (r *Inputer) calculateAndSetState(
 
 // kickGuests kicks guests users from m.room.guest_access rooms, if guest access is now prohibited.
 func (r *Inputer) kickGuests(ctx context.Context, event gomatrixserverlib.PDU, roomInfo *types.RoomInfo) error {
+	if roomInfo == nil {
+		return types.ErrorInvalidRoomInfo
+	}
+
 	membershipNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true)
 	if err != nil {
 		return err
 	}
 
-	if roomInfo == nil {
-		return types.ErrorInvalidRoomInfo
-	}
 	memberEvents, err := r.DB.Events(ctx, roomInfo.RoomVersion, membershipNIDs)
 	if err != nil {
 		return err

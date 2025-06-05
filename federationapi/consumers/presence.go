@@ -27,7 +27,7 @@ import (
 	fedTypes "github.com/antinvestor/matrix/federationapi/types"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/pitabwire/util"
 	log "github.com/sirupsen/logrus"
@@ -70,7 +70,7 @@ func NewOutputPresenceConsumer(
 // events topic from the client api.
 func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	// only send presence events which originated from us
-	userID := metadata[jetstream.UserID]
+	userID := metadata[queueutil.UserID]
 	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		log.WithError(err).WithField("user_id", userID).Error("failed to extract domain from receipt sender")

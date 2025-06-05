@@ -21,7 +21,7 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -69,7 +69,7 @@ func NewOutputClientDataConsumer(
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputClientDataConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	// Parse out the event JSON
-	userID := metadata[jetstream.UserID]
+	userID := metadata[queueutil.UserID]
 	var output eventutil.AccountData
 	if err := json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream

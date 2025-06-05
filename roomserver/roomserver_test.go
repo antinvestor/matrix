@@ -361,7 +361,7 @@ func TestPurgeRoom(t *testing.T) {
 		//		t.Fatalf("test timed out after %s", timeout)
 		//	}
 		//	sum = 0
-		//	consumerCh := jsCtx.Consumers(cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent))
+		//	consumerCh := jsCtx.Consumers(cfg.Global.JetStream.Prefixed(queueutil.OutputRoomEvent))
 		//	for x := range consumerCh {
 		//		sum += x.NumAckPending
 		//	}

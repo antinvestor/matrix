@@ -113,7 +113,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAP
 	inputer, err := input.NewInputer(
 		ctx, &r.Cfg.RoomServer, r.DB, r.Qm,
 		r.ServerName,
-		nil,
+		r.SigningIdentityFor,
 		fsAPI, r,
 		keyRing, r.ServerACLs, r.OutputProducer, r.Queryer,
 		nil, r.enableMetrics)

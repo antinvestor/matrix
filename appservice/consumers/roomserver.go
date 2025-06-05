@@ -32,7 +32,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 
 	log "github.com/sirupsen/logrus"
@@ -79,7 +79,7 @@ func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 
 	s.appServiceMap = make(map[string]*appserviceState)
 	for _, as := range s.cfg.Derived.ApplicationServices {
-		token := jetstream.Tokenise(as.ID)
+		token := queueutil.Tokenise(as.ID)
 		s.appServiceMap[token] = &appserviceState{&as, 0}
 	}
 
@@ -92,7 +92,7 @@ func (s *OutputRoomEventConsumer) Handle(
 	ctx context.Context, metadata map[string]string, message []byte,
 ) error {
 
-	state, ok := s.appServiceMap[metadata[jetstream.AppServiceIDToken]]
+	state, ok := s.appServiceMap[metadata[queueutil.AppServiceIDToken]]
 	if !ok {
 		return nil
 	}
@@ -100,7 +100,7 @@ func (s *OutputRoomEventConsumer) Handle(
 	events := make([]*types.HeaderedEvent, 0, 1)
 
 	// Only handle events we care about
-	receivedType := api.OutputType(metadata[jetstream.RoomEventType])
+	receivedType := api.OutputType(metadata[queueutil.RoomEventType])
 	if receivedType != api.OutputTypeNewRoomEvent && receivedType != api.OutputTypeNewInviteEvent {
 		return nil
 	}

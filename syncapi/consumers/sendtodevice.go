@@ -26,7 +26,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -68,7 +68,7 @@ func NewOutputSendToDeviceEventConsumer(
 }
 
 func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
-	userID := metadata[jetstream.UserID]
+	userID := metadata[queueutil.UserID]
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 

@@ -27,7 +27,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage"
 
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/userapi/producers"
 	"github.com/antinvestor/matrix/userapi/util"
 )
@@ -66,9 +66,9 @@ func NewOutputReceiptEventConsumer(
 
 func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
-	userID := metadata[jetstream.UserID]
-	roomID := metadata[jetstream.RoomID]
-	readPos := metadata[jetstream.EventID]
+	userID := metadata[queueutil.UserID]
+	roomID := metadata[queueutil.RoomID]
+	readPos := metadata[queueutil.EventID]
 	evType := metadata["type"]
 
 	if readPos == "" || (evType != "m.read" && evType != "m.read.private") {

@@ -25,7 +25,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -59,8 +59,8 @@ func NewOutputTypingConsumer(
 // events topic from the client api.
 func (t *OutputTypingConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	// Extract the typing event from msg.
-	roomID := metadata[jetstream.RoomID]
-	userID := metadata[jetstream.UserID]
+	roomID := metadata[queueutil.RoomID]
+	userID := metadata[queueutil.UserID]
 	typing, err := strconv.ParseBool(metadata["typing"])
 	if err != nil {
 		log.WithError(err).Errorf("EDU output log: typing parse failure")

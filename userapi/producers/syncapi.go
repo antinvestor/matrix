@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal/eventutil"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/userapi/storage"
 )
 
@@ -39,7 +39,7 @@ func (p *SyncAPI) SendAccountData(ctx context.Context, userID string, data event
 	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
 
 	header := map[string]string{
-		jetstream.UserID: userID,
+		queueutil.UserID: userID,
 	}
 
 	err := p.qm.Publish(ctx, p.clientDataTopic, data, header)
@@ -78,7 +78,7 @@ func (p *SyncAPI) sendNotificationData(ctx context.Context, userID string, data 
 	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
 
 	header := map[string]string{
-		jetstream.UserID: userID,
+		queueutil.UserID: userID,
 	}
 
 	err := p.qm.Publish(ctx, p.notificationDataTopic, data, header)

@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package actor;
+
+option go_package = "github.com/antinvestor/matrix/apis/actor/v1;actorV1";
+
+message SetupRoomRequest {
+  string roomId = 1;
+  string queueUri = 2;
+}
+
+message SetupRoomResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ActorStopped {
+  string roomId = 1;
+}
+
+message CheckIdleTimeout {
+  string roomId = 1;
+}
+
+service RoomActor {
+  rpc SetupRoom (SetupRoomRequest) returns (SetupRoomResponse) {}
+
+}

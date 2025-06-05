@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/setup/jetstream"
+
 	"github.com/antinvestor/matrix/syncapi/types"
 )
 
@@ -37,7 +37,7 @@ func (f *FederationAPIPresenceProducer) SendPresence(ctx context.Context,
 ) error {
 
 	header := map[string]string{
-		jetstream.UserID: userID,
+		queueutil.UserID: userID,
 		"presence":       presence.String(),
 		"from_sync":      "true", // only update last_active_ts and presence
 		"last_active_ts": strconv.Itoa(int(spec.AsTimestamp(time.Now()))),
