@@ -23,7 +23,7 @@ type RelayAPI struct {
 }
 
 func (c *RelayAPI) Defaults(opts DefaultOpts) {
-	c.Database.ConnectionString = opts.DatabaseConnectionStr
+	c.Database.ConnectionString = opts.DSDatabaseConn
 }
 
 func (c *RelayAPI) Verify(configErrs *ConfigErrors) {

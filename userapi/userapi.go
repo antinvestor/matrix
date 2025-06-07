@@ -101,15 +101,13 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to register publisher for notification data")
 	}
 
-	syncProducer := producers.NewSyncAPI(
+	syncProducer, err := producers.NewSyncAPI(
+		ctx, &cfg.SyncAPI,
 		db, qm,
-		// TODO: user API should handle syncs for account data. Right now,
-		// it's handled by clientapi, and hence uses its topic. When user
-		// API handles it for all account data, we can remove it from
-		// here.
-		cfgSyncApi.Queues.OutputClientData.Ref(),
-		cfgSyncApi.Queues.OutputNotificationData.Ref(),
 	)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to obtain sync publisher")
+	}
 
 	err = qm.RegisterPublisher(ctx, &cfgKeySrv.Queues.OutputKeyChangeEvent)
 	if err != nil {

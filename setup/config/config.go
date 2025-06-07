@@ -182,10 +182,22 @@ func (d DataSource) IsQueue() bool {
 func (d DataSource) ToURI() (*url.URL, error) {
 	return url.Parse(string(d))
 }
-func (d DataSource) ExtendPath(epath ...string) (DataSource, error) {
+func (d DataSource) PrefixPath(prefix string) DataSource {
 	nuUri, err := d.ToURI()
 	if err != nil {
-		return d, err
+		return d
+	}
+
+	if nuUri.Path != "" {
+		nuUri.Path = fmt.Sprintf("%s%s", prefix, nuUri.Path)
+	}
+	return DataSource(nuUri.String())
+}
+
+func (d DataSource) ExtendPath(epath ...string) DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
 	}
 
 	nuPathPieces := []string{nuUri.Path}
@@ -193,13 +205,13 @@ func (d DataSource) ExtendPath(epath ...string) (DataSource, error) {
 
 	nuUri.Path = path.Join(nuPathPieces...)
 
-	return DataSource(nuUri.String()), nil
+	return DataSource(nuUri.String())
 }
 
-func (d DataSource) ExtendQuery(key, value string) (DataSource, error) {
+func (d DataSource) ExtendQuery(key, value string) DataSource {
 	nuUri, err := d.ToURI()
 	if err != nil {
-		return d, err
+		return d
 	}
 
 	q := nuUri.Query()
@@ -207,7 +219,7 @@ func (d DataSource) ExtendQuery(key, value string) (DataSource, error) {
 
 	nuUri.RawQuery = q.Encode()
 
-	return DataSource(nuUri.String()), nil
+	return DataSource(nuUri.String())
 }
 
 // A Topic in kafka.
@@ -395,10 +407,10 @@ func (config *Matrix) LoadEnv() error {
 }
 
 type DefaultOpts struct {
-	DatabaseConnectionStr DataSource
-	CacheConnectionStr    DataSource
-	QueueConnectionStr    DataSource
-	QueuePrefix           string
+	DSDatabaseConn DataSource
+	DSCacheConn    DataSource
+	DSQueueConn    DataSource
+	QueuePrefix    string
 }
 
 // Defaults sets default config values if they are not explicitly set.

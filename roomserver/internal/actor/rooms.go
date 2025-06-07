@@ -14,30 +14,29 @@ import (
 
 // RoomActor is an actor that processes messages for a specific room
 type RoomActor struct {
-	ctx               context.Context
-	cancelFunc        context.CancelFunc
-	roomID            string
-	qm                queueutil.QueueManager
-	subscription      frame.Subscriber
-	worker            frame.SubscribeWorker
-	lastActivity      time.Time
-	idleTimeout       time.Duration
-	idleCheckInterval time.Duration
-	idleCheckTimer    *time.Timer
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+	roomID     string
+	qm         queueutil.QueueManager
+
+	handlerFunc  HandlerFunc
+	subscription frame.Subscriber
+
+	lastActivity time.Time
+	idleTimeout  time.Duration
 }
 
 // NewRoomActor creates a new room actor
-func NewRoomActor(ctx context.Context, qm queueutil.QueueManager, worker frame.SubscribeWorker, idleTimeout time.Duration) *RoomActor {
+func NewRoomActor(ctx context.Context, qm queueutil.QueueManager, handlerFunc HandlerFunc, idleTimeout time.Duration) *RoomActor {
 
 	ictx, cancel := context.WithCancel(ctx)
 
 	return &RoomActor{
-		ctx:               ictx,
-		cancelFunc:        cancel,
-		qm:                qm,
-		worker:            worker,
-		idleTimeout:       idleTimeout,
-		idleCheckInterval: idleTimeout / 4, // Check 4 times during the idle timeout period
+		ctx:         ictx,
+		cancelFunc:  cancel,
+		qm:          qm,
+		handlerFunc: handlerFunc,
+		idleTimeout: idleTimeout,
 	}
 }
 
@@ -56,27 +55,30 @@ func (ra *RoomActor) Receive(ctx actor.Context) {
 		ra.onStopped(ctx)
 	case *actorV1.SetupRoomRequest:
 		ra.onSetupActor(ctx, msg)
-	case *actorV1.CheckIdleTimeout:
-		ra.onCheckIdleTimeout(ctx)
-	default:
-		// Handle cluster PID assignment
+	case *actorV1.QRequestWork:
+		ctx.Send(ctx.Self(), &actorV1.QProduceWork{RoomId: ra.roomID})
+
+	case *actorV1.QProduceWork:
+		err := ra.processNextMessage(ra.ctx)
+		if err != nil {
+			ctx.Logger().With(err).Error("failed to process next message")
+			return
+		}
+		if time.Since(ra.lastActivity) >= ra.idleTimeout {
+			ctx.Stop(ctx.Self())
+		} else {
+			ctx.Send(ctx.Self(), &actorV1.QRequestWork{RoomId: ra.roomID})
+		}
 	}
 }
 
 func (ra *RoomActor) onStarted(ctx actor.Context) {
 	ra.lastActivity = time.Now()
-	// Start the idle timer
-	ra.startIdleTimer(ctx)
 }
 
 func (ra *RoomActor) onStopping(_ actor.Context) {
 
 	ra.cancelFunc()
-
-	// Stop the idle check timer
-	if ra.idleCheckTimer != nil {
-		ra.idleCheckTimer.Stop()
-	}
 
 	// Close the subscription if it exists
 	if ra.subscription != nil {
@@ -116,85 +118,72 @@ func (ra *RoomActor) onSetupActor(ctx actor.Context, msg *actorV1.SetupRoomReque
 		return
 	}
 
-	// Skip if already subscribed
-	if ra.subscription != nil {
-		return
-	}
+	err = ra.setupWorker(ctx, msg.GetQueueUri())
 
-	opts := ra.createQueueOpts(msg.GetQueueUri())
+	// Start continuous message processing in a goroutine
+	//go ra.processNextMessage(ra.ctx)
+}
+
+func (ra *RoomActor) setupWorker(ctx actor.Context, qUri string) error {
+
+	opts := ra.createQueueOpts(qUri)
 
 	// Register subscriber for this room
-	err = ra.qm.RegisterSubscriber(ra.ctx, opts)
+	err := ra.qm.RegisterSubscriber(ra.ctx, opts)
 	if err != nil {
-		return
+		return err
 	}
 
 	// Get the subscriber
 	ra.subscription, err = ra.qm.GetSubscriber(opts.Ref())
 	if err != nil {
-		return
+		return err
 	}
 
-	// Start continuous message processing in a goroutine
-	go ra.internallyHandleRoomEvents(ra.ctx)
+	return nil
+
 }
 
-// internallyHandleRoomEvents continuously pulls messages from the queue and processes them
-func (ra *RoomActor) internallyHandleRoomEvents(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			// Actor is stopping, exit the goroutine
-			return
-		default:
-			// Attempt to receive a message from the subscription
-			msg, err := ra.subscription.Receive(ctx)
-			if err != nil {
-				// If there's an error receiving, wait a bit before trying again
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
+// processNextMessage continuously pulls messages from the queue and processes them
+func (ra *RoomActor) processNextMessage(ctx context.Context) error {
 
-			// Process the message
-			err = ra.worker.Handle(ctx, msg.Metadata, msg.Body)
-			if err != nil {
-				// Log error or take appropriate action - we're not logging as requested
-				msg.Nack()
-				return
-			}
-
-			msg.Ack()
-			// Update last activity timestamp
-			ra.lastActivity = time.Now()
-
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		// Attempt to receive a message from the subscription
+		msg, err := ra.subscription.Receive(ctx)
+		if err != nil {
+			return err
 		}
+
+		// Process the message
+		err = ra.handlerFunc(ctx, msg.Metadata, msg.Body)
+		if err != nil {
+			// Log error or take appropriate action - we're not logging as requested
+			msg.Nack()
+			return err
+		}
+
+		msg.Ack()
+		return nil
+
 	}
+
 }
 
-func (ra *RoomActor) onCheckIdleTimeout(ctx actor.Context) {
-	// If we're actively processing a message, don't check for idle timeout
-	if ra.subscription != nil && !ra.subscription.Idle() {
-		ra.startIdleTimer(ctx)
-		return
-	}
-
-	// If we've been idle for too long, stop the actor
-	if time.Since(ra.lastActivity) >= ra.idleTimeout {
-		ctx.Stop(ctx.Self())
-		return
-	}
-
-	// Not idle yet, restart the timer
-	ra.startIdleTimer(ctx)
+type RoomBehavior struct {
+	isActive bool
 }
 
-func (ra *RoomActor) startIdleTimer(ctx actor.Context) {
-	if ra.idleCheckTimer != nil {
-		ra.idleCheckTimer.Stop()
-	}
-	ra.idleCheckTimer = time.AfterFunc(ra.idleCheckInterval, func() {
-		ctx.Send(ctx.Self(), &actorV1.CheckIdleTimeout{
-			RoomId: ra.roomID,
-		})
-	})
+func (m *RoomBehavior) MailboxStarted() {
 }
+
+func (m *RoomBehavior) MessagePosted(msg any) {
+}
+
+func (m *RoomBehavior) MessageReceived(msg any) {
+
+}
+
+func (m *RoomBehavior) MailboxEmpty() {}

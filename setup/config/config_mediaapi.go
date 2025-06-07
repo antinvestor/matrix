@@ -55,7 +55,7 @@ func (c *MediaAPI) Defaults(opts DefaultOpts) {
 			ResizeMethod: "scale",
 		},
 	}
-	c.Database.ConnectionString = opts.DatabaseConnectionStr
+	c.Database.ConnectionString = opts.DSDatabaseConn
 	c.BasePath = "/tmp/media_store"
 
 }

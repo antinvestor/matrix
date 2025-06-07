@@ -14,7 +14,7 @@ type SyncAPI struct {
 
 func (c *SyncAPI) Defaults(opts DefaultOpts) {
 	c.Fulltext.Defaults(opts)
-	c.Database.ConnectionString = opts.DatabaseConnectionStr
+	c.Database.ConnectionString = opts.DSDatabaseConn
 	c.Queues.Defaults(opts)
 }
 
@@ -74,15 +74,15 @@ type SyncQueues struct {
 
 func (q *SyncQueues) Defaults(opts DefaultOpts) {
 
-	q.OutputRoomEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIRoomServerConsumer", DS: "mem://SyncAPIOutputRoomEvent"}
-	q.OutputClientData = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIAccountDataConsumer", DS: "mem://SyncAPIOutputClientData"}
-	q.OutputKeyChangeEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIKeyChangeConsumer", DS: "mem://SyncAPIOutputKeyChangeEvent"}
-	q.OutputSendToDeviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPISendToDeviceConsumer", DS: "mem://SyncAPIOutputSendToDeviceEvent"}
-	q.OutputTypingEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPITypingConsumer", DS: "mem://SyncAPIOutputTypingEvent"}
-	q.OutputReceiptEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIReceiptConsumer", DS: "mem://SyncAPIOutputReceiptEvent"}
-	q.OutputStreamEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIRoomServerConsumer", DS: "mem://SyncAPIOutputStreamEvent"}
-	q.OutputNotificationData = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPINotificationDataConsumer", DS: "mem://SyncAPIOutputNotificationData"}
-	q.OutputPresenceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIPresenceConsumer", DS: "mem://SyncAPIOutputPresenceEvent"}
+	q.OutputRoomEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIRoomServerConsumer", DS: opts.DSQueueConn.ExtendPath(OutputRoomEvent).ExtendQuery("stream_name", OutputRoomEvent)}
+	q.OutputClientData = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIAccountDataConsumer", DS: opts.DSQueueConn.ExtendPath(OutputClientData).ExtendQuery("stream_name", OutputClientData)}
+	q.OutputKeyChangeEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIKeyChangeConsumer", DS: opts.DSQueueConn.ExtendPath(OutputKeyChangeEvent).ExtendQuery("stream_name", OutputKeyChangeEvent)}
+	q.OutputSendToDeviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPISendToDeviceConsumer", DS: opts.DSQueueConn.ExtendPath(OutputSendToDeviceEvent).ExtendQuery("stream_name", OutputSendToDeviceEvent)}
+	q.OutputTypingEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPITypingConsumer", DS: opts.DSQueueConn.ExtendPath(OutputTypingEvent).ExtendQuery("stream_name", OutputTypingEvent)}
+	q.OutputReceiptEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIReceiptConsumer", DS: opts.DSQueueConn.ExtendPath(OutputReceiptEvent).ExtendQuery("stream_name", OutputReceiptEvent)}
+	q.OutputStreamEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIRoomServerConsumer", DS: opts.DSQueueConn.ExtendPath(OutputStreamEvent).ExtendQuery("stream_name", OutputStreamEvent)}
+	q.OutputNotificationData = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPINotificationDataConsumer", DS: opts.DSQueueConn.ExtendPath(OutputNotificationData).ExtendQuery("stream_name", OutputNotificationData)}
+	q.OutputPresenceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIPresenceConsumer", DS: opts.DSQueueConn.ExtendPath(OutputPresenceEvent).ExtendQuery("stream_name", OutputPresenceEvent)}
 }
 
 func (q *SyncQueues) Verify(configErrs *ConfigErrors) {

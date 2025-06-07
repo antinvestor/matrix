@@ -57,7 +57,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 			Event: &types.HeaderedEvent{PDU: event},
 		}
 
-		inputter, err := input.NewInputer(ctx, &cfg.RoomServer, nil, qm, "", nil, nil, nil, nil, nil, nil, nil, nil, false)
+		inputter, err := input.NewInputer(ctx, &cfg.RoomServer, nil, qm, "", nil, nil, nil, nil, nil, nil, nil, nil,false)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -359,12 +359,12 @@ func (c *CacheOptions) LoadEnv() error {
 }
 
 func (c *CacheOptions) Defaults(opts DefaultOpts) {
-	connectionUriStr := string(opts.CacheConnectionStr)
+	connectionUriStr := string(opts.DSCacheConn)
 	if connectionUriStr != "" {
 		c.ConnectionString = DataSource(connectionUriStr)
 	}
 
-	c.ConnectionString = opts.CacheConnectionStr
+	c.ConnectionString = opts.DSCacheConn
 	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
 	c.MaxAge = time.Hour
 }
@@ -386,6 +386,28 @@ func (q *QueueOptions) Ref() string {
 	return fmt.Sprintf("%s%s", q.Prefix, q.QReference)
 }
 
+func (q *QueueOptions) DSrc() DataSource {
+	pp := q.DS.PrefixPath(q.Prefix)
+	if !pp.IsNats() {
+		return q.DS
+	}
+
+	uri, _ := pp.ToURI()
+	query := uri.Query()
+	query.Set("stream_name", q.Ref())
+	if query.Has("stream_name") {
+		query.Set("stream_name", fmt.Sprintf("%s%s", q.Prefix, query.Get("stream_name")))
+	}
+
+	if query.Has("consumer_durable_name") {
+		query.Set("consumer_durable_name", fmt.Sprintf("%s%s", q.Prefix, query.Get("consumer_durable_name")))
+	}
+
+	uri.RawQuery = query.Encode()
+
+	return DataSource(uri.String())
+}
+
 func (q *QueueOptions) LoadEnv() error {
 
 	err := frame.ConfigFillFromEnv(q)
@@ -400,12 +422,12 @@ func (q *QueueOptions) LoadEnv() error {
 }
 
 func (q *QueueOptions) Defaults(opts DefaultOpts) {
-	connectionUriStr := string(opts.QueueConnectionStr)
+	connectionUriStr := string(opts.DSQueueConn)
 	if connectionUriStr != "" {
 		q.DS = DataSource(connectionUriStr)
 	}
 
-	q.DS = opts.CacheConnectionStr
+	q.DS = opts.DSCacheConn
 	q.Prefix = "Matrix_"
 }
 
@@ -484,7 +506,7 @@ func (c *DatabaseOptions) LoadEnv() error {
 
 func (c *DatabaseOptions) Defaults(opts DefaultOpts) {
 
-	databaseUriStr := string(opts.DatabaseConnectionStr)
+	databaseUriStr := string(opts.DSDatabaseConn)
 	if databaseUriStr != "" {
 		c.ConnectionString = DataSource(databaseUriStr)
 	}

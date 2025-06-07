@@ -18,7 +18,12 @@ message ActorStopped {
   string roomId = 1;
 }
 
-message CheckIdleTimeout {
+// sent to room actor to request more work
+message QRequestWork {
+  string roomId = 1;
+}
+
+message QProduceWork {
   string roomId = 1;
 }
 

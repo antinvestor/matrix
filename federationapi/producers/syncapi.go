@@ -152,7 +152,7 @@ func (p *SyncAPIProducer) SendPresence(
 
 	h["last_active_ts"] = strconv.Itoa(int(lastActiveTS))
 	log.Tracef("Sending presence to syncAPI: %+v", h)
-	return p.Qm.Publish(ctx, p.TopicPresenceEvent, "", h)
+	return p.Qm.Publish(ctx, p.TopicPresenceEvent, []byte(""), h)
 }
 
 func (p *SyncAPIProducer) SendDeviceListUpdate(
@@ -163,7 +163,7 @@ func (p *SyncAPIProducer) SendDeviceListUpdate(
 	}
 
 	log.Debugf("Sending device list update: %+v", h)
-	return p.Qm.Publish(ctx, p.TopicPresenceEvent, deviceListUpdate, h)
+	return p.Qm.Publish(ctx, p.TopicPresenceEvent, []byte(deviceListUpdate), h)
 }
 
 func (p *SyncAPIProducer) SendSigningKeyUpdate(
@@ -174,5 +174,5 @@ func (p *SyncAPIProducer) SendSigningKeyUpdate(
 	}
 
 	log.Debugf("Sending signing key update")
-	return p.Qm.Publish(ctx, p.TopicSigningKeyUpdate, data, h)
+	return p.Qm.Publish(ctx, p.TopicSigningKeyUpdate, []byte(data), h)
 }

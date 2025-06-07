@@ -407,7 +407,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
 
 		// Create the room
-		if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+		if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 		var seenInvitesForBob int

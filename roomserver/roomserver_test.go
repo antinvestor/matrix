@@ -63,13 +63,14 @@ func TestUsers(t *testing.T) {
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		rsAPI.SetUserAPI(ctx, usrAPI)
+
 		t.Run("shared users", func(t *testing.T) {
 			testSharedUsers(ctx, t, rsAPI)
 		})
 
 		t.Run("kick users", func(t *testing.T) {
-			usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
-			rsAPI.SetUserAPI(ctx, usrAPI)
 			testKickUsers(ctx, t, rsAPI, usrAPI)
 		})
 	})

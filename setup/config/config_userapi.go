@@ -37,7 +37,7 @@ func (c *UserAPI) Defaults(opts DefaultOpts) {
 	c.BCryptCost = bcrypt.DefaultCost
 	c.OpenIDTokenLifetimeMS = DefaultOpenIDTokenLifetimeMS
 	c.WorkerCount = 8
-	c.AccountDatabase.ConnectionString = opts.DatabaseConnectionStr
+	c.AccountDatabase.ConnectionString = opts.DSDatabaseConn
 	c.Queues.Defaults(opts)
 }
 
@@ -63,10 +63,10 @@ type UserAPIQueues struct {
 }
 
 func (q *UserAPIQueues) Defaults(opts DefaultOpts) {
-	q.OutputReceiptEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "UserAPIReceiptConsumer", DS: "mem://UserAPIOutputReceiptEvent"}
-	q.InputDeviceListUpdate = QueueOptions{Prefix: opts.QueuePrefix, QReference: "KeyServerInputDeviceListConsumer", DS: "mem://KeyServerInputDeviceListUpdate"}
-	q.InputSigningKeyUpdate = QueueOptions{Prefix: opts.QueuePrefix, QReference: "KeyServerSigningKeyConsumer", DS: "mem://KeyServerInputSigningKeyUpdate"}
-	q.OutputRoomEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "UserAPIRoomServerConsumer", DS: "mem://UserAPIOutputRoomEvent"}
+	q.OutputReceiptEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "UserAPIReceiptConsumer", DS: opts.DSQueueConn.ExtendPath(OutputReceiptEvent).ExtendQuery("stream_name", OutputReceiptEvent)}
+	q.InputDeviceListUpdate = QueueOptions{Prefix: opts.QueuePrefix, QReference: "KeyServerInputDeviceListConsumer", DS: opts.DSQueueConn.ExtendPath(InputDeviceListUpdate).ExtendQuery("stream_name", InputDeviceListUpdate)}
+	q.InputSigningKeyUpdate = QueueOptions{Prefix: opts.QueuePrefix, QReference: "KeyServerSigningKeyConsumer", DS: opts.DSQueueConn.ExtendPath(InputSigningKeyUpdate).ExtendQuery("stream_name", InputSigningKeyUpdate)}
+	q.OutputRoomEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "UserAPIRoomServerConsumer", DS: opts.DSQueueConn.ExtendPath(OutputRoomEvent).ExtendQuery("stream_name", OutputRoomEvent)}
 }
 
 func (q *UserAPIQueues) Verify(configErrs *ConfigErrors) {

@@ -12,7 +12,7 @@ type queues struct {
 }
 
 func (c *queues) RegisterPublisher(ctx context.Context, opts *config.QueueOptions) error {
-	return c.service.AddPublisher(ctx, opts.Ref(), string(opts.DS))
+	return c.service.AddPublisher(ctx, opts.Ref(), string(opts.DSrc()))
 }
 
 func (c *queues) GetPublisher(ref string) (frame.Publisher, error) {
@@ -34,7 +34,7 @@ func (c *queues) Publish(ctx context.Context, reference string, payload any, hea
 }
 
 func (c *queues) RegisterSubscriber(ctx context.Context, opts *config.QueueOptions, optHandler ...frame.SubscribeWorker) error {
-	return c.service.AddSubscriber(ctx, opts.Ref(), string(opts.DS), optHandler...)
+	return c.service.AddSubscriber(ctx, opts.Ref(), string(opts.DSrc()), optHandler...)
 }
 
 func (c *queues) GetSubscriber(ref string) (frame.Subscriber, error) {

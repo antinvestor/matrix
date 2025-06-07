@@ -75,7 +75,7 @@ func PrepareQueueConnection(_ context.Context, testOpts DependancyOption) (connS
 		return "", func(ctx context.Context) {}, err
 	}
 
-	natsUriStr = parsedNatsUri.String()
+	natsUriStr = parsedNatsUri.String() + "?jetstream=true&stream_storage=file&stream_retention=interest"
 
 	return config.DataSource(natsUriStr), func(ctx context.Context) {
 	}, nil

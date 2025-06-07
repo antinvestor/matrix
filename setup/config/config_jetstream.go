@@ -55,7 +55,7 @@ func (c *JetStream) Defaults(opts DefaultOpts) {
 	c.TopicPrefix = "Global"
 	c.Credentials = ""
 
-	connectionUris := opts.QueueConnectionStr.ToArray()
+	connectionUris := opts.DSQueueConn.ToArray()
 	for _, ds := range connectionUris {
 		if ds.IsNats() {
 			c.Addresses = append(c.Addresses, string(ds))

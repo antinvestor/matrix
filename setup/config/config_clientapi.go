@@ -256,7 +256,7 @@ type ClientQueues struct {
 }
 
 func (q *ClientQueues) Defaults(opts DefaultOpts) {
-	q.InputFulltextReindex = QueueOptions{Prefix: opts.QueuePrefix, QReference: "ClientAPIInputFulltextReindex", DS: "mem://ClientAPIInputFulltextReindex"}
+	q.InputFulltextReindex = QueueOptions{Prefix: opts.QueuePrefix, QReference: "ClientAPIInputFulltextReindex", DS: opts.DSQueueConn.ExtendPath(InputFulltextReindex).ExtendQuery("stream_name", InputFulltextReindex)}
 }
 
 func (q *ClientQueues) Verify(configErrs *ConfigErrors) {

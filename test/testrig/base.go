@@ -57,7 +57,7 @@ func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.
 	cfg.Global.DatabaseOptions.MaxOpenConnections = 10
 	cfg.Global.DatabaseOptions.ConnMaxLifetimeSeconds = 60
 
-	for _, conn := range defaultOpts.DatabaseConnectionStr.ToArray() {
+	for _, conn := range defaultOpts.DSDatabaseConn.ToArray() {
 		cfg.Global.DatabasePrimaryURL = append(cfg.Global.DatabasePrimaryURL, string(conn))
 	}
 

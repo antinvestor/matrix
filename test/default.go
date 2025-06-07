@@ -2,34 +2,45 @@ package test
 
 import (
 	"context"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/setup/config"
 )
 
 func PrepareDefaultDSConnections(ctx context.Context, testOpts DependancyOption) (config.DefaultOpts, func(ctx context.Context), error) {
 
-	cacheConnStr, closeCache, err := PrepareCacheConnection(ctx, testOpts)
-	if err != nil {
-		return config.DefaultOpts{}, nil, err
+	configDefaults := config.DefaultOpts{
+		QueuePrefix: util.RandomString(7),
 	}
 
-	queueConnStr, closeQueue, err := PrepareQueueConnection(ctx, testOpts)
+	cacheConn, closeCache, err := PrepareCacheConnection(ctx, testOpts)
+	if err != nil {
+		return configDefaults, nil, err
+	}
+
+	configDefaults.DSCacheConn = cacheConn
+
+	queueConn, closeQueue, err := PrepareQueueConnection(ctx, testOpts)
 	if err != nil {
 		defer closeCache(ctx)
-		return config.DefaultOpts{}, nil, err
+		return configDefaults, nil, err
 	}
 
-	dbConnStr, closeDb, err := PrepareDatabaseConnection(ctx, testOpts)
+	configDefaults.DSQueueConn = queueConn
+
+	dbConn, closeDb, err := PrepareDatabaseConnection(ctx, testOpts)
 	if err != nil {
 		defer closeCache(ctx)
 		defer closeQueue(ctx)
-		return config.DefaultOpts{}, nil, err
+		return configDefaults, nil, err
 	}
 
+	configDefaults.DSDatabaseConn = dbConn
+
 	return config.DefaultOpts{
-			DatabaseConnectionStr: dbConnStr,
-			QueueConnectionStr:    queueConnStr,
-			CacheConnectionStr:    cacheConnStr,
+			DSDatabaseConn: dbConn,
+			DSQueueConn:    queueConn,
+			DSCacheConn:    cacheConn,
 		}, func(ctx context.Context) {
 			closeCache(ctx)
 			closeQueue(ctx)

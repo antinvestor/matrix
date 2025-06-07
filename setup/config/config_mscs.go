@@ -13,7 +13,7 @@ type MSCs struct {
 }
 
 func (c *MSCs) Defaults(opts DefaultOpts) {
-	c.Database.ConnectionString = opts.DatabaseConnectionStr
+	c.Database.ConnectionString = opts.DSDatabaseConn
 }
 
 // Enabled returns true if the given msc is enabled. Should in the form 'msc12345'.

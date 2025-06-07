@@ -151,7 +151,7 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 
 	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
-	err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI, qm, msgs...)
+	err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
 	if err != nil {
 		t.Fatalf("failed to publish events: %v", err)
 	}
@@ -258,7 +258,7 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 	msgs := toQueueMsgs(t, room.Events()...)
 	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
-	err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI, qm, msgs...)
+	err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
 	if err != nil {
 		t.Fatalf("failed to publish events: %v", err)
 	}
@@ -328,7 +328,7 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 			}, test.WithStateKey(""))
 
 			msgs = toQueueMsgs(t, event)
-			err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI, qm, msgs...)
+			err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
 			if err != nil {
 				t.Fatalf("failed to publish events: %v", err)
 			}
@@ -422,7 +422,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 
 	for i, msg := range msgs {
 
-		err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI, qm, msg)
+		err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msg)
 		if err != nil {
 			t.Fatalf("failed to publish events: %v", err)
 		}
@@ -447,7 +447,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 				t.Fatalf("i=%v got %d joined rooms, want 0", i, len(res.Rooms.Join))
 			}
 		} else { // we should have that room somewhere
-			if len(res.Rooms.Join) != 1 {
+			if res.Rooms != nil && len(res.Rooms.Join) != 1 {
 				t.Fatalf("i=%v got %d joined rooms, want 1", i, len(res.Rooms.Join))
 			}
 		}

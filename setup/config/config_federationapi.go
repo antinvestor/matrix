@@ -70,7 +70,7 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 			},
 		},
 	}
-	c.Database.ConnectionString = opts.DatabaseConnectionStr
+	c.Database.ConnectionString = opts.DSDatabaseConn
 	c.Queues.Defaults(opts)
 }
 
@@ -140,11 +140,11 @@ type FederationAPIQueues struct {
 }
 
 func (q *FederationAPIQueues) Defaults(opts DefaultOpts) {
-	q.OutputPresenceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIPresenceConsumer", DS: "mem://FederationAPIOutputPresenceEvent"}
-	q.OutputReceiptEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIReceiptConsumer", DS: "mem://FederationAPIOutputReceiptEvent"}
-	q.OutputRoomEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIRoomServerConsumer", DS: "mem://FederationAPIOutputRoomEvent"}
-	q.OutputSendToDeviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIESendToDeviceConsumer", DS: "mem://FederationAPIOutputSendToDeviceEvent"}
-	q.OutputTypingEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPITypingConsumer", DS: "mem://FederationAPIOutputTypingEvent"}
+	q.OutputPresenceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIPresenceConsumer", DS: opts.DSQueueConn.ExtendPath(OutputPresenceEvent).ExtendQuery("stream_name", OutputPresenceEvent)}
+	q.OutputReceiptEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIReceiptConsumer", DS: opts.DSQueueConn.ExtendPath(OutputReceiptEvent).ExtendQuery("stream_name", OutputReceiptEvent)}
+	q.OutputRoomEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIRoomServerConsumer", DS: opts.DSQueueConn.ExtendPath(OutputRoomEvent).ExtendQuery("stream_name", OutputRoomEvent)}
+	q.OutputSendToDeviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIESendToDeviceConsumer", DS: opts.DSQueueConn.ExtendPath(OutputSendToDeviceEvent).ExtendQuery("stream_name", OutputSendToDeviceEvent)}
+	q.OutputTypingEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPITypingConsumer", DS: opts.DSQueueConn.ExtendPath(OutputTypingEvent).ExtendQuery("stream_name", OutputTypingEvent)}
 }
 
 func (q *FederationAPIQueues) Verify(configErrs *ConfigErrors) {

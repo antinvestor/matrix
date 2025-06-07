@@ -9,8 +9,8 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/cluster"
-	"github.com/asynkron/protoactor-go/cluster/clusterproviders/automanaged"
-	"github.com/asynkron/protoactor-go/cluster/clusterproviders/k8s"
+	cpk8s "github.com/asynkron/protoactor-go/cluster/clusterproviders/k8s"
+	cptest "github.com/asynkron/protoactor-go/cluster/clusterproviders/test"
 	"github.com/asynkron/protoactor-go/cluster/identitylookup/disthash"
 	"github.com/asynkron/protoactor-go/remote"
 	"github.com/pitabwire/frame"
@@ -20,6 +20,8 @@ const (
 	RoomActorQPrefix = "RoomActorQ_"
 )
 
+type HandlerFunc func(ctx context.Context, metadata map[string]string, message []byte) error
+
 // RoomActorSystem manages a set of actors for processing room events
 type RoomActorSystem struct {
 	ctx         context.Context
@@ -27,14 +29,14 @@ type RoomActorSystem struct {
 	qOpts       config.QueueOptions
 	qm          queueutil.QueueManager
 	actorSystem *actor.ActorSystem
-	worker      frame.SubscribeWorker
+	handlerFunc HandlerFunc
 	clusterName string
 	clusterKind string
 	cluster     *cluster.Cluster
 }
 
 // NewRoomActorSystem creates a new room actor system
-func NewRoomActorSystem(ctx context.Context, config *config.ActorConfig, qm queueutil.QueueManager, worker frame.SubscribeWorker) *RoomActorSystem {
+func NewRoomActorSystem(ctx context.Context, config *config.ActorConfig, qm queueutil.QueueManager, handlerFunc HandlerFunc) *RoomActorSystem {
 
 	actorSystem := actor.NewActorSystem()
 
@@ -43,7 +45,7 @@ func NewRoomActorSystem(ctx context.Context, config *config.ActorConfig, qm queu
 		config:      config,
 		qm:          qm,
 		actorSystem: actorSystem,
-		worker:      worker,
+		handlerFunc: handlerFunc,
 		clusterName: "matrix-cluster",
 		clusterKind: "room-actors",
 	}
@@ -66,21 +68,22 @@ func (s *RoomActorSystem) Start(ctx context.Context) error {
 
 	if s.config.ClusterMode == "kubernetes" {
 		// Use Kubernetes provider
-		clusterProvider, err = k8s.New()
+		clusterProvider, err = cpk8s.New()
 		if err != nil {
 			return err
 		}
 	} else {
 		// Default to automanaged cluster
-		clusterProvider = automanaged.New()
+		clusterProvider = cptest.NewTestProvider(cptest.NewInMemAgent())
 	}
 
 	lookup := disthash.New()
 
+	mb := actor.Unbounded(&RoomBehavior{})
 	// Create the room actor props for the cluster
 	roomActorProps := actor.PropsFromProducer(func() actor.Actor {
-		return NewRoomActor(s.ctx, s.qm, s.worker, s.config.IdleTimeout)
-	})
+		return NewRoomActor(s.ctx, s.qm, s.handlerFunc, s.config.IdleTimeout)
+	}, actor.WithMailbox(mb))
 
 	// Register the room actor kind with the cluster
 	roomKind := cluster.NewKind(s.clusterKind, roomActorProps)

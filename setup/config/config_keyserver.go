@@ -9,7 +9,7 @@ type KeyServer struct {
 }
 
 func (c *KeyServer) Defaults(opts DefaultOpts) {
-	c.Database.ConnectionString = opts.DatabaseConnectionStr
+	c.Database.ConnectionString = opts.DSDatabaseConn
 	c.Queues.Defaults(opts)
 }
 
@@ -26,7 +26,7 @@ type KeyServerQueues struct {
 }
 
 func (q *KeyServerQueues) Defaults(opts DefaultOpts) {
-	q.OutputKeyChangeEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "KeyServerKeyChangeConsumer", DS: "mem://KeyServerOutputKeyChangeEvent"}
+	q.OutputKeyChangeEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "KeyServerKeyChangeConsumer", DS: opts.DSQueueConn.ExtendPath(OutputKeyChangeEvent).ExtendQuery("stream_name", OutputKeyChangeEvent)}
 }
 
 func (q *KeyServerQueues) Verify(configErrs *ConfigErrors) {

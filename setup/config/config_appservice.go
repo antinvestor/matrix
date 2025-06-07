@@ -441,8 +441,7 @@ type AppServiceQueues struct {
 }
 
 func (q *AppServiceQueues) Defaults(opts DefaultOpts) {
-	q.OutputAppserviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "AppServiceOutputAppserviceEvent", DS: "mem://AppServiceOutputAppserviceEvent"}
-
+	q.OutputAppserviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "AppServiceOutputAppserviceEvent", DS: opts.DSQueueConn.ExtendPath(OutputAppserviceEvent).ExtendQuery("stream_name", OutputAppserviceEvent)}
 }
 
 func (q *AppServiceQueues) Verify(configErrs *ConfigErrors) {

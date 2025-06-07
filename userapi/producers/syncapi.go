@@ -3,6 +3,7 @@ package producers
 import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
@@ -16,17 +17,33 @@ import (
 type SyncAPI struct {
 	db                    storage.Notification
 	qm                    queueutil.QueueManager
-	clientDataTopic       string
-	notificationDataTopic string
+	clientDataTopic       *config.QueueOptions
+	notificationDataTopic *config.QueueOptions
 }
 
-func NewSyncAPI(db storage.UserDatabase, qm queueutil.QueueManager, clientDataTopic string, notificationDataTopic string) *SyncAPI {
+func NewSyncAPI(ctx context.Context, cfg *config.SyncAPI, db storage.UserDatabase, qm queueutil.QueueManager) (*SyncAPI, error) {
+
+	// TODO: user API should handle syncs for account data. Right now,
+	// it's handled by clientapi, and hence uses its topic. When user
+	// API handles it for all account data, we can remove it from
+	// here.
+
+	err := qm.RegisterPublisher(ctx, &cfg.Queues.OutputClientData)
+	if err != nil {
+		return nil, err
+	}
+
+	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputNotificationData)
+	if err != nil {
+		return nil, err
+	}
+
 	return &SyncAPI{
 		db:                    db,
 		qm:                    qm,
-		clientDataTopic:       clientDataTopic,
-		notificationDataTopic: notificationDataTopic,
-	}
+		clientDataTopic:       &cfg.Queues.OutputClientData,
+		notificationDataTopic: &cfg.Queues.OutputNotificationData,
+	}, nil
 }
 
 // SendAccountData sends account data to the Sync API server.
@@ -42,7 +59,7 @@ func (p *SyncAPI) SendAccountData(ctx context.Context, userID string, data event
 		queueutil.UserID: userID,
 	}
 
-	err := p.qm.Publish(ctx, p.clientDataTopic, data, header)
+	err := p.qm.Publish(ctx, p.clientDataTopic.Ref(), data, header)
 	if err != nil {
 		return err
 	}
@@ -81,7 +98,7 @@ func (p *SyncAPI) sendNotificationData(ctx context.Context, userID string, data 
 		queueutil.UserID: userID,
 	}
 
-	err := p.qm.Publish(ctx, p.notificationDataTopic, data, header)
+	err := p.qm.Publish(ctx, p.notificationDataTopic.Ref(), data, header)
 	if err != nil {
 		return err
 	}

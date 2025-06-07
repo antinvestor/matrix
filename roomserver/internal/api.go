@@ -115,8 +115,8 @@ func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAP
 		r.ServerName,
 		r.SigningIdentityFor,
 		fsAPI, r,
-		keyRing, r.ServerACLs, r.OutputProducer, r.Queryer,
-		nil, r.enableMetrics)
+		keyRing, r.ServerACLs, r.OutputProducer,
+		r.Queryer, nil, r.enableMetrics)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to start roomserver input API")
 	}

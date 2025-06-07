@@ -271,14 +271,16 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 	}
 
 	msg := &testrig.QMsg{
-		Subject: cfg.KeyServer.Queues.OutputKeyChangeEvent.Ref(),
 		Header: map[string]string{
 			queueutil.UserID: key.UserID,
 		},
 		Data: key,
 	}
 
-	testrig.MustPublishMsgs(ctx, t, qm, msg)
+	err = testrig.MustPublishMsgs(ctx, t, &cfg.KeyServer.Queues.OutputKeyChangeEvent, qm, msg)
+	if err != nil {
+		t.Fatalf("MustPublishMsgs: failed to publish message: %s", err)
+	}
 	time.Sleep(500 * time.Millisecond)
 	fc.fedClientMutex.Lock()
 	defer fc.fedClientMutex.Unlock()

@@ -28,9 +28,9 @@ func main() {
 			Version: config.Version,
 		}
 		cfg.Defaults(config.DefaultOpts{
-			DatabaseConnectionStr: config.DataSource(*databaseURI),
-			CacheConnectionStr:    config.DataSource(*cacheURI),
-			QueueConnectionStr:    config.DataSource(*queueURI),
+			DSDatabaseConn: config.DataSource(*databaseURI),
+			DSCacheConn:    config.DataSource(*cacheURI),
+			DSQueueConn:    config.DataSource(*queueURI),
 		})
 		if *serverName != "" {
 			cfg.Global.ServerName = spec.ServerName(*serverName)

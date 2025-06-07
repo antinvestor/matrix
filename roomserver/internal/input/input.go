@@ -36,6 +36,8 @@ import (
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/frame"
 	"github.com/sirupsen/logrus"
+	"strconv"
+	"time"
 )
 
 // Inputer is responsible for consuming from the roomserver input
@@ -78,6 +80,7 @@ type Inputer struct {
 	OutputProducer  *producers.RoomEventProducer
 	Queryer         *query.Queryer
 	UserAPI         userapi.RoomserverUserAPI
+	actorSystem     *actor.RoomActorSystem
 	EnableMetrics   bool
 }
 
@@ -113,63 +116,48 @@ func NewInputer(
 		EnableMetrics:   enableMetrics,
 	}
 
-	actorSyst := actor.NewRoomActorSystem(ctx, &cfg.ActorSystem, qm, c)
-	err := actorSyst.Start(ctx)
+	c.actorSystem = actor.NewRoomActorSystem(ctx, &cfg.ActorSystem, qm, c.HandleRoomEvent)
+	err := c.actorSystem.Start(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	tempWorker := &transientInputer{
-		opts:        &c.Cfg.Queues.InputRoomEvent,
-		qm:          qm,
-		inp:         c,
-		actorSystem: actorSyst,
-	}
+	err = c.Qm.RegisterSubscriber(ctx, &cfg.Queues.InputRoomEvent, c)
 
-	err = c.Qm.RegisterSubscriber(ctx, &c.Cfg.Queues.InputRoomEvent, tempWorker)
+	logrus.WithError(err).WithFields(logrus.Fields{
+		"subj_prefix": cfg.Queues.InputRoomEvent.Prefix,
+		"subj_ref":    cfg.Queues.InputRoomEvent.Ref(),
+		"subj_uri":    cfg.Queues.InputRoomEvent.DSrc(),
+	}).Error("Inputter successfully registered subscriber")
 
 	return c, err
 }
 
-type transientInputer struct {
-	opts        *config.QueueOptions
-	qm          queueutil.QueueManager
-	inp         *Inputer
-	actorSystem *actor.RoomActorSystem
-}
-
-func (ti *transientInputer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
 	roomId, err := spec.NewRoomID(metadata["room_id"])
 	if err != nil {
 		return err
 	}
 
-	roomOpts, err := cleanQOpts(roomId, ti.opts)
+	opt := &r.Cfg.Queues.InputRoomEvent
+	roomOpts, err := cleanQOpts(opt, roomId)
 	if err != nil {
 		return err
 	}
 
-	err = ti.actorSystem.EnsureRoomActorExists(ctx, roomId, roomOpts.DS)
+	err = r.actorSystem.EnsureRoomActorExists(ctx, roomId, roomOpts.DS)
 	if err != nil {
 		return err
 	}
 
 	if !roomOpts.DS.IsNats() {
-		var publisher frame.Publisher
-		publisher, err = ti.qm.GetPublisher(roomOpts.Ref())
+		err = r.Qm.EnsurePublisherOk(ctx, roomOpts)
 		if err != nil {
-			err = ti.qm.RegisterPublisher(ctx, roomOpts)
-			if err != nil {
-				return err
-			}
-			publisher, err = ti.qm.GetPublisher(roomOpts.Ref())
-			if err != nil {
-				return err
-			}
+			return err
 		}
 
-		err = publisher.Publish(ctx, message, metadata)
+		err = r.Qm.Publish(ctx, roomOpts.Ref(), message, metadata)
 		if err != nil {
 			return err
 		}
@@ -179,44 +167,32 @@ func (ti *transientInputer) Handle(ctx context.Context, metadata map[string]stri
 	return nil
 }
 
-func cleanQOpts(roomId *spec.RoomID, opts *config.QueueOptions) (*config.QueueOptions, error) {
+// If a room consumer is inactive for a while then we will allow NATS
+// to clean it up. This stops us from holding onto durable consumers
+// indefinitely for rooms that might no longer be active, since they do
+// have an interest overhead in the NATS Server. If the room becomes
+// active again then we'll recreate the consumer anyway.
+const inactiveThreshold = time.Hour * 24
 
-	var err error
+func cleanQOpts(opts *config.QueueOptions, roomId *spec.RoomID) (*config.QueueOptions, error) {
+
 	ds := opts.DS
 	if ds.IsNats() {
 
-		subject := fmt.Sprintf("InputEvtRoomID.%s", queueutil.Tokenise(roomId.String()))
-		durable := fmt.Sprintf("InputEvtRoomID_%s", queueutil.Tokenise(roomId.String()))
-		ds, err = ds.ExtendQuery("subject", subject)
-		if err != nil {
-			return nil, err
-		}
+		subject := fmt.Sprintf("%s.%s", config.InputRoomEvent, queueutil.Tokenise(roomId.String()))
+		durable := fmt.Sprintf("RoomInput%s", queueutil.Tokenise(roomId.String()))
+		ds = ds.ExtendQuery("subject", subject)
 
-		ds, err = ds.ExtendQuery("consumer_filter_subject", subject)
-		if err != nil {
-			return nil, err
-		}
-		ds, err = ds.ExtendQuery("consumer_durable_name", durable)
-		if err != nil {
-			return nil, err
-		}
-		ds, err = ds.ExtendQuery("consumer_deliver_policy", "all")
-		if err != nil {
-			return nil, err
-		}
-		ds, err = ds.ExtendQuery("consumer_ack_policy", "explicit")
-		if err != nil {
-			return nil, err
-		}
-		ds, err = ds.ExtendQuery("consumer_headers_only", "false")
-		if err != nil {
-			return nil, err
-		}
+		ds = ds.ExtendQuery("consumer_filter_subject", subject)
+		ds = ds.ExtendQuery("consumer_durable_name", durable)
+		ds = ds.ExtendQuery("consumer_deliver_policy", "all")
+		ds = ds.ExtendQuery("consumer_ack_policy", "explicit")
+		ds = ds.ExtendQuery("consumer_ack_wait", strconv.FormatInt(int64(MaximumMissingProcessingTime+(time.Second*10)), 10))
+		ds = ds.ExtendQuery("consumer_inactive_threshold", strconv.FormatInt(int64(inactiveThreshold), 10))
+		ds = ds.ExtendQuery("consumer_headers_only", "false")
+
 	} else {
-		ds, err = opts.DS.ExtendPath(queueutil.Tokenise(roomId.String()))
-		if err != nil {
-			return nil, err
-		}
+		ds = opts.DS.ExtendPath(queueutil.Tokenise(roomId.String()))
 	}
 
 	return &config.QueueOptions{
@@ -226,9 +202,9 @@ func cleanQOpts(roomId *spec.RoomID, opts *config.QueueOptions) (*config.QueueOp
 	}, nil
 }
 
-// Handle is called by the worker for the room. It must only be called
+// HandleRoomEvent is called by the worker for the room. It must only be called
 // by the actor embedded into the worker.
-func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]string, message []byte) error {
 
 	// Try to unmarshal the input room event. If the JSON unmarshalling
 	// fails then we'll terminate the message — this notifies NATS that
@@ -282,13 +258,31 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, messag
 	// that field, so send back the error string (if any). If there
 	// was no error then we'll return a blank message, which means
 	// that everything was OK.
-	if replyTo := metadata["sync"]; replyTo != "" {
-		err0 := r.Qm.Publish(ctx, replyTo, []byte(errString))
+	replyTo := metadata["sync"]
+	if replyTo != "" {
+
+		replyToOpts := &config.QueueOptions{
+			DS:         config.DataSource(replyTo),
+			QReference: metadata["sync_ref"],
+		}
+
+		err0 := r.Qm.EnsurePublisherOk(ctx, replyToOpts)
 		if err0 != nil {
 			logrus.WithError(err0).WithFields(logrus.Fields{
 				"room_id":  inputRoomEvent.Event.RoomID(),
 				"event_id": inputRoomEvent.Event.EventID(),
 				"type":     inputRoomEvent.Event.Type(),
+				"replyTo":  replyTo,
+			}).Warn("Publisher to reply to is not available")
+			return nil
+		}
+		err0 = r.Qm.Publish(ctx, replyToOpts.Ref(), []byte(errString))
+		if err0 != nil {
+			logrus.WithError(err0).WithFields(logrus.Fields{
+				"room_id":  inputRoomEvent.Event.RoomID(),
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+				"replyTo":  replyTo,
 			}).Warn("Roomserver failed to respond for sync event")
 		}
 	}
@@ -305,13 +299,15 @@ func (r *Inputer) queueInputRoomEvents(
 	// temporary inbox to wait for responses on, and then create
 	// a subscription to it. If it's asynchronous then we won't
 	// bother, so these values will remain empty.
-	var replyTo string
+
+	var replyToOpts *config.QueueOptions
 	if !request.Asynchronous {
-		replyTo = fmt.Sprintf("__InternalSynchronousQueue_%s", frame.GenerateID(ctx))
-		err = r.Qm.RegisterSubscriber(ctx, &config.QueueOptions{
-			QReference: replyTo,
-			DS:         config.DataSource(fmt.Sprintf("mem://%s", replyTo)),
-		})
+		replyTo := fmt.Sprintf("__InternalSynchronousQueue_%s", frame.GenerateID(ctx))
+		replyToOpts = &config.QueueOptions{
+			QReference: replyTo, DS: config.DataSource(fmt.Sprintf("mem://%s", replyTo))}
+
+		err = r.Qm.RegisterSubscriber(ctx, replyToOpts)
+
 		if err != nil {
 			return nil, err
 		}
@@ -338,11 +334,12 @@ func (r *Inputer) queueInputRoomEvents(
 			"virtual_host": string(request.VirtualHost),
 		}
 
-		if replyTo != "" {
-			header["sync"] = replyTo
+		if replyToOpts != nil {
+			header["sync_ref"] = replyToOpts.Ref()
+			header["sync"] = string(replyToOpts.DS)
 		}
 
-		roomOpts, err0 := cleanQOpts(&roomID, &r.Cfg.Queues.InputRoomEvent)
+		roomOpts, err0 := cleanQOpts(&r.Cfg.Queues.InputRoomEvent, &roomID)
 		if err0 != nil {
 			return nil, err0
 		}
@@ -401,6 +398,7 @@ func (r *Inputer) InputRoomEvents(
 			response.ErrMsg = err0.Error()
 			return
 		}
+		msg.Ack()
 		if len(msg.Body) > 0 {
 			response.ErrMsg = string(msg.Body)
 		}

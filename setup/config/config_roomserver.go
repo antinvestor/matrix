@@ -22,7 +22,7 @@ type RoomServer struct {
 
 func (c *RoomServer) Defaults(opts DefaultOpts) {
 	c.DefaultRoomVersion = gomatrixserverlib.RoomVersionV10
-	c.Database.ConnectionString = opts.DatabaseConnectionStr
+	c.Database.ConnectionString = opts.DSDatabaseConn
 	c.Queues.Defaults(opts)
 
 	c.ActorSystem.Defaults(opts)
@@ -111,7 +111,13 @@ func (q *RoomServerQueues) Defaults(opts DefaultOpts) {
 	q.InputRoomEvent = QueueOptions{
 		Prefix:     opts.QueuePrefix,
 		QReference: "RoomServerInputRoomEvent",
-		DS:         "nats://matrix:s3cr3t@localhost:4221?jetstream=true&stream_name=RoomServerInputRoomEvent&stream_storage=file&stream_subjects=InputEvtRoomID.*&stream_retention=interest&consumer_headers_only=true"}
+		DS: opts.DSQueueConn.
+			ExtendQuery("stream_name", InputRoomEvent).
+			ExtendQuery("consumer_headers_only", "true").
+			ExtendQuery("consumer_deliver_policy", "all").
+			ExtendQuery("consumer_ack_policy", "explicit").
+			ExtendQuery("consumer_replay_policy", "instant"),
+	}
 }
 
 func (q *RoomServerQueues) Verify(configErrs *ConfigErrors) {

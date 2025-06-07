@@ -14,16 +14,16 @@ type QMsg struct {
 	Data   any
 }
 
-func MustPublishMsgs(ctx context.Context, t *testing.T, cfg *config.SyncAPI, qm queueutil.QueueManager, msgs ...*QMsg) error {
+func MustPublishMsgs(ctx context.Context, t *testing.T, qopts *config.QueueOptions, qm queueutil.QueueManager, msgs ...*QMsg) error {
 	t.Helper()
 
-	err := qm.RegisterPublisher(ctx, &cfg.Queues.OutputRoomEvent)
+	err := qm.RegisterPublisher(ctx, qopts)
 	if err != nil {
 		return err
 	}
 
 	for _, msg := range msgs {
-		err = qm.Publish(ctx, cfg.Queues.OutputRoomEvent.Ref(), msg.Data, msg.Header)
+		err = qm.Publish(ctx, qopts.Ref(), msg.Data, msg.Header)
 		if err != nil {
 			t.Fatalf("MustPublishMsgs: failed to publish message: %s", err)
 		}

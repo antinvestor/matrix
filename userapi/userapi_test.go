@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/sirupsen/logrus"
 	"reflect"
 	"testing"
 	"time"
@@ -77,8 +78,18 @@ func MustMakeInternalAPI(ctx context.Context, svc *frame.Service, cfg *config.Ma
 		ServerName: sName,
 	}
 
-	syncProducer := producers.NewSyncAPI(accountDB, qm, "client_data", "notification_data")
-	keyChangeProducer := &producers.KeyChange{DB: keyDB, Qm: qm, Topic: "keychange"}
+	syncProducer, err := producers.NewSyncAPI(ctx, &cfg.SyncAPI, accountDB, qm)
+	if err != nil {
+		t.Fatalf("failed to obtain sync publisher: %s", err)
+	}
+
+	cfgKeySrv := cfg.KeyServer
+	err = qm.RegisterPublisher(ctx, &cfgKeySrv.Queues.OutputKeyChangeEvent)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to register publisher for key change events")
+	}
+
+	keyChangeProducer := &producers.KeyChange{DB: keyDB, Qm: qm, Topic: &cfgKeySrv.Queues.OutputKeyChangeEvent}
 	return &internal.UserInternalAPI{
 		DB:                accountDB,
 		KeyDatabase:       keyDB,
