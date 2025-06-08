@@ -78,7 +78,7 @@ type Inputer struct {
 	OutputProducer  *producers.RoomEventProducer
 	Queryer         *query.Queryer
 	UserAPI         userapi.RoomserverUserAPI
-	actorSystem     *actor.RoomActorSystem
+	actorSystem     *actor.Manager
 	EnableMetrics   bool
 }
 
@@ -114,7 +114,7 @@ func NewInputer(
 		EnableMetrics:   enableMetrics,
 	}
 
-	c.actorSystem = actor.NewRoomActorSystem(ctx, &cfg.ActorSystem, qm, c.HandleRoomEvent)
+	c.actorSystem = actor.NewManager(ctx, &cfg.ActorSystem, qm, &cfg.Queues.InputRoomEvent, c.HandleRoomEvent)
 	err := c.actorSystem.Start(ctx)
 	if err != nil {
 		return nil, err
@@ -131,18 +131,27 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, messag
 		return err
 	}
 
-	opt := &r.Cfg.Queues.InputRoomEvent
-	roomOpts, err := actor.RoomifyQOpts(ctx, opt, roomId, true)
+	err = r.actorSystem.EnsureRoomActorExists(ctx, roomId)
 	if err != nil {
 		return err
 	}
 
-	err = r.actorSystem.EnsureRoomActorExists(ctx, roomId, roomOpts.DS)
-	if err != nil {
-		return err
-	}
+	qOpts := &r.Cfg.Queues.InputRoomEvent
+	if !qOpts.DS.IsNats() {
 
-	if !roomOpts.DS.IsNats() {
+		roomOpts, err0 := actor.RoomifyQOpts(ctx, qOpts, roomId, false)
+		if err0 != nil {
+			return err0
+		}
+
+		defer func() {
+
+			err = r.Qm.DiscardPublisher(ctx, roomOpts.Ref())
+			if err != nil {
+				return
+			}
+		}()
+
 		err = r.Qm.EnsurePublisherOk(ctx, roomOpts)
 		if err != nil {
 			return err
@@ -254,6 +263,15 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 			}).Warn("Publisher to reply to is not available")
 			return nil
 		}
+
+		defer func() {
+
+			err = r.Qm.DiscardPublisher(ctx, replyToOpts.Ref())
+			if err != nil {
+				return
+			}
+		}()
+
 		err0 = r.Qm.Publish(ctx, replyToOpts.Ref(), []byte(errString))
 		if err0 != nil {
 			logrus.WithError(err0).WithFields(logrus.Fields{
@@ -338,6 +356,12 @@ func (r *Inputer) queueInputRoomEvents(
 			}).Error("Roomserver failed to queue async event")
 			return nil, fmt.Errorf("r.Qm.Publish: %w", err)
 		}
+
+		err = r.Qm.DiscardPublisher(ctx, roomOpts.Ref())
+		if err != nil {
+			return
+		}
+
 	}
 	return
 }

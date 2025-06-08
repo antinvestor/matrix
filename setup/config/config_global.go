@@ -394,6 +394,10 @@ func (q *QueueOptions) DSrc() DataSource {
 
 	uri, _ := pp.ToURI()
 	query := uri.Query()
+	if query.Has("subject") {
+		query.Set("subject", fmt.Sprintf("%s%s", q.Prefix, query.Get("subject")))
+	}
+
 	if query.Has("stream_name") {
 		query.Set("stream_name", fmt.Sprintf("%s%s", q.Prefix, query.Get("stream_name")))
 	}

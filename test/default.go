@@ -2,9 +2,8 @@ package test
 
 import (
 	"context"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
 func PrepareDefaultDSConnections(ctx context.Context, testOpts DependancyOption) (config.DefaultOpts, func(ctx context.Context), error) {
@@ -37,13 +36,9 @@ func PrepareDefaultDSConnections(ctx context.Context, testOpts DependancyOption)
 
 	configDefaults.DSDatabaseConn = dbConn
 
-	return config.DefaultOpts{
-			DSDatabaseConn: dbConn,
-			DSQueueConn:    queueConn,
-			DSCacheConn:    cacheConn,
-		}, func(ctx context.Context) {
-			closeCache(ctx)
-			closeQueue(ctx)
-			closeDb(ctx)
-		}, nil
+	return configDefaults, func(ctx context.Context) {
+		closeCache(ctx)
+		closeQueue(ctx)
+		closeDb(ctx)
+	}, nil
 }

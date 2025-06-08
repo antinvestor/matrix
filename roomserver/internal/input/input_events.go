@@ -64,6 +64,11 @@ var processRoomEventDuration = prometheus.NewHistogramVec(
 	[]string{"room_id"},
 )
 
+// MaximumMissingProcessingTime is the maximum time we allow "processRoomEvent" to fetch
+// e.g. missing auth/prev events. This duration is used for AckWait, and if it is exceeded
+// NATS queues the event for redelivery.
+const MaximumMissingProcessingTime = time.Minute * 5
+
 // processRoomEvent can only be called once at a time
 //
 // TODO(#375): This should be rewritten to allow concurrent calls. The

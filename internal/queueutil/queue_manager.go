@@ -12,26 +12,30 @@ type queues struct {
 	service *frame.Service
 }
 
-func (c *queues) RegisterPublisher(ctx context.Context, opts *config.QueueOptions) error {
-	return c.service.AddPublisher(ctx, opts.Ref(), string(opts.DSrc()))
+func (q *queues) RegisterPublisher(ctx context.Context, opts *config.QueueOptions) error {
+	return q.service.AddPublisher(ctx, opts.Ref(), string(opts.DSrc()))
 }
 
-func (c *queues) GetPublisher(ref string) (frame.Publisher, error) {
-	return c.service.GetPublisher(ref)
+func (q *queues) GetPublisher(ref string) (frame.Publisher, error) {
+	return q.service.GetPublisher(ref)
 }
 
-func (c *queues) EnsurePublisherOk(ctx context.Context, opts *config.QueueOptions) error {
+func (q *queues) DiscardPublisher(ctx context.Context, ref string) error {
+	return q.service.DiscardPublisher(ctx, ref)
+}
 
-	_, err := c.GetPublisher(opts.Ref())
+func (q *queues) EnsurePublisherOk(ctx context.Context, opts *config.QueueOptions) error {
+
+	_, err := q.GetPublisher(opts.Ref())
 	if err != nil {
-		return c.RegisterPublisher(ctx, opts)
+		return q.RegisterPublisher(ctx, opts)
 	}
 	return nil
 
 }
 
-func (c *queues) Publish(ctx context.Context, reference string, payload any, headers ...map[string]string) error {
-	err := c.service.Publish(ctx, reference, payload, headers...)
+func (q *queues) Publish(ctx context.Context, reference string, payload any, headers ...map[string]string) error {
+	err := q.service.Publish(ctx, reference, payload, headers...)
 	if err != nil {
 
 		logrus.WithFields(logrus.Fields{
@@ -43,12 +47,16 @@ func (c *queues) Publish(ctx context.Context, reference string, payload any, hea
 	return nil
 }
 
-func (c *queues) RegisterSubscriber(ctx context.Context, opts *config.QueueOptions, optHandler ...frame.SubscribeWorker) error {
-	return c.service.AddSubscriber(ctx, opts.Ref(), string(opts.DSrc()), optHandler...)
+func (q *queues) RegisterSubscriber(ctx context.Context, opts *config.QueueOptions, optHandler ...frame.SubscribeWorker) error {
+	return q.service.AddSubscriber(ctx, opts.Ref(), string(opts.DSrc()), optHandler...)
 }
 
-func (c *queues) GetSubscriber(ref string) (frame.Subscriber, error) {
-	return c.service.GetSubscriber(ref)
+func (q *queues) GetSubscriber(ref string) (frame.Subscriber, error) {
+	return q.service.GetSubscriber(ref)
+}
+
+func (q *queues) DiscardSubscriber(ctx context.Context, ref string) error {
+	return q.service.DiscardSubscriber(ctx, ref)
 }
 
 // NewQueueManager ensures a default internal Queue exists

@@ -6,7 +6,9 @@ option go_package = "github.com/antinvestor/matrix/apis/actor/v1;actorV1";
 
 message SetupRoomRequest {
   string roomId = 1;
-  string queueUri = 2;
+  string queuePfx = 2;
+  string queueRef = 3;
+  string queueUri = 4;
 }
 
 message SetupRoomResponse {
@@ -14,20 +16,19 @@ message SetupRoomResponse {
   string message = 2;
 }
 
+message ActorStarted {
+  string roomId = 1;
+}
+
 message ActorStopped {
   string roomId = 1;
 }
 
-// sent to room actor to request more work
-message QRequestWork {
+message WorkRequest {
   string roomId = 1;
 }
 
-message QProduceWork {
-  string roomId = 1;
-}
 
-service RoomActor {
+service RoomEventProcessor {
   rpc SetupRoom (SetupRoomRequest) returns (SetupRoomResponse) {}
-
 }

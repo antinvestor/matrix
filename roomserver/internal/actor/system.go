@@ -2,7 +2,6 @@ package actor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	actorV1 "github.com/antinvestor/matrix/apis/actor/v1"
@@ -20,54 +19,59 @@ import (
 )
 
 const (
-	RoomActorQPrefix = "RoomActorQ_"
+	clusterManagerKind = "manager-actor"
+	clusterManagerID   = "heimdal"
+
+	clusterName = "matrix-room-cluster"
 )
 
 type HandlerFunc func(ctx context.Context, metadata map[string]string, message []byte) error
 
-// RoomActorSystem manages a set of actors for processing room events
-type RoomActorSystem struct {
+// Manager manages a set of actors for processing room events
+type Manager struct {
 	config      *config.ActorConfig
-	qOpts       config.QueueOptions
+	qOpts       *config.QueueOptions
 	qm          queueutil.QueueManager
 	actorSystem *actor.ActorSystem
+
 	handlerFunc HandlerFunc
 	clusterName string
-	clusterKind string
 	cluster     *cluster.Cluster
 }
 
-// NewRoomActorSystem creates a new room actor system
-func NewRoomActorSystem(ctx context.Context, config *config.ActorConfig, qm queueutil.QueueManager, handlerFunc HandlerFunc) *RoomActorSystem {
+// NewManager creates a new room actor system
+func NewManager(ctx context.Context, config *config.ActorConfig, qm queueutil.QueueManager, qOpts *config.QueueOptions, handlerFunc HandlerFunc) *Manager {
 
 	actorSystem := actor.NewActorSystem()
 
-	actorSyst := &RoomActorSystem{
+	manager := &Manager{
 		config:      config,
 		qm:          qm,
 		actorSystem: actorSystem,
+		qOpts:       qOpts,
 		handlerFunc: handlerFunc,
-		clusterName: "matrix-cluster",
-		clusterKind: "room-actors",
+		clusterName: clusterName,
 	}
 
 	svc := frame.FromContext(ctx)
-	svc.AddCleanupMethod(actorSyst.Shutdown)
+	svc.AddCleanupMethod(manager.Shutdown)
 
-	return actorSyst
+	return manager
 }
 
 // Start initializes the actor system
-func (s *RoomActorSystem) Start(ctx context.Context) error {
+func (m *Manager) Start(ctx context.Context) error {
 	var err error
 
+	svc := frame.FromContext(ctx)
+
 	// Configure the actor system for remote capability
-	remoteConfig := remote.Configure(s.config.Host, 0)
+	remoteConfig := remote.Configure(m.config.Host, 0)
 
 	// Configuration for the cluster provider
 	var clusterProvider cluster.ClusterProvider
 
-	if s.config.ClusterMode == "kubernetes" {
+	if m.config.ClusterMode == "kubernetes" {
 		// Use Kubernetes provider
 		clusterProvider, err = cpk8s.New()
 		if err != nil {
@@ -80,72 +84,88 @@ func (s *RoomActorSystem) Start(ctx context.Context) error {
 
 	lookup := disthash.New()
 
-	mb := actor.Unbounded(&RoomBehavior{})
-	// Create the room actor props for the cluster
-	roomActorProps := actor.PropsFromProducer(func() actor.Actor {
-		return NewRoomActor(ctx, s.qm, s.handlerFunc)
-	}, actor.WithMailbox(mb))
+	managerProps := actor.PropsFromProducer(func() actor.Actor {
+		return m
+	})
 
 	// Register the room actor kind with the cluster
-	roomKind := cluster.NewKind(s.clusterKind, roomActorProps)
+	managerKind := cluster.NewKind(clusterManagerKind, managerProps)
+	managerNodeId := clusterManagerID + "-" + frame.GenerateID(ctx)
+
+	// Create the room actor props for the cluster
+	roomProcessorKind := actorV1.NewRoomEventProcessorKind(func() actorV1.RoomEventProcessor {
+		return NewRoomActor(ctx, m.cluster, svc, m.qm, m.handlerFunc)
+	}, 0)
 
 	// Create the cluster configuration
 	clusterConfig := cluster.Configure(
-		s.clusterName,
+		m.clusterName,
 		clusterProvider,
 		lookup,
 		remoteConfig,
-		cluster.WithKinds(roomKind),
+		cluster.WithKinds(managerKind, roomProcessorKind),
 	)
 
 	// Start the cluster
-	s.cluster = cluster.New(s.actorSystem, clusterConfig)
-	s.cluster.StartMember()
+	m.cluster = cluster.New(m.actorSystem, clusterConfig)
+	m.cluster.StartMember()
+
+	//Ensure the room manager actor is active
+	_ = m.cluster.Get(managerNodeId, clusterManagerKind)
 	return nil
 }
 
 // EnsureRoomActorExists creates or gets a room actor for the specified room
-func (s *RoomActorSystem) EnsureRoomActorExists(_ context.Context, roomID *spec.RoomID, queueUri config.DataSource) error {
+func (m *Manager) EnsureRoomActorExists(ctx context.Context, roomID *spec.RoomID) error {
 
-	message := &actorV1.SetupRoomRequest{
-		RoomId:   roomID.String(),
-		QueueUri: string(queueUri),
-	}
+	m.cluster.Logger().With("room", roomID).Info("******************** Setup Room actor ***")
 
-	// Send the message to setup the room actor
-	resp, err := s.cluster.Request(roomID.String(), s.clusterKind, message)
+	roomQOpts, err := RoomifyQOpts(ctx, m.qOpts, roomID, true)
 	if err != nil {
 		return err
 	}
 
-	sResp := resp.(*actorV1.SetupRoomResponse)
-	if !sResp.GetSuccess() {
-		return errors.New(sResp.GetMessage())
+	roomActor := actorV1.GetRoomEventProcessorGrainClient(m.cluster, roomID.String())
+	_, err = roomActor.SetupRoom(&actorV1.SetupRoomRequest{
+		RoomId:   roomID.String(),
+		QueueRef: roomQOpts.QReference,
+		QueuePfx: roomQOpts.Prefix,
+		QueueUri: string(roomQOpts.DS),
+	})
+	if err != nil {
+		return err
 	}
-
 	return nil
 }
 
+// handleRoomActorStarted is called when a room actor starts
+func (m *Manager) handleRoomActorStarted(roomID string) {
+	m.cluster.Logger().With("room", roomID).Info(" ***************************** Room actor started")
+}
+
 // handleRoomActorStopped is called when a room actor stops
-func (s *RoomActorSystem) handleRoomActorStopped(roomID string) {
+func (m *Manager) handleRoomActorStopped(roomID string) {
+	m.cluster.Logger().With("room", roomID).Info(" **************************** Room actor stopped")
 
 }
 
 // Receive handles messages sent to the actor system
-func (s *RoomActorSystem) Receive(ctx actor.Context) {
+func (m *Manager) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
+	case *actorV1.ActorStarted:
+		m.handleRoomActorStarted(msg.GetRoomId())
 	case *actorV1.ActorStopped:
-		s.handleRoomActorStopped(msg.GetRoomId())
+		m.handleRoomActorStopped(msg.GetRoomId())
 	}
 }
 
 // Shutdown stops the actor system and all actors
-func (s *RoomActorSystem) Shutdown(ctx context.Context) {
-	if s.cluster != nil {
-		s.cluster.Shutdown(true)
+func (m *Manager) Shutdown(ctx context.Context) {
+	if m.cluster != nil {
+		m.cluster.Shutdown(true)
 	}
-	if s.actorSystem != nil && !s.actorSystem.IsStopped() {
-		s.actorSystem.Shutdown()
+	if m.actorSystem != nil && !m.actorSystem.IsStopped() {
+		m.actorSystem.Shutdown()
 	}
 }
 
@@ -156,10 +176,16 @@ func (s *RoomActorSystem) Shutdown(ctx context.Context) {
 // active again then we'll recreate the consumer anyway.
 const inactiveThreshold = time.Hour * 24
 
-// MaximumMissingProcessingTime is the maximum time we allow "processRoomEvent" to fetch
-// e.g. missing auth/prev events. This duration is used for AckWait, and if it is exceeded
-// NATS queues the event for redelivery.
-const MaximumMissingProcessingTime = time.Minute * 5
+// An event being processed by a room actor is only allowed 5 seconds maximum.
+// If the event takes longer than this then we will assume it has issues and the message will be redelivered.
+const maximumProcessingTime = time.Second * 15
+
+// If a room actor is not receiving messages for sometime, we allow it to
+// be stopped. This stops us from holding onto room actors indefinitely
+// for rooms that might no longer be active, since they do have an
+// interest overhead in the NATS Server. If the room becomes active
+// again then we'll recreate the actor anyway.
+const actorIdlingTime = time.Minute * 1
 
 func RoomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.RoomID, isSubscriber bool) (*config.QueueOptions, error) {
 
@@ -176,11 +202,13 @@ func RoomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.Roo
 			ds = ds.ExtendQuery("consumer_durable_name", durable)
 			ds = ds.ExtendQuery("consumer_deliver_policy", "all")
 			ds = ds.ExtendQuery("consumer_ack_policy", "explicit")
-			ds = ds.ExtendQuery("consumer_ack_wait", strconv.FormatInt(int64(MaximumMissingProcessingTime+(time.Second*10)), 10))
+			ds = ds.ExtendQuery("consumer_ack_wait", strconv.FormatInt(int64(maximumProcessingTime), 10))
 			ds = ds.ExtendQuery("consumer_inactive_threshold", strconv.FormatInt(int64(inactiveThreshold), 10))
 			ds = ds.ExtendQuery("consumer_headers_only", "false")
+			ds = ds.ExtendQuery("receive_batch_max_batch_size", "1")
 		} else {
-			ds = ds.RemoveQuery("jetstream", "stream_storage", "stream_retention")
+			ds = ds.RemoveQuery("jetstream", "stream_storage", "stream_retention", "consumer_ack_policy",
+				"consumer_deliver_policy", "consumer_headers_only", "consumer_replay_policy", "stream_name")
 		}
 
 	} else {

@@ -6,6 +6,10 @@ plugins:
     out: ./
     opt:
       - paths=source_relative
+  - local: protoc-gen-go-grain
+    out: ./
+    opt:
+      - paths=source_relative
 managed:
   enabled: true
   override:

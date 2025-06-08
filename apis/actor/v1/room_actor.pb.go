@@ -24,7 +24,9 @@ const (
 type SetupRoomRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
-	QueueUri      string                 `protobuf:"bytes,2,opt,name=queueUri,proto3" json:"queueUri,omitempty"`
+	QueuePfx      string                 `protobuf:"bytes,2,opt,name=queuePfx,proto3" json:"queuePfx,omitempty"`
+	QueueRef      string                 `protobuf:"bytes,3,opt,name=queueRef,proto3" json:"queueRef,omitempty"`
+	QueueUri      string                 `protobuf:"bytes,4,opt,name=queueUri,proto3" json:"queueUri,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -62,6 +64,20 @@ func (*SetupRoomRequest) Descriptor() ([]byte, []int) {
 func (x *SetupRoomRequest) GetRoomId() string {
 	if x != nil {
 		return x.RoomId
+	}
+	return ""
+}
+
+func (x *SetupRoomRequest) GetQueuePfx() string {
+	if x != nil {
+		return x.QueuePfx
+	}
+	return ""
+}
+
+func (x *SetupRoomRequest) GetQueueRef() string {
+	if x != nil {
+		return x.QueueRef
 	}
 	return ""
 }
@@ -125,28 +141,27 @@ func (x *SetupRoomResponse) GetMessage() string {
 	return ""
 }
 
-type QPayload struct {
+type ActorStarted struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Headers       map[string]string      `protobuf:"bytes,1,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Message       []byte                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *QPayload) Reset() {
-	*x = QPayload{}
+func (x *ActorStarted) Reset() {
+	*x = ActorStarted{}
 	mi := &file_room_actor_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *QPayload) String() string {
+func (x *ActorStarted) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*QPayload) ProtoMessage() {}
+func (*ActorStarted) ProtoMessage() {}
 
-func (x *QPayload) ProtoReflect() protoreflect.Message {
+func (x *ActorStarted) ProtoReflect() protoreflect.Message {
 	mi := &file_room_actor_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -158,23 +173,16 @@ func (x *QPayload) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use QPayload.ProtoReflect.Descriptor instead.
-func (*QPayload) Descriptor() ([]byte, []int) {
+// Deprecated: Use ActorStarted.ProtoReflect.Descriptor instead.
+func (*ActorStarted) Descriptor() ([]byte, []int) {
 	return file_room_actor_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *QPayload) GetHeaders() map[string]string {
+func (x *ActorStarted) GetRoomId() string {
 	if x != nil {
-		return x.Headers
+		return x.RoomId
 	}
-	return nil
-}
-
-func (x *QPayload) GetMessage() []byte {
-	if x != nil {
-		return x.Message
-	}
-	return nil
+	return ""
 }
 
 type ActorStopped struct {
@@ -221,27 +229,27 @@ func (x *ActorStopped) GetRoomId() string {
 	return ""
 }
 
-type QRequestWork struct {
+type WorkRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *QRequestWork) Reset() {
-	*x = QRequestWork{}
+func (x *WorkRequest) Reset() {
+	*x = WorkRequest{}
 	mi := &file_room_actor_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *QRequestWork) String() string {
+func (x *WorkRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*QRequestWork) ProtoMessage() {}
+func (*WorkRequest) ProtoMessage() {}
 
-func (x *QRequestWork) ProtoReflect() protoreflect.Message {
+func (x *WorkRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_room_actor_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -253,56 +261,12 @@ func (x *QRequestWork) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use QRequestWork.ProtoReflect.Descriptor instead.
-func (*QRequestWork) Descriptor() ([]byte, []int) {
+// Deprecated: Use WorkRequest.ProtoReflect.Descriptor instead.
+func (*WorkRequest) Descriptor() ([]byte, []int) {
 	return file_room_actor_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *QRequestWork) GetRoomId() string {
-	if x != nil {
-		return x.RoomId
-	}
-	return ""
-}
-
-type QProduceWork struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *QProduceWork) Reset() {
-	*x = QProduceWork{}
-	mi := &file_room_actor_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *QProduceWork) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*QProduceWork) ProtoMessage() {}
-
-func (x *QProduceWork) ProtoReflect() protoreflect.Message {
-	mi := &file_room_actor_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use QProduceWork.ProtoReflect.Descriptor instead.
-func (*QProduceWork) Descriptor() ([]byte, []int) {
-	return file_room_actor_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *QProduceWork) GetRoomId() string {
+func (x *WorkRequest) GetRoomId() string {
 	if x != nil {
 		return x.RoomId
 	}
@@ -313,26 +277,22 @@ var File_room_actor_proto protoreflect.FileDescriptor
 
 const file_room_actor_proto_rawDesc = "" +
 	"\n" +
-	"\x10room_actor.proto\x12\x05actor\"F\n" +
+	"\x10room_actor.proto\x12\x05actor\"~\n" +
 	"\x10SetupRoomRequest\x12\x16\n" +
 	"\x06roomId\x18\x01 \x01(\tR\x06roomId\x12\x1a\n" +
-	"\bqueueUri\x18\x02 \x01(\tR\bqueueUri\"G\n" +
+	"\bqueuePfx\x18\x02 \x01(\tR\bqueuePfx\x12\x1a\n" +
+	"\bqueueRef\x18\x03 \x01(\tR\bqueueRef\x12\x1a\n" +
+	"\bqueueUri\x18\x04 \x01(\tR\bqueueUri\"G\n" +
 	"\x11SetupRoomResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x98\x01\n" +
-	"\bQPayload\x126\n" +
-	"\aheaders\x18\x01 \x03(\v2\x1c.actor.QPayload.HeadersEntryR\aheaders\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\fR\amessage\x1a:\n" +
-	"\fHeadersEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"&\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"&\n" +
+	"\fActorStarted\x12\x16\n" +
+	"\x06roomId\x18\x01 \x01(\tR\x06roomId\"&\n" +
 	"\fActorStopped\x12\x16\n" +
-	"\x06roomId\x18\x01 \x01(\tR\x06roomId\"&\n" +
-	"\fQRequestWork\x12\x16\n" +
-	"\x06roomId\x18\x01 \x01(\tR\x06roomId\"&\n" +
-	"\fQProduceWork\x12\x16\n" +
-	"\x06roomId\x18\x01 \x01(\tR\x06roomId2M\n" +
-	"\tRoomActor\x12@\n" +
+	"\x06roomId\x18\x01 \x01(\tR\x06roomId\"%\n" +
+	"\vWorkRequest\x12\x16\n" +
+	"\x06roomId\x18\x01 \x01(\tR\x06roomId2V\n" +
+	"\x12RoomEventProcessor\x12@\n" +
 	"\tSetupRoom\x12\x17.actor.SetupRoomRequest\x1a\x18.actor.SetupRoomResponse\"\x00B|\n" +
 	"\tcom.actorB\x0eRoomActorProtoP\x01Z+github.com/antinvestor/matrix/apis/actor/v1\xa2\x02\x03AXX\xaa\x02\x05Actor\xca\x02\x05Actor\xe2\x02\x11Actor\\GPBMetadata\xea\x02\x05Actorb\x06proto3"
 
@@ -348,25 +308,22 @@ func file_room_actor_proto_rawDescGZIP() []byte {
 	return file_room_actor_proto_rawDescData
 }
 
-var file_room_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_room_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_room_actor_proto_goTypes = []any{
 	(*SetupRoomRequest)(nil),  // 0: actor.SetupRoomRequest
 	(*SetupRoomResponse)(nil), // 1: actor.SetupRoomResponse
-	(*QPayload)(nil),          // 2: actor.QPayload
+	(*ActorStarted)(nil),      // 2: actor.ActorStarted
 	(*ActorStopped)(nil),      // 3: actor.ActorStopped
-	(*QRequestWork)(nil),      // 4: actor.QRequestWork
-	(*QProduceWork)(nil),      // 5: actor.QProduceWork
-	nil,                       // 6: actor.QPayload.HeadersEntry
+	(*WorkRequest)(nil),       // 4: actor.WorkRequest
 }
 var file_room_actor_proto_depIdxs = []int32{
-	6, // 0: actor.QPayload.headers:type_name -> actor.QPayload.HeadersEntry
-	0, // 1: actor.RoomActor.SetupRoom:input_type -> actor.SetupRoomRequest
-	1, // 2: actor.RoomActor.SetupRoom:output_type -> actor.SetupRoomResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: actor.RoomEventProcessor.SetupRoom:input_type -> actor.SetupRoomRequest
+	1, // 1: actor.RoomEventProcessor.SetupRoom:output_type -> actor.SetupRoomResponse
+	1, // [1:2] is the sub-list for method output_type
+	0, // [0:1] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_room_actor_proto_init() }
@@ -380,7 +337,7 @@ func file_room_actor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_room_actor_proto_rawDesc), len(file_room_actor_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

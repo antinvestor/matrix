@@ -89,9 +89,14 @@ func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *fr
 	}
 	srv.AddCleanupMethod(clearConfig)
 
-	srvOpts := []frame.Option{frame.Config(&cfg.Global), frame.Datastore(ctx)}
+	srvOpts := []frame.Option{frame.Config(&cfg.Global), frame.Datastore(ctx), frame.WithPoolCapacity(5), frame.WithPoolConcurrency(4)}
 
 	srv.Init(srvOpts...)
+
+	err = srv.Run(ctx, "")
+	if err != nil {
+		t.Fatalf("Could not run service %s", err)
+	}
 
 	return ctx, srv, cfg
 }
