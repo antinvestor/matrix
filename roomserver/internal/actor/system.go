@@ -24,7 +24,6 @@ type HandlerFunc func(ctx context.Context, metadata map[string]string, message [
 
 // RoomActorSystem manages a set of actors for processing room events
 type RoomActorSystem struct {
-	ctx         context.Context
 	config      *config.ActorConfig
 	qOpts       config.QueueOptions
 	qm          queueutil.QueueManager
@@ -41,7 +40,6 @@ func NewRoomActorSystem(ctx context.Context, config *config.ActorConfig, qm queu
 	actorSystem := actor.NewActorSystem()
 
 	actorSyst := &RoomActorSystem{
-		ctx:         ctx,
 		config:      config,
 		qm:          qm,
 		actorSystem: actorSystem,
@@ -82,7 +80,7 @@ func (s *RoomActorSystem) Start(ctx context.Context) error {
 	mb := actor.Unbounded(&RoomBehavior{})
 	// Create the room actor props for the cluster
 	roomActorProps := actor.PropsFromProducer(func() actor.Actor {
-		return NewRoomActor(s.ctx, s.qm, s.handlerFunc, s.config.IdleTimeout)
+		return NewRoomActor(ctx, s.qm, s.handlerFunc)
 	}, actor.WithMailbox(mb))
 
 	// Register the room actor kind with the cluster

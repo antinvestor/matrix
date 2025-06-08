@@ -70,15 +70,6 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to load notifier ")
 	}
 
-	err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputPresenceEvent)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for output presence event")
-	}
-
-	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
-		Topic: &cfgSyncAPI.Queues.OutputPresenceEvent,
-		Qm:    qm,
-	}
 	presenceConsumer, err := consumers.NewPresenceConsumer(
 		ctx, &cfgSyncAPI, qm, syncDB,
 		ntf, strms.PresenceStreamProvider,
@@ -87,6 +78,16 @@ func AddPublicRoutes(
 
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start presence consumer")
+	}
+
+	err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputPresenceEvent)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to register publisher for output presence event")
+	}
+
+	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
+		Topic: &cfgSyncAPI.Queues.OutputPresenceEvent,
+		Qm:    qm,
 	}
 
 	requestPool := sync.NewRequestPool(ctx, syncDB, &cfgSyncAPI, userAPI, rsAPI, strms, ntf, federationPresenceProducer, presenceConsumer, enableMetrics)

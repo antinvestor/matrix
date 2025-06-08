@@ -112,6 +112,7 @@ func (q *RoomServerQueues) Defaults(opts DefaultOpts) {
 		Prefix:     opts.QueuePrefix,
 		QReference: "RoomServerInputRoomEvent",
 		DS: opts.DSQueueConn.
+			ExtendQuery("subject", fmt.Sprintf("%s.*", InputRoomEvent)).
 			ExtendQuery("stream_name", InputRoomEvent).
 			ExtendQuery("consumer_headers_only", "true").
 			ExtendQuery("consumer_deliver_policy", "all").

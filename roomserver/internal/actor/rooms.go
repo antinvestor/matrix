@@ -12,6 +12,8 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 )
 
+var messageQPullDelay = 500 * time.Millisecond
+
 // RoomActor is an actor that processes messages for a specific room
 type RoomActor struct {
 	ctx        context.Context
@@ -21,13 +23,10 @@ type RoomActor struct {
 
 	handlerFunc  HandlerFunc
 	subscription frame.Subscriber
-
-	lastActivity time.Time
-	idleTimeout  time.Duration
 }
 
 // NewRoomActor creates a new room actor
-func NewRoomActor(ctx context.Context, qm queueutil.QueueManager, handlerFunc HandlerFunc, idleTimeout time.Duration) *RoomActor {
+func NewRoomActor(ctx context.Context, qm queueutil.QueueManager, handlerFunc HandlerFunc) *RoomActor {
 
 	ictx, cancel := context.WithCancel(ctx)
 
@@ -36,7 +35,6 @@ func NewRoomActor(ctx context.Context, qm queueutil.QueueManager, handlerFunc Ha
 		cancelFunc:  cancel,
 		qm:          qm,
 		handlerFunc: handlerFunc,
-		idleTimeout: idleTimeout,
 	}
 }
 
@@ -56,34 +54,46 @@ func (ra *RoomActor) Receive(ctx actor.Context) {
 	case *actorV1.SetupRoomRequest:
 		ra.onSetupActor(ctx, msg)
 	case *actorV1.QRequestWork:
+		// Instead of immediately processing, just trigger production work
 		ctx.Send(ctx.Self(), &actorV1.QProduceWork{RoomId: ra.roomID})
 
 	case *actorV1.QProduceWork:
-		err := ra.processNextMessage(ra.ctx)
+		// Process the next message and determine whether there are more to process
+		hasMoreMessages, err := ra.processNextMessage(ra.ctx)
+
+		// Handle potential errors
 		if err != nil {
-			ctx.Logger().With(err).Error("failed to process next message")
+			ctx.Logger().With("error", err).Error("failed to process next message")
+			ctx.Stop(ctx.Self())
 			return
 		}
-		if time.Since(ra.lastActivity) >= ra.idleTimeout {
-			ctx.Stop(ctx.Self())
+
+		// If there are more messages, continue processing immediately
+		if hasMoreMessages {
+			// Process next message immediately without delay
+			ctx.Send(ctx.Self(), &actorV1.QProduceWork{RoomId: ra.roomID})
 		} else {
-			ctx.Send(ctx.Self(), &actorV1.QRequestWork{RoomId: ra.roomID})
+			ctx.Stop(ctx.Self())
 		}
 	}
 }
 
 func (ra *RoomActor) onStarted(ctx actor.Context) {
-	ra.lastActivity = time.Now()
+
 }
 
 func (ra *RoomActor) onStopping(_ actor.Context) {
 
+	// First cancel any ongoing operations
 	ra.cancelFunc()
 
-	// Close the subscription if it exists
+	// Then properly close the subscription with timeout
 	if ra.subscription != nil {
-		_ = ra.subscription.Stop(ra.ctx)
+		closeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = ra.subscription.Stop(closeCtx)
 	}
+
 }
 
 func (ra *RoomActor) onStopped(actx actor.Context) {
@@ -144,32 +154,39 @@ func (ra *RoomActor) setupWorker(ctx actor.Context, qUri string) error {
 
 }
 
-// processNextMessage continuously pulls messages from the queue and processes them
-func (ra *RoomActor) processNextMessage(ctx context.Context) error {
-
+// processNextMessage pulls a message from the queue and processes it
+// returns true if there are more messages available to process immediately
+func (ra *RoomActor) processNextMessage(ctx context.Context) (bool, error) {
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return false, ctx.Err()
 	default:
-		// Attempt to receive a message from the subscription
+		// Check if subscription is active
+		if ra.subscription == nil {
+			return false, fmt.Errorf("subscription not initialized for room %s", ra.roomID)
+		}
+
 		msg, err := ra.subscription.Receive(ctx)
 		if err != nil {
-			return err
+			return false, err
+		}
+
+		// Check if the message is nil
+		if msg == nil {
+			return false, nil
 		}
 
 		// Process the message
 		err = ra.handlerFunc(ctx, msg.Metadata, msg.Body)
 		if err != nil {
-			// Log error or take appropriate action - we're not logging as requested
 			msg.Nack()
-			return err
+			return true, err
 		}
 
 		msg.Ack()
-		return nil
 
+		return true, nil
 	}
-
 }
 
 type RoomBehavior struct {

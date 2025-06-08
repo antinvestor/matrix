@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/frame"
+	"github.com/sirupsen/logrus"
 	"regexp"
 )
 
@@ -30,7 +31,16 @@ func (c *queues) EnsurePublisherOk(ctx context.Context, opts *config.QueueOption
 }
 
 func (c *queues) Publish(ctx context.Context, reference string, payload any, headers ...map[string]string) error {
-	return c.service.Publish(ctx, reference, payload, headers...)
+	err := c.service.Publish(ctx, reference, payload, headers...)
+	if err != nil {
+
+		logrus.WithFields(logrus.Fields{
+			"prefix": reference,
+		}).WithError(err).Error("Failed to publish")
+
+		return err
+	}
+	return nil
 }
 
 func (c *queues) RegisterSubscriber(ctx context.Context, opts *config.QueueOptions, optHandler ...frame.SubscribeWorker) error {

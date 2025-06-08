@@ -123,13 +123,6 @@ func NewInputer(
 	}
 
 	err = c.Qm.RegisterSubscriber(ctx, &cfg.Queues.InputRoomEvent, c)
-
-	logrus.WithError(err).WithFields(logrus.Fields{
-		"subj_prefix": cfg.Queues.InputRoomEvent.Prefix,
-		"subj_ref":    cfg.Queues.InputRoomEvent.Ref(),
-		"subj_uri":    cfg.Queues.InputRoomEvent.DSrc(),
-	}).Error("Inputter successfully registered subscriber")
-
 	return c, err
 }
 
@@ -141,7 +134,7 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, messag
 	}
 
 	opt := &r.Cfg.Queues.InputRoomEvent
-	roomOpts, err := cleanQOpts(opt, roomId)
+	roomOpts, err := roomifyQOpts(ctx, opt, roomId, true)
 	if err != nil {
 		return err
 	}
@@ -174,30 +167,56 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, messag
 // active again then we'll recreate the consumer anyway.
 const inactiveThreshold = time.Hour * 24
 
-func cleanQOpts(opts *config.QueueOptions, roomId *spec.RoomID) (*config.QueueOptions, error) {
+func replyQOpts(ctx context.Context, opts *config.QueueOptions) (*config.QueueOptions, error) {
+
+	replyTo := fmt.Sprintf("__ReplyQueue_%s", frame.GenerateID(ctx))
+
+	ds := opts.DS
+	if ds.IsNats() {
+
+		ds = ds.RemoveQuery("jetstream", "stream_storage", "stream_retention")
+		ds = ds.ExtendQuery("subject", replyTo)
+
+	} else {
+		ds = config.DataSource(fmt.Sprintf("mem://%s", replyTo))
+	}
+
+	return &config.QueueOptions{
+		QReference: fmt.Sprintf("%s%s", opts.QReference, replyTo),
+		Prefix:     opts.Prefix,
+		DS:         ds,
+	}, nil
+}
+
+func roomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.RoomID, isSubscriber bool) (*config.QueueOptions, error) {
 
 	ds := opts.DS
 	if ds.IsNats() {
 
 		subject := fmt.Sprintf("%s.%s", config.InputRoomEvent, queueutil.Tokenise(roomId.String()))
-		durable := fmt.Sprintf("RoomInput%s", queueutil.Tokenise(roomId.String()))
 		ds = ds.ExtendQuery("subject", subject)
 
-		ds = ds.ExtendQuery("consumer_filter_subject", subject)
-		ds = ds.ExtendQuery("consumer_durable_name", durable)
-		ds = ds.ExtendQuery("consumer_deliver_policy", "all")
-		ds = ds.ExtendQuery("consumer_ack_policy", "explicit")
-		ds = ds.ExtendQuery("consumer_ack_wait", strconv.FormatInt(int64(MaximumMissingProcessingTime+(time.Second*10)), 10))
-		ds = ds.ExtendQuery("consumer_inactive_threshold", strconv.FormatInt(int64(inactiveThreshold), 10))
-		ds = ds.ExtendQuery("consumer_headers_only", "false")
+		if isSubscriber {
+			ds = ds.ExtendQuery("consumer_filter_subject", subject)
+			durable := fmt.Sprintf("RoomInput%s", queueutil.Tokenise(roomId.String()))
+
+			ds = ds.ExtendQuery("consumer_durable_name", durable)
+			ds = ds.ExtendQuery("consumer_deliver_policy", "all")
+			ds = ds.ExtendQuery("consumer_ack_policy", "explicit")
+			ds = ds.ExtendQuery("consumer_ack_wait", strconv.FormatInt(int64(MaximumMissingProcessingTime+(time.Second*10)), 10))
+			ds = ds.ExtendQuery("consumer_inactive_threshold", strconv.FormatInt(int64(inactiveThreshold), 10))
+			ds = ds.ExtendQuery("consumer_headers_only", "false")
+		} else {
+			ds = ds.RemoveQuery("jetstream", "stream_storage", "stream_retention")
+		}
 
 	} else {
 		ds = opts.DS.ExtendPath(queueutil.Tokenise(roomId.String()))
 	}
 
 	return &config.QueueOptions{
-		QReference: roomId.String(),
-		Prefix:     actor.RoomActorQPrefix,
+		QReference: fmt.Sprintf("%s%s", opts.QReference, queueutil.Tokenise(roomId.String())),
+		Prefix:     opts.Prefix,
 		DS:         ds,
 	}, nil
 }
@@ -258,11 +277,12 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 	// that field, so send back the error string (if any). If there
 	// was no error then we'll return a blank message, which means
 	// that everything was OK.
-	replyTo := metadata["sync"]
-	if replyTo != "" {
+	replyTo, ok := metadata["sync_uri"]
+	if ok {
 
 		replyToOpts := &config.QueueOptions{
 			DS:         config.DataSource(replyTo),
+			Prefix:     metadata["sync_prefix"],
 			QReference: metadata["sync_ref"],
 		}
 
@@ -302,16 +322,16 @@ func (r *Inputer) queueInputRoomEvents(
 
 	var replyToOpts *config.QueueOptions
 	if !request.Asynchronous {
-		replyTo := fmt.Sprintf("__InternalSynchronousQueue_%s", frame.GenerateID(ctx))
-		replyToOpts = &config.QueueOptions{
-			QReference: replyTo, DS: config.DataSource(fmt.Sprintf("mem://%s", replyTo))}
-
+		replyToOpts, err = replyQOpts(ctx, &r.Cfg.Queues.InputRoomEvent)
+		if err != nil {
+			return nil, err
+		}
 		err = r.Qm.RegisterSubscriber(ctx, replyToOpts)
 
 		if err != nil {
 			return nil, err
 		}
-		replySub, err = r.Qm.GetSubscriber(replyTo)
+		replySub, err = r.Qm.GetSubscriber(replyToOpts.Ref())
 		if err != nil {
 			return nil, err
 		}
@@ -335,11 +355,12 @@ func (r *Inputer) queueInputRoomEvents(
 		}
 
 		if replyToOpts != nil {
+			header["sync_prefix"] = replyToOpts.Prefix
 			header["sync_ref"] = replyToOpts.Ref()
-			header["sync"] = string(replyToOpts.DS)
+			header["sync_uri"] = string(replyToOpts.DS)
 		}
 
-		roomOpts, err0 := cleanQOpts(&r.Cfg.Queues.InputRoomEvent, &roomID)
+		roomOpts, err0 := roomifyQOpts(ctx, &r.Cfg.Queues.InputRoomEvent, &roomID, false)
 		if err0 != nil {
 			return nil, err0
 		}

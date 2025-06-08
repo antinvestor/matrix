@@ -315,7 +315,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	// Clean up old send-to-device messages from before this stream position.
 	// This is needed to avoid sending the same message multiple times
-	if err = rp.db.CleanSendToDeviceUpdates(syncReq.Context, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
+	if err = rp.db.CleanSendToDeviceUpdates(ctx, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
 		syncReq.Log.WithError(err).Error("p.Cm.CleanSendToDeviceUpdates failed")
 	}
 
@@ -339,8 +339,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				// even if that's not required. See also:
 				// https://github.com/matrix-org/synapse/blob/29f06704b8871a44926f7c99e73cf4a978fb8e81/synapse/rest/client/sync.py#L276-L281
 				// Only try to get OTKs if the context isn't already done.
-				if syncReq.Context.Err() == nil {
-					err = internal.DeviceOTKCounts(syncReq.Context, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
+				if ctx.Err() == nil {
+					err = internal.DeviceOTKCounts(ctx, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
 					if err != nil && err != context.Canceled {
 						syncReq.Log.WithError(err).Warn("failed to get OTK counts")
 					}
@@ -352,7 +352,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			}
 
 			select {
-			case <-syncReq.Context.Done(): // Caller gave up
+			case <-ctx.Done(): // Caller gave up
 				return giveup()
 
 			case <-timer.C: // Timeout reached
@@ -368,7 +368,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 		withTransaction := func(from types.StreamPosition, f func(snapshot storage.DatabaseTransaction) types.StreamPosition) types.StreamPosition {
 			var succeeded bool
-			snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
+			snapshot, err := rp.db.NewDatabaseSnapshot(ctx)
 			if err != nil {
 				logrus.WithError(err).Error("Failed to acquire database snapshot for sync request")
 				return from
@@ -390,7 +390,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.DeviceListPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.DeviceListStreamProvider.CompleteSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 						)
 					},
 				),
@@ -398,7 +398,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.PDUPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.PDUStreamProvider.CompleteSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 						)
 					},
 				),
@@ -406,7 +406,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.TypingPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.TypingStreamProvider.CompleteSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 						)
 					},
 				),
@@ -414,7 +414,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.ReceiptPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.ReceiptStreamProvider.CompleteSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 						)
 					},
 				),
@@ -422,7 +422,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.InvitePosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.InviteStreamProvider.CompleteSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 						)
 					},
 				),
@@ -430,7 +430,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.SendToDevicePosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.SendToDeviceStreamProvider.CompleteSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 						)
 					},
 				),
@@ -438,7 +438,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.AccountDataPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.AccountDataStreamProvider.CompleteSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 						)
 					},
 				),
@@ -446,7 +446,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.NotificationDataPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.NotificationDataStreamProvider.CompleteSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 						)
 					},
 				),
@@ -454,7 +454,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.PresencePosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.PresenceStreamProvider.CompleteSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 						)
 					},
 				),
@@ -466,7 +466,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.PDUPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.PDUStreamProvider.IncrementalSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 							syncReq.Since.PDUPosition, rp.Notifier.CurrentPosition().PDUPosition,
 						)
 					},
@@ -475,7 +475,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.TypingPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.TypingStreamProvider.IncrementalSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 							syncReq.Since.TypingPosition, rp.Notifier.CurrentPosition().TypingPosition,
 						)
 					},
@@ -484,7 +484,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.ReceiptPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.ReceiptStreamProvider.IncrementalSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 							syncReq.Since.ReceiptPosition, rp.Notifier.CurrentPosition().ReceiptPosition,
 						)
 					},
@@ -493,7 +493,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.InvitePosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.InviteStreamProvider.IncrementalSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 							syncReq.Since.InvitePosition, rp.Notifier.CurrentPosition().InvitePosition,
 						)
 					},
@@ -502,7 +502,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.SendToDevicePosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.SendToDeviceStreamProvider.IncrementalSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 							syncReq.Since.SendToDevicePosition, rp.Notifier.CurrentPosition().SendToDevicePosition,
 						)
 					},
@@ -511,7 +511,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.AccountDataPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.AccountDataStreamProvider.IncrementalSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 							syncReq.Since.AccountDataPosition, rp.Notifier.CurrentPosition().AccountDataPosition,
 						)
 					},
@@ -520,7 +520,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.NotificationDataPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.NotificationDataStreamProvider.IncrementalSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 							syncReq.Since.NotificationDataPosition, rp.Notifier.CurrentPosition().NotificationDataPosition,
 						)
 					},
@@ -529,7 +529,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.DeviceListPosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.DeviceListStreamProvider.IncrementalSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 							syncReq.Since.DeviceListPosition, rp.Notifier.CurrentPosition().DeviceListPosition,
 						)
 					},
@@ -538,7 +538,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Since.PresencePosition,
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.PresenceStreamProvider.IncrementalSync(
-							syncReq.Context, txn, syncReq,
+							ctx, txn, syncReq,
 							syncReq.Since.PresencePosition, rp.Notifier.CurrentPosition().PresencePosition,
 						)
 					},

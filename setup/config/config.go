@@ -222,6 +222,23 @@ func (d DataSource) ExtendQuery(key, value string) DataSource {
 	return DataSource(nuUri.String())
 }
 
+func (d DataSource) RemoveQuery(key ...string) DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
+	}
+
+	q := nuUri.Query()
+
+	for _, k := range key {
+		q.Del(k)
+	}
+
+	nuUri.RawQuery = q.Encode()
+
+	return DataSource(nuUri.String())
+}
+
 // A Topic in kafka.
 type Topic string
 
