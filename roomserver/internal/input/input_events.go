@@ -49,11 +49,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 )
 
-// MaximumMissingProcessingTime is the maximum time we allow "processRoomEvent" to fetch
-// e.g. missing auth/prev events. This duration is used for AckWait, and if it is exceeded
-// NATS queues the event for redelivery.
-const MaximumMissingProcessingTime = time.Minute * 5
-
 var processRoomEventDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Namespace: "matrix",

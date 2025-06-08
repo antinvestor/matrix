@@ -36,8 +36,6 @@ import (
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/frame"
 	"github.com/sirupsen/logrus"
-	"strconv"
-	"time"
 )
 
 // Inputer is responsible for consuming from the roomserver input
@@ -134,7 +132,7 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, messag
 	}
 
 	opt := &r.Cfg.Queues.InputRoomEvent
-	roomOpts, err := roomifyQOpts(ctx, opt, roomId, true)
+	roomOpts, err := actor.RoomifyQOpts(ctx, opt, roomId, true)
 	if err != nil {
 		return err
 	}
@@ -160,13 +158,6 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, messag
 	return nil
 }
 
-// If a room consumer is inactive for a while then we will allow NATS
-// to clean it up. This stops us from holding onto durable consumers
-// indefinitely for rooms that might no longer be active, since they do
-// have an interest overhead in the NATS Server. If the room becomes
-// active again then we'll recreate the consumer anyway.
-const inactiveThreshold = time.Hour * 24
-
 func replyQOpts(ctx context.Context, opts *config.QueueOptions) (*config.QueueOptions, error) {
 
 	replyTo := fmt.Sprintf("__ReplyQueue_%s", frame.GenerateID(ctx))
@@ -183,39 +174,6 @@ func replyQOpts(ctx context.Context, opts *config.QueueOptions) (*config.QueueOp
 
 	return &config.QueueOptions{
 		QReference: fmt.Sprintf("%s%s", opts.QReference, replyTo),
-		Prefix:     opts.Prefix,
-		DS:         ds,
-	}, nil
-}
-
-func roomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.RoomID, isSubscriber bool) (*config.QueueOptions, error) {
-
-	ds := opts.DS
-	if ds.IsNats() {
-
-		subject := fmt.Sprintf("%s.%s", config.InputRoomEvent, queueutil.Tokenise(roomId.String()))
-		ds = ds.ExtendQuery("subject", subject)
-
-		if isSubscriber {
-			ds = ds.ExtendQuery("consumer_filter_subject", subject)
-			durable := fmt.Sprintf("RoomInput%s", queueutil.Tokenise(roomId.String()))
-
-			ds = ds.ExtendQuery("consumer_durable_name", durable)
-			ds = ds.ExtendQuery("consumer_deliver_policy", "all")
-			ds = ds.ExtendQuery("consumer_ack_policy", "explicit")
-			ds = ds.ExtendQuery("consumer_ack_wait", strconv.FormatInt(int64(MaximumMissingProcessingTime+(time.Second*10)), 10))
-			ds = ds.ExtendQuery("consumer_inactive_threshold", strconv.FormatInt(int64(inactiveThreshold), 10))
-			ds = ds.ExtendQuery("consumer_headers_only", "false")
-		} else {
-			ds = ds.RemoveQuery("jetstream", "stream_storage", "stream_retention")
-		}
-
-	} else {
-		ds = opts.DS.ExtendPath(queueutil.Tokenise(roomId.String()))
-	}
-
-	return &config.QueueOptions{
-		QReference: fmt.Sprintf("%s%s", opts.QReference, queueutil.Tokenise(roomId.String())),
 		Prefix:     opts.Prefix,
 		DS:         ds,
 	}, nil
@@ -360,7 +318,7 @@ func (r *Inputer) queueInputRoomEvents(
 			header["sync_uri"] = string(replyToOpts.DS)
 		}
 
-		roomOpts, err0 := roomifyQOpts(ctx, &r.Cfg.Queues.InputRoomEvent, &roomID, false)
+		roomOpts, err0 := actor.RoomifyQOpts(ctx, &r.Cfg.Queues.InputRoomEvent, &roomID, false)
 		if err0 != nil {
 			return nil, err0
 		}

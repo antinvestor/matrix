@@ -3,6 +3,7 @@ package actor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	actorV1 "github.com/antinvestor/matrix/apis/actor/v1"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -14,6 +15,8 @@ import (
 	"github.com/asynkron/protoactor-go/cluster/identitylookup/disthash"
 	"github.com/asynkron/protoactor-go/remote"
 	"github.com/pitabwire/frame"
+	"strconv"
+	"time"
 )
 
 const (
@@ -144,4 +147,49 @@ func (s *RoomActorSystem) Shutdown(ctx context.Context) {
 	if s.actorSystem != nil && !s.actorSystem.IsStopped() {
 		s.actorSystem.Shutdown()
 	}
+}
+
+// If a room consumer is inactive for a while then we will allow NATS
+// to clean it up. This stops us from holding onto durable consumers
+// indefinitely for rooms that might no longer be active, since they do
+// have an interest overhead in the NATS Server. If the room becomes
+// active again then we'll recreate the consumer anyway.
+const inactiveThreshold = time.Hour * 24
+
+// MaximumMissingProcessingTime is the maximum time we allow "processRoomEvent" to fetch
+// e.g. missing auth/prev events. This duration is used for AckWait, and if it is exceeded
+// NATS queues the event for redelivery.
+const MaximumMissingProcessingTime = time.Minute * 5
+
+func RoomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.RoomID, isSubscriber bool) (*config.QueueOptions, error) {
+
+	ds := opts.DS
+	if ds.IsNats() {
+
+		subject := fmt.Sprintf("%s.%s", config.InputRoomEvent, queueutil.Tokenise(roomId.String()))
+		ds = ds.ExtendQuery("subject", subject)
+
+		if isSubscriber {
+			ds = ds.ExtendQuery("consumer_filter_subject", subject)
+			durable := fmt.Sprintf("RoomInput%s", queueutil.Tokenise(roomId.String()))
+
+			ds = ds.ExtendQuery("consumer_durable_name", durable)
+			ds = ds.ExtendQuery("consumer_deliver_policy", "all")
+			ds = ds.ExtendQuery("consumer_ack_policy", "explicit")
+			ds = ds.ExtendQuery("consumer_ack_wait", strconv.FormatInt(int64(MaximumMissingProcessingTime+(time.Second*10)), 10))
+			ds = ds.ExtendQuery("consumer_inactive_threshold", strconv.FormatInt(int64(inactiveThreshold), 10))
+			ds = ds.ExtendQuery("consumer_headers_only", "false")
+		} else {
+			ds = ds.RemoveQuery("jetstream", "stream_storage", "stream_retention")
+		}
+
+	} else {
+		ds = opts.DS.ExtendPath(queueutil.Tokenise(roomId.String()))
+	}
+
+	return &config.QueueOptions{
+		QReference: fmt.Sprintf("%s%s", opts.QReference, queueutil.Tokenise(roomId.String())),
+		Prefix:     opts.Prefix,
+		DS:         ds,
+	}, nil
 }
