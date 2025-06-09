@@ -16,10 +16,10 @@ package internal
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/pitabwire/util"
 )
 
 func (a *UserInternalAPI) PerformEnsureSSOAccountExists(ctx context.Context, req *api.QuerySSOAccountRequest, res *api.QuerySSOAccountResponse) error {
@@ -35,7 +35,10 @@ func (a *UserInternalAPI) PerformEnsureSSOAccountExists(ctx context.Context, req
 			return err
 		}
 
-		util.GetLogger(ctx).WithField("request", req).Info("No account exists with the profile id")
+		frame.Log(ctx).WithField("subject", req.Subject).
+			WithField("server_name", req.ServerName).
+			WithField("display_name", req.DisplayName).
+			Info("No account exists with the profile id")
 
 		var accRes api.PerformAccountCreationResponse
 		err = a.PerformAccountCreation(ctx, &api.PerformAccountCreationRequest{

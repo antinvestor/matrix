@@ -17,12 +17,11 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"github.com/antinvestor/matrix/internal/queueutil"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/storage"
@@ -59,6 +58,8 @@ func NewOutputSendToDeviceConsumer(
 // Handle is called in response to a message received on the
 // send-to-device events topic from the client api.
 func (t *OutputSendToDeviceConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+
+	log := frame.Log(ctx)
 	// only send send-to-device events which originated from us
 	sender := metadata["sender"]
 	_, originServerName, err := gomatrixserverlib.SplitID('@', sender)

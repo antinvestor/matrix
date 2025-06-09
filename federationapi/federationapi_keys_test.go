@@ -179,11 +179,11 @@ func TestServersRequestOwnKeys(t *testing.T) {
 			},
 		)
 		if err != nil {
-			t.Fatal("server could not fetch own key: %s", err)
+			t.Fatalf("server could not fetch own key: %s", err)
 		}
 
 		if _, ok := res[req]; !ok {
-			t.Fatal("server didn't return its own key in the results")
+			t.Fatalf("server didn't return its own key in the results")
 		}
 		t.Logf("%s's key expires at %s\n", name, res[req].ValidUntilTS.Time())
 	}
@@ -210,13 +210,13 @@ func TestRenewalBehaviour(t *testing.T) {
 		},
 	)
 	if err != nil {
-		t.Fatal("server A failed to retrieve server C key: %s", err)
+		t.Fatalf("server A failed to retrieve server C key: %s", err)
 	}
 	if len(res) != 1 {
-		t.Fatal("server C should have returned one key but instead returned %d keys", len(res))
+		t.Fatalf("server C should have returned one key but instead returned %d keys", len(res))
 	}
 	if _, ok := res[req]; !ok {
-		t.Fatal("server C isn't included in the key fetch response")
+		t.Fatalf("server C isn't included in the key fetch response")
 	}
 
 	originalValidity := res[req].ValidUntilTS
@@ -234,18 +234,18 @@ func TestRenewalBehaviour(t *testing.T) {
 		},
 	)
 	if err != nil {
-		t.Fatal("server A failed to retrieve server C key: %s", err)
+		t.Fatalf("server A failed to retrieve server C key: %s", err)
 	}
 	if len(res) != 1 {
-		t.Fatal("server C should have returned one key but instead returned %d keys", len(res))
+		t.Fatalf("server C should have returned one key but instead returned %d keys", len(res))
 	}
 	if _, ok := res[req]; !ok {
-		t.Fatal("server C isn't included in the key fetch response")
+		t.Fatalf("server C isn't included in the key fetch response")
 	}
 
 	currentValidity := res[req].ValidUntilTS
 
 	if originalValidity == currentValidity {
-		t.Fatal("server C key should have renewed but didn't")
+		t.Fatalf("server C key should have renewed but didn't")
 	}
 }

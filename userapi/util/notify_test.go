@@ -60,23 +60,23 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 			notification := data.Notification
 			// Validate the request
 			if notification.Counts == nil {
-				t.Fatal("no unread notification counts in request")
+				t.Fatalf("no unread notification counts in request")
 			}
 			if unread := notification.Counts.Unread; unread != 1 {
-				t.Error("expected one unread notification, got %d", unread)
+				t.Errorf("expected one unread notification, got %d", unread)
 			}
 
 			if len(notification.Devices) == 0 {
-				t.Fatal("expected devices in request")
+				t.Fatalf("expected devices in request")
 			}
 
 			// We only created one push device, so access it directly
 			device := notification.Devices[0]
 			if device.AppID != appID {
-				t.Error("unexpected app_id: %s, want %s", device.AppID, appID)
+				t.Errorf("unexpected app_id: %s, want %s", device.AppID, appID)
 			}
 			if device.PushKey != pushKey {
-				t.Error("unexpected push_key: %s, want %s", device.PushKey, pushKey)
+				t.Errorf("unexpected push_key: %s, want %s", device.PushKey, pushKey)
 			}
 
 			// Return empty result, otherwise the call is handled as failed
@@ -124,7 +124,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		}
 		select {
 		case <-time.After(time.Second * 5):
-			t.Error("timed out waiting for response")
+			t.Errorf("timed out waiting for response")
 		case <-receivedRequest:
 		}
 	})

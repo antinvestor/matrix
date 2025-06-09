@@ -26,9 +26,9 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage"
 	fedTypes "github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 
 	syncTypes "github.com/antinvestor/matrix/syncapi/types"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputReceiptConsumer consumes events that originate in the clientapi.
@@ -79,7 +79,10 @@ func (t *OutputReceiptConsumer) Handle(ctx context.Context, metadata map[string]
 	// only send receipt events which originated from us
 	_, receiptServerName, err := gomatrixserverlib.SplitID('@', receipt.UserID)
 	if err != nil {
-		log.WithError(err).WithField("user_id", receipt.UserID).Error("failed to extract domain from receipt sender")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			WithField("user_id", receipt.UserID).
+			Error("failed to extract domain from receipt sender")
 		return nil
 	}
 	if !t.isLocalServerName(receiptServerName) {
@@ -89,7 +92,9 @@ func (t *OutputReceiptConsumer) Handle(ctx context.Context, metadata map[string]
 	timestamp, err := strconv.ParseUint(metadata["timestamp"], 10, 64)
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Error("EDU output log: message parse failure")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			Error("EDU output log: message parse failure")
 		return err
 	}
 
@@ -97,7 +102,10 @@ func (t *OutputReceiptConsumer) Handle(ctx context.Context, metadata map[string]
 
 	joined, err := t.db.GetJoinedHosts(ctx, receipt.RoomID)
 	if err != nil {
-		log.WithError(err).WithField("room_id", receipt.RoomID).Error("failed to get joined hosts for room")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			WithField("room_id", receipt.RoomID).
+			Error("failed to get joined hosts for room")
 		return err
 	}
 
@@ -123,13 +131,17 @@ func (t *OutputReceiptConsumer) Handle(ctx context.Context, metadata map[string]
 		Origin: string(receiptServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
-		log.WithError(err).Error("failed to marshal EDU JSON")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			Error("failed to marshal EDU JSON")
 		return nil
 	}
 
 	err = t.queues.SendEDU(ctx, edu, receiptServerName, names)
 	if err != nil {
-		log.WithError(err).Error("failed to send EDU")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			Error("failed to send EDU")
 		return err
 	}
 

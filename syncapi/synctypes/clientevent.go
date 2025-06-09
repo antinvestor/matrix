@@ -16,12 +16,14 @@
 package synctypes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -82,7 +84,7 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 		}
 		ev, err := ToClientEvent(se, format, userIDForSender)
 		if err != nil {
-			logrus.WithError(err).Warn("Failed converting event to ClientEvent")
+			frame.Log(context.TODO()).WithError(err).Warn("Failed converting event to ClientEvent")
 			continue
 		}
 		evs = append(evs, *ev)
@@ -190,7 +192,7 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 			if err != nil {
 				errString = err.Error()
 			}
-			logrus.Warn("Failed to find userID for prev_sender in ClientEvent: %s", errString)
+			frame.Log(context.TODO()).Warn("Failed to find userID for prev_sender in ClientEvent: %s", errString)
 			// NOTE: Not much can be done here, so leave the previous value in place.
 		}
 		ce.Unsigned, err = json.Marshal(prev)

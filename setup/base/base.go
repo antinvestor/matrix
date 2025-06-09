@@ -33,12 +33,10 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/setup/config"
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
-
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 //go:embed static/*.gotmpl
@@ -112,6 +110,9 @@ func SetupHTTPOption(
 	routers httputil.Routers,
 
 ) (frame.Option, error) {
+
+	logger := frame.Log(ctx)
+
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 
 	//Redirect for Landing Page
@@ -131,7 +132,7 @@ func SetupHTTPOption(
 	if err := tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
 		"Version": internal.VersionString(),
 	}); err != nil {
-		logrus.WithError(err).Error("failed to execute landing page template")
+		frame.Log(ctx).WithError(err).Error("failed to execute landing page template")
 		return nil, err
 	}
 
@@ -142,7 +143,7 @@ func SetupHTTPOption(
 	// We only need the files beneath the static/client/login folder.
 	sub, err := fs.Sub(loginFallback, "static/client/login")
 	if err != nil {
-		logrus.Panic("unable to read embedded files, this should never happen: %s", err)
+		logger.Panic("unable to read embedded files, this should never happen: %s", err)
 	}
 	// Serve a static page for login fallback
 	routers.Static.PathPrefix("/client/login/").Handler(http.StripPrefix("/_matrix/static/client/login/", http.FileServer(http.FS(sub))))
@@ -190,8 +191,8 @@ func WaitForShutdown(ctx context.Context) {
 	}
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
 
-	logrus.Warn("Shutdown signal received")
+	frame.Log(ctx).Warn("Shutdown signal received")
 
 	// ShutdownDendrite and WaitForComponentsToFinish are not used in this function, so we don't need to call them
-	logrus.Warn("Matrix is exiting now")
+	frame.Log(ctx).Warn("Matrix is exiting now")
 }

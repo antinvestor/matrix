@@ -52,11 +52,11 @@ func Test_EventAuth(t *testing.T) {
 	// Add the auth events to the allower
 	allower, err := gomatrixserverlib.NewAuthEvents(nil)
 	if err != nil {
-		t.Fatal(err.Error())
+		t.Fatalf(err.Error())
 	}
 	for _, a := range authEvents {
 		if err = allower.AddEvent(a); err != nil {
-			t.Fatal("allower.AddEvent failed: %v", err)
+			t.Fatalf("allower.AddEvent failed: %v", err)
 		}
 	}
 
@@ -64,6 +64,6 @@ func Test_EventAuth(t *testing.T) {
 	if err := gomatrixserverlib.Allowed(ev.PDU, allower, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return spec.NewUserID(string(senderID), true)
 	}); err == nil {
-		t.Fatal("event should not be allowed, but it was")
+		t.Fatalf("event should not be allowed, but it was")
 	}
 }

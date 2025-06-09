@@ -17,6 +17,7 @@ package sync
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"math"
 	"net/http"
 	"strconv"
@@ -26,7 +27,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
@@ -84,13 +84,12 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		filter.Room.AccountData.Limit = math.MaxInt32
 	}
 
-	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
-		"user_id":   device.UserID,
-		"device_id": device.ID,
-		"since":     since,
-		"timeout":   timeout,
-		"limit":     filter.Room.Timeline.Limit,
-	})
+	logger := frame.Log(req.Context()).
+		WithField("user_id", device.UserID).
+		WithField("device_id", device.ID).
+		WithField("since", since).
+		WithField("timeout", timeout).
+		WithField("limit", filter.Room.Timeline.Limit)
 
 	return &types.SyncRequest{
 		Context:           req.Context(),             //

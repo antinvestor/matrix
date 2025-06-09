@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"strconv"
 
@@ -62,7 +63,7 @@ func publicRooms(
 	// ParseInt returns 0 and an error when trying to parse an empty string
 	// In that case, we want to assign 0 so we ignore the error
 	if err != nil && len(request.Since) > 0 {
-		util.GetLogger(ctx).WithError(err).Error("strconv.ParseInt failed")
+		frame.Log(ctx).WithError(err).Error("strconv.ParseInt failed")
 		return nil, err
 	}
 
@@ -75,7 +76,7 @@ func publicRooms(
 		NetworkID: request.NetworkID,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("QueryPublishedRooms failed")
+		frame.Log(ctx).WithError(err).Error("QueryPublishedRooms failed")
 		return nil, err
 	}
 	response.TotalRoomCountEstimate = len(queryRes.RoomIDs)
@@ -148,7 +149,7 @@ func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.Fede
 		},
 	}, &stateRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("QueryBulkStateContent failed")
+		frame.Log(ctx).WithError(err).Error("QueryBulkStateContent failed")
 		return nil, err
 	}
 	chunk := make([]fclient.PublicRoom, len(roomIDs))

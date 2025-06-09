@@ -94,6 +94,6 @@ func (m *Monolith) AddAllPublicRoutes(
 	syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
 
 	if m.RelayAPI != nil {
-		relayapi.AddPublicRoutes(routers, cfg, m.KeyRing, m.RelayAPI)
+		relayapi.AddPublicRoutes(ctx, routers, cfg, m.KeyRing, m.RelayAPI)
 	}
 }

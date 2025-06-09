@@ -16,13 +16,13 @@ package routing
 
 import (
 	"encoding/json"
+	"github.com/pitabwire/frame"
 	"net/http"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/relayapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 // GetTransactionFromRelay implements GET /_matrix/federation/v1/relay_txn/{userID}
@@ -33,7 +33,8 @@ func GetTransactionFromRelay(
 	relayAPI api.RelayInternalAPI,
 	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Info("Processing relay_txn for %s", userID.String())
+	log := frame.Log(httpReq.Context())
+	log.Info("Processing relay_txn for %s", userID.String())
 
 	var previousEntry fclient.RelayEntry
 	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err != nil {
@@ -48,7 +49,7 @@ func GetTransactionFromRelay(
 			JSON: spec.BadJSON("Invalid entry id provided. Must be >= 0."),
 		}
 	}
-	logrus.Info("Previous entry provided: %v", previousEntry.EntryID)
+	log.Info("Previous entry provided: %v", previousEntry.EntryID)
 
 	response, err := relayAPI.QueryTransactions(httpReq.Context(), userID, previousEntry)
 	if err != nil {

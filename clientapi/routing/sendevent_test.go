@@ -109,7 +109,7 @@ func (s *sendEventTestRoomserverAPI) QueryUserIDForSender(
 				if string(spec.SenderIDFromPseudoIDKey(roomKey)) == string(senderID) {
 					parsedUserID, err := spec.NewUserID(uID, true)
 					if err != nil {
-						s.t.Fatal("Mock QueryUserIDForSender failed: %s", err)
+						s.t.Fatalf("Mock QueryUserIDForSender failed: %s", err)
 					}
 					return parsedUserID, nil
 				}
@@ -172,7 +172,7 @@ func Test_SendEvent_PseudoIDStateKeys(t *testing.T) {
 
 		roomState, err := createEvents(eventsJSON, nonpseudoIDRoomVersion)
 		if err != nil {
-			t.Fatal("failed to prepare state events: %s", err.Error())
+			t.Fatalf("failed to prepare state events: %s", err.Error())
 		}
 
 		rsAPI := &sendEventTestRoomserverAPI{
@@ -184,7 +184,7 @@ func Test_SendEvent_PseudoIDStateKeys(t *testing.T) {
 
 		req, err := http.NewRequest("POST", "https://domain", io.NopCloser(strings.NewReader("{}")))
 		if err != nil {
-			t.Fatal("failed to make new request: %s", err.Error())
+			t.Fatalf("failed to make new request: %s", err.Error())
 		}
 
 		cfg := &config.ClientAPI{}
@@ -192,7 +192,7 @@ func Test_SendEvent_PseudoIDStateKeys(t *testing.T) {
 		resp := SendEvent(req, device, roomIDStr, eventType, nil, &senderUserID, cfg, rsAPI, nil)
 
 		if resp.Code != http.StatusOK {
-			t.Fatal("non-200 HTTP code returned: %v\nfull response: %v", resp.Code, resp)
+			t.Fatalf("non-200 HTTP code returned: %v\nfull response: %v", resp.Code, resp)
 		}
 
 		assert.Equal(t, len(rsAPI.savedInputRoomEvents), 1)
@@ -200,11 +200,11 @@ func Test_SendEvent_PseudoIDStateKeys(t *testing.T) {
 		ev := rsAPI.savedInputRoomEvents[0]
 		stateKey := ev.Event.StateKey()
 		if stateKey == nil {
-			t.Fatal("submitted InputRoomEvent has nil state key, when it should be %v", senderUserID)
+			t.Fatalf("submitted InputRoomEvent has nil state key, when it should be %v", senderUserID)
 			return
 		}
 		if *stateKey != senderUserID {
-			t.Fatal("expected submitted InputRoomEvent to have user ID state key\nfound: %v\nexpected: %v", *stateKey, senderUserID)
+			t.Fatalf("expected submitted InputRoomEvent to have user ID state key\nfound: %v\nexpected: %v", *stateKey, senderUserID)
 			return
 		}
 	})
@@ -217,7 +217,7 @@ func Test_SendEvent_PseudoIDStateKeys(t *testing.T) {
 
 		roomState, err := createEvents(eventsJSON, pseudoIDRoomVersion)
 		if err != nil {
-			t.Fatal("failed to prepare state events: %s", err.Error())
+			t.Fatalf("failed to prepare state events: %s", err.Error())
 		}
 
 		rsAPI := &sendEventTestRoomserverAPI{
@@ -232,7 +232,7 @@ func Test_SendEvent_PseudoIDStateKeys(t *testing.T) {
 
 		req, err := http.NewRequest("POST", "https://domain", io.NopCloser(strings.NewReader("{}")))
 		if err != nil {
-			t.Fatal("failed to make new request: %s", err.Error())
+			t.Fatalf("failed to make new request: %s", err.Error())
 		}
 
 		cfg := &config.ClientAPI{}
@@ -240,7 +240,7 @@ func Test_SendEvent_PseudoIDStateKeys(t *testing.T) {
 		resp := SendEvent(req, device, roomIDStr, eventType, nil, &senderUserID, cfg, rsAPI, nil)
 
 		if resp.Code != http.StatusOK {
-			t.Fatal("non-200 HTTP code returned: %v\nfull response: %v", resp.Code, resp)
+			t.Fatalf("non-200 HTTP code returned: %v\nfull response: %v", resp.Code, resp)
 		}
 
 		assert.Equal(t, len(rsAPI.savedInputRoomEvents), 1)
@@ -248,11 +248,11 @@ func Test_SendEvent_PseudoIDStateKeys(t *testing.T) {
 		ev := rsAPI.savedInputRoomEvents[0]
 		stateKey := ev.Event.StateKey()
 		if stateKey == nil {
-			t.Fatal("submitted InputRoomEvent has nil state key, when it should be %v", senderPseudoID)
+			t.Fatalf("submitted InputRoomEvent has nil state key, when it should be %v", senderPseudoID)
 			return
 		}
 		if *stateKey != senderPseudoID {
-			t.Fatal("expected submitted InputRoomEvent to have pseudo ID state key\nfound: %v\nexpected: %v", *stateKey, senderPseudoID)
+			t.Fatalf("expected submitted InputRoomEvent to have pseudo ID state key\nfound: %v\nexpected: %v", *stateKey, senderPseudoID)
 		}
 	})
 }

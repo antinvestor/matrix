@@ -18,7 +18,7 @@ import (
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/sirupsen/logrus"
+	"github.com/pitabwire/frame"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -54,26 +54,27 @@ func AddPublicRoutes(
 	enableMetrics bool,
 ) {
 
+	log := frame.Log(ctx)
 	syncApiCfg := cfg.SyncAPI.Queues
 
 	err := qm.RegisterPublisher(ctx, &syncApiCfg.OutputReceiptEvent)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to register publisher for receipt event")
+		log.WithError(err).Panic("failed to register publisher for receipt event")
 	}
 
 	err = qm.RegisterPublisher(ctx, &syncApiCfg.OutputSendToDeviceEvent)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to register publisher for send to device event")
+		log.WithError(err).Panic("failed to register publisher for send to device event")
 	}
 
 	err = qm.RegisterPublisher(ctx, &syncApiCfg.OutputTypingEvent)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to register publisher for typing event")
+		log.WithError(err).Panic("failed to register publisher for typing event")
 	}
 
 	err = qm.RegisterPublisher(ctx, &syncApiCfg.OutputPresenceEvent)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to register publisher for presence event")
+		log.WithError(err).Panic("failed to register publisher for presence event")
 	}
 
 	syncProducer := &producers.SyncAPIProducer{

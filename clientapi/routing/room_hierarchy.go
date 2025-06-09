@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"github.com/pitabwire/frame"
 	"net/http"
 	"strconv"
 	"sync"
@@ -26,7 +27,6 @@ import (
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/google/uuid"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 )
 
 // For storing pagination information for room hierarchies
@@ -67,6 +67,10 @@ func (c *RoomHierarchyPaginationCache) AddLine(line roomserverAPI.RoomHierarchyW
 //
 // Implements /_matrix/client/v1/rooms/{roomID}/hierarchy
 func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr string, rsAPI roomserverAPI.ClientRoomserverAPI, paginationCache *RoomHierarchyPaginationCache) util.JSONResponse {
+
+	ctx := req.Context()
+	log := frame.Log(ctx)
+
 	parsedRoomID, err := spec.NewRoomID(roomIDStr)
 	if err != nil {
 		return util.JSONResponse{

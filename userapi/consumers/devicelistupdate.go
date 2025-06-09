@@ -18,14 +18,13 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/userapi/internal"
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/userapi/internal"
 )
 
 // DeviceListUpdateConsumer consumes device list updates that came in over federation.
@@ -57,7 +56,7 @@ func (t *DeviceListUpdateConsumer) Handle(ctx context.Context, metadata map[stri
 
 	var m gomatrixserverlib.DeviceListUpdateEvent
 	if err := json.Unmarshal(message, &m); err != nil {
-		logrus.WithError(err).Error("Failed to read from device list update input topic")
+		frame.Log(ctx).WithError(err).Error("Failed to read from device list update input topic")
 		return nil
 	}
 	origin := spec.ServerName(metadata["origin"])
@@ -74,12 +73,13 @@ func (t *DeviceListUpdateConsumer) Handle(ctx context.Context, metadata map[stri
 
 	err := t.updater.Update(timeoutCtx, m)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"user_id":   m.UserID,
-			"device_id": m.DeviceID,
-			"stream_id": m.StreamID,
-			"prev_id":   m.PrevID,
-		}).WithError(err).Error("Failed to update device list")
+		frame.Log(ctx).
+			WithField("user_id", m.UserID).
+			WithField("device_id", m.DeviceID).
+			WithField("stream_id", m.StreamID).
+			WithField("prev_id", m.PrevID).
+			WithError(err).
+			Error("Failed to update device list")
 		return err
 	}
 	return nil

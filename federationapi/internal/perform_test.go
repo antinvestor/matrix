@@ -78,7 +78,7 @@ func TestPerformWakeupServers(t *testing.T) {
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
-		testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
+		ctx, testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
 	)
 
 	req := api.PerformWakeupServersRequest{
@@ -128,7 +128,7 @@ func TestQueryRelayServers(t *testing.T) {
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
-		testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
+		ctx, testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
 	)
 
 	req := api.P2PQueryRelayServersRequest{
@@ -173,7 +173,7 @@ func TestRemoveRelayServers(t *testing.T) {
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
-		testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
+		ctx, testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
 	)
 
 	req := api.P2PRemoveRelayServersRequest{
@@ -217,7 +217,7 @@ func TestPerformDirectoryLookup(t *testing.T) {
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
-		testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
+		ctx, testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
 	)
 
 	req := api.PerformDirectoryLookupRequest{
@@ -260,7 +260,7 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 		nil,
 	)
 	fedAPI := NewFederationInternalAPI(
-		testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
+		ctx, testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
 	)
 
 	req := api.PerformDirectoryLookupRequest{

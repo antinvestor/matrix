@@ -23,14 +23,14 @@ func TestActionJSON(t *testing.T) {
 		t.Run(fmt.Sprintf("%+v", tst.Want), func(t *testing.T) {
 			bs, err := json.Marshal(&tst.Want)
 			if err != nil {
-				t.Fatal("Marshal failed: %v", err)
+				t.Fatalf("Marshal failed: %v", err)
 			}
 			var got Action
 			if err := json.Unmarshal(bs, &got); err != nil {
-				t.Fatal("Unmarshal failed: %v", err)
+				t.Fatalf("Unmarshal failed: %v", err)
 			}
 			if diff := cmp.Diff(tst.Want, got); diff != "" {
-				t.Error("+got -want:\n%s", diff)
+				t.Errorf("+got -want:\n%s", diff)
 			}
 		})
 	}

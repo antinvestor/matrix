@@ -46,13 +46,13 @@ func TestSliceInto(t *testing.T) {
 	for _, tc := range testCases {
 		subset, prev, next := sliceInto(slice, tc.since, limit)
 		if !reflect.DeepEqual(subset, tc.wantSubset) {
-			t.Error("returned subset is wrong, got %v want %v", subset, tc.wantSubset)
+			t.Errorf("returned subset is wrong, got %v want %v", subset, tc.wantSubset)
 		}
 		if prev != tc.wantPrev {
-			t.Error("returned prev is wrong, got %d want %d", prev, tc.wantPrev)
+			t.Errorf("returned prev is wrong, got %d want %d", prev, tc.wantPrev)
 		}
 		if next != tc.wantNext {
-			t.Error("returned next is wrong, got %d want %d", next, tc.wantNext)
+			t.Errorf("returned next is wrong, got %d want %d", next, tc.wantNext)
 		}
 	}
 }

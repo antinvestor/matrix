@@ -20,14 +20,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"sync"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
@@ -91,7 +90,7 @@ func (a *UserInternalAPI) PerformClaimKeys(ctx context.Context, req *api.Perform
 				Err: fmt.Sprintf("failed to ClaimKeys locally: %s", err),
 			}
 		}
-		util.GetLogger(ctx).WithField("keys_claimed", len(keys)).WithField("num_users", len(local)).Info("Claimed local keys")
+		frame.Log(ctx).WithField("keys_claimed", len(keys)).WithField("num_users", len(local)).Info("Claimed local keys")
 		for _, key := range keys {
 			_, ok := res.OneTimeKeys[key.UserID]
 			if !ok {
@@ -120,7 +119,7 @@ func (a *UserInternalAPI) claimRemoteKeys(
 	var claimed int       // Number of keys claimed in total
 	var failures int      // Number of servers we failed to ask
 
-	util.GetLogger(ctx).Info("Claiming remote keys from %d server(s)", len(domainToDeviceKeys))
+	frame.Log(ctx).WithField("num_servers", len(domainToDeviceKeys)).Info("Claiming remote keys")
 	wg.Add(len(domainToDeviceKeys))
 
 	for d, k := range domainToDeviceKeys {
@@ -135,7 +134,7 @@ func (a *UserInternalAPI) claimRemoteKeys(
 			defer mu.Unlock()
 
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).WithField("server", domain).Error("ClaimKeys failed")
+				frame.Log(ctx).WithError(err).WithField("server", domain).Error("ClaimKeys failed")
 				res.Failures[domain] = map[string]interface{}{
 					"message": err.Error(),
 				}
@@ -154,10 +153,7 @@ func (a *UserInternalAPI) claimRemoteKeys(
 	}
 
 	wg.Wait()
-	util.GetLogger(ctx).WithFields(logrus.Fields{
-		"num_keys":     claimed,
-		"num_failures": failures,
-	}).Info("Claimed remote keys from %d server(s)", len(domainToDeviceKeys))
+	frame.Log(ctx).WithField("num_keys", claimed).WithField("num_servers", len(domainToDeviceKeys)).WithField("num_failures", failures).Info("Claimed remote keys")
 }
 
 func (a *UserInternalAPI) PerformDeleteKeys(ctx context.Context, req *api.PerformDeleteKeysRequest, res *api.PerformDeleteKeysResponse) error {
@@ -264,7 +260,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 				DeviceIDs: dids,
 			}, &queryRes)
 			if err != nil {
-				util.GetLogger(ctx).Warn("Failed to QueryDeviceInfos for device IDs, display names will be missing")
+				frame.Log(ctx).Warn("Failed to QueryDeviceInfos for device IDs, display names will be missing")
 			}
 
 			if res.DeviceKeys[userID] == nil {
@@ -331,7 +327,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 					return
 				}
-				logrus.WithError(err).Error("a.KeyDatabase.CrossSigningSigsForTarget failed")
+				frame.Log(ctx).WithError(err).Error("a.KeyDatabase.CrossSigningSigsForTarget failed")
 				continue
 			}
 			if len(sigMap) == 0 {
@@ -357,7 +353,7 @@ func (a *UserInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReque
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 					return
 				}
-				logrus.WithError(err).Error("a.KeyDatabase.CrossSigningSigsForTarget failed")
+				frame.Log(ctx).WithError(err).Error("a.KeyDatabase.CrossSigningSigsForTarget failed")
 				continue
 			}
 			if len(sigMap) == 0 {
@@ -398,7 +394,7 @@ func (a *UserInternalAPI) remoteKeysFromDatabase(
 				if err == nil {
 					continue
 				}
-				util.GetLogger(ctx).WithError(err).Error("populateResponseWithDeviceKeysFromDatabase")
+				frame.Log(ctx).WithError(err).Error("populateResponseWithDeviceKeysFromDatabase")
 			}
 			// fetch device lists from remote
 			if _, ok := fetchRemote[domain]; !ok {
@@ -515,11 +511,11 @@ func (a *UserInternalAPI) queryRemoteKeysOnServer(
 	for userID := range userIDsForAllDevices {
 		err := a.Updater.ManualUpdate(ctx, spec.ServerName(serverName), userID)
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				logrus.ErrorKey: err,
-				"user_id":       userID,
-				"server":        serverName,
-			}).Error("Failed to manually update device lists for user")
+			frame.Log(ctx).
+				WithError(err).
+				WithField("user_id", userID).
+				WithField("server", serverName).
+				Error("Failed to manually update device lists for user")
 			// try to do it via /keys/query
 			devKeys[userID] = []string{}
 			continue
@@ -528,11 +524,11 @@ func (a *UserInternalAPI) queryRemoteKeysOnServer(
 		// user so the fact that we're populating all devices here isn't a problem so long as we have devices.
 		err = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, respMu, userID, nil)
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				logrus.ErrorKey: err,
-				"user_id":       userID,
-				"server":        serverName,
-			}).Error("Failed to manually update device lists for user")
+			frame.Log(ctx).
+				WithError(err).
+				WithField("user_id", userID).
+				WithField("server", serverName).
+				Error("Failed to manually update device lists for user")
 			// try to do it via /keys/query
 			devKeys[userID] = []string{}
 			continue
@@ -645,9 +641,9 @@ func (a *UserInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Pe
 
 	if len(toClean) > 0 {
 		if err = a.KeyDatabase.DeleteDeviceKeys(ctx, req.UserID, toClean); err != nil {
-			logrus.WithField("user_id", req.UserID).WithError(err).Error("Failed to clean up %d stale keyserver device key entries", len(toClean))
+			frame.Log(ctx).WithField("user_id", req.UserID).WithError(err).Error("Failed to clean up %d stale keyserver device key entries", len(toClean))
 		} else {
-			logrus.WithField("user_id", req.UserID).Debug("Cleaned up %d stale keyserver device key entries", len(toClean))
+			frame.Log(ctx).WithField("user_id", req.UserID).Debug("Cleaned up %d stale keyserver device key entries", len(toClean))
 		}
 	}
 
@@ -718,7 +714,7 @@ func (a *UserInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Pe
 	if !req.FromRegistration {
 		err = emitDeviceKeyChanges(ctx, a.KeyChangeProducer, existingKeys, keysToStore, req.OnlyDisplayNameUpdates)
 		if err != nil {
-			util.GetLogger(ctx).Error("Failed to emitDeviceKeyChanges: %s", err)
+			frame.Log(ctx).WithError(err).Error("Failed to emitDeviceKeyChanges")
 		}
 	}
 }

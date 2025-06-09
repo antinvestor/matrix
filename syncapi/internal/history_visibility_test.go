@@ -161,7 +161,7 @@ func Test_ApplyHistoryVisbility_Boundaries(t *testing.T) {
 	for i, eventJSON := range eventsJSON {
 		pdu, err := roomVerImpl.NewEventFromTrustedJSONWithEventID(eventJSON.id, []byte(eventJSON.json), false)
 		if err != nil {
-			t.Fatal("failed to prepare event %s for test: %s", eventJSON.id, err.Error())
+			t.Fatalf("failed to prepare event %s for test: %s", eventJSON.id, err.Error())
 		}
 		events[i] = &types.HeaderedEvent{PDU: pdu}
 
@@ -171,7 +171,7 @@ func Test_ApplyHistoryVisbility_Boundaries(t *testing.T) {
 		if pdu.Type() == spec.MRoomHistoryVisibility {
 			newHisVis, err := pdu.HistoryVisibility()
 			if err != nil {
-				t.Fatal("failed to prepare history visibility event: %s", err.Error())
+				t.Fatalf("failed to prepare history visibility event: %s", err.Error())
 			}
 			hisVis = newHisVis
 		}
@@ -191,7 +191,7 @@ func Test_ApplyHistoryVisbility_Boundaries(t *testing.T) {
 
 	filteredEvents, err := ApplyHistoryVisibilityFilter(ctx, syncDB, rsAPI, events, nil, otherUserID, "hisVisTest")
 	if err != nil {
-		t.Fatal("ApplyHistoryVisibility returned non-nil error: %s", err.Error())
+		t.Fatalf("ApplyHistoryVisibility returned non-nil error: %s", err.Error())
 	}
 
 	filteredEventIDs := make([]string, len(filteredEvents))

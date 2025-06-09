@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"sort"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -14,7 +15,7 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
+
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/matrix/internal/cacheutil"
@@ -1830,7 +1831,7 @@ func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys ma
 				return nil, rErr
 			}
 			if roomInfo == nil {
-				logrus.Warn("missing room info for %s, there will be missing users in the response", roomID.String())
+				frame.Log(ctx).Warn("missing room info for %s, there will be missing users in the response", roomID.String())
 				continue
 			}
 			roomNID = roomInfo.RoomNID
@@ -1981,7 +1982,7 @@ func (d *Database) QueryAdminEventReports(ctx context.Context, from uint64, limi
 
 	eventIDMap, err := d.EventIDs(ctx, qryEventNIDs)
 	if err != nil {
-		logrus.WithError(err).Error("unable to map eventNIDs to eventIDs")
+		frame.Log(ctx).WithError(err).Error("unable to map eventNIDs to eventIDs")
 		return nil, 0, err
 	}
 	if len(eventIDMap) != len(qryEventNIDs) {
@@ -1991,7 +1992,7 @@ func (d *Database) QueryAdminEventReports(ctx context.Context, from uint64, limi
 	// Get a map from EventStateKeyNID to userID
 	userNIDMap, err := d.EventStateKeys(ctx, qryStateKeyNIDs)
 	if err != nil {
-		logrus.WithError(err).Error("unable to map userNIDs to userIDs")
+		frame.Log(ctx).WithError(err).Error("unable to map userNIDs to userIDs")
 		return nil, 0, err
 	}
 
@@ -2006,7 +2007,7 @@ func (d *Database) QueryAdminEventReports(ctx context.Context, from uint64, limi
 				return nil, 0, err
 			}
 			if len(roomIDs) == 0 || len(roomIDs) > 1 {
-				logrus.Warn("unable to map roomNID %d to a roomID, was this room deleted?", roomNID)
+				frame.Log(ctx).Warn("unable to map roomNID %d to a roomID, was this room deleted?", roomNID)
 				continue
 			}
 			roomNIDIDCache[reports[i].RoomNID] = roomIDs[0]
@@ -2035,7 +2036,7 @@ func (d *Database) QueryAdminEventReport(ctx context.Context, reportID uint64) (
 	// Get a map from EventStateKeyNID to userID
 	userNIDMap, err := d.EventStateKeys(ctx, []types.EventStateKeyNID{report.ReportingUserNID, report.SenderNID})
 	if err != nil {
-		logrus.WithError(err).Error("unable to map userNIDs to userIDs")
+		frame.Log(ctx).WithError(err).Error("unable to map userNIDs to userIDs")
 		return report, err
 	}
 
@@ -2059,7 +2060,7 @@ func (d *Database) QueryAdminEventReport(ctx context.Context, reportID uint64) (
 
 	eventIDMap, err := d.EventIDs(ctx, []types.EventNID{report.EventNID})
 	if err != nil {
-		logrus.WithError(err).Error("unable to map eventNIDs to eventIDs")
+		frame.Log(ctx).WithError(err).Error("unable to map eventNIDs to eventIDs")
 		return report, err
 	}
 	if len(eventIDMap) != 1 {

@@ -19,9 +19,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -85,7 +84,7 @@ func (c *RedisCachePartition[K, V]) Get(ctx context.Context, key K) (V, bool) {
 	if err != nil {
 
 		if !errors.Is(err, redis.Nil) {
-			logrus.WithError(err).Error("Failed to get value")
+			frame.Log(ctx).WithError(err).Error("Failed to get value")
 		}
 
 		var empty V

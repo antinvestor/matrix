@@ -64,34 +64,34 @@ func TestAppserviceInternalAPI(t *testing.T) {
 			// Check if we've got an existing protocol, if so, return a proper response.
 			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
 				if err := json.NewEncoder(w).Encode(wantLocationResponse); err != nil {
-					t.Fatal("failed to encode response: %s", err)
+					t.Fatalf("failed to encode response: %s", err)
 				}
 				return
 			}
 			if err := json.NewEncoder(w).Encode([]api.ASLocationResponse{}); err != nil {
-				t.Fatal("failed to encode response: %s", err)
+				t.Fatalf("failed to encode response: %s", err)
 			}
 			return
 		case strings.Contains(r.URL.Path, "user"):
 			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
 				if err := json.NewEncoder(w).Encode(wantUserResponse); err != nil {
-					t.Fatal("failed to encode response: %s", err)
+					t.Fatalf("failed to encode response: %s", err)
 				}
 				return
 			}
 			if err := json.NewEncoder(w).Encode([]api.UserResponse{}); err != nil {
-				t.Fatal("failed to encode response: %s", err)
+				t.Fatalf("failed to encode response: %s", err)
 			}
 			return
 		case strings.Contains(r.URL.Path, "protocol"):
 			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
 				if err := json.NewEncoder(w).Encode(wantProtocolResponse); err != nil {
-					t.Fatal("failed to encode response: %s", err)
+					t.Fatalf("failed to encode response: %s", err)
 				}
 				return
 			}
 			if err := json.NewEncoder(w).Encode(nil); err != nil {
-				t.Fatal("failed to encode response: %s", err)
+				t.Fatalf("failed to encode response: %s", err)
 			}
 			return
 		default:
@@ -151,7 +151,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatal("failed to create a cache: %v", err)
+			t.Fatalf("failed to create a cache: %v", err)
 		}
 
 		// Create required internal APIs
@@ -182,34 +182,34 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 			// Check if we've got an existing protocol, if so, return a proper response.
 			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
 				if err := json.NewEncoder(w).Encode(wantLocationResponse); err != nil {
-					t.Fatal("failed to encode response: %s", err)
+					t.Fatalf("failed to encode response: %s", err)
 				}
 				return
 			}
 			if err := json.NewEncoder(w).Encode([]api.ASLocationResponse{}); err != nil {
-				t.Fatal("failed to encode response: %s", err)
+				t.Fatalf("failed to encode response: %s", err)
 			}
 			return
 		case strings.Contains(r.URL.Path, "user"):
 			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
 				if err := json.NewEncoder(w).Encode(wantUserResponse); err != nil {
-					t.Fatal("failed to encode response: %s", err)
+					t.Fatalf("failed to encode response: %s", err)
 				}
 				return
 			}
 			if err := json.NewEncoder(w).Encode([]api.UserResponse{}); err != nil {
-				t.Fatal("failed to encode response: %s", err)
+				t.Fatalf("failed to encode response: %s", err)
 			}
 			return
 		case strings.Contains(r.URL.Path, "protocol"):
 			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
 				if err := json.NewEncoder(w).Encode(wantProtocolResponse); err != nil {
-					t.Fatal("failed to encode response: %s", err)
+					t.Fatalf("failed to encode response: %s", err)
 				}
 				return
 			}
 			if err := json.NewEncoder(w).Encode(nil); err != nil {
-				t.Fatal("failed to encode response: %s", err)
+				t.Fatalf("failed to encode response: %s", err)
 			}
 			return
 		default:
@@ -247,7 +247,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatal("failed to create a cache: %v", err)
+		t.Fatalf("failed to create a cache: %v", err)
 	}
 	// Create required internal APIs
 	qm := queueutil.NewQueueManager(svc)
@@ -272,10 +272,10 @@ func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID stri
 	if err := asAPI.UserIDExists(ctx, &api.UserIDExistsRequest{
 		UserID: userID,
 	}, userResp); err != nil {
-		t.Error("failed to get userID: %s", err)
+		t.Errorf("failed to get userID: %s", err)
 	}
 	if userResp.UserIDExists != wantExists {
-		t.Error("unexpected result for UserIDExists(%s): %v, expected %v", userID, userResp.UserIDExists, wantExists)
+		t.Errorf("unexpected result for UserIDExists(%s): %v, expected %v", userID, userResp.UserIDExists, wantExists)
 	}
 }
 
@@ -287,10 +287,10 @@ func testAliasExists(t *testing.T, asAPI api.AppServiceInternalAPI, alias string
 	if err := asAPI.RoomAliasExists(ctx, &api.RoomAliasExistsRequest{
 		Alias: alias,
 	}, aliasResp); err != nil {
-		t.Error("failed to get alias: %s", err)
+		t.Errorf("failed to get alias: %s", err)
 	}
 	if aliasResp.AliasExists != wantExists {
-		t.Error("unexpected result for RoomAliasExists(%s): %v, expected %v", alias, aliasResp.AliasExists, wantExists)
+		t.Errorf("unexpected result for RoomAliasExists(%s): %v, expected %v", alias, aliasResp.AliasExists, wantExists)
 	}
 }
 
@@ -302,10 +302,10 @@ func testLocations(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, 
 	if err := asAPI.Locations(ctx, &api.LocationRequest{
 		Protocol: proto,
 	}, locationResp); err != nil {
-		t.Error("failed to get locations: %s", err)
+		t.Errorf("failed to get locations: %s", err)
 	}
 	if !reflect.DeepEqual(locationResp.Locations, wantResult) {
-		t.Error("unexpected result for Locations(%s): %+v, expected %+v", proto, locationResp.Locations, wantResult)
+		t.Errorf("unexpected result for Locations(%s): %+v, expected %+v", proto, locationResp.Locations, wantResult)
 	}
 }
 
@@ -317,10 +317,10 @@ func testUser(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, wantR
 	if err := asAPI.User(ctx, &api.UserRequest{
 		Protocol: proto,
 	}, userResp); err != nil {
-		t.Error("failed to get user: %s", err)
+		t.Errorf("failed to get user: %s", err)
 	}
 	if !reflect.DeepEqual(userResp.Users, wantResult) {
-		t.Error("unexpected result for User(%s): %+v, expected %+v", proto, userResp.Users, wantResult)
+		t.Errorf("unexpected result for User(%s): %+v, expected %+v", proto, userResp.Users, wantResult)
 	}
 }
 
@@ -332,10 +332,10 @@ func testProtocol(t *testing.T, asAPI api.AppServiceInternalAPI, proto string, w
 	if err := asAPI.Protocols(ctx, &api.ProtocolRequest{
 		Protocol: proto,
 	}, protoResp); err != nil {
-		t.Error("failed to get Protocols: %s", err)
+		t.Errorf("failed to get Protocols: %s", err)
 	}
 	if !reflect.DeepEqual(protoResp.Protocols, wantResult) {
-		t.Error("unexpected result for Protocols(%s): %+v, expected %+v", proto, protoResp.Protocols[proto], wantResult)
+		t.Errorf("unexpected result for Protocols(%s): %+v, expected %+v", proto, protoResp.Protocols[proto], wantResult)
 	}
 }
 
@@ -397,7 +397,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatal("failed to create a cache: %v", err)
+			t.Fatalf("failed to create a cache: %v", err)
 		}
 		// Create required internal APIs
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
@@ -408,7 +408,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 
 		// Create the room
 		if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-			t.Fatal("failed to send events: %v", err)
+			t.Fatalf("failed to send events: %v", err)
 		}
 		var seenInvitesForBob int
 	waitLoop:
@@ -419,7 +419,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 			case <-evChan:
 				seenInvitesForBob++
 				if seenInvitesForBob != 1 {
-					t.Fatal("received unexpected invites: %d", seenInvitesForBob)
+					t.Fatalf("received unexpected invites: %d", seenInvitesForBob)
 				}
 			}
 		}
@@ -446,7 +446,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatal("failed to create a cache: %v", err)
+			t.Fatalf("failed to create a cache: %v", err)
 		}
 		// Create required internal APIs
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
@@ -492,7 +492,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 						}, test.WithStateKey(bob.ID))
 
 						if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, []*types.HeaderedEvent{joinEv}, "test", "test", "test", nil, false); err != nil {
-							t.Fatal("failed to send events: %v", err)
+							t.Fatalf("failed to send events: %v", err)
 						}
 					case spec.Join: // the AS has received the join event, now hit `/joined_members` to validate that
 						rec := httptest.NewRecorder()
@@ -500,19 +500,19 @@ func TestOutputAppserviceEvent(t *testing.T) {
 						req.Header.Set("Authorization", "Bearer "+accessTokens[bob].accessToken)
 						routers.Client.ServeHTTP(rec, req)
 						if rec.Code != http.StatusOK {
-							t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+							t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 						}
 
 						// Both Alice and Bob should be joined. If not, we have a race condition
 						if !gjson.GetBytes(rec.Body.Bytes(), "joined."+alice.ID).Exists() {
-							t.Error("Alice is not joined to the room") // in theory should not happen
+							t.Errorf("Alice is not joined to the room") // in theory should not happen
 						}
 						if !gjson.GetBytes(rec.Body.Bytes(), "joined."+bob.ID).Exists() {
-							t.Error("Bob is not joined to the room")
+							t.Errorf("Bob is not joined to the room")
 						}
 						evChan <- struct{}{}
 					default:
-						t.Fatal("Unexpected membership: %s", membership)
+						t.Fatalf("Unexpected membership: %s", membership)
 					}
 				}
 			}
@@ -544,13 +544,13 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		// Create the room, this triggers the AS to receive an invite for Bob.
 		err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false)
 		if err != nil {
-			t.Fatal("failed to send events: %v", err)
+			t.Fatalf("failed to send events: %v", err)
 		}
 
 		select {
 		// Pretty generous timeout duration...
 		case <-time.After(time.Second * 10): // wait for the AS to process the events
-			t.Error("Timed out waiting for join event")
+			t.Errorf("Timed out waiting for join event")
 		case <-evChan:
 		}
 		close(evChan)
@@ -575,7 +575,7 @@ func createAccessTokens(t *testing.T, accessTokens map[*test.User]userDevice, us
 			ServerName:  serverName,
 			Password:    password,
 		}, userRes); err != nil {
-			t.Error("failed to create account: %s", err)
+			t.Errorf("failed to create account: %s", err)
 		}
 		req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
 			"type": authtypes.LoginTypePassword,
@@ -588,7 +588,7 @@ func createAccessTokens(t *testing.T, accessTokens map[*test.User]userDevice, us
 		rec := httptest.NewRecorder()
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatal("failed to login: %s", rec.Body.String())
+			t.Fatalf("failed to login: %s", rec.Body.String())
 		}
 		accessTokens[u] = userDevice{
 			accessToken: gjson.GetBytes(rec.Body.Bytes(), "access_token").String(),

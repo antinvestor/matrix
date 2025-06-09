@@ -27,12 +27,12 @@ func newCurrentRoomStateTable(ctx context.Context, svc *frame.Service, t *testin
 	tab, err := postgres.NewPostgresCurrentRoomStateTable(ctx, cm)
 
 	if err != nil {
-		t.Fatal("failed to make new table: %s", err)
+		t.Fatalf("failed to make new table: %s", err)
 	}
 
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatal("failed to migrate database: %s", err)
+		t.Fatalf("failed to migrate database: %s", err)
 	}
 	return tab, cm
 }
@@ -90,7 +90,7 @@ func TestCurrentRoomStateTable(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatal("err: %v", err)
+			t.Fatalf("err: %v", err)
 		}
 	})
 }
@@ -105,7 +105,7 @@ func testCurrentState(ctx context.Context, t *testing.T, tab tables.CurrentRoomS
 		}
 		expectCount := 5
 		if gotCount := len(evs); gotCount != expectCount {
-			t.Fatal("expected %d state events, got %d", expectCount, gotCount)
+			t.Fatalf("expected %d state events, got %d", expectCount, gotCount)
 		}
 		// When lazy loading, we expect no membership event, so only 4 events
 		filter.LazyLoadMembers = true
@@ -115,7 +115,7 @@ func testCurrentState(ctx context.Context, t *testing.T, tab tables.CurrentRoomS
 			t.Fatal(err)
 		}
 		if gotCount := len(evs); gotCount != expectCount {
-			t.Fatal("expected %d state events, got %d", expectCount, gotCount)
+			t.Fatalf("expected %d state events, got %d", expectCount, gotCount)
 		}
 		// same as above, but with existing NotTypes defined
 		notTypes := []string{spec.MRoomMember}
@@ -125,7 +125,7 @@ func testCurrentState(ctx context.Context, t *testing.T, tab tables.CurrentRoomS
 			t.Fatal(err)
 		}
 		if gotCount := len(evs); gotCount != expectCount {
-			t.Fatal("expected %d state events, got %d", expectCount, gotCount)
+			t.Fatalf("expected %d state events, got %d", expectCount, gotCount)
 		}
 	})
 

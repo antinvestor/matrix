@@ -17,13 +17,14 @@ package internal
 import (
 	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"math"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
+
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -211,7 +212,7 @@ func visibilityForEvents(
 	if senderID != nil {
 		membershipEvents, err = rsAPI.QueryMembershipAtEvent(ctx, roomID, eventIDs, *senderID)
 		if err != nil {
-			logrus.WithError(err).Error("visibilityForEvents: failed to fetch membership at event, defaulting to 'leave'")
+			frame.Log(ctx).WithError(err).Error("visibilityForEvents: failed to fetch membership at event, defaulting to 'leave'")
 		}
 	}
 

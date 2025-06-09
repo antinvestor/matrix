@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 
@@ -48,7 +49,7 @@ func Deactivate(
 		ServerName: serverName,
 	}, &res)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformAccountDeactivation failed")
+		frame.Log(ctx).WithError(err).Error("userAPI.PerformAccountDeactivation failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

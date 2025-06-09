@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"github.com/pitabwire/frame"
 	"io"
 	"net"
 	"net/http"
@@ -214,7 +215,7 @@ func DeleteDeviceById(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		frame.Log(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -235,7 +236,7 @@ func DeleteDeviceById(
 		UserID:    device.UserID,
 		DeviceIDs: []string{deviceID},
 	}, &res); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
+		frame.Log(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -280,7 +281,7 @@ func DeleteDevices(
 
 	payload := devicesDeleteJSON{}
 	if err = json.Unmarshal(bodyBytes, &payload); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("unable to unmarshal device deletion request")
+		frame.Log(ctx).WithError(err).Error("unable to unmarshal device deletion request")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -292,7 +293,7 @@ func DeleteDevices(
 		UserID:    device.UserID,
 		DeviceIDs: payload.Devices,
 	}, &res); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
+		frame.Log(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

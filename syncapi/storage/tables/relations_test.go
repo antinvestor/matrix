@@ -24,12 +24,12 @@ func newRelationsTable(ctx context.Context, svc *frame.Service, t *testing.T, _ 
 	tab, err := postgres.NewPostgresRelationsTable(ctx, cm)
 
 	if err != nil {
-		t.Fatal("failed to make new table: %s", err)
+		t.Fatalf("failed to make new table: %s", err)
 	}
 
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatal("failed to migrate table: %s", err)
+		t.Fatalf("failed to migrate table: %s", err)
 	}
 	return tab
 }
@@ -41,13 +41,13 @@ func compareRelationsToExpected(ctx context.Context, t *testing.T, tab tables.Re
 		t.Fatal(err)
 	}
 	if len(relations[relType]) != len(expected) {
-		t.Fatal("incorrect number of values returned for range %v (got %d, want %d)", r, len(relations[relType]), len(expected))
+		t.Fatalf("incorrect number of values returned for range %v (got %d, want %d)", r, len(relations[relType]), len(expected))
 	}
 	for i := 0; i < len(relations[relType]); i++ {
 		got := relations[relType][i]
 		want := expected[i]
 		if got != want {
-			t.Fatal("range %v position %d should have been %q but got %q", r, i, got, want)
+			t.Fatalf("range %v position %d should have been %q but got %q", r, i, got, want)
 		}
 	}
 }
@@ -76,7 +76,7 @@ func TestRelationsTable(t *testing.T) {
 		if maxVal, err := tab.SelectMaxRelationID(ctx); err != nil {
 			t.Fatal(err)
 		} else if maxVal != 3 {
-			t.Fatal("maxVal position should have been 3 but got %d", maxVal)
+			t.Fatalf("maxVal position should have been 3 but got %d", maxVal)
 		}
 
 		// Query some ranges for "a"
@@ -143,7 +143,7 @@ func TestRelationsTable(t *testing.T) {
 		if maxVal, err := tab.SelectMaxRelationID(ctx); err != nil {
 			t.Fatal(err)
 		} else if maxVal != 7 {
-			t.Fatal("maxVal position should have been 3 but got %d", maxVal)
+			t.Fatalf("maxVal position should have been 3 but got %d", maxVal)
 		}
 
 		// Query last set of ranges for "a"

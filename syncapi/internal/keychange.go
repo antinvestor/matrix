@@ -16,13 +16,13 @@ package internal
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"strings"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	keytypes "github.com/antinvestor/matrix/userapi/types"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
@@ -83,7 +83,12 @@ func DeviceListCatchup(
 	}, &queryRes)
 	if queryRes.Error != nil {
 		// don't fail the catchup because we may have got useful information by tracking membership
-		util.GetLogger(ctx).WithError(queryRes.Error).Error("QueryKeyChanges failed")
+		frame.Log(ctx).
+			WithField("user_id", userID).
+			WithField("from", offset).
+			WithField("to", toOffset).
+			WithError(queryRes.Error).
+			Error("QueryKeyChanges failed")
 		return to, hasNew, nil
 	}
 
@@ -124,12 +129,12 @@ func DeviceListCatchup(
 		}
 	}
 
-	util.GetLogger(ctx).WithFields(logrus.Fields{
-		"user_id":         userID,
-		"from":            offset,
-		"to":              toOffset,
-		"response_offset": queryRes.Offset,
-	}).Tracef("QueryKeyChanges request result: %+v", res.DeviceLists)
+	frame.Log(ctx).
+		WithField("user_id", userID).
+		WithField("from", offset).
+		WithField("to", toOffset).
+		WithField("response_offset", queryRes.Offset).
+		Debug("QueryKeyChanges request result: %+v", res.DeviceLists)
 
 	return types.StreamPosition(queryRes.Offset), hasNew, nil
 }
@@ -258,7 +263,7 @@ func filterSharedUsers(
 	}
 	sharedUsers, err := db.SharedUsers(ctx, userID, usersWithChangedKeys)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("db.SharedUsers failed: %s", err)
+		frame.Log(ctx).WithError(err).Error("db.SharedUsers failed: %s", err)
 		// default to all users so we do needless queries rather than miss some important device update
 		return sharedUsersMap
 	}

@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"net/http"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -82,7 +83,7 @@ func completeAuth(
 
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
+		frame.Log(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -95,7 +96,7 @@ func completeAuth(
 
 	localpart, serverName, err := userutil.ParseUsernameParam(login.Username(), cfg)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
+		frame.Log(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

@@ -18,17 +18,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"strings"
 	"time"
 
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/eventutil"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/internal/eventutil"
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/internal/input"
@@ -55,10 +53,10 @@ func (r *Leaver) PerformLeave(
 	if !r.Cfg.Global.IsLocalServerName(req.Leaver.Domain()) {
 		return nil, fmt.Errorf("user %q does not belong to this homeserver", req.Leaver.String())
 	}
-	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
-		"room_id": req.RoomID,
-		"user_id": req.Leaver.String(),
-	})
+	logger := frame.Log(ctx).WithContext(ctx).
+		WithField("room_id", req.RoomID).
+		WithField("user_id", req.Leaver.String())
+
 	logger.Info("User requested to leave join")
 	if strings.HasPrefix(req.RoomID, "!") {
 		output, err := r.performLeaveRoomByID(ctx, req, res)
@@ -241,21 +239,21 @@ func (r *Leaver) performFederatedRejectInvite(
 	if err := r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
 		// failures in PerformLeave should NEVER stop us from telling other components like the
 		// sync API that the invite was withdrawn. Otherwise we can end up with stuck invites.
-		util.GetLogger(ctx).WithError(err).Error("failed to PerformLeave, still retiring invite event")
+		frame.Log(ctx).WithError(err).Error("failed to PerformLeave, still retiring invite event")
 	}
 
 	info, err := r.DB.RoomInfo(ctx, req.RoomID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to get RoomInfo, still retiring invite event")
+		frame.Log(ctx).WithError(err).Error("failed to get RoomInfo, still retiring invite event")
 	}
 
 	ctx, updater, err := r.DB.MembershipUpdater(ctx, req.RoomID, string(leaver), true, info.RoomVersion)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to get MembershipUpdater, still retiring invite event")
+		frame.Log(ctx).WithError(err).Error("failed to get MembershipUpdater, still retiring invite event")
 	}
 	if updater != nil {
 		if err = updater.Delete(ctx); err != nil {
-			util.GetLogger(ctx).WithError(err).Error("failed to delete membership, still retiring invite event")
+			frame.Log(ctx).WithError(err).Error("failed to delete membership, still retiring invite event")
 		}
 	}
 

@@ -39,11 +39,11 @@ func TestGoodUserID(t *testing.T) {
 	lp, _, err := ParseUsernameParam(goodUserID, cfg)
 
 	if err != nil {
-		t.Error("User ID Parsing failed for ", goodUserID, " with error: ", err.Error())
+		t.Errorf("User ID Parsing failed for ", goodUserID, " with error: ", err.Error())
 	}
 
 	if lp != localpart {
-		t.Error("Incorrect username, returned: ", lp, " should be: ", localpart)
+		t.Errorf("Incorrect username, returned: ", lp, " should be: ", localpart)
 	}
 }
 
@@ -58,11 +58,11 @@ func TestWithLocalpartOnly(t *testing.T) {
 	lp, _, err := ParseUsernameParam(localpart, cfg)
 
 	if err != nil {
-		t.Error("User ID Parsing failed for ", localpart, " with error: ", err.Error())
+		t.Errorf("User ID Parsing failed for ", localpart, " with error: ", err.Error())
 	}
 
 	if lp != localpart {
-		t.Error("Incorrect username, returned: ", lp, " should be: ", localpart)
+		t.Errorf("Incorrect username, returned: ", lp, " should be: ", localpart)
 	}
 }
 
@@ -77,7 +77,7 @@ func TestIncorrectDomain(t *testing.T) {
 	_, _, err := ParseUsernameParam(goodUserID, cfg)
 
 	if err == nil {
-		t.Error("Invalid Domain should return an error")
+		t.Errorf("Invalid Domain should return an error")
 	}
 }
 
@@ -92,6 +92,6 @@ func TestBadUserID(t *testing.T) {
 	_, _, err := ParseUsernameParam(badUserID, cfg)
 
 	if err == nil {
-		t.Error("Illegal User ID should return an error")
+		t.Errorf("Illegal User ID should return an error")
 	}
 }

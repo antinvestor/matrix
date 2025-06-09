@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 	"strconv"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -25,8 +26,6 @@ import (
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/setup/config"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputTypingConsumer consumes events that originate in the clientapi.
@@ -63,14 +62,14 @@ func (t *OutputTypingConsumer) Handle(ctx context.Context, metadata map[string]s
 	userID := metadata[queueutil.UserID]
 	typing, err := strconv.ParseBool(metadata["typing"])
 	if err != nil {
-		log.WithError(err).Error("EDU output log: typing parse failure")
+		frame.Log(ctx).WithError(err).Error("EDU output log: typing parse failure")
 		return nil
 	}
 
 	// only send typing events which originated from us
 	_, typingServerName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		log.WithError(err).WithField("user_id", userID).Error("Failed to extract domain from typing sender")
+		frame.Log(ctx).WithError(err).WithField("user_id", userID).Error("Failed to extract domain from typing sender")
 		return nil
 	}
 	if !t.isLocalServerName(typingServerName) {
@@ -79,7 +78,7 @@ func (t *OutputTypingConsumer) Handle(ctx context.Context, metadata map[string]s
 
 	joined, err := t.db.GetJoinedHosts(ctx, roomID)
 	if err != nil {
-		log.WithError(err).WithField("room_id", roomID).Error("failed to get joined hosts for room")
+		frame.Log(ctx).WithError(err).WithField("room_id", roomID).Error("failed to get joined hosts for room")
 		return err
 	}
 
@@ -94,12 +93,12 @@ func (t *OutputTypingConsumer) Handle(ctx context.Context, metadata map[string]s
 		"user_id": userID,
 		"typing":  typing,
 	}); err != nil {
-		log.WithError(err).Error("failed to marshal EDU JSON")
+		frame.Log(ctx).WithError(err).Error("failed to marshal EDU JSON")
 		return nil
 	}
 	err = t.queues.SendEDU(ctx, edu, typingServerName, names)
 	if err != nil {
-		log.WithError(err).Error("failed to send EDU")
+		frame.Log(ctx).WithError(err).Error("failed to send EDU")
 		return err
 	}
 

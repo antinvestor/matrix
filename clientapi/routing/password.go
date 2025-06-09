@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"github.com/pitabwire/frame"
 	"net/http"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -12,7 +13,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 type newPasswordRequest struct {
@@ -37,10 +37,10 @@ func Password(
 	var r newPasswordRequest
 	r.LogoutDevices = true
 
-	logrus.WithFields(logrus.Fields{
-		"sessionId": device.SessionID,
-		"userId":    device.UserID,
-	}).Debug("Changing password")
+	frame.Log(req.Context()).
+		WithField("sessionId", device.SessionID).
+		WithField("userId", device.UserID).
+		Debug("Changing password")
 
 	// Unmarshal the request.
 	resErr := httputil.UnmarshalJSONRequest(req, &r)

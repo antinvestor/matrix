@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 	"strconv"
 	"time"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputTypingEventConsumer consumes events that originated in the EDU server.
@@ -58,6 +58,9 @@ func NewOutputTypingEventConsumer(
 }
 
 func (s *OutputTypingEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+
+	log := frame.Log(ctx)
+
 	roomID := metadata[queueutil.RoomID]
 	userID := metadata[queueutil.UserID]
 	typing, err := strconv.ParseBool(metadata["typing"])
@@ -71,12 +74,10 @@ func (s *OutputTypingEventConsumer) Handle(ctx context.Context, metadata map[str
 		return nil
 	}
 
-	log.WithFields(log.Fields{
-		"room_id": roomID,
-		"user_id": userID,
-		"typing":  typing,
-		"timeout": timeout,
-	}).Debug("syncapi received EDU data from client api")
+	log.WithField("room_id", roomID).
+		WithField("user_id", userID).
+		WithField("typing", typing).
+		WithField("timeout", timeout).Debug("syncapi received EDU data from client api")
 
 	var typingPos types.StreamPosition
 	if typing {

@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/tokens"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/roomserver/types"
 
@@ -65,6 +65,9 @@ func SendServerNotice(
 	txnID *string,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
+
+	log := frame.Log(req.Context())
+
 	if device.AccountType != userapi.AccountTypeAdmin {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -182,7 +185,7 @@ func SendServerNotice(
 				},
 			}}
 			if err = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("saveTagData failed")
+				frame.Log(ctx).WithError(err).Error("saveTagData failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -207,7 +210,7 @@ func SendServerNotice(
 		membershipRes := api.QueryMembershipForUserResponse{}
 		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("unable to query membership for user")
+			frame.Log(ctx).WithError(err).Error("unable to query membership for user")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -230,7 +233,7 @@ func SendServerNotice(
 	}
 	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, rsAPI, time.Now())
 	if resErr != nil {
-		logrus.Error("failed to send message: %+v", resErr)
+		log.Error("failed to send message: %+v", resErr)
 		return *resErr
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)
@@ -246,7 +249,7 @@ func SendServerNotice(
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	startedSubmittingEvent := time.Now()
-	if err := api.SendEvents(
+	if err = api.SendEvents(
 		ctx, rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
@@ -258,17 +261,13 @@ func SendServerNotice(
 		txnAndSessionID,
 		false,
 	); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
+		log.WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	util.GetLogger(ctx).WithFields(logrus.Fields{
-		"event_id":     e.EventID(),
-		"room_id":      roomID,
-		"room_version": roomVersion,
-	}).Info("Sent event to roomserver")
+	log.WithField("event_id", e.EventID()).WithField("room_id", roomID).WithField("room_version", roomVersion).Info("Sent event to roomserver")
 	timeToSubmitEvent := time.Since(startedSubmittingEvent)
 
 	res := util.JSONResponse{
@@ -325,7 +324,7 @@ func getSenderDevice(
 		cfg.Global.ServerNotices.AvatarURL,
 	)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
+		frame.Log(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
 		return nil, err
 	}
 
@@ -336,7 +335,7 @@ func getSenderDevice(
 		cfg.Global.ServerNotices.DisplayName,
 	)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
+		frame.Log(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
 		return nil, err
 	}
 

@@ -34,7 +34,7 @@ func TestConnectionManager(t *testing.T) {
 			assert.NoError(t, err0)
 
 			if !reflect.DeepEqual(sqlDb, sqlDb2) {
-				t.Fatal("expected database connection to be reused")
+				t.Fatalf("expected database connection to be reused")
 			}
 
 		})
@@ -69,7 +69,7 @@ func TestConnectionManager(t *testing.T) {
 
 			//We check the underlaying database connection as gorm mutates quickly
 			if !reflect.DeepEqual(sqlDb1, sqlDb2) {
-				t.Fatal("expected database connection to be reused")
+				t.Fatalf("expected database connection to be reused")
 			}
 		})
 	})
@@ -100,12 +100,12 @@ func TestConnectionManager(t *testing.T) {
 	// test invalid connection string configured
 	_, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &config.DatabaseOptions{ConnectionString: "http://"})
 	if err == nil {
-		t.Fatal("expected an error but got none")
+		t.Fatalf("expected an error but got none")
 	}
 
 	// empty connection string is not allowed
 	_, err = sqlutil.NewConnectionManagerWithOptions(ctx, svc, &config.DatabaseOptions{})
 	if err == nil {
-		t.Fatal("expected an error but got none")
+		t.Fatalf("expected an error but got none")
 	}
 }

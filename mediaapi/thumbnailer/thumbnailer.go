@@ -17,6 +17,7 @@ package thumbnailer
 import (
 	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"math"
 	"os"
 	"path/filepath"
@@ -25,7 +26,6 @@ import (
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
-	log "github.com/sirupsen/logrus"
 )
 
 type thumbnailFitness struct {
@@ -89,7 +89,7 @@ func SelectThumbnail(desired types.ThumbnailSize, thumbnails []*types.ThumbnailM
 }
 
 // getActiveThumbnailGeneration checks for active thumbnail generation
-func getActiveThumbnailGeneration(dst types.Path, _ types.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, logger *log.Entry) (isActive bool, busy bool, errorReturn error) {
+func getActiveThumbnailGeneration(dst types.Path, _ types.ThumbnailSize, activeThumbnailGeneration *types.ActiveThumbnailGeneration, maxThumbnailGenerators int, logger *frame.Entry) (isActive bool, busy bool, errorReturn error) {
 	// Check if there is active thumbnail generation.
 	activeThumbnailGeneration.Lock()
 	defer activeThumbnailGeneration.Unlock()
@@ -119,7 +119,7 @@ func getActiveThumbnailGeneration(dst types.Path, _ types.ThumbnailSize, activeT
 
 // broadcastGeneration broadcasts that thumbnail generation completed and the error to all waiting goroutines
 // Note: This should only be called by the owner of the activeThumbnailGenerationResult
-func broadcastGeneration(dst types.Path, activeThumbnailGeneration *types.ActiveThumbnailGeneration, _ types.ThumbnailSize, errorReturn error, logger *log.Entry) {
+func broadcastGeneration(dst types.Path, activeThumbnailGeneration *types.ActiveThumbnailGeneration, _ types.ThumbnailSize, errorReturn error, logger *frame.Entry) {
 	activeThumbnailGeneration.Lock()
 	defer activeThumbnailGeneration.Unlock()
 	if activeThumbnailGenerationResult, ok := activeThumbnailGeneration.PathToResult[string(dst)]; ok {
@@ -137,7 +137,7 @@ func isThumbnailExists(
 	config types.ThumbnailSize,
 	mediaMetadata *types.MediaMetadata,
 	db storage.Database,
-	logger *log.Entry,
+	logger *frame.Entry,
 ) (bool, error) {
 	thumbnailMetadata, err := db.GetThumbnail(
 		ctx, mediaMetadata.MediaID, mediaMetadata.Origin,

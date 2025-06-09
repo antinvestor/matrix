@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"math"
 	"net/http"
 	"sort"
@@ -25,7 +26,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -77,6 +77,8 @@ func OnIncomingMessagesRequest(
 	lazyLoadCache cacheutil.LazyLoadCache,
 ) util.JSONResponse {
 	var err error
+
+	ctx := req.Context()
 
 	deviceUserID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
@@ -177,7 +179,7 @@ func OnIncomingMessagesRequest(
 			fromStream = &streamToken
 			from, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
 			if err != nil {
-				logrus.WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
+				frame.Log(ctx).WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -202,7 +204,7 @@ func OnIncomingMessagesRequest(
 			} else {
 				to, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
 				if err != nil {
-					logrus.WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
+					frame.Log(ctx).WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
 					return util.JSONResponse{
 						Code: http.StatusInternalServerError,
 						JSON: spec.InternalServerError{},
@@ -278,15 +280,15 @@ func OnIncomingMessagesRequest(
 		end = types.TopologyToken{}
 	}
 
-	util.GetLogger(req.Context()).WithFields(logrus.Fields{
-		"request_from":   from.String(),
-		"request_to":     to.String(),
-		"limit":          filter.Limit,
-		"backwards":      backwardOrdering,
-		"response_start": start.String(),
-		"response_end":   end.String(),
-		"backfilled":     mReq.didBackfill,
-	}).Info("Responding")
+	util.GetLogger(req.Context()).
+		WithField("request_from", from.String()).
+		WithField("request_to", to.String()).
+		WithField("limit", filter.Limit).
+		WithField("backwards", backwardOrdering).
+		WithField("response_start", start.String()).
+		WithField("response_end", end.String()).
+		WithField("backfilled", mReq.didBackfill).
+		Info("Responding")
 
 	res := messagesResp{
 		Chunk: clientEvents,
@@ -354,11 +356,11 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	end.Decrement()
 
 	var events []*rstypes.HeaderedEvent
-	util.GetLogger(r.ctx).WithFields(logrus.Fields{
-		"start":     r.from,
-		"end":       r.to,
-		"backwards": r.backwardOrdering,
-	}).Info("Fetched %d events locally", len(streamEvents))
+	util.GetLogger(r.ctx).
+		WithField("start", r.from).
+		WithField("end", r.to).
+		WithField("backwards", r.backwardOrdering).
+		Info("Fetched %d events locally", len(streamEvents))
 
 	// There can be two reasons for streamEvents to be empty: either we've
 	// reached the oldest event in the room (or the most recent one, depending
@@ -384,12 +386,12 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	if err != nil {
 		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
 	}
-	logrus.WithFields(logrus.Fields{
-		"duration":      time.Since(startTime),
-		"room_id":       r.roomID,
-		"events_before": len(events),
-		"events_after":  len(filteredEvents),
-	}).Debug("applied history visibility (messages)")
+	frame.Log(ctx).
+		WithField("duration", time.Since(startTime)).
+		WithField("room_id", r.roomID).
+		WithField("events_before", len(events)).
+		WithField("events_after", len(filteredEvents)).
+		Debug("applied history visibility (messages)")
 
 	// No events left after applying history visibility
 	if len(filteredEvents) == 0 {

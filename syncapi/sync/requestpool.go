@@ -19,6 +19,7 @@ package sync
 import (
 	"context"
 	"errors"
+	"github.com/pitabwire/frame"
 	"net"
 	"net/http"
 	"strings"
@@ -28,7 +29,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
@@ -221,7 +221,7 @@ func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Pr
 
 	err = rp.producer.SendPresence(ctx, userID, presenceToSet, newPresence.ClientFields.StatusMsg)
 	if err != nil {
-		logrus.WithError(err).Error("Unable to publish presence message from sync")
+		frame.Log(ctx).WithError(err).Error("Unable to publish presence message from sync")
 		return
 	}
 
@@ -333,7 +333,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			defer userStreamListener.Close()
 
 			giveup := func() util.JSONResponse {
-				syncReq.Log.Debugln("Responding to sync since client gave up or timeout was reached")
+				syncReq.Log.Debug("Responding to sync since client gave up or timeout was reached")
 				syncReq.Response.NextBatch = syncReq.Since
 				// We should always try to include OTKs in sync responses, otherwise clients might upload keys
 				// even if that's not required. See also:
@@ -360,17 +360,17 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 			case <-userStreamListener.GetNotifyChannel(syncReq.Since):
 				currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
-				syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync after wake-up")
+				syncReq.Log.WithField("currentPos", currentPos).Debug("Responding to sync after wake-up")
 			}
 		} else {
-			syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
+			syncReq.Log.WithField("currentPos", currentPos).Debug("Responding to sync immediately")
 		}
 
 		withTransaction := func(from types.StreamPosition, f func(snapshot storage.DatabaseTransaction) types.StreamPosition) types.StreamPosition {
 			var succeeded bool
 			snapshot, err := rp.db.NewDatabaseSnapshot(ctx)
 			if err != nil {
-				logrus.WithError(err).Error("Failed to acquire database snapshot for sync request")
+				frame.Log(ctx).WithError(err).Error("Failed to acquire database snapshot for sync request")
 				return from
 			}
 			defer func() {
@@ -607,7 +607,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 	snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		logrus.WithError(err).Error("Failed to acquire database snapshot for key change")
+		frame.Log(req.Context()).WithError(err).Error("Failed to acquire database snapshot for key change")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

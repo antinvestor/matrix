@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -23,7 +24,6 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/relayapi/api"
-	"github.com/sirupsen/logrus"
 )
 
 // SetRelayingEnabled implements api.RelayInternalAPI
@@ -51,22 +51,22 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	prevEntry := fclient.RelayEntry{}
 	asyncResponse, err := r.fedClient.P2PGetTransactionFromRelay(ctx, userID, prevEntry, relayServer)
 	if err != nil {
-		logrus.Error("P2PGetTransactionFromRelay: %s", err.Error())
+		frame.Log(ctx).Error("P2PGetTransactionFromRelay: %s", err.Error())
 		return err
 	}
-	r.processTransaction(&asyncResponse.Transaction)
+	r.processTransaction(ctx, &asyncResponse.Transaction)
 
 	prevEntry = fclient.RelayEntry{EntryID: asyncResponse.EntryID}
 	for asyncResponse.EntriesQueued {
 		// There are still more entries available for this node from the relay.
-		logrus.Info("Retrieving next entry from relay, previous: %v", prevEntry)
+		frame.Log(ctx).Info("Retrieving next entry from relay, previous: %v", prevEntry)
 		asyncResponse, err = r.fedClient.P2PGetTransactionFromRelay(ctx, userID, prevEntry, relayServer)
 		prevEntry = fclient.RelayEntry{EntryID: asyncResponse.EntryID}
 		if err != nil {
-			logrus.Error("P2PGetTransactionFromRelay: %s", err.Error())
+			frame.Log(ctx).Error("P2PGetTransactionFromRelay: %s", err.Error())
 			return err
 		}
-		r.processTransaction(&asyncResponse.Transaction)
+		r.processTransaction(ctx, &asyncResponse.Transaction)
 	}
 
 	return nil
@@ -78,10 +78,10 @@ func (r *RelayInternalAPI) PerformStoreTransaction(
 	transaction gomatrixserverlib.Transaction,
 	userID spec.UserID,
 ) error {
-	logrus.Warn("Storing transaction for %v", userID)
+	frame.Log(ctx).Warn("Storing transaction for %v", userID)
 	receiptTx, err := r.db.StoreTransaction(ctx, transaction)
 	if err != nil {
-		logrus.Error("db.StoreTransaction: %s", err.Error())
+		frame.Log(ctx).Error("db.StoreTransaction: %s", err.Error())
 		return err
 	}
 	err = r.db.AssociateTransactionWithDestinations(
@@ -101,34 +101,34 @@ func (r *RelayInternalAPI) QueryTransactions(
 	userID spec.UserID,
 	previousEntry fclient.RelayEntry,
 ) (api.QueryRelayTransactionsResponse, error) {
-	logrus.Info("QueryTransactions for %s", userID.String())
+	frame.Log(ctx).Info("QueryTransactions for %s", userID.String())
 	if previousEntry.EntryID > 0 {
-		logrus.Info("Cleaning previous entry (%v) from db for %s",
+		frame.Log(ctx).Info("Cleaning previous entry (%v) from db for %s",
 			previousEntry.EntryID,
 			userID.String(),
 		)
 		prevReceipt := receipt.NewReceipt(previousEntry.EntryID)
 		err := r.db.CleanTransactions(ctx, userID, []*receipt.Receipt{&prevReceipt})
 		if err != nil {
-			logrus.Error("db.CleanTransactions: %s", err.Error())
+			frame.Log(ctx).Error("db.CleanTransactions: %s", err.Error())
 			return api.QueryRelayTransactionsResponse{}, err
 		}
 	}
 
 	transaction, receiptTx, err := r.db.GetTransaction(ctx, userID)
 	if err != nil {
-		logrus.Error("db.GetTransaction: %s", err.Error())
+		frame.Log(ctx).Error("db.GetTransaction: %s", err.Error())
 		return api.QueryRelayTransactionsResponse{}, err
 	}
 
 	response := api.QueryRelayTransactionsResponse{}
 	if transaction != nil && receiptTx != nil {
-		logrus.Info("Obtained transaction (%v) for %s", transaction.TransactionID, userID.String())
+		frame.Log(ctx).Info("Obtained transaction (%v) for %s", transaction.TransactionID, userID.String())
 		response.Transaction = *transaction
 		response.EntryID = receiptTx.GetNID()
 		response.EntriesQueued = true
 	} else {
-		logrus.Info("No more entries in the queue for %s", userID.String())
+		frame.Log(ctx).Info("No more entries in the queue for %s", userID.String())
 		response.EntryID = 0
 		response.EntriesQueued = false
 	}
@@ -136,8 +136,8 @@ func (r *RelayInternalAPI) QueryTransactions(
 	return response, nil
 }
 
-func (r *RelayInternalAPI) processTransaction(txn *gomatrixserverlib.Transaction) {
-	logrus.Warn("Processing transaction from relay server")
+func (r *RelayInternalAPI) processTransaction(ctx context.Context, txn *gomatrixserverlib.Transaction) {
+	frame.Log(ctx).Warn("Processing transaction from relay server")
 	mu := internal.NewMutexByRoom()
 	t := internal.NewTxnReq(
 		r.rsAPI,

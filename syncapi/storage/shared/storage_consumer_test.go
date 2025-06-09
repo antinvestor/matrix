@@ -21,7 +21,7 @@ func newSyncDB(ctx context.Context, svc *frame.Service, t *testing.T, _ test.Dep
 	cm := sqlutil.NewConnectionManager(svc)
 	syncDB, err := storage.NewSyncServerDatabase(ctx, cm)
 	if err != nil {
-		t.Fatal("failed to create sync Cm: %s", err)
+		t.Fatalf("failed to create sync Cm: %s", err)
 	}
 
 	return syncDB
@@ -48,7 +48,7 @@ func TestFilterTable(t *testing.T) {
 		}
 
 		if secondFilterID != filterID {
-			t.Fatal("expected second filter to be the same as the first: %s vs %s", filterID, secondFilterID)
+			t.Fatalf("expected second filter to be the same as the first: %s vs %s", filterID, secondFilterID)
 		}
 
 		// query the filter again
@@ -58,12 +58,12 @@ func TestFilterTable(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(filter, targetFilter) {
-			t.Fatal("%#v vs %#v", filter, targetFilter)
+			t.Fatalf("%#v vs %#v", filter, targetFilter)
 		}
 
 		// query non-existent filter
 		if err = tab.GetFilter(ctx, targetFilter, "bob", filterID); err == nil {
-			t.Fatal("expected filter to not exist, but it does exist: %v", targetFilter)
+			t.Fatalf("expected filter to not exist, but it does exist: %v", targetFilter)
 		}
 	})
 }
@@ -97,12 +97,12 @@ func TestIgnores(t *testing.T) {
 
 		// verify the ignored users matches those we stored
 		if !reflect.DeepEqual(gotIgnoredUsers, ignoredUsers) {
-			t.Fatal("%#v vs %#v", gotIgnoredUsers, ignoredUsers)
+			t.Fatalf("%#v vs %#v", gotIgnoredUsers, ignoredUsers)
 		}
 
 		// Bob doesn't have any ignored users, so should receive sql.ErrNoRows
 		if _, err = tab.IgnoresForUser(ctx, bob.ID); err == nil {
-			t.Fatal("expected an error but got none")
+			t.Fatalf("expected an error but got none")
 		}
 	})
 }

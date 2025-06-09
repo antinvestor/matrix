@@ -28,7 +28,7 @@ func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _
 	cm := sqlutil.NewConnectionManager(svc)
 	db, err := storage.NewSyncServerDatabase(ctx, cm)
 	if err != nil {
-		t.Fatal("NewSyncServerDatabase returned %s", err)
+		t.Fatalf("NewSyncServerDatabase returned %s", err)
 	}
 	return db
 }
@@ -45,7 +45,7 @@ func MustWriteEvents(ctx context.Context, t *testing.T, db storage.Database, eve
 		}
 		pos, err := db.WriteEvent(ctx, ev, addStateEvents, addStateEventIDs, removeStateEventIDs, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 		if err != nil {
-			t.Fatal("WriteEvent failed: %s", err)
+			t.Fatalf("WriteEvent failed: %s", err)
 		}
 		t.Logf("Event ID %s spos=%v depth=%v", ev.EventID(), pos, ev.Depth())
 		positions = append(positions, pos)
@@ -104,7 +104,7 @@ func TestRecentEventsPDU(t *testing.T) {
 		WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 			var err error
 			if latest, err = snapshot.MaxStreamPositionForPDUs(ctx); err != nil {
-				t.Fatal("failed to get MaxStreamPositionForPDUs: %w", err)
+				t.Fatalf("failed to get MaxStreamPositionForPDUs: %w", err)
 			}
 		})
 
@@ -174,22 +174,22 @@ func TestRecentEventsPDU(t *testing.T) {
 						To:   tc.To,
 					}, &filter, !tc.ReverseOrder, true)
 					if err != nil {
-						st.Fatal("failed to do sync: %s", err)
+						st.Fatalf("failed to do sync: %s", err)
 					}
 				})
 				streamEvents := gotEvents[r.ID]
 				limited = streamEvents.Limited
 				if limited != tc.WantLimited {
-					st.Error("got limited=%v want %v", limited, tc.WantLimited)
+					st.Errorf("got limited=%v want %v", limited, tc.WantLimited)
 				}
 				if len(streamEvents.Events) != len(tc.WantEvents) {
-					st.Error("got %d events, want %d", len(gotEvents), len(tc.WantEvents))
+					st.Errorf("got %d events, want %d", len(gotEvents), len(tc.WantEvents))
 				}
 
 				for j := range streamEvents.Events {
 
 					if !test.DeepJsonCompare(streamEvents.Events[j].JSON(), tc.WantEvents[j].JSON()) {
-						st.Error("event %d got %s want %s", j, string(streamEvents.Events[j].JSON()), string(tc.WantEvents[j].JSON()))
+						st.Errorf("event %d got %s want %s", j, string(streamEvents.Events[j].JSON()), string(tc.WantEvents[j].JSON()))
 					}
 				}
 			})
@@ -223,7 +223,7 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 			filter := &synctypes.RoomEventFilter{Limit: 5}
 			paginatedEvents, start, end, err := snapshot.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
 			if err != nil {
-				t.Fatal("GetEventsInTopologicalRange returned an error: %s", err)
+				t.Fatalf("GetEventsInTopologicalRange returned an error: %s", err)
 			}
 			gots := snapshot.StreamEventsToEvents(ctx, nil, paginatedEvents, nil)
 			test.AssertEventsEqual(t, gots, test.Reversed(events[len(events)-5:]))
@@ -345,7 +345,7 @@ func TestStreamToTopologicalPosition(t *testing.T) {
 					t.Fatal(err)
 				}
 				if tc.wantToken != token {
-					t.Fatal("expected token %q, got %q", tc.wantToken, token)
+					t.Fatalf("expected token %q, got %q", tc.wantToken, token)
 				}
 			})
 		}
@@ -405,11 +405,11 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 	MustWriteEvents(ctx, t, db, events)
 	fromLatest, err := db.EventPositionInTopology(ctx, events[len(events)-1].EventID())
 	if err != nil {
-		t.Fatal("failed to get EventPositionInTopology: %s", err)
+		t.Fatalf("failed to get EventPositionInTopology: %s", err)
 	}
 	fromFork, err := db.EventPositionInTopology(ctx, events[len(events)-3].EventID()) // Message 2
 	if err != nil {
-		t.Fatal("failed to get EventPositionInTopology for event: %s", err)
+		t.Fatalf("failed to get EventPositionInTopology for event: %s", err)
 	}
 	// head towards the beginning of time
 	to := types.TopologyToken{}
@@ -444,7 +444,7 @@ func TestGetEventsInRangeWithEventsSameDepth(t *testing.T) {
 		// backpaginate messages starting at the latest position.
 		paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &tc.From, &to, testRoomID, tc.Limit, true)
 		if err != nil {
-			t.Fatal("%s GetEventsInRange returned an error: %s", tc.Name, err)
+			t.Fatalf("%s GetEventsInRange returned an error: %s", tc.Name, err)
 		}
 		gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
 		assertEventsEqual(t, tc.Name, true, gots, tc.Wants)
@@ -485,7 +485,7 @@ func TestGetEventsInTopologicalRangeMultiRoom(t *testing.T) {
 	MustWriteEvents(ctx, t, db, eventsB)
 	from, err := db.MaxTopologicalPosition(ctx, roomB)
 	if err != nil {
-		t.Fatal("failed to get MaxTopologicalPosition: %s", err)
+		t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
 	}
 	// head towards the beginning of time
 	to := types.TopologyToken{}
@@ -494,7 +494,7 @@ func TestGetEventsInTopologicalRangeMultiRoom(t *testing.T) {
 	// allowing this bug to surface.
 	paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &from, &to, roomB, 5, true)
 	if err != nil {
-		t.Fatal("GetEventsInRange returned an error: %s", err)
+		t.Fatalf("GetEventsInRange returned an error: %s", err)
 	}
 	gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
 	assertEventsEqual(t, "", true, gots, reversed(eventsB))
@@ -546,7 +546,7 @@ func TestGetEventsInRangeWithEventsInsertedLikeBackfill(t *testing.T) {
 	for i := 0; i < len(events); i += chunkSize {
 		paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, from, &to, testRoomID, chunkSize, true)
 		if err != nil {
-			t.Fatal("GetEventsInRange returned an error: %s", err)
+			t.Fatalf("GetEventsInRange returned an error: %s", err)
 		}
 		gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
 		endi := i + chunkSize
@@ -579,7 +579,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 				t.Fatal(err)
 			}
 			if len(events) != 0 {
-				t.Fatal("first call should have no updates")
+				t.Fatalf("first call should have no updates")
 			}
 		})
 
@@ -603,7 +603,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 				t.Fatal(err)
 			}
 			if count := len(events); count != 1 {
-				t.Fatal("second call should have one update, got %d", count)
+				t.Fatalf("second call should have one update, got %d", count)
 			}
 
 			// At this point we should still have one message because we haven't progressed the
@@ -614,7 +614,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 				t.Fatal(err)
 			}
 			if len(events) != 1 {
-				t.Fatal("third call should have one update still")
+				t.Fatalf("third call should have one update still")
 			}
 		})
 
@@ -632,7 +632,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 				t.Fatal(err)
 			}
 			if len(events) != 0 {
-				t.Fatal("fourth call should have no updates")
+				t.Fatalf("fourth call should have no updates")
 			}
 
 			// At this point we should still have no updates, because no new updates have been
@@ -642,7 +642,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 				t.Fatal(err)
 			}
 			if len(events) != 0 {
-				t.Fatal("fifth call should have no updates")
+				t.Fatalf("fifth call should have no updates")
 			}
 		})
 
@@ -663,14 +663,14 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 		WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 			_, events, err := snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, lastPos)
 			if err != nil {
-				t.Fatal("unable to get events: %v", err)
+				t.Fatalf("unable to get events: %v", err)
 			}
 
 			for i := 0; i < 10; i++ {
 				want := json.RawMessage(fmt.Sprintf(`{"count":%d}`, i))
 				got := events[i].Content
 				if !bytes.Equal(got, want) {
-					t.Fatal("messages are out of order\nwant: %s\ngot: %s", string(want), string(got))
+					t.Fatalf("messages are out of order\nwant: %s\ngot: %s", string(want), string(got))
 				}
 			}
 		})
@@ -697,33 +697,33 @@ func TestInviteBehaviour(t *testing.T) {
 	for _, ev := range []*types.HeaderedEvent{inviteEvent1, inviteEvent2} {
 		_, err := db.AddInviteEvent(ctx, ev)
 		if err != nil {
-			t.Fatal("Failed to AddInviteEvent: %s", err)
+			t.Fatalf("Failed to AddInviteEvent: %s", err)
 		}
 	}
 	latest, err := db.SyncPosition(ctx)
 	if err != nil {
-		t.Fatal("failed to get SyncPosition: %s", err)
+		t.Fatalf("failed to get SyncPosition: %s", err)
 	}
 	// both invite events should appear in a new sync
 	beforeRetireRes := types.NewResponse()
 	beforeRetireRes, err = db.IncrementalSync(ctx, beforeRetireRes, testUserDeviceA, types.StreamingToken{}, latest, 0, false)
 	if err != nil {
-		t.Fatal("IncrementalSync failed: %s", err)
+		t.Fatalf("IncrementalSync failed: %s", err)
 	}
 	assertInvitedToRooms(t, beforeRetireRes, []string{inviteRoom1, inviteRoom2})
 
 	// retire one event: a fresh sync should just return 1 invite room
 	if _, err = db.RetireInviteEvent(ctx, inviteEvent1.EventID()); err != nil {
-		t.Fatal("Failed to RetireInviteEvent: %s", err)
+		t.Fatalf("Failed to RetireInviteEvent: %s", err)
 	}
 	latest, err = db.SyncPosition(ctx)
 	if err != nil {
-		t.Fatal("failed to get SyncPosition: %s", err)
+		t.Fatalf("failed to get SyncPosition: %s", err)
 	}
 	res := types.NewResponse()
 	res, err = db.IncrementalSync(ctx, res, testUserDeviceA, types.StreamingToken{}, latest, 0, false)
 	if err != nil {
-		t.Fatal("IncrementalSync failed: %s", err)
+		t.Fatalf("IncrementalSync failed: %s", err)
 	}
 	assertInvitedToRooms(t, res, []string{inviteRoom2})
 
@@ -731,22 +731,22 @@ func TestInviteBehaviour(t *testing.T) {
 	res = types.NewResponse()
 	res, err = db.IncrementalSync(ctx, res, testUserDeviceA, beforeRetireRes.NextBatch, latest, 0, false)
 	if err != nil {
-		t.Fatal("IncrementalSync failed: %s", err)
+		t.Fatalf("IncrementalSync failed: %s", err)
 	}
 	assertInvitedToRooms(t, res, []string{})
 	if _, ok := res.Rooms.Leave[inviteRoom1]; !ok {
-		t.Fatal("IncrementalSync: expected to see room left after it was retired but it wasn't")
+		t.Fatalf("IncrementalSync: expected to see room left after it was retired but it wasn't")
 	}
 }
 
 func assertInvitedToRooms(t *testing.T, res *types.Response, roomIDs []string) {
 	t.Helper()
 	if len(res.Rooms.Invite) != len(roomIDs) {
-		t.Fatal("got %d invited rooms, want %d", len(res.Rooms.Invite), len(roomIDs))
+		t.Fatalf("got %d invited rooms, want %d", len(res.Rooms.Invite), len(roomIDs))
 	}
 	for _, roomID := range roomIDs {
 		if _, ok := res.Rooms.Invite[roomID]; !ok {
-			t.Fatal("missing room ID %s", roomID)
+			t.Fatalf("missing room ID %s", roomID)
 		}
 	}
 }
@@ -754,39 +754,39 @@ func assertInvitedToRooms(t *testing.T, res *types.Response, roomIDs []string) {
 func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatrixserverlib.ClientEvent, wants []*types.HeaderedEvent) {
 	t.Helper()
 	if len(gots) != len(wants) {
-		t.Fatal("%s response returned %d events, want %d", msg, len(gots), len(wants))
+		t.Fatalf("%s response returned %d events, want %d", msg, len(gots), len(wants))
 	}
 	for i := range gots {
 		g := gots[i]
 		w := wants[i]
 		if g.EventID != w.EventID() {
-			t.Error("%s event[%d] event_id mismatch: got %s want %s", msg, i, g.EventID, w.EventID())
+			t.Errorf("%s event[%d] event_id mismatch: got %s want %s", msg, i, g.EventID, w.EventID())
 		}
 		if g.Sender != w.Sender() {
-			t.Error("%s event[%d] sender mismatch: got %s want %s", msg, i, g.Sender, w.Sender())
+			t.Errorf("%s event[%d] sender mismatch: got %s want %s", msg, i, g.Sender, w.Sender())
 		}
 		if checkRoomID && g.RoomID != w.RoomID() {
-			t.Error("%s event[%d] room_id mismatch: got %s want %s", msg, i, g.RoomID, w.RoomID())
+			t.Errorf("%s event[%d] room_id mismatch: got %s want %s", msg, i, g.RoomID, w.RoomID())
 		}
 		if g.Type != w.Type() {
-			t.Error("%s event[%d] event type mismatch: got %s want %s", msg, i, g.Type, w.Type())
+			t.Errorf("%s event[%d] event type mismatch: got %s want %s", msg, i, g.Type, w.Type())
 		}
 		if g.OriginServerTS != w.OriginServerTS() {
-			t.Error("%s event[%d] origin_server_ts mismatch: got %v want %v", msg, i, g.OriginServerTS, w.OriginServerTS())
+			t.Errorf("%s event[%d] origin_server_ts mismatch: got %v want %v", msg, i, g.OriginServerTS, w.OriginServerTS())
 		}
 		if string(g.Content) != string(w.Content()) {
-			t.Error("%s event[%d] content mismatch: got %s want %s", msg, i, string(g.Content), string(w.Content()))
+			t.Errorf("%s event[%d] content mismatch: got %s want %s", msg, i, string(g.Content), string(w.Content()))
 		}
 		if string(g.Unsigned) != string(w.Unsigned()) {
-			t.Error("%s event[%d] unsigned mismatch: got %s want %s", msg, i, string(g.Unsigned), string(w.Unsigned()))
+			t.Errorf("%s event[%d] unsigned mismatch: got %s want %s", msg, i, string(g.Unsigned), string(w.Unsigned()))
 		}
 		if (g.StateKey == nil && w.StateKey() != nil) || (g.StateKey != nil && w.StateKey() == nil) {
-			t.Error("%s event[%d] state_key [not] missing: got %v want %v", msg, i, g.StateKey, w.StateKey())
+			t.Errorf("%s event[%d] state_key [not] missing: got %v want %v", msg, i, g.StateKey, w.StateKey())
 			continue
 		}
 		if g.StateKey != nil {
 			if !w.StateKeyEquals(*g.StateKey) {
-				t.Error("%s event[%d] state_key mismatch: got %s want %s", msg, i, *g.StateKey, *w.StateKey())
+				t.Errorf("%s event[%d] state_key mismatch: got %s want %s", msg, i, *g.StateKey, *w.StateKey())
 			}
 		}
 	}
@@ -795,7 +795,7 @@ func assertEventsEqual(t *testing.T, msg string, checkRoomID bool, gots []gomatr
 func topologyTokenBefore(t *testing.T, db storage.Database, eventID string) *types.TopologyToken {
 	tok, err := db.EventPositionInTopology(ctx, eventID)
 	if err != nil {
-		t.Fatal("failed to get EventPositionInTopology: %s", err)
+		t.Fatalf("failed to get EventPositionInTopology: %s", err)
 	}
 	tok.Decrement()
 	return &tok
@@ -1071,21 +1071,21 @@ func TestRedaction(t *testing.T) {
 		}
 
 		if len(evs) != 1 {
-			t.Fatal("expected 1 event, got %d", len(evs))
+			t.Fatalf("expected 1 event, got %d", len(evs))
 		}
 
 		// check a few fields which shouldn't be there in unsigned
 		authEvs := gjson.GetBytes(evs[0].Unsigned(), "redacted_because.auth_events")
 		if authEvs.Exists() {
-			t.Error("unexpected auth_events in redacted event")
+			t.Errorf("unexpected auth_events in redacted event")
 		}
 		prevEvs := gjson.GetBytes(evs[0].Unsigned(), "redacted_because.prev_events")
 		if prevEvs.Exists() {
-			t.Error("unexpected auth_events in redacted event")
+			t.Errorf("unexpected auth_events in redacted event")
 		}
 		depth := gjson.GetBytes(evs[0].Unsigned(), "redacted_because.depth")
 		if depth.Exists() {
-			t.Error("unexpected auth_events in redacted event")
+			t.Errorf("unexpected auth_events in redacted event")
 		}
 	})
 }

@@ -17,6 +17,7 @@ package userapi
 import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 	"time"
 
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
@@ -33,7 +34,6 @@ import (
 	"github.com/antinvestor/matrix/userapi/producers"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/util"
-	"github.com/sirupsen/logrus"
 
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 )
@@ -66,7 +66,7 @@ func NewInternalAPI(
 
 	userapiCm, err := cm.FromOptions(ctx, &cfgUsrApi.AccountDatabase)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to obtain accounts db connection manager :%v", err)
+		frame.Log(ctx).WithError(err).Panic("failed to obtain accounts db connection manager :%v", err)
 	}
 	db, err := storage.NewUserDatabase(
 		ctx,
@@ -79,26 +79,26 @@ func NewInternalAPI(
 		cfg.UserAPI.Global.ServerNotices.LocalPart,
 	)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to accounts db")
+		frame.Log(ctx).WithError(err).Panic("failed to connect to accounts db")
 	}
 
 	keyCm, err := cm.FromOptions(ctx, &cfgKeySrv.Database)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to obtain key db connection manager")
+		frame.Log(ctx).WithError(err).Panic("failed to obtain key db connection manager")
 	}
 	keyDB, err := storage.NewKeyDatabase(ctx, keyCm)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to key db")
+		frame.Log(ctx).WithError(err).Panic("failed to connect to key db")
 	}
 
 	err = qm.RegisterPublisher(ctx, &cfgSyncApi.Queues.OutputClientData)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to register publisher for client data")
+		frame.Log(ctx).WithError(err).Panic("failed to register publisher for client data")
 	}
 
 	err = qm.RegisterPublisher(ctx, &cfgSyncApi.Queues.OutputNotificationData)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to register publisher for notification data")
+		frame.Log(ctx).WithError(err).Panic("failed to register publisher for notification data")
 	}
 
 	syncProducer, err := producers.NewSyncAPI(
@@ -106,12 +106,12 @@ func NewInternalAPI(
 		db, qm,
 	)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to obtain sync publisher")
+		frame.Log(ctx).WithError(err).Panic("failed to obtain sync publisher")
 	}
 
 	err = qm.RegisterPublisher(ctx, &cfgKeySrv.Queues.OutputKeyChangeEvent)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to register publisher for key change events")
+		frame.Log(ctx).WithError(err).Panic("failed to register publisher for key change events")
 	}
 
 	keyChangeProducer := &producers.KeyChange{
@@ -137,12 +137,12 @@ func NewInternalAPI(
 	userAPI.Updater = updater
 	// Remove users which we don't share a room with anymore
 	if err = updater.CleanUp(ctx); err != nil {
-		logrus.WithError(err).Error("failed to cleanup stale device lists")
+		frame.Log(ctx).WithError(err).Error("failed to cleanup stale device lists")
 	}
 
 	go func() {
 		if err = updater.Start(ctx); err != nil {
-			logrus.WithError(err).Panic("failed to start device list updater")
+			frame.Log(ctx).WithError(err).Panic("failed to start device list updater")
 		}
 	}()
 
@@ -150,28 +150,28 @@ func NewInternalAPI(
 		ctx, &cfg.UserAPI, qm, updater,
 	)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to start device list consumer")
+		frame.Log(ctx).WithError(err).Panic("failed to start device list consumer")
 	}
 
 	err = consumers.NewSigningKeyUpdateConsumer(
 		ctx, &cfg.UserAPI, qm, userAPI,
 	)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to start signing key consumer")
+		frame.Log(ctx).WithError(err).Panic("failed to start signing key consumer")
 	}
 
 	err = consumers.NewOutputReceiptEventConsumer(
 		ctx, &cfg.UserAPI, qm, db, syncProducer, pgClient,
 	)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to start user API receipt consumer")
+		frame.Log(ctx).WithError(err).Panic("failed to start user API receipt consumer")
 	}
 
 	err = consumers.NewOutputRoomEventConsumer(
 		ctx, &cfg.UserAPI, qm, db, pgClient, rsAPI, syncProducer,
 	)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
+		frame.Log(ctx).WithError(err).Panic("failed to start user API streamed event consumer")
 	}
 
 	var cleanOldNotifs func()
@@ -182,9 +182,9 @@ func NewInternalAPI(
 		default:
 			// Context is still valid, continue with operation
 
-			logrus.Info("Cleaning old notifications")
+			frame.Log(ctx).Info("Cleaning old notifications")
 			if err = db.DeleteOldNotifications(ctx); err != nil {
-				logrus.WithError(err).Error("Failed to clean old notifications")
+				frame.Log(ctx).WithError(err).Error("Failed to clean old notifications")
 			}
 			time.AfterFunc(time.Hour, cleanOldNotifs)
 		}

@@ -17,6 +17,7 @@ package routing
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
 
@@ -25,18 +26,18 @@ import (
 
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 func SetReceipt(req *http.Request, userAPI userapi.ClientUserAPI, syncProducer *producers.SyncAPIProducer, device *userapi.Device, roomID, receiptType, eventID string) util.JSONResponse {
+	ctx := req.Context()
 	timestamp := spec.AsTimestamp(time.Now())
-	logrus.WithFields(logrus.Fields{
-		"roomID":      roomID,
-		"receiptType": receiptType,
-		"eventID":     eventID,
-		"userId":      device.UserID,
-		"timestamp":   timestamp,
-	}).Debug("Setting receipt")
+	frame.Log(ctx).
+		WithField("roomID", roomID).
+		WithField("receiptType", receiptType).
+		WithField("eventID", eventID).
+		WithField("userId", device.UserID).
+		WithField("timestamp", timestamp).
+		Debug("Setting receipt")
 
 	switch receiptType {
 	case "m.read", "m.read.private":

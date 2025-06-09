@@ -15,17 +15,17 @@
 package util
 
 import (
+	"context"
+	"github.com/pitabwire/frame"
 	"syscall"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
 
-func getMemoryStats(p *phoneHomeStats) error {
+func getMemoryStats(ctx context.Context, p *phoneHomeStats) error {
 	oldUsage := p.prevData
 	newUsage := syscall.Rusage{}
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &newUsage); err != nil {
-		logrus.WithError(err).Error("unable to get usage")
+		frame.Log(ctx).WithError(err).Error("unable to get usage")
 		return err
 	}
 	newData := timestampToRUUsage{timestamp: time.Now().Unix(), usage: newUsage}

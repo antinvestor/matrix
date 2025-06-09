@@ -25,7 +25,6 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/pitabwire/frame"
-	"github.com/pitabwire/util"
 )
 
 // loginTokenSchema defines the schema for the login tokens table.
@@ -117,7 +116,8 @@ func (t *loginTokenTable) DeleteLoginToken(ctx context.Context, token string) er
 	}
 
 	if n := result.RowsAffected; n > 1 {
-		util.GetLogger(ctx).WithField("num_deleted", n).Info("Deleted %d login tokens (%d likely additional expired token)", n, n-1)
+		frame.Log(ctx).WithField("num_deleted", n).Info("Deleted multiple login tokens")
+		frame.Log(ctx).WithField("num_deleted", n).WithField("additional_expired", n-1).Info("Deleted additional expired token")
 	}
 	return nil
 }

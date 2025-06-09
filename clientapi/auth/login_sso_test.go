@@ -24,7 +24,7 @@ func TestNewAuthenticator(t *testing.T) {
 		},
 	}, nil)
 	if a == nil {
-		t.Fatal("NewAuthenticator failed to be instantiated")
+		t.Fatalf("NewAuthenticator failed to be instantiated")
 	}
 }
 
@@ -41,20 +41,20 @@ func TestAuthenticator(t *testing.T) {
 	t.Run("authorizationURL", func(t *testing.T) {
 		got, err := a.AuthorizationURL(ctx, "fake", "http://matrix.example.com/continue", "anonce", "codeVerifier")
 		if err != nil {
-			t.Fatal("AuthorizationURL failed: %v", err)
+			t.Fatalf("AuthorizationURL failed: %v", err)
 		}
 		if want := "aurl"; got != want {
-			t.Error("AuthorizationURL: got %q, want %q", got, want)
+			t.Errorf("AuthorizationURL: got %q, want %q", got, want)
 		}
 	})
 
 	t.Run("processCallback", func(t *testing.T) {
 		got, err := a.ProcessCallback(ctx, "fake", "http://matrix.example.com/continue", "anonce", "codeVerifier", url.Values{})
 		if err != nil {
-			t.Fatal("ProcessCallback failed: %v", err)
+			t.Fatalf("ProcessCallback failed: %v", err)
 		}
 		if want := (&CallbackResult{DisplayName: "aname"}); !reflect.DeepEqual(got, want) {
-			t.Error("ProcessCallback: got %+v, want %+v", got, want)
+			t.Errorf("ProcessCallback: got %+v, want %+v", got, want)
 		}
 	})
 }

@@ -15,10 +15,8 @@
 package routing
 
 import (
+	"github.com/pitabwire/frame"
 	"net/http"
-
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -27,6 +25,7 @@ import (
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // GetEvent implements
@@ -45,10 +44,9 @@ func GetEvent(
 ) util.JSONResponse {
 	ctx := req.Context()
 	db, err := syncDB.NewDatabaseSnapshot(ctx)
-	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
-		"event_id": eventID,
-		"room_id":  rawRoomID,
-	})
+	logger := frame.Log(ctx).
+		WithField("event_id", eventID).
+		WithField("room_id", rawRoomID)
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: syncDB.NewDatabaseTransaction failed")
 		return util.JSONResponse{

@@ -17,12 +17,11 @@ package consumers
 import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/userapi/storage"
 
@@ -75,10 +74,9 @@ func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[st
 		return nil
 	}
 
-	log := logrus.WithFields(logrus.Fields{
-		"room_id": roomID,
-		"user_id": userID,
-	})
+	log := frame.Log(ctx).
+		WithField("room_id", roomID).
+		WithField("user_id", userID)
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {

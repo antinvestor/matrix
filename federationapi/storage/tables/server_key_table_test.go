@@ -24,11 +24,11 @@ func mustCreateServerKeyDB(ctx context.Context, svc *frame.Service, t *testing.T
 	tab, err := postgres.NewPostgresServerSigningKeysTable(ctx, cm)
 
 	if err != nil {
-		t.Fatal("failed to create table: %s", err)
+		t.Fatalf("failed to create table: %s", err)
 	}
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatal("failed to migrate table: %s", err)
+		t.Fatalf("failed to migrate table: %s", err)
 	}
 	return tab
 }

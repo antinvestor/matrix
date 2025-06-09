@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"github.com/pitabwire/frame"
 	"net/http"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -23,7 +24,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/relayapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 // SendTransactionToRelay implements PUT /_matrix/federation/v1/send_relay/{txnID}/{userID}
@@ -35,11 +35,12 @@ func SendTransactionToRelay(
 	txnID gomatrixserverlib.TransactionID,
 	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Info("Processing send_relay for %s", userID.String())
+	log := frame.Log(httpReq.Context())
+	log.Info("Processing send_relay for %s", userID.String())
 
 	var txnEvents fclient.RelayEvents
 	if err := json.Unmarshal(fedReq.Content(), &txnEvents); err != nil {
-		logrus.Info("The request body could not be decoded into valid JSON." + err.Error())
+		log.Info("The request body could not be decoded into valid JSON." + err.Error())
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotJSON("The request body could not be decoded into valid JSON." + err.Error()),

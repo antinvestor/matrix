@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/frame"
-	"github.com/sirupsen/logrus"
 	"regexp"
 )
 
@@ -38,9 +37,10 @@ func (q *queues) Publish(ctx context.Context, reference string, payload any, hea
 	err := q.service.Publish(ctx, reference, payload, headers...)
 	if err != nil {
 
-		logrus.WithFields(logrus.Fields{
-			"prefix": reference,
-		}).WithError(err).Error("Failed to publish")
+		frame.Log(ctx).
+			WithField("prefix", reference).
+			WithError(err).
+			Error("Failed to publish")
 
 		return err
 	}

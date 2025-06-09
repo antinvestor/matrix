@@ -16,6 +16,7 @@ package auth
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"net/http"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -47,7 +48,7 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 
 	var res uapi.QueryLoginTokenResponse
 	if err := t.UserAPI.QueryLoginToken(ctx, &uapi.QueryLoginTokenRequest{Token: r.Token}, &res); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("UserAPI.QueryLoginToken failed")
+		frame.Log(ctx).WithError(err).Error("UserAPI.QueryLoginToken failed")
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -66,13 +67,13 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 
 	cleanup := func(ctx context.Context, authRes *util.JSONResponse) {
 		if authRes == nil {
-			util.GetLogger(ctx).Error("No JSONResponse provided to LoginTokenType cleanup function")
+			frame.Log(ctx).Error("missing JSONResponse in LoginTokenType cleanup")
 			return
 		}
 		if authRes.Code == http.StatusOK {
 			var res uapi.PerformLoginTokenDeletionResponse
 			if err := t.UserAPI.PerformLoginTokenDeletion(ctx, &uapi.PerformLoginTokenDeletionRequest{Token: r.Token}, &res); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("UserAPI.PerformLoginTokenDeletion failed")
+				frame.Log(ctx).WithError(err).Error("UserAPI.PerformLoginTokenDeletion failed")
 			}
 		}
 	}

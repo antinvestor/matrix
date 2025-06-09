@@ -2,9 +2,8 @@ package types
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
@@ -13,7 +12,7 @@ import (
 
 type SyncRequest struct {
 	Context       context.Context
-	Log           *logrus.Entry
+	Log           *frame.Entry
 	Device        *userapi.Device
 	Response      *Response
 	Filter        synctypes.Filter

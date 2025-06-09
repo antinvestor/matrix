@@ -21,12 +21,12 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
@@ -68,6 +68,8 @@ func NewOutputClientDataConsumer(
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputClientDataConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+
+	log := frame.Log(ctx)
 	// Parse out the event JSON
 	userID := metadata[queueutil.UserID]
 	var output eventutil.AccountData
@@ -77,29 +79,25 @@ func (s *OutputClientDataConsumer) Handle(ctx context.Context, metadata map[stri
 		return nil
 	}
 
-	log.WithFields(log.Fields{
-		"type":    output.Type,
-		"room_id": output.RoomID,
-	}).Debug("Received data from client API server")
+	log.WithField("type", output.Type).
+		WithField("room_id", output.RoomID).
+		Debug("Received data from client API server")
 
 	streamPos, err := s.db.UpsertAccountData(
 		ctx, userID, output.RoomID, output.Type,
 	)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"type":       output.Type,
-			"room_id":    output.RoomID,
-			log.ErrorKey: err,
-		}).Error("could not save account data")
+		log.WithError(err).
+			WithField("type", output.Type).
+			WithField("room_id", output.RoomID).Error("could not save account data")
 		return err
 	}
 
 	if output.IgnoredUsers != nil {
 		err = s.db.UpdateIgnoresForUser(ctx, userID, output.IgnoredUsers)
 		if err != nil {
-			log.WithError(err).WithFields(log.Fields{
-				"user_id": userID,
-			}).Error("Failed to update ignored users")
+			log.WithError(err).
+				WithField("user_id", userID).Error("Failed to update ignored users")
 
 		}
 	}

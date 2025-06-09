@@ -16,8 +16,12 @@ package routing
 
 import (
 	"encoding/json"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
+
+	"github.com/pitabwire/util"
+	"golang.org/x/crypto/ed25519"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -26,9 +30,6 @@ import (
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ed25519"
 )
 
 type queryKeysRequest struct {
@@ -206,6 +207,9 @@ func NotaryKeys(
 	fsAPI federationAPI.FederationInternalAPI,
 	req *gomatrixserverlib.PublicKeyNotaryLookupRequest,
 ) util.JSONResponse {
+
+	ctx := httpReq.Context()
+
 	serverName := spec.ServerName(httpReq.Host) // TODO: this is not ideal
 	if !cfg.Global.IsLocalServerName(serverName) {
 		return util.JSONResponse{
@@ -251,7 +255,7 @@ func NotaryKeys(
 		for _, keys := range keyList {
 			j, err := json.Marshal(keys)
 			if err != nil {
-				logrus.WithError(err).Error("Failed to marshal %q response", serverName)
+				frame.Log(ctx).WithError(err).Error("Failed to marshal %q response", serverName)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -262,7 +266,7 @@ func NotaryKeys(
 				string(cfg.Global.ServerName), cfg.Global.KeyID, cfg.Global.PrivateKey, j,
 			)
 			if err != nil {
-				logrus.WithError(err).Error("Failed to sign %q response", serverName)
+				frame.Log(ctx).WithError(err).Error("Failed to sign %q response", serverName)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},

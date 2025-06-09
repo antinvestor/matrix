@@ -15,13 +15,15 @@
 package config
 
 import (
+	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"reflect"
 	"testing"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -33,16 +35,16 @@ func TestLoadConfigRelative(t *testing.T) {
 		}.readFile,
 	)
 	if err != nil {
-		t.Error("failed to load config:", err)
+		t.Errorf("failed to load config:", err)
 	}
 
 	configErrors := &ConfigErrors{}
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			logrus.Error("Configuration error: %s", err)
+			frame.Log(context.TODO()).Error("Configuration error: %s", err)
 		}
-		t.Error("configuration verification failed")
+		t.Errorf("configuration verification failed")
 	}
 }
 
@@ -219,11 +221,11 @@ func (m mockReadFile) readFile(path string) ([]byte, error) {
 func TestReadKey(t *testing.T) {
 	keyID, _, err := readKeyPEM("path/to/key", []byte(testKey), true)
 	if err != nil {
-		t.Error("failed to load private key:", err)
+		t.Errorf("failed to load private key:", err)
 	}
 	wantKeyID := testKeyID
 	if wantKeyID != string(keyID) {
-		t.Error("wanted key ID to be %q, got %q", wantKeyID, keyID)
+		t.Errorf("wanted key ID to be %q, got %q", wantKeyID, keyID)
 	}
 }
 
@@ -281,7 +283,7 @@ func TestUnmarshalDataUnit(t *testing.T) {
 		if err := yaml.Unmarshal([]byte(input), &target); err != nil {
 			t.Fatal(err)
 		} else if target.Got != expect {
-			t.Fatal("expected value %d but got %d", expect, target.Got)
+			t.Fatalf("expected value %d but got %d", expect, target.Got)
 		}
 	}
 }
@@ -328,11 +330,11 @@ func Test_SigningIdentityFor(t *testing.T) {
 			}
 			got, err := c.SigningIdentityFor(tt.serverName)
 			if (err != nil) != tt.wantErr {
-				t.Error("SigningIdentityFor() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("SigningIdentityFor() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Error("SigningIdentityFor() got = %v, want %v", got, tt.want)
+				t.Errorf("SigningIdentityFor() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

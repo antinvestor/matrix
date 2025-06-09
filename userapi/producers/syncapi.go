@@ -4,9 +4,9 @@ import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal/eventutil"
 
@@ -49,11 +49,11 @@ func NewSyncAPI(ctx context.Context, cfg *config.SyncAPI, db storage.UserDatabas
 // SendAccountData sends account data to the Sync API server.
 func (p *SyncAPI) SendAccountData(ctx context.Context, userID string, data eventutil.AccountData) error {
 
-	log.WithFields(log.Fields{
-		"user_id":   userID,
-		"room_id":   data.RoomID,
-		"data_type": data.Type,
-	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
+	frame.Log(ctx).
+		WithField("user_id", userID).
+		WithField("room_id", data.RoomID).
+		WithField("data_type", data.Type).
+		Debug("Producing to topic '%s'", p.clientDataTopic)
 
 	header := map[string]string{
 		queueutil.UserID: userID,
@@ -89,10 +89,10 @@ func (p *SyncAPI) GetAndSendNotificationData(ctx context.Context, userID, roomID
 // sendNotificationData sends data about unread notifications to the Sync API server.
 func (p *SyncAPI) sendNotificationData(ctx context.Context, userID string, data *eventutil.NotificationData) error {
 
-	log.WithFields(log.Fields{
-		"user_id": userID,
-		"room_id": data.RoomID,
-	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
+	frame.Log(ctx).
+		WithField("user_id", userID).
+		WithField("room_id", data.RoomID).
+		Debug("Producing to topic '%s'", p.notificationDataTopic)
 
 	header := map[string]string{
 		queueutil.UserID: userID,

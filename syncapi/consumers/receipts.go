@@ -17,9 +17,8 @@ package consumers
 import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 	"strconv"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
@@ -69,7 +68,7 @@ func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[st
 	timestamp, err := strconv.ParseUint(metadata["timestamp"], 10, 64)
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Error("output log: message parse failure")
+		frame.Log(ctx).WithError(err).Error("output log: message parse failure")
 		return err
 	}
 

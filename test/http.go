@@ -20,7 +20,7 @@ func WithJSONBody(t *testing.T, body interface{}) HTTPRequestOpt {
 	t.Helper()
 	b, err := json.Marshal(body)
 	if err != nil {
-		t.Fatal("WithJSONBody: %s", err)
+		t.Fatalf("WithJSONBody: %s", err)
 	}
 	return func(req *http.Request) {
 		req.Body = io.NopCloser(bytes.NewBuffer(b))
@@ -41,7 +41,7 @@ func NewRequest(t *testing.T, method, path string, opts ...HTTPRequestOpt) *http
 	t.Helper()
 	req, err := http.NewRequest(method, "http://localhost"+path, nil)
 	if err != nil {
-		t.Fatal("failed to make new HTTP request %v %v : %v", method, path, err)
+		t.Fatalf("failed to make new HTTP request %v %v : %v", method, path, err)
 	}
 	for _, o := range opts {
 		o(req)
@@ -54,7 +54,7 @@ func NewRequest(t *testing.T, method, path string, opts ...HTTPRequestOpt) *http
 func ListenAndServe(ctx context.Context, t *testing.T, router http.Handler, withTLS bool) (apiURL string, cancel func()) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatal("failed to listen: %s", err)
+		t.Fatalf("failed to listen: %s", err)
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 	srv := http.Server{}
@@ -70,7 +70,7 @@ func ListenAndServe(ctx context.Context, t *testing.T, router http.Handler, with
 			keyFile := filepath.Join(t.TempDir(), "dendrite.key")
 			err = NewTLSKey(keyFile, certFile, 1024)
 			if err != nil {
-				t.Error("failed to make TLS key: %s", err)
+				t.Errorf("failed to make TLS key: %s", err)
 				return
 			}
 			err = srv.ServeTLS(listener, certFile, keyFile)

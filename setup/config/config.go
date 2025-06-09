@@ -73,9 +73,6 @@ type Matrix struct {
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
 	} `yaml:"tracing"`
 
-	// The config for logging informations. Each hook will be added to logrus.
-	Logging []LogrusHook `yaml:"logging"`
-
 	// Any information derived from the configuration options for later use.
 	Derived Derived `yaml:"-"`
 }
@@ -256,20 +253,6 @@ type ThumbnailSize struct {
 	// crop scales to fill the requested dimensions and crops the excess.
 	// scale scales to fit the requested dimensions and one dimension may be smaller than requested.
 	ResizeMethod string `yaml:"method,omitempty"`
-}
-
-// LogrusHook represents a single logrus hook. At this point, only parsing and
-// verification of the proper values for type and level are done.
-// Validity/integrity checks on the parameters are done when configuring logrus.
-type LogrusHook struct {
-	// The type of hook, currently only "file" is supported.
-	Type string `yaml:"type"`
-
-	// The level of the logs to produce. Will output only this level and above.
-	Level string `yaml:"level"`
-
-	// The parameters for this hook.
-	Params map[string]interface{} `yaml:"params"`
 }
 
 // ConfigErrors stores problems encountered when parsing a config file.
@@ -530,14 +513,6 @@ func checkPositive(configErrs *ConfigErrors, key string, value int64) {
 	}
 }
 
-// checkLogging verifies the parameters logging.* are valid.
-func (config *Matrix) checkLogging(configErrs *ConfigErrors) {
-	for _, logrusHook := range config.Logging {
-		checkNotEmpty(configErrs, "logging.type", string(logrusHook.Type))
-		checkNotEmpty(configErrs, "logging.level", string(logrusHook.Level))
-	}
-}
-
 // check returns an error type containing all errors found within the config
 // file.
 func (config *Matrix) check() error { // monolithic
@@ -553,8 +528,6 @@ func (config *Matrix) check() error { // monolithic
 		))
 		return &configErrs
 	}
-
-	config.checkLogging(&configErrs)
 
 	// Due to how Golang manages its interface types, this condition is not redundant.
 	// In order to get the proper behaviour, it is necessary to return an explicit nil

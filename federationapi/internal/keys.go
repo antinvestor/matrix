@@ -8,7 +8,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+	"github.com/pitabwire/frame"
 )
 
 func (r *FederationInternalAPI) KeyRing() *gomatrixserverlib.KeyRing {
@@ -64,9 +64,9 @@ func (r *FederationInternalAPI) FetchKeys(
 
 		// Ask the fetcher to look up our keys.
 		if err := r.handleFetcherKeys(ctx, now, fetcher, requests, results); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"fetcher_name": fetcher.FetcherName(),
-			}).Error("Failed to retrieve %d key(s)", len(requests))
+			frame.Log(ctx).WithError(err).
+				WithField("fetcher_name", fetcher.FetcherName()).
+				Error("Failed to retrieve %d key(s)", len(requests))
 			continue
 		}
 	}
@@ -78,7 +78,10 @@ func (r *FederationInternalAPI) FetchKeys(
 			// The results don't contain anything for this specific request, so
 			// we've failed to satisfy it from local keys, database keys or from
 			// all of the fetchers. Report an error.
-			logrus.Warn("Failed to retrieve key %q for server %q", req.KeyID, req.ServerName)
+			frame.Log(ctx).
+				WithField("key_id", req.KeyID).
+				WithField("server_name", req.ServerName).
+				Warn("Failed to retrieve key")
 		}
 	}
 
@@ -184,9 +187,7 @@ func (r *FederationInternalAPI) handleFetcherKeys(
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	logrus.WithFields(logrus.Fields{
-		"fetcher_name": fetcher.FetcherName(),
-	}).Info("Fetching %d key(s)", len(requests))
+	frame.Log(ctx).WithField("fetcher_name", fetcher.FetcherName()).Info("Fetching %d key(s)", len(requests))
 
 	// Create a context that limits our requests to 30 seconds.
 	fetcherCtx, fetcherCancel := context.WithTimeout(ctx, time.Second*30)
@@ -230,17 +231,15 @@ func (r *FederationInternalAPI) handleFetcherKeys(
 
 	// Store the keys from our store map.
 	if err = r.keyRing.KeyDatabase.StoreKeys(ctx, storeResults); err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"fetcher_name":  fetcher.FetcherName(),
-			"database_name": r.keyRing.KeyDatabase.FetcherName(),
-		}).Error("Failed to store keys in the database")
+		frame.Log(ctx).WithError(err).
+			WithField("fetcher_name", fetcher.FetcherName()).
+			WithField("database_name", r.keyRing.KeyDatabase.FetcherName()).Error("Failed to store keys in the database")
 		return fmt.Errorf("server key API failed to store retrieved keys: %w", err)
 	}
 
 	if len(storeResults) > 0 {
-		logrus.WithFields(logrus.Fields{
-			"fetcher_name": fetcher.FetcherName(),
-		}).Info("Updated %d of %d key(s) in database (%d keys remaining)", len(storeResults), len(results), len(requests))
+		frame.Log(ctx).
+			WithField("fetcher_name", fetcher.FetcherName()).Info("Updated %d of %d key(s) in database (%d keys remaining)", len(storeResults), len(results), len(requests))
 	}
 
 	return nil

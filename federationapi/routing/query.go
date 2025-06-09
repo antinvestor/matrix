@@ -17,6 +17,7 @@ package routing
 import (
 	"errors"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 
 	"github.com/antinvestor/gomatrix"
@@ -28,7 +29,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 )
 
 // RoomAliasToID converts the queried alias into a room ID and returns it
@@ -125,6 +125,9 @@ func RoomAliasToID(
 //
 // Implements /_matrix/federation/v1/hierarchy/{roomID}
 func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationRequest, roomIDStr string, rsAPI roomserverAPI.FederationRoomserverAPI) util.JSONResponse {
+
+	ctx := httpReq.Context()
+
 	parsedRoomID, err := spec.NewRoomID(roomIDStr)
 	if err != nil {
 		return util.JSONResponse{
@@ -154,13 +157,13 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 		var errRoomUnknownOrNotAllowed roomserverAPI.ErrRoomUnknownOrNotAllowed
 		switch {
 		case errors.As(err, &errRoomUnknownOrNotAllowed):
-			util.GetLogger(httpReq.Context()).WithError(err).Debugln("room unknown/forbidden when handling SS room hierarchy request")
+			frame.Log(ctx).WithError(err).Debug("room unknown/forbidden when handling SS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound("room is unknown/forbidden"),
 			}
 		default:
-			log.WithError(err).Error("failed to fetch next page of room hierarchy (SS API)")
+			frame.Log(ctx).WithError(err).Error("failed to fetch next page of room hierarchy (SS API)")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),

@@ -18,11 +18,10 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/matrix/setup/config"
@@ -68,6 +67,9 @@ func NewOutputSendToDeviceEventConsumer(
 }
 
 func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+
+	log := frame.Log(ctx)
+
 	userID := metadata[queueutil.UserID]
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -76,7 +78,7 @@ func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata m
 		return nil
 	}
 	if !s.isLocalServerName(domain) {
-		log.Tracef("ignoring send-to-device event with destination %s", domain)
+		log.Debug("ignoring send-to-device event with destination %s", domain)
 		return nil
 	}
 
@@ -87,13 +89,12 @@ func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata m
 		return err
 	}
 
-	logger := util.GetLogger(ctx).WithFields(log.Fields{
-		"sender":     output.Sender,
-		"user_id":    output.UserID,
-		"device_id":  output.DeviceID,
-		"event_type": output.Type,
-	})
-	logger.Debug("sync API received send-to-device event from the clientapi/federationsender")
+	log = log.
+		WithField("sender", output.Sender).
+		WithField("user_id", output.UserID).
+		WithField("device_id", output.DeviceID).
+		WithField("event_type", output.Type)
+	log.Debug("sync API received send-to-device event from the clientapi/federationsender")
 
 	// Check we actually got the requesting device in our store, if we receive a room key request
 	if output.Type == "m.room_key_request" {
@@ -104,7 +105,7 @@ func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata m
 			if err = s.userAPI.PerformMarkAsStaleIfNeeded(ctx, &api.PerformMarkAsStaleRequest{
 				UserID: output.Sender, Domain: senderDomain, DeviceID: requestingDeviceID,
 			}, &struct{}{}); err != nil {
-				logger.WithError(err).Error("failed to mark as stale if needed")
+				log.WithError(err).Error("failed to mark as stale if needed")
 				return err
 			}
 		}

@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net"
 	"regexp"
 	"strings"
@@ -26,7 +27,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	"github.com/sirupsen/logrus"
 )
 
 const MRoomServerACL = "m.room.server_acl"
@@ -58,7 +58,7 @@ func NewServerACLs(ctx context.Context, db ServerACLDatabase) *ServerACLs {
 	// Look up all of the rooms that the current state server knows about.
 	rooms, err := db.RoomsWithACLs(ctx)
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to get known rooms")
+		frame.Log(ctx).WithError(err).Fatal("Failed to get known rooms")
 	}
 	// For each room, let's see if we have a server ACL state event. If we
 	// do then we'll process it into memory so that we have the regexes to
@@ -66,11 +66,11 @@ func NewServerACLs(ctx context.Context, db ServerACLDatabase) *ServerACLs {
 
 	events, err := db.GetBulkStateContent(ctx, rooms, []gomatrixserverlib.StateKeyTuple{{EventType: MRoomServerACL, StateKey: ""}}, false)
 	if err != nil {
-		logrus.WithError(err).Error("Failed to get server ACLs for all rooms: %q", err)
+		frame.Log(ctx).WithError(err).Error("Failed to get server ACLs for all rooms: %q", err)
 	}
 
 	for _, event := range events {
-		acls.OnServerACLUpdate(event)
+		acls.OnServerACLUpdate(ctx, event)
 	}
 
 	return acls
@@ -114,10 +114,11 @@ func (s *ServerACLs) cachedCompileACLRegex(orig string) (**regexp.Regexp, error)
 	return &compiled, nil
 }
 
-func (s *ServerACLs) OnServerACLUpdate(strippedEvent tables.StrippedEvent) {
+func (s *ServerACLs) OnServerACLUpdate(ctx context.Context, strippedEvent tables.StrippedEvent) {
+
 	acls := &serverACL{}
 	if err := json.Unmarshal([]byte(strippedEvent.ContentValue), &acls.ServerACL); err != nil {
-		logrus.WithError(err).Error("Failed to unmarshal state content for server ACLs")
+		frame.Log(ctx).WithError(err).Error("Failed to unmarshal state content for server ACLs")
 		return
 	}
 	// The spec calls only for * (zero or more chars) and ? (exactly one char)
@@ -126,23 +127,23 @@ func (s *ServerACLs) OnServerACLUpdate(strippedEvent tables.StrippedEvent) {
 	// https://matrix.org/docs/spec/client_server/r0.6.1#m-room-server-acl
 	for _, orig := range acls.Allowed {
 		if expr, err := s.cachedCompileACLRegex(orig); err != nil {
-			logrus.WithError(err).Error("Failed to compile allowed regex")
+			frame.Log(ctx).WithError(err).Error("Failed to compile allowed regex")
 		} else {
 			acls.allowedRegexes = append(acls.allowedRegexes, expr)
 		}
 	}
 	for _, orig := range acls.Denied {
 		if expr, err := s.cachedCompileACLRegex(orig); err != nil {
-			logrus.WithError(err).Error("Failed to compile denied regex")
+			frame.Log(ctx).WithError(err).Error("Failed to compile denied regex")
 		} else {
 			acls.deniedRegexes = append(acls.deniedRegexes, expr)
 		}
 	}
-	logrus.WithFields(logrus.Fields{
-		"allow_ip_literals": acls.AllowIPLiterals,
-		"num_allowed":       len(acls.allowedRegexes),
-		"num_denied":        len(acls.deniedRegexes),
-	}).Debug("Updating server ACLs for %q", strippedEvent.RoomID)
+	frame.Log(ctx).
+		WithField("allow_ip_literals", acls.AllowIPLiterals).
+		WithField("num_allowed", len(acls.allowedRegexes)).
+		WithField("num_denied", len(acls.deniedRegexes)).
+		Debug("Updating server ACLs for %q", strippedEvent.RoomID)
 
 	// Clear out Denied and Allowed, now that we have the compiled regexes.
 	// They are not needed anymore from this point on.

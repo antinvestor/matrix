@@ -48,12 +48,12 @@ func mustCreateFederationDatabase(ctx context.Context, svc *frame.Service, cfg *
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatal("failed to create a cache: %v", err)
+			t.Fatalf("failed to create a cache: %v", err)
 		}
 
 		db, err := storage.NewDatabase(ctx, cm, caches, cfg.Global.IsLocalServerName)
 		if err != nil {
-			t.Fatal("NewDatabase failed with : %s", err)
+			t.Fatalf("NewDatabase failed with : %s", err)
 		}
 		return db
 	} else {
@@ -96,7 +96,7 @@ func mustCreatePDU(t *testing.T) *types.HeaderedEvent {
 	content := `{"type":"m.room.message", "room_id":"!room:a"}`
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV10).NewEventFromTrustedJSON([]byte(content), false)
 	if err != nil {
-		t.Fatal("failed to create event: %v", err)
+		t.Fatalf("failed to create event: %v", err)
 	}
 	return &types.HeaderedEvent{PDU: ev}
 }

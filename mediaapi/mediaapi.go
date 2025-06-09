@@ -16,6 +16,7 @@ package mediaapi
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -25,7 +26,6 @@ import (
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/sirupsen/logrus"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the MediaAPI component.
@@ -41,12 +41,12 @@ func AddPublicRoutes(
 ) {
 	mediaCm, err := cm.FromOptions(ctx, &cfg.MediaAPI.Database)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to obtain a media db connection manager :%v", err)
+		frame.Log(ctx).WithError(err).Panic("failed to obtain a media db connection manager :%v", err)
 	}
 
 	mediaDB, err := storage.NewMediaAPIDatasource(ctx, mediaCm)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to media db")
+		frame.Log(ctx).WithError(err).Panic("failed to connect to media db")
 	}
 
 	routing.Setup(

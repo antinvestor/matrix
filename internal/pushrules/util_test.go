@@ -34,13 +34,13 @@ func TestActionsToTweaks(t *testing.T) {
 		t.Run(tst.Name, func(t *testing.T) {
 			gotKind, gotTweaks, err := ActionsToTweaks(tst.Input)
 			if err != nil {
-				t.Fatal("ActionsToTweaks failed: %v", err)
+				t.Fatalf("ActionsToTweaks failed: %v", err)
 			}
 			if gotKind != tst.WantKind {
-				t.Error("kind: got %v, want %v", gotKind, tst.WantKind)
+				t.Errorf("kind: got %v, want %v", gotKind, tst.WantKind)
 			}
 			if diff := cmp.Diff(tst.WantTweaks, gotTweaks); diff != "" {
-				t.Error("tweaks: +got -want:\n%s", diff)
+				t.Errorf("tweaks: +got -want:\n%s", diff)
 			}
 		})
 	}
@@ -62,7 +62,7 @@ func TestBoolTweakOr(t *testing.T) {
 		t.Run(tst.Name, func(t *testing.T) {
 			got := BoolTweakOr(tst.Input, HighlightTweak, tst.Def)
 			if got != tst.Want {
-				t.Error("BoolTweakOr: got %v, want %v", got, tst.Want)
+				t.Errorf("BoolTweakOr: got %v, want %v", got, tst.Want)
 			}
 		})
 	}
@@ -84,10 +84,10 @@ func TestGlobToRegexp(t *testing.T) {
 		t.Run(tst.Want, func(t *testing.T) {
 			got, err := globToRegexp(tst.Input)
 			if err != nil {
-				t.Fatal("globToRegexp failed: %v", err)
+				t.Fatalf("globToRegexp failed: %v", err)
 			}
 			if got.String() != tst.Want {
-				t.Error("got %v, want %v", got.String(), tst.Want)
+				t.Errorf("got %v, want %v", got.String(), tst.Want)
 			}
 		})
 	}
@@ -107,10 +107,10 @@ func TestLookupMapPath(t *testing.T) {
 		t.Run(fmt.Sprint(tst.Path, "/", tst.Want), func(t *testing.T) {
 			got, err := lookupMapPath(tst.Path, tst.Root)
 			if err != nil {
-				t.Fatal("lookupMapPath failed: %v", err)
+				t.Fatalf("lookupMapPath failed: %v", err)
 			}
 			if diff := cmp.Diff(tst.Want, got); diff != "" {
-				t.Error("+got -want:\n%s", diff)
+				t.Errorf("+got -want:\n%s", diff)
 			}
 		})
 	}
@@ -129,7 +129,7 @@ func TestLookupMapPathInvalid(t *testing.T) {
 		t.Run(fmt.Sprint(tst.Path), func(t *testing.T) {
 			got, err := lookupMapPath(tst.Path, tst.Root)
 			if err == nil {
-				t.Fatal("lookupMapPath succeeded with %#v, but want failure", got)
+				t.Fatalf("lookupMapPath succeeded with %#v, but want failure", got)
 			}
 		})
 	}
@@ -152,16 +152,16 @@ func TestParseRoomMemberCountCondition(t *testing.T) {
 		t.Run(tst.Input, func(t *testing.T) {
 			got, err := parseRoomMemberCountCondition(tst.Input)
 			if err != nil {
-				t.Fatal("parseRoomMemberCountCondition failed: %v", err)
+				t.Fatalf("parseRoomMemberCountCondition failed: %v", err)
 			}
 			for _, v := range tst.WantTrue {
 				if !got(v) {
-					t.Error("parseRoomMemberCountCondition(%q)(%d): got false, want true", tst.Input, v)
+					t.Errorf("parseRoomMemberCountCondition(%q)(%d): got false, want true", tst.Input, v)
 				}
 			}
 			for _, v := range tst.WantFalse {
 				if got(v) {
-					t.Error("parseRoomMemberCountCondition(%q)(%d): got true, want false", tst.Input, v)
+					t.Errorf("parseRoomMemberCountCondition(%q)(%d): got true, want false", tst.Input, v)
 				}
 			}
 		})

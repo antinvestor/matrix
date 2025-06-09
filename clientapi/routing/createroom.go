@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"strings"
 	"time"
@@ -32,7 +33,6 @@ import (
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 )
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
@@ -143,7 +143,7 @@ func createRoom(
 ) util.JSONResponse {
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("invalid userID")
+		frame.Log(ctx).WithError(err).Error("invalid userID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -156,13 +156,13 @@ func createRoom(
 		}
 	}
 
-	logger := util.GetLogger(ctx)
+	logger := frame.Log(ctx)
 
 	// TODO: Check room ID doesn't clash with an existing one, and we
 	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID, err := spec.NewRoomID(fmt.Sprintf("!%s:%s", util.RandomString(16), userID.Domain()))
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("invalid roomID")
+		frame.Log(ctx).WithError(err).Error("invalid roomID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -184,15 +184,15 @@ func createRoom(
 		roomVersion = candidateVersion
 	}
 
-	logger.WithFields(log.Fields{
-		"userID":      userID.String(),
-		"roomID":      roomID.String(),
-		"roomVersion": roomVersion,
-	}).Info("Creating new room")
+	logger.
+		WithField("userID", userID.String()).
+		WithField("roomID", roomID.String()).
+		WithField("roomVersion", roomVersion).
+		Info("Creating new room")
 
 	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID.String(), asAPI, profileAPI)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
+		frame.Log(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

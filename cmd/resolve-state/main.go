@@ -11,8 +11,6 @@ import (
 
 	"github.com/pitabwire/frame"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/cacheutil"
@@ -21,7 +19,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup"
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 // This is a utility for inspecting state snapshots and running state resolution
@@ -55,10 +52,7 @@ func main() {
 	ctx, svc := frame.NewService("resolve-state")
 
 	cfg := setup.ParseFlags(true)
-	cfg.Logging = append(cfg.Logging[:0], config.LogrusHook{
-		Type:  "std",
-		Level: "error",
-	})
+
 	cfg.ClientAPI.RegistrationDisabled = true
 
 	args := flag.Args()
@@ -85,7 +79,7 @@ func main() {
 	cfg.Global.Cache.MaxAge = time.Minute * 5
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to create cache")
+		frame.Log(ctx).WithError(err).Panic("failed to create cache")
 	}
 
 	fmt.Println("Opening database")

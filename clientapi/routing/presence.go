@@ -19,6 +19,7 @@ import (
 	presenceV1 "buf.build/gen/go/antinvestor/presence/protocolbuffers/go"
 	"connectrpc.com/connect"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -28,7 +29,6 @@ import (
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 )
 
 type presenceReq struct {
@@ -70,7 +70,7 @@ func SetPresence(
 	}
 	err := producer.SendPresence(req.Context(), userID, presenceStatus, presence.StatusMsg)
 	if err != nil {
-		log.WithError(err).Error("failed to update presence")
+		frame.Log(req.Context()).WithError(err).Error("failed to update presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -97,7 +97,7 @@ func GetPresence(
 	}))
 
 	if err != nil {
-		log.WithError(err).Error("unable to get presence")
+		frame.Log(ctx).WithError(err).Error("unable to get presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

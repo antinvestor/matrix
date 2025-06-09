@@ -35,7 +35,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/frame"
-	"github.com/sirupsen/logrus"
 )
 
 // Inputer is responsible for consuming from the roomserver input
@@ -216,19 +215,19 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 		switch {
 		case errors.As(err, &rejectedError):
 			// Don't send events that were rejected to Sentry
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"room_id":  inputRoomEvent.Event.RoomID(),
-				"event_id": inputRoomEvent.Event.EventID(),
-				"type":     inputRoomEvent.Event.Type(),
-			}).Warn("Roomserver rejected event")
+			frame.Log(ctx).WithError(err).
+				WithField("room_id", inputRoomEvent.Event.RoomID()).
+				WithField("event_id", inputRoomEvent.Event.EventID()).
+				WithField("type", inputRoomEvent.Event.Type()).
+				Warn("Roomserver rejected event")
 			err = nil
 		default:
 
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"room_id":  inputRoomEvent.Event.RoomID(),
-				"event_id": inputRoomEvent.Event.EventID(),
-				"type":     inputRoomEvent.Event.Type(),
-			}).Warn("Roomserver failed to process event")
+			frame.Log(ctx).WithError(err).
+				WithField("room_id", inputRoomEvent.Event.RoomID()).
+				WithField("event_id", inputRoomEvent.Event.EventID()).
+				WithField("type", inputRoomEvent.Event.Type()).
+				Warn("Roomserver failed to process event")
 
 			// Even though we failed to process this message (e.g. due to Matrix restarting and receiving a context canceled),
 			// the message may already have been queued for redelivery or will be, so this makes sure that we still reprocess the msg
@@ -255,12 +254,11 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 
 		err0 := r.Qm.EnsurePublisherOk(ctx, replyToOpts)
 		if err0 != nil {
-			logrus.WithError(err0).WithFields(logrus.Fields{
-				"room_id":  inputRoomEvent.Event.RoomID(),
-				"event_id": inputRoomEvent.Event.EventID(),
-				"type":     inputRoomEvent.Event.Type(),
-				"replyTo":  replyTo,
-			}).Warn("Publisher to reply to is not available")
+			frame.Log(ctx).WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
+				WithField("event_id", inputRoomEvent.Event.EventID()).
+				WithField("type", inputRoomEvent.Event.Type()).
+				WithField("replyTo", replyTo).
+				Warn("Publisher to reply to is not available")
 			return nil
 		}
 
@@ -274,12 +272,11 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 
 		err0 = r.Qm.Publish(ctx, replyToOpts.Ref(), []byte(errString))
 		if err0 != nil {
-			logrus.WithError(err0).WithFields(logrus.Fields{
-				"room_id":  inputRoomEvent.Event.RoomID(),
-				"event_id": inputRoomEvent.Event.EventID(),
-				"type":     inputRoomEvent.Event.Type(),
-				"replyTo":  replyTo,
-			}).Warn("Roomserver failed to respond for sync event")
+			frame.Log(ctx).WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
+				WithField("event_id", inputRoomEvent.Event.EventID()).
+				WithField("type", inputRoomEvent.Event.Type()).
+				WithField("replyTo", replyTo).
+				Warn("Roomserver failed to respond for sync event")
 		}
 	}
 	return err
@@ -338,10 +335,9 @@ func (r *Inputer) queueInputRoomEvents(
 
 		err = r.actorSystem.Publish(ctx, &roomID, e, header)
 		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"room_id":  roomID,
-				"event_id": e.Event.EventID(),
-			}).Error("Roomserver failed to queue async event")
+			frame.Log(ctx).WithError(err).WithField("room_id", roomID).
+				WithField("event_id", e.Event.EventID()).
+				Error("Roomserver failed to queue async event")
 			return nil, fmt.Errorf("r.Qm.Publish: %w", err)
 		}
 	}
@@ -374,7 +370,7 @@ func (r *Inputer) InputRoomEvents(
 	defer func(replySub frame.Subscriber, ctx context.Context) {
 		err = replySub.Stop(ctx)
 		if err != nil {
-			logrus.WithError(err).Error("Roomserver failed to stop subscriber")
+			frame.Log(ctx).WithError(err).Error("Roomserver failed to stop subscriber")
 		}
 	}(replySub, ctx) // nolint:errcheck
 	for i := 0; i < len(request.InputRoomEvents); i++ {

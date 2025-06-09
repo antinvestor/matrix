@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"reflect"
@@ -28,7 +29,7 @@ func errorResponse(ctx context.Context, err error, msg string, args ...interface
 		}
 		return util.MatrixErrorResponse(status, string(eerr.ErrCode), eerr.Err)
 	}
-	util.GetLogger(ctx).WithError(err).Errorf(msg, args...)
+	frame.Log(ctx).WithError(err).Error(msg, args...)
 	return util.JSONResponse{
 		Code: http.StatusInternalServerError,
 		JSON: spec.InternalServerError{},
@@ -38,7 +39,7 @@ func errorResponse(ctx context.Context, err error, msg string, args ...interface
 func GetAllPushRules(ctx context.Context, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
 	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
 	if err != nil {
-		return errorResponse(ctx, err, "queryPushRulesJSON failed")
+		return errorResponse(ctx, err, "queryPushRules failed")
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -49,7 +50,7 @@ func GetAllPushRules(ctx context.Context, device *userapi.Device, userAPI userap
 func GetPushRulesByScope(ctx context.Context, scope string, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
 	ruleSets, err := userAPI.QueryPushRules(ctx, device.UserID)
 	if err != nil {
-		return errorResponse(ctx, err, "queryPushRulesJSON failed")
+		return errorResponse(ctx, err, "queryPushRules failed")
 	}
 	ruleSet := pushRuleSetByScope(ruleSets, pushrules.Scope(scope))
 	if ruleSet == nil {
@@ -139,12 +140,12 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 		// TODO: The spec does not say what to do in this case, but
 		// this feels reasonable.
 		*((*rulesPtr)[i]) = newRule
-		util.GetLogger(ctx).Info("Modified existing push rule at %d", i)
+		frame.Log(ctx).WithField("index", i).Info("Modified existing push rule")
 	} else {
 		if i >= 0 {
 			// Delete old rule.
 			*rulesPtr = append((*rulesPtr)[:i], (*rulesPtr)[i+1:]...)
-			util.GetLogger(ctx).Info("Deleted old push rule at %d", i)
+			frame.Log(ctx).WithField("index", i).Info("Deleted old push rule")
 		} else {
 			// SPEC: When creating push rules, they MUST be enabled by default.
 			//
@@ -160,7 +161,7 @@ func PutPushRuleByRuleID(ctx context.Context, scope, kind, ruleID, afterRuleID, 
 		}
 
 		*rulesPtr = append((*rulesPtr)[:i], append([]*pushrules.Rule{&newRule}, (*rulesPtr)[i:]...)...)
-		util.GetLogger(ctx).WithField("after", afterRuleID).WithField("before", beforeRuleID).Info("Added new push rule at %d", i)
+		frame.Log(ctx).WithField("after", afterRuleID).WithField("before", beforeRuleID).WithField("index", i).Info("Added new push rule")
 	}
 
 	if err = userAPI.PerformPushRulesPut(ctx, device.UserID, ruleSets); err != nil {

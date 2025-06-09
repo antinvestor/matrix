@@ -15,10 +15,10 @@ func TestRoutersError(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, filepath.Join(PublicFederationPathPrefix, "doesnotexist"), nil)
 	r.Federation.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound {
-		t.Fatal("unexpected status code: %d - %s", rec.Code, rec.Body.String())
+		t.Fatalf("unexpected status code: %d - %s", rec.Code, rec.Body.String())
 	}
 	if ct := rec.Result().Header.Get("Content-Type"); ct != "application/json" {
-		t.Fatal("unexpected content-type: %s", ct)
+		t.Fatalf("unexpected content-type: %s", ct)
 	}
 
 	// not allowed test
@@ -30,9 +30,9 @@ func TestRoutersError(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, filepath.Join(DendriteAdminPathPrefix, "test"), nil)
 	r.DendriteAdmin.ServeHTTP(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatal("unexpected status code: %d - %s", rec.Code, rec.Body.String())
+		t.Fatalf("unexpected status code: %d - %s", rec.Code, rec.Body.String())
 	}
 	if ct := rec.Result().Header.Get("Content-Type"); ct != "application/json" {
-		t.Fatal("unexpected content-type: %s", ct)
+		t.Fatalf("unexpected content-type: %s", ct)
 	}
 }

@@ -34,7 +34,7 @@ func TestValidateRuleNegatives(t *testing.T) {
 				}
 			}
 			if foundErr == nil {
-				t.Error("errs: got %#v, want containing %q", errs, tst.WantErrString)
+				t.Errorf("errs: got %#v, want containing %q", errs, tst.WantErrString)
 			}
 		})
 	}
@@ -62,7 +62,7 @@ func TestValidateRulePositives(t *testing.T) {
 			for _, err := range errs {
 				t.Logf("Got error %#v", err)
 				if strings.Contains(err.Error(), tst.WantNoErrString) {
-					t.Error("errs: got %#v, want none containing %q", errs, tst.WantNoErrString)
+					t.Errorf("errs: got %#v, want none containing %q", errs, tst.WantNoErrString)
 				}
 			}
 		})
@@ -89,7 +89,7 @@ func TestValidateActionNegatives(t *testing.T) {
 				}
 			}
 			if foundErr == nil {
-				t.Error("errs: got %#v, want containing %q", errs, tst.WantErrString)
+				t.Errorf("errs: got %#v, want containing %q", errs, tst.WantErrString)
 			}
 		})
 	}
@@ -109,7 +109,7 @@ func TestValidateActionPositives(t *testing.T) {
 			for _, err := range errs {
 				t.Logf("Got error %#v", err)
 				if strings.Contains(err.Error(), tst.WantNoErrString) {
-					t.Error("errs: got %#v, want none containing %q", errs, tst.WantNoErrString)
+					t.Errorf("errs: got %#v, want none containing %q", errs, tst.WantNoErrString)
 				}
 			}
 		})
@@ -136,7 +136,7 @@ func TestValidateConditionNegatives(t *testing.T) {
 				}
 			}
 			if foundErr == nil {
-				t.Error("errs: got %#v, want containing %q", errs, tst.WantErrString)
+				t.Errorf("errs: got %#v, want containing %q", errs, tst.WantErrString)
 			}
 		})
 	}
@@ -156,7 +156,7 @@ func TestValidateConditionPositives(t *testing.T) {
 			for _, err := range errs {
 				t.Logf("Got error %#v", err)
 				if strings.Contains(err.Error(), tst.WantNoErrString) {
-					t.Error("errs: got %#v, want none containing %q", errs, tst.WantNoErrString)
+					t.Errorf("errs: got %#v, want none containing %q", errs, tst.WantNoErrString)
 				}
 			}
 		})

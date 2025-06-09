@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"math/rand"
 	"net/http"
 	"sort"
@@ -123,7 +124,7 @@ func publicRooms(
 	// ParseInt returns 0 and an error when trying to parse an empty string
 	// In that case, we want to assign 0 so we ignore the error
 	if err != nil && len(request.Since) > 0 {
-		util.GetLogger(ctx).WithError(err).Error("strconv.ParseInt failed")
+		frame.Log(ctx).WithError(err).Error("strconv.ParseInt failed")
 		return nil, err
 	}
 	err = nil
@@ -267,12 +268,12 @@ func refreshPublicRoomCache(
 		IncludeAllNetworks: request.IncludeAllNetworks,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("QueryPublishedRooms failed")
+		frame.Log(ctx).WithError(err).Error("QueryPublishedRooms failed")
 		return publicRoomsCache
 	}
 	pubRooms, err := roomserverAPI.PopulatePublicRooms(ctx, queryRes.RoomIDs, rsAPI)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("PopulatePublicRooms failed")
+		frame.Log(ctx).WithError(err).Error("PopulatePublicRooms failed")
 		return publicRoomsCache
 	}
 	publicRoomsCache = []fclient.PublicRoom{}

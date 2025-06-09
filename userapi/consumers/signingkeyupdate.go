@@ -18,12 +18,11 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 )
@@ -58,18 +57,18 @@ func NewSigningKeyUpdateConsumer(
 func (t *SigningKeyUpdateConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	var updatePayload api.CrossSigningKeyUpdate
 	if err := json.Unmarshal(message, &updatePayload); err != nil {
-		logrus.WithError(err).Error("Failed to read from signing key update input topic")
+		frame.Log(ctx).WithError(err).Error("Failed to read from signing key update input topic")
 		return nil
 	}
 	origin := spec.ServerName(metadata["origin"])
 	if _, serverName, err := gomatrixserverlib.SplitID('@', updatePayload.UserID); err != nil {
-		logrus.WithError(err).Error("failed to split user id")
+		frame.Log(ctx).WithError(err).Error("failed to split user id")
 		return nil
 	} else if t.isLocalServerName(serverName) {
-		logrus.Warn("dropping device key update from ourself")
+		frame.Log(ctx).Warn("dropping device key update from ourself")
 		return nil
 	} else if serverName != origin {
-		logrus.Warn("dropping device key update, %s != %s", serverName, origin)
+		frame.Log(ctx).Warn("dropping device key update, %s != %s", serverName, origin)
 		return nil
 	}
 
@@ -87,7 +86,7 @@ func (t *SigningKeyUpdateConsumer) Handle(ctx context.Context, metadata map[stri
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
 	t.userAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
 	if uploadRes.Error != nil {
-		logrus.WithError(uploadRes.Error).Error("failed to upload device keys")
+		frame.Log(ctx).WithError(uploadRes.Error).Error("failed to upload device keys")
 		return nil
 	}
 

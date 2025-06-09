@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"hash/fnv"
 	"net"
 	"strconv"
@@ -32,12 +33,10 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
-
 	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -238,7 +237,7 @@ func (u *DeviceListUpdater) CleanUp(ctx context.Context) error {
 	if len(res.LeftUsers) == 0 {
 		return nil
 	}
-	logrus.Debug("Deleting %d stale device list entries", len(res.LeftUsers))
+	frame.Log(ctx).Debug("Deleting %d stale device list entries", len(res.LeftUsers))
 	return u.db.DeleteStaleDeviceLists(ctx, res.LeftUsers)
 }
 
@@ -292,15 +291,14 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 	if len(event.PrevID) == 0 {
 		exists = false
 	}
-	util.GetLogger(ctx).WithFields(logrus.Fields{
-		"prev_ids_exist": exists,
-		"user_id":        event.UserID,
-		"device_id":      event.DeviceID,
-		"stream_id":      event.StreamID,
-		"prev_ids":       event.PrevID,
-		"display_name":   event.DeviceDisplayName,
-		"deleted":        event.Deleted,
-	}).Trace("DeviceListUpdater.Update")
+	frame.Log(ctx).WithField("prev_ids_exist", exists).
+		WithField("user_id", event.UserID).
+		WithField("device_id", event.DeviceID).
+		WithField("stream_id", event.StreamID).
+		WithField("prev_ids", event.PrevID).
+		WithField("display_name", event.DeviceDisplayName).
+		WithField("deleted", event.Deleted).
+		Debug("DeviceListUpdater.Update")
 
 	// if we haven't missed anything update the database and notify users
 	if exists || event.Deleted {
@@ -336,7 +334,7 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 		// fetch what keys we had already and only emit changes
 		if err = u.db.DeviceKeysJSON(ctx, existingKeys); err != nil {
 			// non-fatal, log and continue
-			util.GetLogger(ctx).WithError(err).WithField("user_id", event.UserID).Error(
+			frame.Log(ctx).WithError(err).WithField("user_id", event.UserID).Error(
 				"failed to query device keys json for calculating diffs",
 			)
 		}
@@ -494,7 +492,7 @@ func (u *DeviceListUpdater) processServer(ctx context.Context, serverName spec.S
 		return defaultWaitTime, false
 	}
 
-	logger := util.GetLogger(ctx).WithField("server_name", serverName)
+	logger := frame.Log(ctx).WithField("server_name", serverName)
 	deviceListUpdateCount.WithLabelValues(string(serverName)).Inc()
 
 	waitTime := defaultWaitTime // How long should we wait to try again?
@@ -519,12 +517,12 @@ func (u *DeviceListUpdater) processServer(ctx context.Context, serverName spec.S
 
 	allUsersSucceeded := successCount == len(userIDs)
 	if !allUsersSucceeded {
-		logger.WithFields(logrus.Fields{
-			"total":     len(userIDs),
-			"succeeded": successCount,
-			"failed":    len(userIDs) - successCount,
-			"wait_time": waitTime,
-		}).Debug("Failed to query device keys for some users")
+		logger.
+			WithField("total", len(userIDs)).
+			WithField("succeeded", successCount).
+			WithField("failed", len(userIDs)-successCount).
+			WithField("wait_time", waitTime).
+			Debug("Failed to query device keys for some users")
 	}
 	return waitTime, !allUsersSucceeded
 }
@@ -537,10 +535,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 	// immediately instead of just after **all** users have been processed.
 	defer u.clearChannel(userID)
 
-	logger := util.GetLogger(iCtx).WithFields(logrus.Fields{
-		"server_name": serverName,
-		"user_id":     userID,
-	})
+	logger := util.GetLogger(iCtx).WithField("server_name", serverName).WithField("user_id", userID)
 	res, err := u.fedClient.GetUserDevices(iCtx, u.thisServer, serverName, userID)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -572,12 +567,12 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 			}
 		default:
 			// Something else failed
-			logger.WithError(err).Debug("GetUserDevices returned unknown error type: %T", err)
+			logger.WithError(err).WithField("error_type", fmt.Sprintf("%T", err)).Debug("GetUserDevices returned unknown error type")
 			return time.Minute * 10, err
 		}
 	}
 	if res.UserID != userID {
-		logger.WithError(err).Debug("User ID %q in device list update response doesn't match expected %q", res.UserID, userID)
+		logger.WithError(err).WithField("user_id", res.UserID).Debug("User ID in device list update response doesn't match expected")
 		return defaultWaitTime, nil
 	}
 	if res.MasterKey != nil || res.SelfSigningKey != nil {
@@ -611,7 +606,7 @@ func (u *DeviceListUpdater) updateDeviceList(ctx context.Context, res *fclient.R
 	for i, device := range res.Devices {
 		keyJSON, err := json.Marshal(device.Keys)
 		if err != nil {
-			util.GetLogger(ctx).WithField("keys", device.Keys).Error("failed to marshal keys, skipping device")
+			frame.Log(ctx).WithField("keys", device.Keys).Error("failed to marshal keys, skipping device")
 			continue
 		}
 		keys[i] = api.DeviceMessage{
@@ -635,7 +630,7 @@ func (u *DeviceListUpdater) updateDeviceList(ctx context.Context, res *fclient.R
 	// fetch what keys we had already and only emit changes
 	if err := u.db.DeviceKeysJSON(ctx, existingKeys); err != nil {
 		// non-fatal, log and continue
-		util.GetLogger(ctx).WithError(err).WithField("user_id", res.UserID).Error(
+		frame.Log(ctx).WithError(err).WithField("user_id", res.UserID).Error(
 			"failed to query device keys json for calculating diffs",
 		)
 	}

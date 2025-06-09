@@ -21,10 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/pitabwire/frame"
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -34,7 +35,6 @@ import (
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -85,6 +85,9 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 	// Parse out the event JSON
 	var err error
 	var output api.OutputEvent
+
+	log := frame.Log(ctx)
+
 	if err = json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Error("roomserver output log: message parse failure")
@@ -137,9 +140,9 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 			// no matter how often we retry this event, we will always get this error, discard the event
 			return nil
 		}
-		log.WithFields(log.Fields{
-			"type": output.Type,
-		}).WithError(err).Error("roomserver output log: failed to process event")
+		log.WithField("type", output.Type).
+			WithError(err).
+			Error("roomserver output log: failed to process event")
 		return err
 	}
 
@@ -149,6 +152,8 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 func (s *OutputRoomEventConsumer) onRedactEvent(
 	ctx context.Context, msg api.OutputRedactedEvent,
 ) error {
+	log := frame.Log(ctx)
+
 	err := s.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause, s.rsAPI)
 	if err != nil {
 		log.WithError(err).Error("RedactEvent error'd")
@@ -156,11 +161,11 @@ func (s *OutputRoomEventConsumer) onRedactEvent(
 	}
 
 	if err = s.db.RedactRelations(ctx, msg.RedactedBecause.RoomID().String(), msg.RedactedEventID); err != nil {
-		log.WithFields(log.Fields{
-			"room_id":           msg.RedactedBecause.RoomID().String(),
-			"event_id":          msg.RedactedBecause.EventID(),
-			"redacted_event_id": msg.RedactedEventID,
-		}).WithError(err).Warn("Failed to redact relations")
+		log.WithField("room_id", msg.RedactedBecause.RoomID().String()).
+			WithField("event_id", msg.RedactedBecause.EventID()).
+			WithField("redacted_event_id", msg.RedactedEventID).
+			WithError(err).
+			Warn("Failed to redact relations")
 		return err
 	}
 
@@ -174,6 +179,9 @@ func (s *OutputRoomEventConsumer) onRedactEvent(
 func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
+
+	log := frame.Log(ctx)
+
 	ev := msg.Event
 	addsStateEvents, missingEventIDs := msg.NeededStateEventIDs()
 
@@ -261,21 +269,18 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	pduPos, err := s.db.WriteEvent(ctx, ev, addsStateEvents, msg.AddsStateEventIDs, msg.RemovesStateEventIDs, msg.TransactionID, false, msg.HistoryVisibility)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		log.WithFields(log.Fields{
-			"event_id":   ev.EventID(),
-			"event":      string(ev.JSON()),
-			log.ErrorKey: err,
-			"add":        msg.AddsStateEventIDs,
-			"del":        msg.RemovesStateEventIDs,
-		}).Panic("roomserver output log: write new event failure")
+		log.WithField("event_id", ev.EventID()).
+			WithField("event", string(ev.JSON())).
+			WithError(err).
+			Panic("roomserver output log: write new event failure")
 		return nil
 	}
 
 	if err = s.checkIndexExclusion(ctx, ev); err != nil {
-		log.WithFields(log.Fields{
-			"event_id": ev.EventID(),
-			"type":     ev.Type(),
-		}).WithError(err).Warn("failed to exclude from search index element")
+		log.WithField("event_id", ev.EventID()).
+			WithField("type", ev.Type()).
+			WithError(err).
+			Warn("failed to exclude from search index element")
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
@@ -284,10 +289,10 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	}
 
 	if err = s.db.UpdateRelations(ctx, ev); err != nil {
-		log.WithFields(log.Fields{
-			"event_id": ev.EventID(),
-			"type":     ev.Type(),
-		}).WithError(err).Warn("Failed to update relations")
+		log.WithField("event_id", ev.EventID()).
+			WithField("type", ev.Type()).
+			WithError(err).
+			Warn("Failed to update relations")
 		return err
 	}
 
@@ -300,6 +305,9 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	ctx context.Context, msg api.OutputOldRoomEvent,
 ) error {
+
+	log := frame.Log(ctx)
+
 	ev := msg.Event
 
 	// TODO: The state key check when excluding from sync is designed
@@ -318,27 +326,26 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	pduPos, err := s.db.WriteEvent(ctx, ev, []*rstypes.HeaderedEvent{}, []string{}, []string{}, nil, ev.StateKey() != nil, msg.HistoryVisibility)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		log.WithFields(log.Fields{
-			"event_id":   ev.EventID(),
-			"event":      string(ev.JSON()),
-			log.ErrorKey: err,
-		}).Panic("roomserver output log: write old event failure")
+		log.WithField("event_id", ev.EventID()).
+			WithField("event", string(ev.JSON())).
+			WithError(err).
+			Panic("roomserver output log: write old event failure")
 		return nil
 	}
 
 	if err = s.checkIndexExclusion(ctx, ev); err != nil {
-		log.WithFields(log.Fields{
-			"event_id": ev.EventID(),
-			"type":     ev.Type(),
-		}).WithError(err).Warn("failed to exclude from search index element")
+		log.WithField("event_id", ev.EventID()).
+			WithField("type", ev.Type()).
+			WithError(err).
+			Warn("failed to exclude from search index element")
 	}
 
 	if err = s.db.UpdateRelations(ctx, ev); err != nil {
-		log.WithFields(log.Fields{
-			"room_id":  ev.RoomID().String(),
-			"event_id": ev.EventID(),
-			"type":     ev.Type(),
-		}).WithError(err).Warn("Failed to update relations")
+		log.WithField("room_id", ev.RoomID().String()).
+			WithField("event_id", ev.EventID()).
+			WithField("type", ev.Type()).
+			WithError(err).
+			Warn("Failed to update relations")
 		return err
 	}
 
@@ -391,6 +398,9 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *rst
 func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) {
+
+	log := frame.Log(ctx)
+
 	if msg.Event.StateKey() == nil {
 		return
 	}
@@ -408,12 +418,11 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		log.WithFields(log.Fields{
-			"event_id":   msg.Event.EventID(),
-			"event":      string(msg.Event.JSON()),
-			"pdupos":     pduPos,
-			log.ErrorKey: err,
-		}).Error("roomserver output log: write invite failure")
+		log.WithField("event_id", msg.Event.EventID()).
+			WithField("event", string(msg.Event.JSON())).
+			WithField("pdupos", pduPos).
+			WithError(err).
+			Error("roomserver output log: write invite failure")
 		return
 	}
 
@@ -424,15 +433,17 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	ctx context.Context, msg api.OutputRetireInviteEvent,
 ) {
+
+	log := frame.Log(ctx)
+
 	pduPos, err := s.db.RetireInviteEvent(ctx, msg.EventID)
 	// It's possible we just haven't heard of this invite yet, so
 	// we should not panic if we try to retire it.
 	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		// panic rather than continue with an inconsistent database
-		log.WithFields(log.Fields{
-			"event_id":   msg.EventID,
-			log.ErrorKey: err,
-		}).Error("roomserver output log: remove invite failure")
+		log.WithField("event_id", msg.EventID).
+			WithError(err).
+			Error("roomserver output log: remove invite failure")
 		return
 	}
 
@@ -447,20 +458,17 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	s.inviteStream.Advance(pduPos)
 	validRoomID, err := spec.NewRoomID(msg.RoomID)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"event_id":   msg.EventID,
-			"room_id":    msg.RoomID,
-			log.ErrorKey: err,
-		}).Error("roomID is invalid")
+		log.WithField("room_id", msg.RoomID).
+			WithError(err).
+			Error("roomID is invalid")
 		return
 	}
 	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, msg.TargetSenderID)
 	if err != nil || userID == nil {
-		log.WithFields(log.Fields{
-			"event_id":   msg.EventID,
-			"sender_id":  msg.TargetSenderID,
-			log.ErrorKey: err,
-		}).Error("failed to find userID for sender")
+		log.WithField("event_id", msg.EventID).
+			WithField("sender_id", msg.TargetSenderID).
+			WithError(err).
+			Error("failed to find userID for sender")
 		return
 	}
 	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, userID.String())
@@ -469,12 +477,13 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 func (s *OutputRoomEventConsumer) onNewPeek(
 	ctx context.Context, msg api.OutputNewPeek,
 ) {
+
+	log := frame.Log(ctx)
+
 	sp, err := s.db.AddPeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		log.WithFields(log.Fields{
-			log.ErrorKey: err,
-		}).Error("roomserver output log: write peek failure")
+		log.WithError(err).Error("roomserver output log: write peek failure")
 		return
 	}
 
@@ -488,12 +497,13 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 func (s *OutputRoomEventConsumer) onRetirePeek(
 	ctx context.Context, msg api.OutputRetirePeek,
 ) {
+
+	log := frame.Log(ctx)
+
 	sp, err := s.db.DeletePeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
-		log.WithFields(log.Fields{
-			log.ErrorKey: err,
-		}).Error("roomserver output log: write peek failure")
+		log.WithError(err).Error("roomserver output log: write peek failure")
 		return
 	}
 
@@ -507,10 +517,14 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 func (s *OutputRoomEventConsumer) onPurgeRoom(
 	ctx context.Context, req api.OutputPurgeRoom,
 ) error {
+
+	log := frame.Log(ctx)
 	log.WithField("room_id", req.RoomID).Warn("Purging room from sync API")
 
 	if err := s.db.PurgeRoom(ctx, req.RoomID); err != nil {
-		log.WithField("room_id", req.RoomID).WithError(err).Error("Failed to purge room from sync API")
+		log.WithField("room_id", req.RoomID).
+			WithError(err).
+			Error("Failed to purge room from sync API")
 		return err
 	} else {
 		log.WithField("room_id", req.RoomID).Warn("Room purged from sync API")
@@ -573,6 +587,8 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 
 func (s *OutputRoomEventConsumer) checkIndexExclusion(ctx context.Context, ev *rstypes.HeaderedEvent) error {
 
+	log := frame.Log(ctx)
+
 	var relatesTo gjson.Result
 	switch ev.Type() {
 	case "m.room.message":
@@ -587,16 +603,16 @@ func (s *OutputRoomEventConsumer) checkIndexExclusion(ctx context.Context, ev *r
 				if srcEventID, ok := relatedData["event_id"]; ok {
 					err := s.db.ExcludeEventsFromSearchIndex(ctx, []string{srcEventID.Str})
 					if err != nil {
-						log.WithFields(log.Fields{
-							"event_id": ev.EventID(),
-							"src_id":   srcEventID.Str,
-						}).WithError(err).Error("Failed to delete edited message from the fulltext index")
+						log.WithField("event_id", ev.EventID()).
+							WithField("src_id", srcEventID.Str).
+							WithError(err).
+							Error("Failed to delete edited message from the fulltext index")
 					}
 				}
 			}
 		}
 	case spec.MRoomRedaction:
-		log.Tracef("Redacting event: %s", ev.Redacts())
+		log.Debug("Redacting event: %s", ev.Redacts())
 		if err := s.db.ExcludeEventsFromSearchIndex(ctx, []string{ev.EventID()}); err != nil {
 			return fmt.Errorf("failed to exclude entry from search index: %w", err)
 		}

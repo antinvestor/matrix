@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
@@ -26,7 +27,6 @@ import (
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/sirupsen/logrus"
 )
 
 // OutputKeyChangeEventConsumer consumes events that originated in the key server.
@@ -65,7 +65,7 @@ func NewOutputKeyChangeEventConsumer(
 func (s *OutputKeyChangeEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	var m api.DeviceMessage
 	if err := json.Unmarshal(message, &m); err != nil {
-		logrus.WithError(err).Error("failed to read device message from key change topic")
+		frame.Log(ctx).WithError(err).Error("failed to read device message from key change topic")
 		return nil
 	}
 	if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {
@@ -95,7 +95,7 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(ctx context.Context, m
 		LocalOnly: true,
 	}, &queryRes)
 	if err != nil {
-		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
+		frame.Log(ctx).WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
 		return err
 	}
 	// make sure we get our own key updates too!
@@ -119,7 +119,7 @@ func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(ctx context.Context
 		LocalOnly: true,
 	}, &queryRes)
 	if err != nil {
-		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
+		frame.Log(ctx).WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
 		return err
 	}
 	// make sure we get our own key updates too!

@@ -100,7 +100,7 @@ func (s stateTestRoomserverAPI) QueryUserIDForSender(
 		if sID == string(senderID) {
 			parsedUserID, err := spec.NewUserID(uID, true)
 			if err != nil {
-				s.t.Fatal("Mock QueryUserIDForSender failed: %s", err)
+				s.t.Fatalf("Mock QueryUserIDForSender failed: %s", err)
 			}
 			return parsedUserID, nil
 		}
@@ -246,12 +246,12 @@ func mustCreateStatePDU(t *testing.T, roomVer gomatrixserverlib.RoomVersion, roo
 		"content":   stateContent,
 	})
 	if err != nil {
-		t.Fatal("failed to create event: %v", err)
+		t.Fatalf("failed to create event: %v", err)
 	}
 
 	ev, err := roomVerImpl.NewEventFromTrustedJSON(evBytes, false)
 	if err != nil {
-		t.Fatal("failed to create event: %v", err)
+		t.Fatalf("failed to create event: %v", err)
 	}
 
 	return &types.HeaderedEvent{PDU: ev}

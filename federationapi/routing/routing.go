@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"sync"
 	"time"
@@ -36,7 +37,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -54,6 +54,7 @@ const (
 // applied:
 // nolint: gocyclo
 func Setup(
+	ctx context.Context,
 	routers httputil.Routers,
 	mcfg *config.Matrix,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
@@ -109,7 +110,7 @@ func Setup(
 	})
 
 	if cfg.Global.WellKnownServerName != "" {
-		logrus.Info("Setting m.server as %s at /.well-known/matrix/server", cfg.Global.WellKnownServerName)
+		frame.Log(ctx).Info("Setting m.server as %s at /.well-known/matrix/server", cfg.Global.WellKnownServerName)
 		wkMux.Handle("/server", httputil.MakeExternalAPI("wellknown", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -390,7 +391,7 @@ func Setup(
 				}
 			}
 
-			logrus.Debug("Processing make_join for user %s, room %s", userID.String(), roomID.String())
+			frame.Log(ctx).Debug("Processing make_join for user %s, room %s", userID.String(), roomID.String())
 			return MakeJoin(
 				httpReq, request, cfg, rsAPI, *roomID, *userID, remoteVersions,
 			)

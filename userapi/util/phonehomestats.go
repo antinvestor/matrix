@@ -18,13 +18,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/pitabwire/frame"
 	"math"
 	"net/http"
 	"runtime"
 	"syscall"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
@@ -92,19 +91,14 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 	defer cancel()
 
 	// cpu and memory usage information
-	err := getMemoryStats(p)
+	err := getMemoryStats(ctx, p)
 	if err != nil {
-		logrus.WithError(err).Warn("unable to get memory/cpu stats, using defaults")
+		frame.Log(ctx).WithError(err).Warn("unable to get memory/cpu stats, using defaults")
 	}
 
 	// configuration information
 	p.stats["federation_disabled"] = p.cfg.Global.DisableFederation
-
-	if len(p.cfg.Logging) > 0 {
-		p.stats["log_level"] = p.cfg.Logging[0].Level
-	} else {
-		p.stats["log_level"] = "info"
-	}
+	p.stats["log_level"] = "info"
 
 	// message and room stats
 	// TODO: Find a solution to actually set this value
@@ -112,7 +106,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 
 	messageStats, activeRooms, activeE2EERooms, err := p.db.DailyRoomsMessages(iCtx, p.serverName)
 	if err != nil {
-		logrus.WithError(err).Warn("unable to query message stats, using default values")
+		frame.Log(ctx).WithError(err).Warn("unable to query message stats, using default values")
 	}
 	p.stats["daily_messages"] = messageStats.Messages
 	p.stats["daily_sent_messages"] = messageStats.SentMessages
@@ -124,7 +118,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 	// user stats and Cm engine
 	userStats, db, err := p.db.UserStatistics(iCtx)
 	if err != nil {
-		logrus.WithError(err).Warn("unable to query userstats, using default values")
+		frame.Log(ctx).WithError(err).Warn("unable to query userstats, using default values")
 	}
 	p.stats["database_engine"] = db.Engine
 	p.stats["database_server_version"] = db.Version
@@ -144,22 +138,22 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 
 	output := bytes.Buffer{}
 	if err = json.NewEncoder(&output).Encode(p.stats); err != nil {
-		logrus.WithError(err).Error("Unable to encode phone-home statistics")
+		frame.Log(ctx).WithError(err).Error("Unable to encode phone-home statistics")
 		return
 	}
 
-	logrus.Info("Reporting stats to %s: %s", p.cfg.Global.ReportStats.Endpoint, output.String())
+	frame.Log(ctx).Info("Reporting stats to %s: %s", p.cfg.Global.ReportStats.Endpoint, output.String())
 
 	request, err := http.NewRequestWithContext(iCtx, http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
 	if err != nil {
-		logrus.WithError(err).Error("Unable to create phone-home statistics request")
+		frame.Log(ctx).WithError(err).Error("Unable to create phone-home statistics request")
 		return
 	}
 	request.Header.Set("User-Agent", "Matrix/"+internal.VersionString())
 
 	_, err = p.client.Do(request)
 	if err != nil {
-		logrus.WithError(err).Error("Unable to send phone-home statistics")
+		frame.Log(ctx).WithError(err).Error("Unable to send phone-home statistics")
 		return
 	}
 }

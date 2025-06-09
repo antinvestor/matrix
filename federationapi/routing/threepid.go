@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
 
@@ -30,7 +31,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 type invite struct {
@@ -415,7 +415,7 @@ func sendToRemoteServer(
 		if err == nil {
 			return
 		}
-		logrus.WithError(err).Warn("failed to send 3PID invite via %s", server)
+		frame.Log(ctx).WithError(err).Warn("failed to send 3PID invite via %s", server)
 	}
 
 	return errors.New("failed to send 3PID invite via any server")

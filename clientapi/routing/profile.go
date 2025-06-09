@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
 
@@ -261,7 +262,7 @@ func updateProfile(
 
 	rooms, err := rsAPI.QueryRoomsForUser(ctx, *deviceUserID, "join")
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("QueryRoomsForUser failed")
+		frame.Log(ctx).WithError(err).Error("QueryRoomsForUser failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -275,7 +276,7 @@ func updateProfile(
 
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		frame.Log(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -293,7 +294,7 @@ func updateProfile(
 			JSON: spec.BadJSON(e.Error()),
 		}, e
 	default:
-		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvents failed")
+		frame.Log(ctx).WithError(err).Error("buildMembershipEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -301,7 +302,7 @@ func updateProfile(
 	}
 
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, device.UserDomain(), domain, domain, nil, false); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
+		frame.Log(ctx).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

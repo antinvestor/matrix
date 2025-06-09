@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"time"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -32,7 +33,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/sirupsen/logrus"
 )
 
 type Admin struct {
@@ -206,13 +206,13 @@ func (r *Admin) PerformAdminPurgeRoom(
 		return err
 	}
 
-	logrus.WithField("room_id", roomID).Warn("Purging room from roomserver")
+	frame.Log(ctx).WithField("room_id", roomID).Warn("Purging room from roomserver")
 	if err := r.DB.PurgeRoom(ctx, roomID); err != nil {
-		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
+		frame.Log(ctx).WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
 		return err
 	}
 
-	logrus.WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
+	frame.Log(ctx).WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
 
 	return r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, []api.OutputEvent{
 		{

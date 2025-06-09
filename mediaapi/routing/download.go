@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"io"
 	"io/fs"
 	"mime"
@@ -42,7 +43,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/util"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 const mediaIDCharacters = "A-Za-z0-9_=-"
@@ -61,7 +61,7 @@ type downloadRequest struct {
 	MediaMetadata      *types.MediaMetadata
 	IsThumbnailRequest bool
 	ThumbnailSize      types.ThumbnailSize
-	Logger             *log.Entry
+	Logger             *frame.Entry
 	DownloadFilename   string
 	multipartResponse  bool // whether we need to return a multipart/mixed response (for requests coming in over federation)
 	fedClient          fclient.FederationClient
@@ -133,10 +133,9 @@ func Download(
 			Origin:  origin,
 		},
 		IsThumbnailRequest: isThumbnailRequest,
-		Logger: util.GetLogger(req.Context()).WithFields(log.Fields{
-			"Origin":  origin,
-			"MediaID": mediaID,
-		}),
+		Logger: frame.Log(req.Context()).
+			WithField("Origin", origin).
+			WithField("MediaID", mediaID),
 		DownloadFilename:  customFilename,
 		multipartResponse: federationRequest,
 		origin:            cfg.Global.ServerName,
@@ -157,11 +156,10 @@ func Download(
 			Height:       height,
 			ResizeMethod: strings.ToLower(req.FormValue("method")),
 		}
-		dReq.Logger.WithFields(log.Fields{
-			"RequestedWidth":        dReq.ThumbnailSize.Width,
-			"RequestedHeight":       dReq.ThumbnailSize.Height,
-			"RequestedResizeMethod": dReq.ThumbnailSize.ResizeMethod,
-		})
+		dReq.Logger.
+			WithField("RequestedWidth", dReq.ThumbnailSize.Width).
+			WithField("RequestedHeight", dReq.ThumbnailSize.Height).
+			WithField("RequestedResizeMethod", dReq.ThumbnailSize.ResizeMethod)
 	}
 
 	// request validation
@@ -216,7 +214,7 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 
 	// Set status code and write the body
 	w.WriteHeader(res.Code)
-	r.Logger.WithField("code", res.Code).Tracef("Responding (%d bytes)", len(resBytes))
+	r.Logger.WithField("code", res.Code).Debug("Responding (%d bytes)", len(resBytes))
 
 	// we don't really care that much if we fail to write the error response
 	w.Write(resBytes) // nolint: errcheck
@@ -326,10 +324,9 @@ func (r *downloadRequest) respondFromLocalFile(
 	}
 
 	if r.MediaMetadata.FileSizeBytes > 0 && int64(r.MediaMetadata.FileSizeBytes) != stat.Size() {
-		r.Logger.WithFields(log.Fields{
-			"fileSizeDatabase": r.MediaMetadata.FileSizeBytes,
-			"fileSizeDisk":     stat.Size(),
-		}).Warn("File size in database and on-disk differ.")
+		r.Logger.WithField("fileSizeDatabase", r.MediaMetadata.FileSizeBytes).
+			WithField("fileSizeDisk", stat.Size()).
+			Warn("File size in database and on-disk differ.")
 		return nil, errors.New("file size in database and on-disk differ")
 	}
 
@@ -347,26 +344,24 @@ func (r *downloadRequest) respondFromLocalFile(
 			return nil, resErr
 		}
 		if thumbFile == nil {
-			r.Logger.WithFields(log.Fields{
-				"UploadName":    r.MediaMetadata.UploadName,
-				"Base64Hash":    r.MediaMetadata.Base64Hash,
-				"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
-				"ContentType":   r.MediaMetadata.ContentType,
-			}).Trace("No good thumbnail found. Responding with original file.")
+			r.Logger.WithField("UploadName", r.MediaMetadata.UploadName).
+				WithField("Base64Hash", r.MediaMetadata.Base64Hash).
+				WithField("FileSizeBytes", r.MediaMetadata.FileSizeBytes).
+				WithField("ContentType", r.MediaMetadata.ContentType).
+				Debug("No good thumbnail found. Responding with original file.")
 			responseFile = file
 			responseMetadata = r.MediaMetadata
 		} else {
-			r.Logger.Trace("Responding with thumbnail")
+			r.Logger.Debug("Responding with thumbnail")
 			responseFile = thumbFile
 			responseMetadata = thumbMetadata.MediaMetadata
 		}
 	} else {
-		r.Logger.WithFields(log.Fields{
-			"UploadName":    r.MediaMetadata.UploadName,
-			"Base64Hash":    r.MediaMetadata.Base64Hash,
-			"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
-			"ContentType":   r.MediaMetadata.ContentType,
-		}).Trace("Responding with file")
+		r.Logger.WithField("UploadName", r.MediaMetadata.UploadName).
+			WithField("Base64Hash", r.MediaMetadata.Base64Hash).
+			WithField("FileSizeBytes", r.MediaMetadata.FileSizeBytes).
+			WithField("ContentType", r.MediaMetadata.ContentType).
+			Debug("Responding with file")
 		responseFile = file
 		responseMetadata = r.MediaMetadata
 		if err = r.addDownloadFilenameToHeaders(w, responseMetadata); err != nil {
@@ -534,11 +529,10 @@ func (r *downloadRequest) getThumbnailFile(
 		// If dynamicThumbnails is true and we are not over-loaded then we would have generated what was requested above.
 		// So we don't try to generate a pre-generated thumbnail here.
 		if thumbnailSize != nil && !dynamicThumbnails {
-			r.Logger.WithFields(log.Fields{
-				"Width":        thumbnailSize.Width,
-				"Height":       thumbnailSize.Height,
-				"ResizeMethod": thumbnailSize.ResizeMethod,
-			}).Debug("Pre-generating thumbnail for immediate response.")
+			r.Logger.WithField("Width", thumbnailSize.Width).
+				WithField("Height", thumbnailSize.Height).
+				WithField("ResizeMethod", thumbnailSize.ResizeMethod).
+				Debug("Pre-generating thumbnail for immediate response.")
 			thumbnail, err = r.generateThumbnail(
 				ctx, filePath, *thumbnailSize, activeThumbnailGeneration,
 				maxThumbnailGenerators, db,
@@ -551,13 +545,12 @@ func (r *downloadRequest) getThumbnailFile(
 	if thumbnail == nil {
 		return nil, nil, nil
 	}
-	r.Logger = r.Logger.WithFields(log.Fields{
-		"Width":         thumbnail.ThumbnailSize.Width,
-		"Height":        thumbnail.ThumbnailSize.Height,
-		"ResizeMethod":  thumbnail.ThumbnailSize.ResizeMethod,
-		"FileSizeBytes": thumbnail.MediaMetadata.FileSizeBytes,
-		"ContentType":   thumbnail.MediaMetadata.ContentType,
-	})
+	r.Logger = r.Logger.
+		WithField("Width", thumbnail.ThumbnailSize.Width).
+		WithField("Height", thumbnail.ThumbnailSize.Height).
+		WithField("ResizeMethod", thumbnail.ThumbnailSize.ResizeMethod).
+		WithField("FileSizeBytes", thumbnail.MediaMetadata.FileSizeBytes).
+		WithField("ContentType", thumbnail.MediaMetadata.ContentType)
 	thumbPath := string(thumbnailer.GetThumbnailPath(types.Path(filePath), thumbnail.ThumbnailSize))
 	thumbFile, err := os.Open(string(thumbPath))
 	if err != nil {
@@ -586,11 +579,9 @@ func (r *downloadRequest) generateThumbnail(
 	maxThumbnailGenerators int,
 	db storage.Database,
 ) (*types.ThumbnailMetadata, error) {
-	r.Logger.WithFields(log.Fields{
-		"Width":        thumbnailSize.Width,
-		"Height":       thumbnailSize.Height,
-		"ResizeMethod": thumbnailSize.ResizeMethod,
-	})
+	r.Logger.WithField("Width", thumbnailSize.Width).
+		WithField("Height", thumbnailSize.Height).
+		WithField("ResizeMethod", thumbnailSize.ResizeMethod)
 	busy, err := thumbnailer.GenerateThumbnail(
 		ctx, filePath, thumbnailSize, r.MediaMetadata,
 		activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger,
@@ -679,7 +670,7 @@ func (r *downloadRequest) getMediaMetadataFromActiveRequest(activeRemoteRequests
 	defer activeRemoteRequests.Unlock()
 
 	if activeRemoteRequestResult, ok := activeRemoteRequests.MXCToResult[mxcURL]; ok {
-		r.Logger.Trace("Waiting for another goroutine to fetch the remote file.")
+		r.Logger.Debug("Waiting for another goroutine to fetch the remote file.")
 
 		// NOTE: Wait unlocks and locks again internally. There is still a deferred Unlock() that will unlock this.
 		activeRemoteRequestResult.Cond.Wait()
@@ -709,7 +700,7 @@ func (r *downloadRequest) broadcastMediaMetadata(activeRemoteRequests *types.Act
 	defer activeRemoteRequests.Unlock()
 	mxcURL := "mxc://" + string(r.MediaMetadata.Origin) + "/" + string(r.MediaMetadata.MediaID)
 	if activeRemoteRequestResult, ok := activeRemoteRequests.MXCToResult[mxcURL]; ok {
-		r.Logger.Trace("Signalling other goroutines waiting for this goroutine to fetch the file.")
+		r.Logger.Debug("Signalling other goroutines waiting for this goroutine to fetch the file.")
 		activeRemoteRequestResult.MediaMetadata = r.MediaMetadata
 		activeRemoteRequestResult.Error = err
 		activeRemoteRequestResult.Cond.Broadcast()
@@ -735,12 +726,11 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 		return err
 	}
 
-	r.Logger.WithFields(log.Fields{
-		"Base64Hash":    r.MediaMetadata.Base64Hash,
-		"UploadName":    r.MediaMetadata.UploadName,
-		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
-		"ContentType":   r.MediaMetadata.ContentType,
-	}).Debug("Storing file metadata to media repository database")
+	r.Logger.WithField("Base64Hash", r.MediaMetadata.Base64Hash).
+		WithField("UploadName", r.MediaMetadata.UploadName).
+		WithField("FileSizeBytes", r.MediaMetadata.FileSizeBytes).
+		WithField("ContentType", r.MediaMetadata.ContentType).
+		Debug("Storing file metadata to media repository database")
 
 	// FIXME: timeout db request
 	if err := db.StoreMediaMetadata(ctx, r.MediaMetadata); err != nil {
@@ -769,12 +759,11 @@ func (r *downloadRequest) fetchRemoteFileAndStoreMetadata(
 		}
 	}()
 
-	r.Logger.WithFields(log.Fields{
-		"UploadName":    r.MediaMetadata.UploadName,
-		"Base64Hash":    r.MediaMetadata.Base64Hash,
-		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
-		"ContentType":   r.MediaMetadata.ContentType,
-	}).Debug("Remote file cached")
+	r.Logger.WithField("UploadName", r.MediaMetadata.UploadName).
+		WithField("Base64Hash", r.MediaMetadata.Base64Hash).
+		WithField("FileSizeBytes", r.MediaMetadata.FileSizeBytes).
+		WithField("ContentType", r.MediaMetadata.ContentType).
+		Debug("Remote file cached")
 
 	return nil
 }
@@ -888,7 +877,7 @@ func (r *downloadRequest) fetchRemoteFile(
 		}
 	}
 
-	r.Logger.Trace("Transferring remote file")
+	r.Logger.Debug("Transferring remote file")
 
 	// The file data is hashed but is NOT used as the MediaID, unlike in Upload. The hash is useful as a
 	// method of deduplicating files to save storage, as well as a way to conduct
@@ -896,13 +885,11 @@ func (r *downloadRequest) fetchRemoteFile(
 	// Data is truncated to maxFileSizeBytes. Content-Length was reported as 0 < Content-Length <= maxFileSizeBytes so this is OK.
 	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reader, absBasePath)
 	if err != nil {
-		r.Logger.WithError(err).WithFields(log.Fields{
-			"MaxFileSizeBytes": maxFileSizeBytes,
-		}).Warn("Error while downloading file from remote server")
+		r.Logger.WithError(err).WithField("MaxFileSizeBytes", maxFileSizeBytes).Warn("Error while downloading file from remote server")
 		return "", false, errors.New("file could not be downloaded from remote server")
 	}
 
-	r.Logger.Trace("Remote file transferred")
+	r.Logger.Debug("Remote file transferred")
 
 	// It's possible the bytesWritten to the temporary file is different to the reported Content-Length from the remote
 	// request's response. bytesWritten is therefore used as it is what would be sent to clients when reading from the local
@@ -916,7 +903,7 @@ func (r *downloadRequest) fetchRemoteFile(
 		return "", false, fmt.Errorf("fileutils.MoveFileWithHashCheck: %w", err)
 	}
 	if duplicate {
-		r.Logger.WithField("dst", finalPath).Trace("File was stored previously - discarding duplicate")
+		r.Logger.WithField("dst", finalPath).Debug("File was stored previously - discarding duplicate")
 		// Continue on to store the metadata in the database
 	}
 

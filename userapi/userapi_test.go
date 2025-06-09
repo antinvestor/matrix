@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/sirupsen/logrus"
 	"reflect"
 	"testing"
 	"time"
@@ -66,12 +65,12 @@ func MustMakeInternalAPI(ctx context.Context, svc *frame.Service, cfg *config.Ma
 
 	accountDB, err := storage.NewUserDatabase(ctx, nil, cm, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
-		t.Fatal("failed to create account Cm: %s", err)
+		t.Fatalf("failed to create account Cm: %s", err)
 	}
 
 	keyDB, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
-		t.Fatal("failed to create key Cm: %s", err)
+		t.Fatalf("failed to create key Cm: %s", err)
 	}
 
 	cfg.Global.SigningIdentity = fclient.SigningIdentity{
@@ -80,13 +79,13 @@ func MustMakeInternalAPI(ctx context.Context, svc *frame.Service, cfg *config.Ma
 
 	syncProducer, err := producers.NewSyncAPI(ctx, &cfg.SyncAPI, accountDB, qm)
 	if err != nil {
-		t.Fatal("failed to obtain sync publisher: %s", err)
+		t.Fatalf("failed to obtain sync publisher: %s", err)
 	}
 
 	cfgKeySrv := cfg.KeyServer
 	err = qm.RegisterPublisher(ctx, &cfgKeySrv.Queues.OutputKeyChangeEvent)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to register publisher for key change events")
+		frame.Log(ctx).WithError(err).Panic("failed to register publisher for key change events")
 	}
 
 	keyChangeProducer := &producers.KeyChange{DB: keyDB, Qm: qm, Topic: &cfgKeySrv.Queues.OutputKeyChangeEvent}
@@ -136,11 +135,11 @@ func TestQueryProfile(t *testing.T) {
 
 			profile, gotErr := testAPI.QueryProfile(ctx, tc.userID)
 			if tc.wantErr == nil && gotErr != nil || tc.wantErr != nil && gotErr == nil {
-				t.Error("QueryProfile %s error, got %s want %s", mode, gotErr, tc.wantErr)
+				t.Errorf("QueryProfile %s error, got %s want %s", mode, gotErr, tc.wantErr)
 				continue
 			}
 			if !reflect.DeepEqual(tc.wantRes, profile) {
-				t.Error("QueryProfile %s response got %+v want %+v", mode, profile, tc.wantRes)
+				t.Errorf("QueryProfile %s response got %+v want %+v", mode, profile, tc.wantRes)
 			}
 		}
 	}
@@ -154,13 +153,13 @@ func TestQueryProfile(t *testing.T) {
 
 		_, err := accountDB.CreateAccount(ctx, "alice", serverName, "foobar", "", api.AccountTypeUser)
 		if err != nil {
-			t.Fatal("failed to make account: %s", err)
+			t.Fatalf("failed to make account: %s", err)
 		}
 		if _, _, err = accountDB.SetAvatarURL(ctx, "alice", serverName, aliceAvatarURL); err != nil {
-			t.Fatal("failed to set avatar url: %s", err)
+			t.Fatalf("failed to set avatar url: %s", err)
 		}
 		if _, _, err = accountDB.SetDisplayName(ctx, "alice", serverName, aliceDisplayName); err != nil {
-			t.Fatal("failed to set display name: %s", err)
+			t.Fatalf("failed to set display name: %s", err)
 		}
 
 		runCases(ctx, userAPI, false)
@@ -179,7 +178,7 @@ func TestPasswordlessLoginFails(t *testing.T) {
 
 		_, err := accountDB.CreateAccount(ctx, "auser", serverName, "", "", api.AccountTypeAppService)
 		if err != nil {
-			t.Fatal("failed to make account: %s", err)
+			t.Fatalf("failed to make account: %s", err)
 		}
 
 		userReq := &api.QueryAccountByPasswordRequest{
@@ -191,7 +190,7 @@ func TestPasswordlessLoginFails(t *testing.T) {
 			t.Fatal(err)
 		}
 		if userRes.Exists || userRes.Account != nil {
-			t.Fatal("QueryAccountByPassword should not return correctly for a passwordless account")
+			t.Fatalf("QueryAccountByPassword should not return correctly for a passwordless account")
 		}
 	})
 }
@@ -207,7 +206,7 @@ func TestLoginToken(t *testing.T) {
 
 			_, err := accountDB.CreateAccount(ctx, "auser", serverName, "apassword", "", api.AccountTypeUser)
 			if err != nil {
-				t.Fatal("failed to make account: %s", err)
+				t.Fatalf("failed to make account: %s", err)
 			}
 
 			t.Log("Creating a login token like the LoginSSO callback would...")
@@ -217,14 +216,14 @@ func TestLoginToken(t *testing.T) {
 			}
 			var cresp api.PerformLoginTokenCreationResponse
 			if err = userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
-				t.Fatal("PerformLoginTokenCreation failed: %v", err)
+				t.Fatalf("PerformLoginTokenCreation failed: %v", err)
 			}
 
 			if cresp.Metadata.Token == "" {
-				t.Error("PerformLoginTokenCreation Token: got %q, want non-empty", cresp.Metadata.Token)
+				t.Errorf("PerformLoginTokenCreation Token: got %q, want non-empty", cresp.Metadata.Token)
 			}
 			if cresp.Metadata.Expiration.Before(time.Now()) {
-				t.Error("PerformLoginTokenCreation Expiration: got %v, want non-expired", cresp.Metadata.Expiration)
+				t.Errorf("PerformLoginTokenCreation Expiration: got %v, want non-expired", cresp.Metadata.Expiration)
 			}
 
 			t.Log("Querying the login token like /login with m.login.token would...")
@@ -232,13 +231,13 @@ func TestLoginToken(t *testing.T) {
 			qreq := api.QueryLoginTokenRequest{Token: cresp.Metadata.Token}
 			var qresp api.QueryLoginTokenResponse
 			if err := userAPI.QueryLoginToken(ctx, &qreq, &qresp); err != nil {
-				t.Fatal("QueryLoginToken failed: %v", err)
+				t.Fatalf("QueryLoginToken failed: %v", err)
 			}
 
 			if qresp.Data == nil {
-				t.Error("QueryLoginToken Data: got %v, want non-nil", qresp.Data)
+				t.Errorf("QueryLoginToken Data: got %v, want non-nil", qresp.Data)
 			} else if want := "@auser:example.com"; qresp.Data.UserID != want {
-				t.Error("QueryLoginToken UserID: got %q, want %q", qresp.Data.UserID, want)
+				t.Errorf("QueryLoginToken UserID: got %q, want %q", qresp.Data.UserID, want)
 			}
 
 			t.Log("Deleting the login token like /login with m.login.token would...")
@@ -246,7 +245,7 @@ func TestLoginToken(t *testing.T) {
 			dreq := api.PerformLoginTokenDeletionRequest{Token: cresp.Metadata.Token}
 			var dresp api.PerformLoginTokenDeletionResponse
 			if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
-				t.Fatal("PerformLoginTokenDeletion failed: %v", err)
+				t.Fatalf("PerformLoginTokenDeletion failed: %v", err)
 			}
 		})
 	})
@@ -264,17 +263,17 @@ func TestLoginToken(t *testing.T) {
 			}
 			var cresp api.PerformLoginTokenCreationResponse
 			if err := userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
-				t.Fatal("PerformLoginTokenCreation failed: %v", err)
+				t.Fatalf("PerformLoginTokenCreation failed: %v", err)
 			}
 
 			qreq := api.QueryLoginTokenRequest{Token: cresp.Metadata.Token}
 			var qresp api.QueryLoginTokenResponse
 			if err := userAPI.QueryLoginToken(ctx, &qreq, &qresp); err != nil {
-				t.Fatal("QueryLoginToken failed: %v", err)
+				t.Fatalf("QueryLoginToken failed: %v", err)
 			}
 
 			if qresp.Data != nil {
-				t.Error("QueryLoginToken Data: got %v, want nil", qresp.Data)
+				t.Errorf("QueryLoginToken Data: got %v, want nil", qresp.Data)
 			}
 		})
 	})
@@ -291,23 +290,23 @@ func TestLoginToken(t *testing.T) {
 			}
 			var cresp api.PerformLoginTokenCreationResponse
 			if err := userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
-				t.Fatal("PerformLoginTokenCreation failed: %v", err)
+				t.Fatalf("PerformLoginTokenCreation failed: %v", err)
 			}
 
 			dreq := api.PerformLoginTokenDeletionRequest{Token: cresp.Metadata.Token}
 			var dresp api.PerformLoginTokenDeletionResponse
 			if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
-				t.Fatal("PerformLoginTokenDeletion failed: %v", err)
+				t.Fatalf("PerformLoginTokenDeletion failed: %v", err)
 			}
 
 			qreq := api.QueryLoginTokenRequest{Token: cresp.Metadata.Token}
 			var qresp api.QueryLoginTokenResponse
 			if err := userAPI.QueryLoginToken(ctx, &qreq, &qresp); err != nil {
-				t.Fatal("QueryLoginToken failed: %v", err)
+				t.Fatalf("QueryLoginToken failed: %v", err)
 			}
 
 			if qresp.Data != nil {
-				t.Error("QueryLoginToken Data: got %v, want nil", qresp.Data)
+				t.Errorf("QueryLoginToken Data: got %v, want nil", qresp.Data)
 			}
 		})
 	})
@@ -322,7 +321,7 @@ func TestLoginToken(t *testing.T) {
 			dreq := api.PerformLoginTokenDeletionRequest{Token: "non-existent token"}
 			var dresp api.PerformLoginTokenDeletionResponse
 			if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
-				t.Fatal("PerformLoginTokenDeletion failed: %v", err)
+				t.Fatalf("PerformLoginTokenDeletion failed: %v", err)
 			}
 		})
 	})
@@ -354,7 +353,7 @@ func TestQueryAccountByLocalpart(t *testing.T) {
 				t.Error(err)
 			}
 			if !reflect.DeepEqual(createdAcc, queryAccResp.Account) {
-				t.Fatal("created and queried accounts don't match:\n%+v vs.\n%+v", createdAcc, queryAccResp.Account)
+				t.Fatalf("created and queried accounts don't match:\n%+v vs.\n%+v", createdAcc, queryAccResp.Account)
 			}
 
 			// Query non-existent account, this should result in an error
@@ -364,7 +363,7 @@ func TestQueryAccountByLocalpart(t *testing.T) {
 			}, queryAccResp)
 
 			if err == nil {
-				t.Fatal("expected an error, but got none: %+v", queryAccResp)
+				t.Fatalf("expected an error, but got none: %+v", queryAccResp)
 			}
 		}
 
@@ -424,10 +423,10 @@ func TestAccountData(t *testing.T) {
 				res := api.InputAccountDataResponse{}
 				err := userAPI.InputAccountData(ctx, tc.inputData, &res)
 				if tc.wantErr && err == nil {
-					t.Fatal("expected an error, but got none")
+					t.Fatalf("expected an error, but got none")
 				}
 				if !tc.wantErr && err != nil {
-					t.Fatal("expected no error, but got: %s", err)
+					t.Fatalf("expected no error, but got: %s", err)
 				}
 
 				// query the data again and compare
@@ -444,12 +443,12 @@ func TestAccountData(t *testing.T) {
 				// verify global data
 				if tc.inputData.RoomID == "" {
 					if !reflect.DeepEqual(tc.inputData.AccountData, queryRes.GlobalAccountData[tc.inputData.DataType]) {
-						t.Fatal("expected accountdata to be %s, got %s", string(tc.inputData.AccountData), string(queryRes.GlobalAccountData[tc.inputData.DataType]))
+						t.Fatalf("expected accountdata to be %s, got %s", string(tc.inputData.AccountData), string(queryRes.GlobalAccountData[tc.inputData.DataType]))
 					}
 				} else {
 					// verify room data
 					if !reflect.DeepEqual(tc.inputData.AccountData, queryRes.RoomAccountData[tc.inputData.RoomID][tc.inputData.DataType]) {
-						t.Fatal("expected accountdata to be %s, got %s", string(tc.inputData.AccountData), string(queryRes.RoomAccountData[tc.inputData.RoomID][tc.inputData.DataType]))
+						t.Fatalf("expected accountdata to be %s, got %s", string(tc.inputData.AccountData), string(queryRes.RoomAccountData[tc.inputData.RoomID][tc.inputData.DataType]))
 					}
 				}
 			})
@@ -546,10 +545,10 @@ func TestDevices(t *testing.T) {
 				}
 				err := userAPI.PerformDeviceCreation(ctx, tc.inputData, &res)
 				if tc.wantErr && err == nil {
-					t.Fatal("expected an error, but got none")
+					t.Fatalf("expected an error, but got none")
 				}
 				if !tc.wantErr && err != nil {
-					t.Fatal("expected no error, but got: %s", err)
+					t.Fatalf("expected no error, but got: %s", err)
 				}
 				if !res.DeviceCreated {
 					return
@@ -568,7 +567,7 @@ func TestDevices(t *testing.T) {
 
 				// At this point, there should only be one device
 				if !reflect.DeepEqual(*res.Device, queryDevicesRes.Devices[0]) {
-					t.Fatal("expected device to be\n%#v, got \n%#v", *res.Device, queryDevicesRes.Devices[0])
+					t.Fatalf("expected device to be\n%#v, got \n%#v", *res.Device, queryDevicesRes.Devices[0])
 				}
 
 				newDisplayName := "new name"
@@ -594,12 +593,12 @@ func TestDevices(t *testing.T) {
 				if tc.inputData.DeviceDisplayName != nil {
 					wantDisplayName := *tc.inputData.DeviceDisplayName
 					if wantDisplayName != gotDisplayName {
-						t.Fatal("expected displayName to be %s, got %s", wantDisplayName, gotDisplayName)
+						t.Fatalf("expected displayName to be %s, got %s", wantDisplayName, gotDisplayName)
 					}
 				} else {
 					wantDisplayName := newDisplayName
 					if wantDisplayName != gotDisplayName {
-						t.Fatal("expected displayName to be %s, got %s", wantDisplayName, gotDisplayName)
+						t.Fatalf("expected displayName to be %s, got %s", wantDisplayName, gotDisplayName)
 					}
 				}
 			})
@@ -611,10 +610,10 @@ func TestDevices(t *testing.T) {
 				delRes := api.PerformDeviceDeletionResponse{}
 				err := userAPI.PerformDeviceDeletion(ctx, tc.inputData, &delRes)
 				if tc.wantErr && err == nil {
-					t.Fatal("expected an error, but got none")
+					t.Fatalf("expected an error, but got none")
 				}
 				if !tc.wantErr && err != nil {
-					t.Fatal("expected no error, but got: %s", err)
+					t.Fatalf("expected no error, but got: %s", err)
 				}
 				if tc.wantErr {
 					return
@@ -627,7 +626,7 @@ func TestDevices(t *testing.T) {
 				}
 
 				if len(queryDevicesRes.Devices) != tc.wantDevices {
-					t.Fatal("expected %d devices, got %d", tc.wantDevices, len(queryDevicesRes.Devices))
+					t.Fatalf("expected %d devices, got %d", tc.wantDevices, len(queryDevicesRes.Devices))
 				}
 
 			})
@@ -660,11 +659,11 @@ func TestDeviceIDReuse(t *testing.T) {
 		req.NoDeviceListUpdate = false
 		err = userAPI.PerformDeviceCreation(ctx, &req, &res2)
 		if err != nil {
-			t.Fatal("expected no error, but got: %v", err)
+			t.Fatalf("expected no error, but got: %v", err)
 		}
 
 		if res2.Device.SessionID == res.Device.SessionID {
-			t.Fatal("expected a different session ID, but they are the same")
+			t.Fatalf("expected a different session ID, but they are the same")
 		}
 
 	})

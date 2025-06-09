@@ -90,14 +90,14 @@ func Reversed(in []*types.HeaderedEvent) []*types.HeaderedEvent {
 func AssertEventIDsEqual(t *testing.T, gotEventIDs []string, wants []*types.HeaderedEvent) {
 	t.Helper()
 	if len(gotEventIDs) != len(wants) {
-		t.Error("length mismatch: got %d events, want %d", len(gotEventIDs), len(wants))
+		t.Errorf("length mismatch: got %d events, want %d", len(gotEventIDs), len(wants))
 		return
 	}
 	for i := range wants {
 		w := wants[i].EventID()
 		g := gotEventIDs[i]
 		if w != g {
-			t.Error("event at index %d mismatch:\ngot  %s\n\nwant %s", i, string(g), string(w))
+			t.Errorf("event at index %d mismatch:\ngot  %s\n\nwant %s", i, string(g), string(w))
 		}
 	}
 }
@@ -105,13 +105,13 @@ func AssertEventIDsEqual(t *testing.T, gotEventIDs []string, wants []*types.Head
 func AssertEventsEqual(t *testing.T, gots, wants []*types.HeaderedEvent) {
 	t.Helper()
 	if len(gots) != len(wants) {
-		t.Fatal("length mismatch: got %d events, want %d", len(gots), len(wants))
+		t.Fatalf("length mismatch: got %d events, want %d", len(gots), len(wants))
 	}
 	for i := range wants {
 		w := wants[i].JSON()
 		g := gots[i].JSON()
 		if !DeepJsonCompare(w, g) {
-			t.Error("event at index %d mismatch:\ngot  %s\n\nwant %s", i, string(g), string(w))
+			t.Errorf("event at index %d mismatch:\ngot  %s\n\nwant %s", i, string(g), string(w))
 		}
 	}
 }

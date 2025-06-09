@@ -41,7 +41,7 @@ type Manager struct {
 // NewManager creates a new room actor system
 func NewManager(ctx context.Context, config *config.ActorConfig, qm queueutil.QueueManager, qOpts *config.QueueOptions, handlerFunc HandlerFunc) *Manager {
 
-	svc := frame.FromContext(ctx)
+	svc := frame.Svc(ctx)
 
 	actorSystem := actor.NewActorSystem(actor.WithLoggerFactory(
 		func(sys *actor.ActorSystem) *slog.Logger {
@@ -66,7 +66,7 @@ func NewManager(ctx context.Context, config *config.ActorConfig, qm queueutil.Qu
 func (m *Manager) Start(ctx context.Context) error {
 	var err error
 
-	svc := frame.FromContext(ctx)
+	svc := frame.Svc(ctx)
 
 	// Configure the actor system for remote capability
 	remoteConfig := remote.Configure(m.config.Host, 0)

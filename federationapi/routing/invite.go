@@ -19,6 +19,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -284,13 +285,13 @@ func handleInviteResult(ctx context.Context, inviteEvent gomatrixserverlib.PDU, 
 	switch e := err.(type) {
 	case nil:
 	case spec.InternalServerError:
-		util.GetLogger(ctx).WithError(err)
+		frame.Log(ctx).WithError(err)
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	case spec.MatrixError:
-		util.GetLogger(ctx).WithError(err)
+		frame.Log(ctx).WithError(err)
 		code := http.StatusInternalServerError
 		switch e.ErrCode {
 		case spec.ErrorForbidden:
@@ -306,7 +307,7 @@ func handleInviteResult(ctx context.Context, inviteEvent gomatrixserverlib.PDU, 
 			JSON: e,
 		}
 	default:
-		util.GetLogger(ctx).WithError(err)
+		frame.Log(ctx).WithError(err)
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("unknown error"),
@@ -315,7 +316,7 @@ func handleInviteResult(ctx context.Context, inviteEvent gomatrixserverlib.PDU, 
 
 	headeredInvite := &types.HeaderedEvent{PDU: inviteEvent}
 	if err = rsAPI.HandleInvite(ctx, headeredInvite); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("HandleInvite failed")
+		frame.Log(ctx).WithError(err).Error("HandleInvite failed")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

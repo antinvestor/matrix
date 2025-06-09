@@ -29,8 +29,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/matrix/syncapi/types"
-	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/frame"
 )
 
 // OutputPresenceConsumer consumes events that originate in the clientapi.
@@ -66,14 +65,17 @@ func NewOutputPresenceConsumer(
 	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputPresenceEvent, c)
 }
 
-// onMessage is called in response to a message received on the presence
+// Handle onMessage is called in response to a message received on the presence
 // events topic from the client api.
 func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	// only send presence events which originated from us
 	userID := metadata[queueutil.UserID]
 	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		log.WithError(err).WithField("user_id", userID).Error("failed to extract domain from receipt sender")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			WithField("user_id", userID).
+			Error("failed to extract domain from receipt sender")
 		return nil
 	}
 	if !t.isLocalServerName(serverName) {
@@ -82,13 +84,18 @@ func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string
 
 	parsedUserID, err := spec.NewUserID(userID, true)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("user_id", userID).Error("invalid user ID")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			WithField("user_id", userID).
+			Error("invalid user ID")
 		return nil
 	}
 
 	roomIDs, err := t.rsAPI.QueryRoomsForUser(ctx, *parsedUserID, "join")
 	if err != nil {
-		log.WithError(err).Error("failed to calculate joined rooms for user")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			Error("failed to calculate joined rooms for user")
 		return nil
 	}
 
@@ -107,7 +114,9 @@ func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string
 	// send this presence to all servers who share rooms with this user.
 	joined, err := t.db.GetJoinedHostsForRooms(ctx, roomIDStrs, true, true)
 	if err != nil {
-		log.WithError(err).Error("failed to get joined hosts")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			Error("failed to get joined hosts")
 		return nil
 	}
 
@@ -140,13 +149,21 @@ func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string
 		Origin: string(serverName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
-		log.WithError(err).Error("failed to marshal EDU JSON")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			Error("failed to marshal EDU JSON")
 		return nil
 	}
 
-	log.Tracef("sending presence EDU to %d servers", len(joined))
+	frame.Log(ctx).
+		WithField("component", "federation_consumer").
+		WithField("server_count", len(joined)).
+		Debug("sending presence EDU to servers")
+
 	if err = t.queues.SendEDU(ctx, edu, serverName, joined); err != nil {
-		log.WithError(err).Error("failed to send EDU")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_consumer").
+			Error("failed to send EDU")
 		return err
 	}
 

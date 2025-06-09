@@ -24,7 +24,7 @@ import (
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
-	log "github.com/sirupsen/logrus"
+
 	"gopkg.in/h2non/bimg.v1"
 )
 
@@ -41,7 +41,9 @@ func GenerateThumbnails(
 ) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
 	if err != nil {
-		logger.WithError(err).WithField("src", src).Error("Failed to read src file")
+		logger.WithError(err).
+			WithField("src", src).
+			Error("Failed to read src file")
 		return false, err
 	}
 	img := bimg.NewImage(buffer)
@@ -52,7 +54,9 @@ func GenerateThumbnails(
 			maxThumbnailGenerators, db, logger,
 		)
 		if err != nil {
-			logger.WithError(err).WithField("src", src).Error("Failed to generate thumbnails")
+			logger.WithError(err).
+				WithField("src", src).
+				Error("Failed to generate thumbnails")
 			return false, err
 		}
 		if busy {
@@ -75,9 +79,9 @@ func GenerateThumbnail(
 ) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
-			"src": src,
-		}).Error("Failed to read src file")
+		logger.WithError(err).
+			WithField("src", src).
+			Error("Failed to read src file")
 		return false, err
 	}
 	img := bimg.NewImage(buffer)
@@ -87,9 +91,9 @@ func GenerateThumbnail(
 		maxThumbnailGenerators, db, logger,
 	)
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
-			"src": src,
-		}).Error("Failed to generate thumbnails")
+		logger.WithError(err).
+			WithField("src", src).
+			Error("Failed to generate thumbnails")
 		return false, err
 	}
 	if busy {
@@ -111,11 +115,10 @@ func createThumbnail(
 	db storage.Database,
 	logger *log.Entry,
 ) (busy bool, errorReturn error) {
-	logger = logger.WithFields(log.Fields{
-		"Width":        config.Width,
-		"Height":       config.Height,
-		"ResizeMethod": config.ResizeMethod,
-	})
+	logger = logger.
+		WithField("Width", config.Width).
+		WithField("Height", config.Height).
+		WithField("ResizeMethod", config.ResizeMethod)
 
 	// Check if request is larger than original
 	if isLargerThanOriginal(config, img) {
@@ -156,11 +159,11 @@ func createThumbnail(
 	if err != nil {
 		return false, err
 	}
-	logger.WithFields(log.Fields{
-		"ActualWidth":  width,
-		"ActualHeight": height,
-		"processTime":  time.Now().Sub(start),
-	}).Info("Generated thumbnail")
+	logger.
+		WithField("ActualWidth", width).
+		WithField("ActualHeight", height).
+		WithField("processTime", time.Now().Sub(start)).
+		Info("Generated thumbnail")
 
 	stat, err := os.Stat(string(dst))
 	if err != nil {
@@ -184,10 +187,10 @@ func createThumbnail(
 
 	err = db.StoreThumbnail(ctx, thumbnailMetadata)
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
-			"ActualWidth":  width,
-			"ActualHeight": height,
-		}).Error("Failed to store thumbnail metadata in database.")
+		logger.WithError(err).
+			WithField("ActualWidth", width).
+			WithField("ActualHeight", height).
+			Error("Failed to store thumbnail metadata in database.")
 		return false, err
 	}
 

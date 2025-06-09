@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
 
@@ -104,7 +105,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
+		frame.Log(ctx).WithError(err).Error("buildMembershipEvent failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -122,7 +123,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		nil,
 		false,
 	); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
+		frame.Log(ctx).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -391,7 +392,7 @@ func sendInvite(
 		}, e
 	case nil:
 	default:
-		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
+		frame.Log(ctx).WithError(err).Error("PerformInvite failed")
 
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -591,7 +592,7 @@ func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.ClientRoomserver
 		UserID: userID,
 	}, &membershipRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("QueryMembershipForUser: could not query membership for user")
+		frame.Log(ctx).WithError(err).Error("QueryMembershipForUser: could not query membership for user")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -611,7 +612,7 @@ func SendForget(
 	roomID string, rsAPI roomserverAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
 	ctx := req.Context()
-	logger := util.GetLogger(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)
+	logger := frame.Log(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)
 
 	deviceUserID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {

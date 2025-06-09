@@ -57,11 +57,11 @@ func Test_parseContextParams(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gotFilter, err := parseRoomEventFilter(tt.req)
 			if (err != nil) != tt.wantErr {
-				t.Error("parseRoomEventFilter() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("parseRoomEventFilter() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(gotFilter, tt.wantFilter) {
-				t.Error("parseRoomEventFilter() gotFilter = %v, want %v", gotFilter, tt.wantFilter)
+				t.Errorf("parseRoomEventFilter() gotFilter = %v, want %v", gotFilter, tt.wantFilter)
 			}
 		})
 	}

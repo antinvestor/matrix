@@ -19,8 +19,6 @@ import (
 	"encoding/json"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -161,7 +159,10 @@ func (s *notificationsTable) DeleteUpTo(ctx context.Context, localpart string, s
 		return false, result.Error
 	}
 
-	log.WithFields(log.Fields{"localpart": localpart, "room_id": roomID, "stream_pos": pos}).Tracef("DeleteUpTo: %d rows affected", result.RowsAffected)
+	frame.Log(ctx).WithField("localpart", localpart).
+		WithField("room_id", roomID).
+		WithField("stream_pos", pos).
+		Debug("DeleteUpTo: %d rows affected", result.RowsAffected)
 	return result.RowsAffected > 0, nil
 }
 
@@ -173,7 +174,10 @@ func (s *notificationsTable) UpdateRead(ctx context.Context, localpart string, s
 		return false, res.Error
 	}
 
-	log.WithFields(log.Fields{"localpart": localpart, "room_id": roomID, "stream_pos": pos}).Tracef("UpdateRead: %d rows affected", res.RowsAffected)
+	frame.Log(ctx).WithField("localpart", localpart).
+		WithField("room_id", roomID).
+		WithField("stream_pos", pos).
+		Debug("UpdateRead: %d rows affected", res.RowsAffected)
 	return res.RowsAffected > 0, nil
 }
 

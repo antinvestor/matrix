@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -16,7 +17,6 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/gorilla/mux"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/exp/constraints"
 
 	clientapi "github.com/antinvestor/matrix/clientapi/api"
@@ -264,6 +264,9 @@ func AdminUpdateRegistrationToken(req *http.Request, cfg *config.ClientAPI, user
 }
 
 func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+
+	ctx := req.Context()
+
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -278,7 +281,7 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 			JSON: spec.NotFound(err.Error()),
 		}
 	default:
-		logrus.WithError(err).WithField("roomID", vars["roomID"]).Error("Failed to evacuate room")
+		frame.Log(ctx).WithError(err).WithField("roomID", vars["roomID"]).Error("Failed to evacuate room")
 		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{
@@ -290,6 +293,9 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 }
 
 func AdminEvacuateUser(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+
+	ctx := req.Context()
+
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -297,7 +303,7 @@ func AdminEvacuateUser(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 
 	affected, err := rsAPI.PerformAdminEvacuateUser(req.Context(), vars["userID"])
 	if err != nil {
-		logrus.WithError(err).WithField("userID", vars["userID"]).Error("Failed to evacuate user")
+		frame.Log(ctx).WithError(err).WithField("userID", vars["userID"]).Error("Failed to evacuate user")
 		return util.MessageResponse(http.StatusBadRequest, err.Error())
 	}
 
@@ -329,6 +335,7 @@ func AdminPurgeRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI) 
 }
 
 func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
+
 	if req.Body == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -414,13 +421,13 @@ func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *userapi.Devi
 
 	err := qm.RegisterPublisher(ctx, &cfg.Queues.InputFulltextReindex)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to register publisher for receipt event")
+		frame.Log(ctx).WithError(err).Panic("failed to register publisher for receipt event")
 	}
 
 	err = qm.Publish(ctx, cfg.Queues.InputFulltextReindex.Ref(), []byte{})
 
 	if err != nil {
-		logrus.WithError(err).Error("failed to publish nats message")
+		frame.Log(ctx).WithError(err).Error("failed to publish nats message")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -467,6 +474,9 @@ func AdminMarkAsStale(req *http.Request, cfg *config.ClientAPI, keyAPI userapi.C
 }
 
 func AdminDownloadState(req *http.Request, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+
+	ctx := req.Context()
+
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -485,18 +495,18 @@ func AdminDownloadState(req *http.Request, device *userapi.Device, rsAPI roomser
 			JSON: spec.MissingParam("Expecting remote server name."),
 		}
 	}
-	if err = rsAPI.PerformAdminDownloadState(req.Context(), roomID, device.UserID, spec.ServerName(serverName)); err != nil {
+	if err = rsAPI.PerformAdminDownloadState(ctx, roomID, device.UserID, spec.ServerName(serverName)); err != nil {
 		if errors.Is(err, eventutil.ErrRoomNoExists{}) {
 			return util.JSONResponse{
 				Code: 200,
 				JSON: spec.NotFound(err.Error()),
 			}
 		}
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"userID":     device.UserID,
-			"serverName": serverName,
-			"roomID":     roomID,
-		}).Error("failed to download state")
+		frame.Log(ctx).WithError(err).
+			WithField("userID", device.UserID).
+			WithField("serverName", serverName).
+			WithField("roomID", roomID).
+			Error("failed to download state")
 		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{
@@ -514,9 +524,11 @@ func GetEventReports(
 	userID, roomID string,
 ) util.JSONResponse {
 
+	ctx := req.Context()
+
 	eventReports, count, err := rsAPI.QueryAdminEventReports(req.Context(), from, limit, backwards, userID, roomID)
 	if err != nil {
-		logrus.WithError(err).Error("failed to query event reports")
+		frame.Log(ctx).WithError(err).Error("failed to query event reports")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

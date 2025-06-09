@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 	"math"
 	"net/http"
 	"net/url"
@@ -34,8 +35,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/matrix/syncapi/synctypes"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // ApplicationServiceTransaction is the transaction that is sent off to an
@@ -91,12 +90,13 @@ func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 func (s *OutputRoomEventConsumer) Handle(
 	ctx context.Context, metadata map[string]string, message []byte,
 ) error {
+	logger := frame.Log(ctx)
 
 	state, ok := s.appServiceMap[metadata[queueutil.AppServiceIDToken]]
 	if !ok {
 		return nil
 	}
-	log.WithField("appservice", state.ID).Tracef("Appservice worker received %d message(s) from roomserver", 1)
+	logger.WithField("appservice", state.ID).Debug("Appservice worker received %d message(s) from roomserver", 1)
 	events := make([]*types.HeaderedEvent, 0, 1)
 
 	// Only handle events we care about
@@ -108,7 +108,7 @@ func (s *OutputRoomEventConsumer) Handle(
 	var output api.OutputEvent
 	if err := json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithField("appservice", state.ID).WithError(err).Error("Appservice failed to parse message, ignoring")
+		logger.WithField("appservice", state.ID).WithError(err).Error("Appservice failed to parse message, ignoring")
 		return nil
 	}
 	switch output.Type {
@@ -131,7 +131,7 @@ func (s *OutputRoomEventConsumer) Handle(
 			}
 			if len(eventsReq.EventIDs) > 0 {
 				if err := s.rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
-					log.WithError(err).Error("s.rsAPI.QueryEventsByID failed")
+					logger.WithError(err).Error("s.rsAPI.QueryEventsByID failed")
 					return err
 				}
 				events = append(events, eventsRes.Events...)
@@ -155,7 +155,7 @@ func (s *OutputRoomEventConsumer) Handle(
 
 	// Send event to any relevant application services. If we hit
 	// an error here, return false, so that we negatively ack.
-	log.WithField("appservice", state.ID).Debug("Appservice worker sending %d events(s) from roomserver", len(events))
+	logger.WithField("appservice", state.ID).Debug("Appservice worker sending %d events(s) from roomserver", len(events))
 	return s.sendEvents(ctx, state, events, txnID)
 }
 
@@ -201,7 +201,7 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", state.HSToken))
 	resp, err := state.HTTPClient.Do(req)
 	if err != nil {
-		return state.backoffAndPause(err)
+		return state.backoffAndPause(ctx, err)
 	}
 
 	// If the response was fine then we can clear any backoffs in place and
@@ -210,19 +210,24 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	case http.StatusOK:
 		state.backoff = 0
 	default:
-		return state.backoffAndPause(fmt.Errorf("received HTTP status code %d from appservice url %s", resp.StatusCode, address))
+		return state.backoffAndPause(ctx, fmt.Errorf("received HTTP status code %d from appservice url %s", resp.StatusCode, address))
 	}
 	return nil
 }
 
 // backoff pauses the calling goroutine for a 2^some backoff exponent seconds
-func (s *appserviceState) backoffAndPause(err error) error {
-	if s.backoff < 6 {
-		s.backoff++
-	}
-	duration := time.Second * time.Duration(math.Pow(2, float64(s.backoff)))
-	log.WithField("appservice", s.ID).WithError(err).Error("Unable to send transaction to appservice, backing off for %s", duration.String())
+func (s *appserviceState) backoffAndPause(ctx context.Context, err error) error {
+	logger := frame.Log(ctx)
+
+	// work out how much to back off by
+	backoffDuration := time.Second * time.Duration(math.Pow(2, float64(s.backoff)))
+	s.backoff++
+	duration := backoffDuration
+
+	// sleep for that amount of time
+	logger.WithField("appservice", s.ID).WithField("backing off duration", duration.String()).WithError(err).Error("Unable to send transaction to appservice")
 	time.Sleep(duration)
+
 	return err
 }
 
@@ -231,6 +236,7 @@ func (s *appserviceState) backoffAndPause(err error) error {
 //
 // TODO: This should be cached, see https://github.com/antinvestor/matrix/issues/1682
 func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
+	logger := frame.Log(ctx)
 	user := ""
 	userID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err == nil {
@@ -262,10 +268,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 			}
 		}
 	} else {
-		log.WithFields(log.Fields{
-			"appservice": appservice.ID,
-			"room_id":    event.RoomID().String(),
-		}).WithError(err).Error("Unable to get aliases for room")
+		logger.WithField("appservice", appservice.ID).WithField("room_id", event.RoomID().String()).WithError(err).Error("Unable to get aliases for room")
 	}
 
 	// Check if any of the members in the room match the appservice
@@ -275,6 +278,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 // appserviceJoinedAtEvent returns a boolean depending on whether a given
 // appservice has membership at the time a given event was created.
 func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
+	logger := frame.Log(ctx)
 	// TODO: This is only checking the current room state, not the state at
 	// the event in question. Pretty sure this is what Synapse does too, but
 	// until we have a lighter way of checking the state before the event that
@@ -307,10 +311,7 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 			}
 		}
 	} else {
-		log.WithFields(log.Fields{
-			"appservice": appservice.ID,
-			"room_id":    event.RoomID().String(),
-		}).WithError(err).Error("Unable to get membership for room")
+		logger.WithField("appservice", appservice.ID).WithField("room_id", event.RoomID().String()).WithError(err).Error("Unable to get membership for room")
 	}
 	return false
 }

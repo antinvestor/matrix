@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"net/url"
 	"path"
@@ -43,7 +44,7 @@ func SSORedirect(
 	cfg *config.LoginSSO,
 ) util.JSONResponse {
 	ctx := req.Context()
-	logger := util.GetLogger(ctx)
+	logger := frame.Log(ctx)
 
 	if auth == nil {
 		return util.JSONResponse{
@@ -82,7 +83,7 @@ func SSORedirect(
 
 	callbackURL, err := syncCallbackURLWithConfig(cfg, req, "/login/sso/redirect")
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
+		frame.Log(ctx).WithError(err).Error("Failed to build callback URL")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
@@ -106,7 +107,7 @@ func SSORedirect(
 		}
 	}
 
-	util.GetLogger(ctx).Info("LoginSSO redirect to %s.", u)
+	frame.Log(ctx).WithField("redirect_url", u).Info("LoginSSO redirect")
 
 	resp := util.RedirectResponse(u)
 	nonceCookie := &http.Cookie{
@@ -186,7 +187,7 @@ func SSOCallback(
 	}
 
 	ctx := req.Context()
-	logger := util.GetLogger(ctx)
+	logger := frame.Log(ctx)
 
 	query := req.URL.Query()
 	idpID := query.Get("partition_id")
@@ -232,7 +233,7 @@ func SSOCallback(
 
 	callbackURL, err := syncCallbackURLWithConfig(cfg, req, "/login/sso/callback")
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
+		frame.Log(ctx).WithError(err).Error("Failed to build callback URL")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
@@ -260,7 +261,7 @@ func SSOCallback(
 
 	account, err := verifyUserExits(ctx, serverName, userAPI, result)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Error("failed to find user")
+		frame.Log(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Error("failed to find user")
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: spec.Forbidden("ID not associated with a local account"),
@@ -269,13 +270,13 @@ func SSOCallback(
 
 	token, err := createLoginToken(ctx, userAPI, account.UserID, result.Token)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("PerformLoginTokenCreation failed")
+		frame.Log(ctx).WithError(err).Error("PerformLoginTokenCreation failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	util.GetLogger(ctx).WithField("account", account).WithField("ssoIdentifier", result.Identifier).Info("LoginSSO created token")
+	frame.Log(ctx).WithField("user_id", account.UserID).WithField("token", token.Token).Info("LoginSSO created token")
 
 	rquery := clientRedirectURL.Query()
 	rquery.Set("loginToken", token.Token)

@@ -141,7 +141,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 			rp.updatePresence(ctx, db, tt.args.presence, tt.args.userID)
 			publisher.lock.Lock()
 			if tt.wantIncrease && publisher.count <= beforeCount {
-				t.Fatal("expected count to increase: %d <= %d", publisher.count, beforeCount)
+				t.Fatalf("expected count to increase: %d <= %d", publisher.count, beforeCount)
 			}
 			publisher.lock.Unlock()
 			time.Sleep(tt.args.sleep)

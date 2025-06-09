@@ -44,16 +44,16 @@ func TestNotify(t *testing.T) {
 	// Test happy path
 	err := cl.Notify(ctx, svr.URL, &NotifyRequest{}, &gotResponse)
 	if err != nil {
-		t.Error("failed to notify client")
+		t.Errorf("failed to notify client")
 	}
 	if !reflect.DeepEqual(gotResponse, wantResponse) {
-		t.Error("expected response %+v, got %+v", wantResponse, gotResponse)
+		t.Errorf("expected response %+v, got %+v", wantResponse, gotResponse)
 	}
 
 	// Test error path
 	i++
 	err = cl.Notify(ctx, svr.URL, &NotifyRequest{}, &gotResponse)
 	if err == nil {
-		t.Error("expected notifying the pushgateway to fail, but it succeeded")
+		t.Errorf("expected notifying the pushgateway to fail, but it succeeded")
 	}
 }

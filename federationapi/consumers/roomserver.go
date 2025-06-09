@@ -31,7 +31,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/frame"
 
 	syncAPITypes "github.com/antinvestor/matrix/syncapi/types"
 
@@ -91,7 +91,9 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 	err := json.Unmarshal(message, &output)
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Error("roomserver output log: message parse failure")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "roomserver_consumer").
+			Error("roomserver output log: message parse failure")
 		return nil
 	}
 
@@ -101,38 +103,44 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 		err = s.processMessage(ctx, *output.NewRoomEvent, output.NewRoomEvent.RewritesState)
 		if err != nil {
 			// panic rather than continue with an inconsistent database
-			log.WithFields(log.Fields{
-				"event_id":   ev.EventID(),
-				"event":      string(ev.JSON()),
-				"add":        output.NewRoomEvent.AddsStateEventIDs,
-				"del":        output.NewRoomEvent.RemovesStateEventIDs,
-				log.ErrorKey: err,
-			}).Panic("roomserver output log: write room event failure")
+			frame.Log(ctx).
+				WithField("event_id", ev.EventID()).
+				WithField("event", string(ev.JSON())).
+				WithField("add", output.NewRoomEvent.AddsStateEventIDs).
+				WithField("del", output.NewRoomEvent.RemovesStateEventIDs).
+				WithField("component", "roomserver_consumer").
+				WithError(err).Panic("roomserver output log: write room event failure")
 		}
 
 	case api.OutputTypeNewInboundPeek:
 		err = s.processInboundPeek(ctx, *output.NewInboundPeek)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"event":      output.NewInboundPeek,
-				log.ErrorKey: err,
-			}).Panic("roomserver output log: remote peek event failure")
+			frame.Log(ctx).WithField(
+				"event", output.NewInboundPeek).
+				WithField("component", "roomserver_consumer").
+				WithError(err).Panic("roomserver output log: remote peek event failure")
 			return err
 		}
 
 	case api.OutputTypePurgeRoom:
-		log.WithField("room_id", output.PurgeRoom.RoomID).Warn("Purging room from federation API")
+		frame.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
+			WithField("component", "roomserver_consumer").
+			Warn("Purging room from federation API")
 		err = s.db.PurgeRoom(ctx, output.PurgeRoom.RoomID)
 		if err != nil {
-			log.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from federation API")
+			frame.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
+				WithField("component", "roomserver_consumer").
+				WithError(err).Error("Failed to purge room from federation API")
 		} else {
-			log.WithField("room_id", output.PurgeRoom.RoomID).Warn("Room purged from federation API")
+			frame.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
+				WithField("component", "roomserver_consumer").
+				Warn("Room purged from federation API")
 		}
 
 	default:
-		log.WithField("type", output.Type).Debug(
-			"roomserver output log: ignoring unknown output type",
-		)
+		frame.Log(ctx).WithField("type", output.Type).
+			WithField("component", "roomserver_consumer").
+			Debug("roomserver output log: ignoring unknown output type")
 	}
 
 	return nil
@@ -254,7 +262,9 @@ func (s *OutputRoomEventConsumer) sendPresence(ctx context.Context, roomID strin
 		RoomID:     roomID,
 	}, &queryRes)
 	if err != nil {
-		log.WithError(err).Error("failed to calculate joined rooms for user")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "roomserver_consumer").
+			Error("failed to calculate joined rooms for user")
 		return
 	}
 
@@ -266,7 +276,10 @@ func (s *OutputRoomEventConsumer) sendPresence(ctx context.Context, roomID strin
 			UserId: ev.Sender,
 		}))
 		if err0 != nil {
-			log.WithError(err0).Error("unable to get presence")
+			frame.Log(ctx).WithError(err0).
+				WithField("component", "roomserver_consumer").
+				WithField("user_id", ev.Sender).
+				Error("unable to get presence")
 			continue
 		}
 
@@ -295,11 +308,15 @@ func (s *OutputRoomEventConsumer) sendPresence(ctx context.Context, roomID strin
 		Origin: string(s.cfg.Global.ServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
-		log.WithError(err).Error("failed to marshal EDU JSON")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "roomserver_consumer").
+			Error("failed to marshal EDU JSON")
 		return
 	}
 	if err := s.queues.SendEDU(ctx, edu, s.cfg.Global.ServerName, joined); err != nil {
-		log.WithError(err).Error("failed to send EDU")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "roomserver_consumer").
+			Error("failed to send EDU")
 	}
 }
 

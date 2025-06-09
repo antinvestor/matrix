@@ -1,7 +1,9 @@
 package routing
 
 import (
+	"github.com/pitabwire/frame"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,13 +19,12 @@ import (
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 )
 
 func Test_uploadRequest_doUpload(t *testing.T) {
 	type fields struct {
 		MediaMetadata *types.MediaMetadata
-		Logger        *log.Entry
+		Logger        *frame.Entry
 	}
 	type args struct {
 		reqReader                 io.Reader
@@ -33,11 +34,11 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		t.Error("failed to get current working directory: %v", err)
+		t.Errorf("failed to get current working directory: %v", err)
 	}
 
 	maxSize := config.FileSizeBytes(8)
-	logger := log.New().WithField("mediaapi", "test")
+	logger := frame.NewLogger(slog.LevelInfo).WithField("mediaapi", "test")
 	testdataPath := filepath.Join(wd, "./testdata")
 
 	cfg := &config.MediaAPI{
@@ -129,7 +130,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 				cm := sqlutil.NewConnectionManager(svc)
 				db, err0 := storage.NewMediaAPIDatasource(ctx, cm)
 				if err0 != nil {
-					t.Error("error opening mediaapi database: %v", err0)
+					t.Errorf("error opening mediaapi database: %v", err0)
 				}
 
 				r := &uploadRequest{
@@ -137,7 +138,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 					Logger:        tt.fields.Logger,
 				}
 				if got := r.doUpload(ctx, tt.args.reqReader, tt.args.cfg, db, tt.args.activeThumbnailGeneration); !reflect.DeepEqual(got, tt.want) {
-					t.Error("doUpload() = %+v, want %+v", got, tt.want)
+					t.Errorf("doUpload() = %+v, want %+v", got, tt.want)
 				}
 			})
 		})

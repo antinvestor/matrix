@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"time"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -20,7 +21,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/syncapi/notifier"
-	"github.com/sirupsen/logrus"
 )
 
 // The max number of per-room goroutines to have running.
@@ -382,7 +382,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// Applies the history visibility rules
 	events, err := applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, delta.RoomID, device.UserID, recentEvents)
 	if err != nil {
-		logrus.WithError(err).Error("unable to apply history visibility filter")
+		frame.Log(ctx).WithError(err).Error("unable to apply history visibility filter")
 	}
 
 	if r.Backwards && len(events) > eventFilter.Limit {
@@ -438,7 +438,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		if hasMembershipChange {
 			jr.Summary, err = snapshot.GetRoomSummary(ctx, delta.RoomID, device.UserID)
 			if err != nil {
-				logrus.WithError(err).Warn("failed to get room summary")
+				frame.Log(ctx).WithError(err).Warn("failed to get room summary")
 			}
 		}
 		jr.Timeline.PrevBatch = &prevBatch
@@ -532,12 +532,12 @@ func applyHistoryVisibilityFilter(
 	if err != nil {
 		return nil, err
 	}
-	logrus.WithFields(logrus.Fields{
-		"duration": time.Since(startTime),
-		"room_id":  roomID,
-		"before":   len(recentEvents),
-		"after":    len(events),
-	}).Debug("Applied history visibility (sync)")
+	frame.Log(ctx).
+		WithField("duration", time.Since(startTime)).
+		WithField("room_id", roomID).
+		WithField("before", len(recentEvents)).
+		WithField("after", len(events)).
+		Debug("Applied history visibility (sync)")
 	return events, nil
 }
 
@@ -579,7 +579,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 
 	jr.Summary, err = snapshot.GetRoomSummary(ctx, roomID, device.UserID)
 	if err != nil {
-		logrus.WithError(err).Warn("failed to get room summary")
+		frame.Log(ctx).WithError(err).Warn("failed to get room summary")
 	}
 
 	// We don't include a device here as we don't need to send down
@@ -592,7 +592,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	if !isPeek {
 		events, err = applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, roomID, device.UserID, recentEvents)
 		if err != nil {
-			logrus.WithError(err).Error("unable to apply history visibility filter")
+			frame.Log(ctx).WithError(err).Error("unable to apply history visibility filter")
 		}
 	}
 

@@ -65,11 +65,11 @@ func TestUserInteractiveChallenge(t *testing.T) {
 	// no auth key results in a challenge
 	_, errRes := uia.Verify(ctx, []byte(`{}`), device)
 	if errRes == nil {
-		t.Fatal("Verify succeeded with {} but expected failure")
+		t.Fatalf("Verify succeeded with {} but expected failure")
 		return
 	}
 	if errRes.Code != 401 {
-		t.Error("Expected HTTP 401, got %d", errRes.Code)
+		t.Errorf("Expected HTTP 401, got %d", errRes.Code)
 	}
 }
 
@@ -109,7 +109,7 @@ func TestUserInteractivePasswordLogin(t *testing.T) {
 	for _, tc := range testCases {
 		_, errRes := uia.Verify(ctx, tc, device)
 		if errRes != nil {
-			t.Error("Verify failed but expected success for request: %s - got %+v", string(tc), errRes)
+			t.Errorf("Verify failed but expected success for request: %s - got %+v", string(tc), errRes)
 		}
 	}
 }
@@ -193,11 +193,11 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 	for _, tc := range testCases {
 		_, errRes := uia.Verify(ctx, tc.body, device)
 		if errRes == nil {
-			t.Error("Verify succeeded but expected failure for request: %s", string(tc.body))
+			t.Errorf("Verify succeeded but expected failure for request: %s", string(tc.body))
 			continue
 		}
 		if errRes.Code != tc.wantRes.Code {
-			t.Error("got code %d want code %d for request: %s", errRes.Code, tc.wantRes.Code, string(tc.body))
+			t.Errorf("got code %d want code %d for request: %s", errRes.Code, tc.wantRes.Code, string(tc.body))
 		}
 	}
 }
@@ -230,10 +230,10 @@ func TestUserInteractive_AddCompletedStage(t *testing.T) {
 			_, resp := u.Verify(ctx, []byte("{}"), nil)
 			challenge, ok := resp.JSON.(Challenge)
 			if !ok {
-				t.Fatal("expected a Challenge, got %T", resp.JSON)
+				t.Fatalf("expected a Challenge, got %T", resp.JSON)
 			}
 			if len(challenge.Completed) > 0 {
-				t.Fatal("expected 0 completed stages, got %d", len(challenge.Completed))
+				t.Fatalf("expected 0 completed stages, got %d", len(challenge.Completed))
 			}
 			u.AddCompletedStage(tt.sessionID, "")
 		})

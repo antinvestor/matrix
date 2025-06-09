@@ -25,7 +25,7 @@ func MustPublishMsgs(ctx context.Context, t *testing.T, qopts *config.QueueOptio
 	for _, msg := range msgs {
 		err = qm.Publish(ctx, qopts.Ref(), msg.Data, msg.Header)
 		if err != nil {
-			t.Fatal("MustPublishMsgs: failed to publish message: %s", err)
+			t.Fatalf("MustPublishMsgs: failed to publish message: %s", err)
 		}
 	}
 

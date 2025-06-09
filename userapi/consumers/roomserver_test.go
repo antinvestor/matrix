@@ -34,7 +34,7 @@ func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _
 	cm := sqlutil.NewConnectionManager(svc)
 	db, err := storage.NewUserDatabase(ctx, nil, cm, "", 4, 0, 0, "")
 	if err != nil {
-		t.Fatal("failed to create new user db: %v", err)
+		t.Fatalf("failed to create new user db: %v", err)
 	}
 	return db
 }
@@ -43,7 +43,7 @@ func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
 	t.Helper()
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionV10).NewEventFromTrustedJSON([]byte(content), false)
 	if err != nil {
-		t.Fatal("failed to create event: %v", err)
+		t.Fatalf("failed to create event: %v", err)
 	}
 	return &types.HeaderedEvent{PDU: ev}
 }
@@ -119,19 +119,19 @@ func Test_evaluatePushRules(t *testing.T) {
 					Domain:    "localhost",
 				}, 10)
 				if err != nil {
-					t.Fatal("failed to evaluate push rules: %v", err)
+					t.Fatalf("failed to evaluate push rules: %v", err)
 				}
 				assert.Equal(t, tc.wantActions, actions)
 				gotAction, _, err := pushrules.ActionsToTweaks(actions)
 				if err != nil {
-					t.Fatal("failed to get actions: %v", err)
+					t.Fatalf("failed to get actions: %v", err)
 				}
 				if gotAction != tc.wantAction {
-					t.Fatal("expected action to be '%s', got '%s'", tc.wantAction, gotAction)
+					t.Fatalf("expected action to be '%s', got '%s'", tc.wantAction, gotAction)
 				}
 				// this is taken from `notifyLocal`
 				if tc.wantNotify && gotAction != pushrules.NotifyAction {
-					t.Fatal("expected to notify but didn't")
+					t.Fatalf("expected to notify but didn't")
 				}
 			})
 
@@ -159,7 +159,7 @@ func TestLocalRoomMembers(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatal("failed to create a cache: %v", err)
+			t.Fatalf("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -284,16 +284,16 @@ func TestMessageStats(t *testing.T) {
 				t.Logf("%+v", s.roomCounts)
 				gotStats, activeRooms, activeE2EERooms, err := db.DailyRoomsMessages(ctx, tt.ourServer)
 				if err != nil {
-					t.Fatal("unexpected error: %s", err)
+					t.Fatalf("unexpected error: %s", err)
 				}
 				if !reflect.DeepEqual(gotStats, tt.wantStats) {
-					t.Fatal("expected %+v, got %+v", tt.wantStats, gotStats)
+					t.Fatalf("expected %+v, got %+v", tt.wantStats, gotStats)
 				}
 				if tt.args.eventType == "m.room.encrypted" && activeE2EERooms != 1 {
-					t.Fatal("expected room to be activeE2EE")
+					t.Fatalf("expected room to be activeE2EE")
 				}
 				if tt.args.eventType == "m.room.message" && activeRooms != 1 {
-					t.Fatal("expected room to be active")
+					t.Fatalf("expected room to be active")
 				}
 			})
 		}
@@ -310,7 +310,7 @@ func BenchmarkLocalRoomMembers(b *testing.B) {
 	qm := queueutil.NewQueueManager(svc)
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatal("failed to create a cache: %v", err)
+		t.Fatalf("failed to create a cache: %v", err)
 	}
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)

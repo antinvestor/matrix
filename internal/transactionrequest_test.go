@@ -279,7 +279,7 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 		"user_id": userID,
 		"typing":  typing,
 	}); err != nil {
-		t.Error("failed to marshal EDU JSON")
+		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.typing"}
 	badEDU.Content = spec.RawJSON("badjson")
@@ -347,7 +347,7 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 			},
 		},
 	}); err != nil {
-		t.Error("failed to marshal EDU JSON")
+		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.direct_to_device"}
 	badEDU.Content = spec.RawJSON("badjson")
@@ -424,7 +424,7 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 		"stream_id": 6,
 		"user_id":   userID,
 	}); err != nil {
-		t.Error("failed to marshal EDU JSON")
+		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.device_list_update"}
 	badEDU.Content = spec.RawJSON("badjson")
@@ -487,7 +487,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 			},
 		},
 	}); err != nil {
-		t.Error("failed to marshal EDU JSON")
+		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.receipt"}
 	badEDU.Content = spec.RawJSON("badjson")
@@ -506,7 +506,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 			},
 		},
 	}); err != nil {
-		t.Error("failed to marshal EDU JSON")
+		t.Errorf("failed to marshal EDU JSON")
 	}
 	badDomain := gomatrixserverlib.EDU{Type: "m.receipt"}
 	if badDomain.Content, err = json.Marshal(map[string]interface{}{
@@ -523,7 +523,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 			},
 		},
 	}); err != nil {
-		t.Error("failed to marshal EDU JSON")
+		t.Errorf("failed to marshal EDU JSON")
 	}
 	edus := []gomatrixserverlib.EDU{badEDU, badUser, edu}
 
@@ -565,7 +565,7 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 
 	edu := gomatrixserverlib.EDU{Type: "m.signing_key_update"}
 	if edu.Content, err = json.Marshal(map[string]interface{}{}); err != nil {
-		t.Error("failed to marshal EDU JSON")
+		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.signing_key_update"}
 	badEDU.Content = spec.RawJSON("badjson")
@@ -622,7 +622,7 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 			"user_id":          userID,
 		}},
 	}); err != nil {
-		t.Error("failed to marshal EDU JSON")
+		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.presence"}
 	badEDU.Content = spec.RawJSON("badjson")
@@ -668,7 +668,7 @@ func TestProcessTransactionRequestEDUUnhandled(t *testing.T) {
 
 	edu := gomatrixserverlib.EDU{Type: "m.unhandled"}
 	if edu.Content, err = json.Marshal(map[string]interface{}{}); err != nil {
-		t.Error("failed to marshal EDU JSON")
+		t.Errorf("failed to marshal EDU JSON")
 	}
 
 	txn, _, err := createTransactionWithEDU(ctx, svc, cfg, []gomatrixserverlib.EDU{edu})
@@ -814,11 +814,11 @@ func mustProcessTransaction(t *testing.T, txn *TxnReq, pdusWithErrors []string) 
 
 	res, err := txn.ProcessTransaction(ctx)
 	if err != nil {
-		t.Error("txn.processTransaction returned an error: %v", err)
+		t.Errorf("txn.processTransaction returned an error: %v", err)
 		return
 	}
 	if len(res.PDUs) != len(txn.PDUs) {
-		t.Error("txn.processTransaction did not return results for all PDUs, got %d want %d", len(res.PDUs), len(txn.PDUs))
+		t.Errorf("txn.processTransaction did not return results for all PDUs, got %d want %d", len(res.PDUs), len(txn.PDUs))
 		return
 	}
 NextPDU:
@@ -831,7 +831,7 @@ NextPDU:
 				break NextPDU
 			}
 		}
-		t.Error("txn.processTransaction PDU %s returned an error %s", eventID, result.Error)
+		t.Errorf("txn.processTransaction PDU %s returned an error %s", eventID, result.Error)
 	}
 }
 
@@ -840,12 +840,12 @@ func assertInputRoomEvents(t *testing.T, got []rsAPI.InputRoomEvent, want []*rst
 		fmt.Println("GOT ", g.Event.EventID())
 	}
 	if len(got) != len(want) {
-		t.Error("wrong number of InputRoomEvents: got %d want %d", len(got), len(want))
+		t.Errorf("wrong number of InputRoomEvents: got %d want %d", len(got), len(want))
 		return
 	}
 	for i := range got {
 		if got[i].Event.EventID() != want[i].EventID() {
-			t.Error("InputRoomEvents[%d] got %s want %s", i, got[i].Event.EventID(), want[i].EventID())
+			t.Errorf("InputRoomEvents[%d] got %s want %s", i, got[i].Event.EventID(), want[i].EventID())
 		}
 	}
 }

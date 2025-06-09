@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/tidwall/gjson"
 	"io"
 	"net"
 	"net/http"
@@ -31,23 +32,19 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/internal"
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/gomatrixserverlib/tokens"
-	"github.com/pitabwire/util"
-	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/clientapi/auth"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/userutil"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -570,11 +567,11 @@ func Register(
 	}
 
 	logger := util.GetLogger(req.Context())
-	logger.WithFields(log.Fields{
-		"username":   r.Username,
-		"auth.type":  r.Auth.Type,
-		"session_id": r.Auth.Session,
-	}).Info("Processing registration request")
+	logger.
+		WithField("username", r.Username).
+		WithField("auth.type", r.Auth.Type).
+		WithField("session_id", r.Auth.Session).
+		Info("Processing registration request")
 
 	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
 }

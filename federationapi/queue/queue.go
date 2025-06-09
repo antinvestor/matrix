@@ -24,8 +24,8 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/pitabwire/frame"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
@@ -107,14 +107,18 @@ func NewOutgoingQueues(
 				serverNames[serverName] = struct{}{}
 			}
 		} else {
-			log.WithError(err).Error("Failed to get PDU server names for destination queue hydration")
+			frame.Log(ctx).WithError(err).
+				WithField("component", "federation_queue").
+				Error("Failed to get PDU server names for destination queue hydration")
 		}
 		if names, err := db.GetPendingEDUServerNames(ctx); err == nil {
 			for _, serverName := range names {
 				serverNames[serverName] = struct{}{}
 			}
 		} else {
-			log.WithError(err).Error("Failed to get EDU server names for destination queue hydration")
+			frame.Log(ctx).WithError(err).
+				WithField("component", "federation_queue").
+				Error("Failed to get EDU server names for destination queue hydration")
 		}
 		offset, step := time.Second*5, time.Second
 		if maxVal := len(serverNames); maxVal > 120 {
@@ -186,7 +190,9 @@ func (oqs *OutgoingQueues) SendEvent(
 	destinations []spec.ServerName,
 ) error {
 	if oqs.disabled {
-		log.Trace("Federation is disabled, not sending event")
+		frame.Log(ctx).
+			WithField("component", "federation_queue").
+			Debug("Federation is disabled, not sending event")
 		return nil
 	}
 	if _, ok := oqs.signing[origin]; !ok {
@@ -212,9 +218,11 @@ func (oqs *OutgoingQueues) SendEvent(
 		return nil
 	}
 
-	log.WithFields(log.Fields{
-		"destinations": len(destmap), "event": ev.EventID(),
-	}).Info("Sending event")
+	frame.Log(ctx).
+		WithField("event_id", ev.EventID()).
+		WithField("destinations", len(destmap)).
+		WithField("event", ev.EventID()).
+		Info("Sending event")
 
 	headeredJSON, err := json.Marshal(ev)
 	if err != nil {
@@ -243,7 +251,10 @@ func (oqs *OutgoingQueues) SendEvent(
 		destmap,
 		nid, // NIDs from federationapi_queue_json table
 	); err != nil {
-		log.WithError(err).Error("failed to associate PDUs %q with destinations", nid)
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_queue").
+			WithField("nid", nid).
+			Error("Failed to associate PDUs with destinations")
 		return err
 	}
 
@@ -265,7 +276,9 @@ func (oqs *OutgoingQueues) SendEDU(
 	destinations []spec.ServerName,
 ) error {
 	if oqs.disabled {
-		log.Trace("Federation is disabled, not sending EDU")
+		frame.Log(ctx).
+			WithField("component", "federation_queue").
+			Debug("Federation is disabled, not sending EDU")
 		return nil
 	}
 	if _, ok := oqs.signing[origin]; !ok {
@@ -291,9 +304,11 @@ func (oqs *OutgoingQueues) SendEDU(
 		return nil
 	}
 
-	log.WithFields(log.Fields{
-		"destinations": len(destmap), "edu_type": e.Type,
-	}).Info("Sending EDU event")
+	frame.Log(ctx).
+		WithField("edu_type", e.Type).
+		WithField("destinations", len(destmap)).
+		WithField("edu_type", e.Type).
+		Info("Sending EDU event")
 
 	ephemeralJSON, err := json.Marshal(e)
 	if err != nil {
@@ -326,7 +341,9 @@ func (oqs *OutgoingQueues) SendEDU(
 		e.Type,
 		nil, // this will use the default expireEDUTypes map
 	); err != nil {
-		log.WithError(err).Error("failed to associate EDU with destinations")
+		frame.Log(ctx).WithError(err).
+			WithField("component", "federation_queue").
+			Error("Failed to associate EDU with destinations")
 		return err
 	}
 

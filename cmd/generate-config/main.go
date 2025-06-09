@@ -38,15 +38,7 @@ func main() {
 
 		cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
 		cfg.SyncAPI.Fulltext.IndexPath = config.Path(filepath.Join(*dirPath, "searchindex"))
-		cfg.Logging = []config.LogrusHook{
-			{
-				Type:  "file",
-				Level: "info",
-				Params: map[string]interface{}{
-					"path": filepath.Join(*dirPath, "log"),
-				},
-			},
-		}
+
 		if *defaultsForCI {
 			cfg.AppServiceAPI.DisableTLSValidation = true
 			cfg.ClientAPI.RateLimiting.Enabled = false
@@ -56,8 +48,6 @@ func main() {
 			cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{}
 			cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
 			cfg.MSCs.MSCs = []string{"msc2836", "msc2444", "msc2753"}
-			cfg.Logging[0].Level = "trace"
-			cfg.Logging[0].Type = "std"
 			cfg.UserAPI.BCryptCost = bcrypt.MinCost
 			cfg.ClientAPI.RegistrationDisabled = false
 			cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true

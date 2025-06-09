@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"github.com/pitabwire/frame"
 	"net/http"
 
 	"github.com/antinvestor/gomatrix"
@@ -23,7 +24,6 @@ import (
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 func PeekRoomByIDOrAlias(
@@ -74,7 +74,7 @@ func PeekRoomByIDOrAlias(
 		}
 	case nil:
 	default:
-		logrus.WithError(err).WithField("roomID", roomIDOrAlias).Error("Failed to peek room")
+		frame.Log(req.Context()).WithError(err).WithField("roomID", roomIDOrAlias).Error("Failed to peek room")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -113,7 +113,7 @@ func UnpeekRoomByID(
 		}
 	case nil:
 	default:
-		logrus.WithError(err).WithField("roomID", roomID).Error("Failed to un-peek room")
+		frame.Log(req.Context()).WithError(err).WithField("roomID", roomID).Error("Failed to un-peek room")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

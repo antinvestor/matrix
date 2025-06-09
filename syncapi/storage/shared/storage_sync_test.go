@@ -65,7 +65,7 @@ func Test_isStatefilterEmpty(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isStatefilterEmpty(tt.filter); got != tt.want {
-				t.Error("isStatefilterEmpty() = %v, want %v", got, tt.want)
+				t.Errorf("isStatefilterEmpty() = %v, want %v", got, tt.want)
 			}
 		})
 	}

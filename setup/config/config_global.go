@@ -1,14 +1,13 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -69,9 +68,6 @@ type Global struct {
 	// Defaults to an empty array.
 	TrustedIDServers []string `yaml:"trusted_third_party_id_servers"`
 
-	// JetStream configuration
-	JetStream JetStream `yaml:"jetstream"`
-
 	// Metrics configuration
 	Metrics Metrics `yaml:"metrics"`
 
@@ -111,7 +107,6 @@ func (c *Global) Defaults(opts DefaultOpts) {
 
 	c.KeyValidityPeriod = time.Hour * 24 * 7
 	c.DatabaseOptions.Defaults(opts)
-	c.JetStream.Defaults(opts)
 	c.Metrics.Defaults(opts)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
@@ -132,7 +127,6 @@ func (c *Global) LoadEnv() error {
 	if err != nil {
 		return err
 	}
-	err = c.JetStream.LoadEnv()
 	if err != nil {
 		return err
 	}
@@ -157,7 +151,6 @@ func (c *Global) Verify(configErrs *ConfigErrors) {
 	}
 
 	c.DatabaseOptions.Verify(configErrs)
-	c.JetStream.Verify(configErrs)
 	c.Metrics.Verify(configErrs)
 	c.Sentry.Verify(configErrs)
 	c.DNSCache.Verify(configErrs)
@@ -353,7 +346,7 @@ func (c *CacheOptions) LoadEnv() error {
 	}
 
 	if !c.ConnectionString.IsRedis() {
-		log.WithField("cache_uri", c.ConnectionString).Warn("Invalid cache uri in the config")
+		frame.Log(context.TODO()).WithField("cache_uri", c.ConnectionString).Warn("Invalid cache uri in the config")
 	}
 	return nil
 }
@@ -427,7 +420,7 @@ func (q *QueueOptions) LoadEnv() error {
 	}
 
 	if !q.DS.IsQueue() {
-		log.WithField("queue_uri", q.DS).Warn("Invalid queue uri in the config")
+		frame.Log(context.TODO()).WithField("queue_uri", q.DS).Warn("Invalid queue uri in the config")
 	}
 	return nil
 }
@@ -510,7 +503,7 @@ func (c *DatabaseOptions) LoadEnv() error {
 	}
 
 	if !c.ConnectionString.IsPostgres() {
-		log.WithField("db_uri", c.ConnectionString).Warn("Invalid database uri in the config")
+		frame.Log(context.TODO()).WithField("db_uri", c.ConnectionString).Warn("Invalid database uri in the config")
 	}
 	return nil
 }

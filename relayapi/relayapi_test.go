@@ -43,7 +43,7 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatal("failed to create a cache: %v", err)
+			t.Fatalf("failed to create a cache: %v", err)
 		}
 
 		cm := sqlutil.NewConnectionManager(svc)
@@ -72,7 +72,7 @@ func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
 
 		routers := httputil.NewRouters()
 		assert.Panics(t, func() {
-			relayapi.AddPublicRoutes(routers, cfg, nil, nil)
+			relayapi.AddPublicRoutes(ctx, routers, cfg, nil, nil)
 		})
 	})
 }
@@ -120,7 +120,7 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 		routers := httputil.NewRouters()
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatal("failed to create a cache: %v", err)
+			t.Fatalf("failed to create a cache: %v", err)
 		}
 
 		cm := sqlutil.NewConnectionManager(svc)
@@ -130,7 +130,7 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		relayapi.AddPublicRoutes(routers, cfg, keyRing, relayAPI)
+		relayapi.AddPublicRoutes(ctx, routers, cfg, keyRing, relayAPI)
 
 		testCases := []struct {
 			name     string
@@ -163,7 +163,7 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			routers.Federation.ServeHTTP(w, tc.req)
 			if w.Code != tc.wantCode {
-				t.Fatal("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}
 		}
 	})
@@ -177,7 +177,7 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 		routers := httputil.NewRouters()
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatal("failed to create a cache: %v", err)
+			t.Fatalf("failed to create a cache: %v", err)
 		}
 
 		cm := sqlutil.NewConnectionManager(svc)
@@ -187,7 +187,7 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		relayapi.AddPublicRoutes(routers, cfg, keyRing, relayAPI)
+		relayapi.AddPublicRoutes(ctx, routers, cfg, keyRing, relayAPI)
 
 		testCases := []struct {
 			name     string
@@ -210,7 +210,7 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			routers.Federation.ServeHTTP(w, tc.req)
 			if w.Code != tc.wantCode {
-				t.Fatal("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}
 		}
 	})

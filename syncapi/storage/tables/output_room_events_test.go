@@ -27,12 +27,12 @@ func newOutputRoomEventsTable(ctx context.Context, svc *frame.Service, t *testin
 	var tab tables.Events
 	tab, err := postgres.NewPostgresEventsTable(ctx, cm)
 	if err != nil {
-		t.Fatal("failed to make new table: %s", err)
+		t.Fatalf("failed to make new table: %s", err)
 	}
 
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatal("failed to migrate events table: %s", err)
+		t.Fatalf("failed to migrate events table: %s", err)
 	}
 	return cm, tab
 }
@@ -97,7 +97,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatal("err: %s", err)
+			t.Fatalf("err: %s", err)
 		}
 	})
 }
@@ -138,7 +138,7 @@ func TestReindex(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatal("err: %s", err)
+			t.Fatalf("err: %s", err)
 		}
 
 		events, err := tab.ReIndex(ctx, 10, 0, []string{
@@ -151,7 +151,7 @@ func TestReindex(t *testing.T) {
 
 		wantEventCount := 3
 		if len(events) != wantEventCount {
-			t.Fatal("expected %d events, got %d", wantEventCount, len(events))
+			t.Fatalf("expected %d events, got %d", wantEventCount, len(events))
 		}
 	})
 }

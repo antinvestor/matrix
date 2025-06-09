@@ -20,7 +20,7 @@ func TestSharedSecretRegister(t *testing.T) {
 
 	req, err := NewSharedSecretRegistrationRequest(ctx, io.NopCloser(bytes.NewBuffer(jsonStr)))
 	if err != nil {
-		t.Fatal("failed to read request: %s", err)
+		t.Fatalf("failed to read request: %s", err)
 	}
 
 	r := NewSharedSecretRegistration(sharedSecret)
@@ -30,19 +30,19 @@ func TestSharedSecretRegister(t *testing.T) {
 
 	valid, err := r.IsValidMacLogin(req.Nonce, req.User, req.Password, req.Admin, req.MacBytes)
 	if err != nil {
-		t.Fatal("failed to check for valid mac: %s", err)
+		t.Fatalf("failed to check for valid mac: %s", err)
 	}
 	if !valid {
-		t.Error("mac login failed, wanted success")
+		t.Errorf("mac login failed, wanted success")
 	}
 
 	// modify the mac so it fails
 	req.MacBytes[0] = 0xff
 	valid, err = r.IsValidMacLogin(req.Nonce, req.User, req.Password, req.Admin, req.MacBytes)
 	if err != nil {
-		t.Fatal("failed to check for valid mac: %s", err)
+		t.Fatalf("failed to check for valid mac: %s", err)
 	}
 	if valid {
-		t.Error("mac login succeeded, wanted failure")
+		t.Errorf("mac login succeeded, wanted failure")
 	}
 }

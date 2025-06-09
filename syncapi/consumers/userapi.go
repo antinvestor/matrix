@@ -18,8 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/antinvestor/matrix/internal/queueutil"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -63,6 +62,9 @@ func NewOutputNotificationDataConsumer(
 // multiple goroutines, or else the sync stream position may race and
 // be incorrectly calculated.
 func (s *OutputNotificationDataConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+
+	log := frame.Log(ctx)
+
 	userID := metadata[queueutil.UserID]
 
 	// Parse out the event JSON
@@ -76,21 +78,18 @@ func (s *OutputNotificationDataConsumer) Handle(ctx context.Context, metadata ma
 	streamPos, err := s.db.UpsertRoomUnreadNotificationCounts(ctx, userID, data.RoomID, data.UnreadNotificationCount, data.UnreadHighlightCount)
 	if err != nil {
 
-		log.WithFields(log.Fields{
-			"user_id": userID,
-			"room_id": data.RoomID,
-		}).WithError(err).Error("Could not save notification counts")
+		log.WithField(
+			"user_id", userID).
+			WithField("room_id", data.RoomID).WithError(err).Error("Could not save notification counts")
 		return err
 	}
 
 	s.stream.Advance(streamPos)
 	s.notifier.OnNewNotificationData(userID, types.StreamingToken{NotificationDataPosition: streamPos})
 
-	log.WithFields(log.Fields{
-		"user_id":   userID,
-		"room_id":   data.RoomID,
-		"streamPos": streamPos,
-	}).Trace("Received notification data from user API")
+	log.WithField("user_id", userID).
+		WithField("room_id", data.RoomID).
+		WithField("streamPos", streamPos).Debug("Received notification data from user API")
 
 	return nil
 }

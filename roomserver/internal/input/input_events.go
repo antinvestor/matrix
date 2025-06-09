@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"time"
 
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
@@ -30,12 +31,9 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
+	"github.com/prometheus/client_golang/prometheus"
 
 	userAPI "github.com/antinvestor/matrix/userapi/api"
 
@@ -107,18 +105,17 @@ func (r *Inputer) processRoomEvent(
 	// Parse and validate the event JSON
 	headered := input.Event
 	event := headered.PDU
-	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
-		"event_id": event.EventID(),
-		"room_id":  event.RoomID().String(),
-		"kind":     input.Kind,
-		"origin":   input.Origin,
-		"type":     event.Type(),
-	})
+	logger := frame.Log(ctx).
+		WithField("event_id", event.EventID()).
+		WithField("room_id", event.RoomID().String()).
+		WithField("kind", input.Kind).
+		WithField("origin", input.Origin).
+		WithField("type", event.Type())
+
 	if input.HasState {
-		logger = logger.WithFields(logrus.Fields{
-			"has_state": input.HasState,
-			"state_ids": len(input.StateEventIDs),
-		})
+		logger = logger.
+			WithField("has_state", input.HasState).
+			WithField("state_ids", len(input.StateEventIDs))
 	}
 
 	// Don't waste time processing the event if the room doesn't exist.
@@ -512,7 +509,7 @@ func (r *Inputer) processRoomEvent(
 				var aclEvent *types.HeaderedEvent
 				aclEvent, err = r.DB.GetStateEvent(ctx, event.RoomID().String(), acls.MRoomServerACL, "")
 				if err != nil {
-					logrus.WithError(err).Error("failed to get server ACLs")
+					frame.Log(ctx).WithError(err).Error("failed to get server ACLs")
 				}
 				if aclEvent != nil {
 					strippedEvent := tables.StrippedEvent{
@@ -521,7 +518,7 @@ func (r *Inputer) processRoomEvent(
 						StateKey:     *aclEvent.StateKey(),
 						ContentValue: string(aclEvent.Content()),
 					}
-					r.ACLs.OnServerACLUpdate(strippedEvent)
+					r.ACLs.OnServerACLUpdate(ctx, strippedEvent)
 				}
 			}
 		}
@@ -556,7 +553,7 @@ func (r *Inputer) processRoomEvent(
 	// If guest_access changed and is not can_join, kick all guest users.
 	if event.Type() == spec.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
 		if err = r.kickGuests(ctx, event, roomInfo); err != nil && !sqlutil.ErrorIsNoRows(err) {
-			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
+			frame.Log(ctx).WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
 		}
 	}
 
@@ -693,7 +690,7 @@ func (r *Inputer) processStateBefore(
 // nolint: gocyclo
 func (r *Inputer) fetchAuthEvents(
 	ctx context.Context,
-	logger *logrus.Entry,
+	logger *frame.Entry,
 	roomInfo *types.RoomInfo,
 	virtualHost spec.ServerName,
 	event *types.HeaderedEvent,

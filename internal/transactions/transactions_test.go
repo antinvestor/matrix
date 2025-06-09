@@ -33,7 +33,7 @@ func TestCompare(t *testing.T) {
 	c1 := CacheKey{"1", "2", filepath.Dir(u1.Path)}
 	c2 := CacheKey{"1", "2", filepath.Dir(u2.Path)}
 	if !reflect.DeepEqual(c1, c2) {
-		t.Fatal("Cache keys differ: %+v <> %+v", c1, c2)
+		t.Fatalf("Cache keys differ: %+v <> %+v", c1, c2)
 	}
 }
 
@@ -70,9 +70,9 @@ func TestCache(t *testing.T) {
 
 	testResponse, ok := fakeTxnCache.FetchTransaction(fakeAccessToken, fakeTxnID, u)
 	if !ok {
-		t.Error("Failed to retrieve entry for txnID: ", fakeTxnID)
+		t.Errorf("Failed to retrieve entry for txnID: ", fakeTxnID)
 	} else if testResponse.JSON != fakeResponse.JSON {
-		t.Error("Fetched response incorrect. Expected: ", fakeResponse.JSON, " got: ", testResponse.JSON)
+		t.Errorf("Fetched response incorrect. Expected: ", fakeResponse.JSON, " got: ", testResponse.JSON)
 	}
 }
 
@@ -87,20 +87,20 @@ func TestCacheScope(t *testing.T) {
 	cache.AddTransaction(fakeAccessToken2, fakeTxnID, sendToDeviceEndpoint, fakeResponse3)
 
 	if res, ok := cache.FetchTransaction(fakeAccessToken, fakeTxnID, sendEndpoint); !ok {
-		t.Error("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
+		t.Errorf("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
 	} else if res.JSON != fakeResponse.JSON {
-		t.Error("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse.JSON, res.JSON)
+		t.Errorf("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse.JSON, res.JSON)
 	}
 	if res, ok := cache.FetchTransaction(fakeAccessToken2, fakeTxnID, sendEndpoint); !ok {
-		t.Error("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
+		t.Errorf("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
 	} else if res.JSON != fakeResponse2.JSON {
-		t.Error("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse2.JSON, res.JSON)
+		t.Errorf("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse2.JSON, res.JSON)
 	}
 
 	// Ensure the txnID is not shared across endpoints
 	if res, ok := cache.FetchTransaction(fakeAccessToken2, fakeTxnID, sendToDeviceEndpoint); !ok {
-		t.Error("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
+		t.Errorf("failed to retrieve entry for (%s, %s)", fakeAccessToken, fakeTxnID)
 	} else if res.JSON != fakeResponse3.JSON {
-		t.Error("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse2.JSON, res.JSON)
+		t.Errorf("Wrong cache entry for (%s, %s). Expected: %v; got: %v", fakeAccessToken, fakeTxnID, fakeResponse2.JSON, res.JSON)
 	}
 }

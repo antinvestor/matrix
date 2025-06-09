@@ -20,7 +20,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/lib/pq"
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -268,9 +267,9 @@ func (s *statsTable) startTimers(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 		default:
-			logrus.Info("Executing UpdateUserDailyVisits")
+			frame.Log(ctx).Info("Executing UpdateUserDailyVisits")
 			if err := s.UpdateUserDailyVisits(ctx, time.Now(), s.lastUpdate); err != nil {
-				logrus.WithError(err).Error("failed to update daily user visits")
+				frame.Log(ctx).WithError(err).Error("failed to update daily user visits")
 			}
 			time.AfterFunc(time.Hour*3, updateStatsFunc)
 		}
@@ -319,7 +318,7 @@ func (s *statsTable) registeredUserByType(ctx context.Context) (map[string]int64
 	).Rows()
 	if err != nil {
 		if !sqlutil.ErrorIsNoRows(err) {
-			logrus.Error("Failed to get registered users: ", err)
+			frame.Log(ctx).Error("Failed to get registered users: ", err)
 		}
 		return nil, err
 	}
@@ -368,7 +367,7 @@ func (s *statsTable) r30Users(ctx context.Context) (map[string]int64, error) {
 
 	if err != nil {
 		if !sqlutil.ErrorIsNoRows(err) {
-			logrus.Error("Failed to get r30 users: ", err)
+			frame.Log(ctx).Error("Failed to get r30 users: ", err)
 		}
 		return nil, err
 	}

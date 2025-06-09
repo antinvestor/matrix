@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net"
 	"net/http"
 	"os"
@@ -26,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -327,6 +327,9 @@ func compileNamespaceRegexes(namespaces []ApplicationServiceNamespace) (err erro
 // checkErrors checks for any configuration errors amongst the loaded
 // application services according to the application service spec.
 func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
+
+	log := frame.Log(context.TODO())
+
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
 
@@ -412,7 +415,7 @@ func validateNamespace(
 	// Check if GroupID for the users namespace is in the correct format
 	if key == "users" && namespace.GroupID != "" {
 		// TODO: Remove once group_id is implemented
-		log.Warn("WARNING: Application service option group_id is currently unimplemented")
+		frame.Log(context.TODO()).Warn("WARNING: Application service option group_id is currently unimplemented")
 
 		correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
 		if !correctFormat {

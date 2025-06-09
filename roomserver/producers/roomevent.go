@@ -18,9 +18,10 @@ import (
 	"context"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	log "github.com/sirupsen/logrus"
+
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/matrix/roomserver/acls"
@@ -41,22 +42,22 @@ type RoomEventProducer struct {
 
 func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string, updates []api.OutputEvent) error {
 	var err error
+
+	log := frame.Log(ctx)
+
 	for _, update := range updates {
 
-		logger := log.WithFields(log.Fields{
-			"room_id": roomID,
-			"type":    update.Type,
-		})
+		logger := log.WithField("room_id", roomID).
+			WithField("type", update.Type)
 		if update.NewRoomEvent != nil {
 			eventType := update.NewRoomEvent.Event.Type()
-			logger = logger.WithFields(log.Fields{
-				"event_type":     eventType,
-				"event_id":       update.NewRoomEvent.Event.EventID(),
-				"adds_state":     len(update.NewRoomEvent.AddsStateEventIDs),
-				"removes_state":  len(update.NewRoomEvent.RemovesStateEventIDs),
-				"send_as_server": update.NewRoomEvent.SendAsServer,
-				"sender":         update.NewRoomEvent.Event.SenderID(),
-			})
+			logger = logger.
+				WithField("event_type", eventType).
+				WithField("event_id", update.NewRoomEvent.Event.EventID()).
+				WithField("adds_state", len(update.NewRoomEvent.AddsStateEventIDs)).
+				WithField("removes_state", len(update.NewRoomEvent.RemovesStateEventIDs)).
+				WithField("send_as_server", update.NewRoomEvent.SendAsServer).
+				WithField("sender", update.NewRoomEvent.Event.SenderID())
 			if update.NewRoomEvent.Event.StateKey() != nil {
 				logger = logger.WithField("state_key", *update.NewRoomEvent.Event.StateKey())
 			}
@@ -76,7 +77,7 @@ func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string
 					StateKey:     *ev.StateKey(),
 					ContentValue: string(ev.Content()),
 				}
-				defer r.ACLs.OnServerACLUpdate(strippedEvent)
+				defer r.ACLs.OnServerACLUpdate(ctx, strippedEvent)
 			}
 		}
 
@@ -85,7 +86,7 @@ func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string
 			queueutil.RoomID:        roomID,
 		}
 
-		logger.Tracef("Producing to topic '%s'", r.Topic)
+		logger.Debug("Producing to topic '%s'", r.Topic)
 		err = r.Qm.Publish(ctx, r.Topic.Ref(), update, h)
 		if err != nil {
 			logger.WithError(err).Error("Failed to produce to topic '%s': %s", r.Topic, err)

@@ -42,7 +42,7 @@ func mustCreateUserDatabase(ctx context.Context, svc *frame.Service, t *testing.
 
 	db, err := storage.NewUserDatabase(ctx, nil, cm, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
-		t.Fatal("NewUserDatabase returned %s", err)
+		t.Fatalf("NewUserDatabase returned %s", err)
 	}
 	return db
 }
@@ -133,10 +133,10 @@ func Test_Accounts(t *testing.T) {
 		assert.NoError(t, err, "failed to deactivate account")
 		// This should fail now, as the account is deactivated
 		_, err = db.GetAccountByPassword(ctx, aliceLocalpart, aliceDomain, "newPassword")
-		assert.Error(t, err, "expected an error, got none")
+		assert.Errorf(t, err, "expected an error, got none")
 
 		_, err = db.GetAccountByLocalpart(ctx, "unusename", aliceDomain)
-		assert.Error(t, err, "expected an error for non existent localpart")
+		assert.Errorf(t, err, "expected an error for non existent localpart")
 
 		// create an empty localpart; this should never happen, but is required to test getting a numeric localpart
 		// if there's already a user without a localpart in the database
@@ -348,7 +348,7 @@ func Test_LoginToken(t *testing.T) {
 
 		// check if the token was actually deleted
 		_, err = db.GetLoginTokenDataByToken(ctx, gotMetadata.Token)
-		assert.Error(t, err, "expected an error, but got none")
+		assert.Errorf(t, err, "expected an error, but got none")
 	})
 }
 
@@ -594,7 +594,7 @@ func mustCreateKeyDatabase(ctx context.Context, svc *frame.Service, t *testing.T
 	cm := sqlutil.NewConnectionManager(svc)
 	db, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
-		t.Fatal("failed to create new database: %v", err)
+		t.Fatalf("failed to create new database: %v", err)
 	}
 	return db
 }
@@ -604,7 +604,7 @@ func MustNotError(t *testing.T, err error) {
 	if err == nil {
 		return
 	}
-	t.Fatal("operation failed: %s", err)
+	t.Fatalf("operation failed: %s", err)
 }
 
 func TestKeyChanges(t *testing.T) {
@@ -621,13 +621,13 @@ func TestKeyChanges(t *testing.T) {
 		MustNotError(t, err)
 		userIDs, latest, err := db.KeyChanges(ctx, deviceChangeIDB, types.OffsetNewest)
 		if err != nil {
-			t.Fatal("Failed to KeyChanges: %s", err)
+			t.Fatalf("Failed to KeyChanges: %s", err)
 		}
 		if latest != deviceChangeIDC {
-			t.Fatal("KeyChanges: got latest=%d want %d", latest, deviceChangeIDC)
+			t.Fatalf("KeyChanges: got latest=%d want %d", latest, deviceChangeIDC)
 		}
 		if !reflect.DeepEqual(userIDs, []string{"@charlie:localhost"}) {
-			t.Fatal("KeyChanges: wrong user_ids: %v", userIDs)
+			t.Fatalf("KeyChanges: wrong user_ids: %v", userIDs)
 		}
 	})
 }
@@ -643,19 +643,19 @@ func TestKeyChangesNoDupes(t *testing.T) {
 		deviceChangeIDB, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
 		if deviceChangeIDA == deviceChangeIDB {
-			t.Fatal("Expected change ID to be different even when inserting key change for the same user, got %d for both changes", deviceChangeIDA)
+			t.Fatalf("Expected change ID to be different even when inserting key change for the same user, got %d for both changes", deviceChangeIDA)
 		}
 		deviceChangeID, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
 		userIDs, latest, err := db.KeyChanges(ctx, 0, types.OffsetNewest)
 		if err != nil {
-			t.Fatal("Failed to KeyChanges: %s", err)
+			t.Fatalf("Failed to KeyChanges: %s", err)
 		}
 		if latest != deviceChangeID {
-			t.Fatal("KeyChanges: got latest=%d want %d", latest, deviceChangeID)
+			t.Fatalf("KeyChanges: got latest=%d want %d", latest, deviceChangeID)
 		}
 		if !reflect.DeepEqual(userIDs, []string{"@alice:localhost"}) {
-			t.Fatal("KeyChanges: wrong user_ids: %v", userIDs)
+			t.Fatalf("KeyChanges: wrong user_ids: %v", userIDs)
 		}
 	})
 }
@@ -674,13 +674,13 @@ func TestKeyChangesUpperLimit(t *testing.T) {
 		MustNotError(t, err)
 		userIDs, latest, err := db.KeyChanges(ctx, deviceChangeIDA, deviceChangeIDB)
 		if err != nil {
-			t.Fatal("Failed to KeyChanges: %s", err)
+			t.Fatalf("Failed to KeyChanges: %s", err)
 		}
 		if latest != deviceChangeIDB {
-			t.Fatal("KeyChanges: got latest=%d want %d", latest, deviceChangeIDB)
+			t.Fatalf("KeyChanges: got latest=%d want %d", latest, deviceChangeIDB)
 		}
 		if !reflect.DeepEqual(userIDs, []string{"@bob:localhost"}) {
-			t.Fatal("KeyChanges: wrong user_ids: %v", userIDs)
+			t.Fatalf("KeyChanges: wrong user_ids: %v", userIDs)
 		}
 	})
 }
@@ -730,13 +730,13 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 		}
 		MustNotError(t, db.StoreLocalDeviceKeys(ctx, msgs))
 		if msgs[0].StreamID != 1 {
-			t.Fatal("Expected StoreLocalDeviceKeys to set StreamID=1 but got %d", msgs[0].StreamID)
+			t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=1 but got %d", msgs[0].StreamID)
 		}
 		if msgs[1].StreamID != 1 {
-			t.Fatal("Expected StoreLocalDeviceKeys to set StreamID=1 (different user) but got %d", msgs[1].StreamID)
+			t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=1 (different user) but got %d", msgs[1].StreamID)
 		}
 		if msgs[2].StreamID != 2 {
-			t.Fatal("Expected StoreLocalDeviceKeys to set StreamID=2 (another device) but got %d", msgs[2].StreamID)
+			t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=2 (another device) but got %d", msgs[2].StreamID)
 		}
 
 		// updating a device sets the next stream ID for that user
@@ -753,7 +753,7 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 		}
 		MustNotError(t, db.StoreLocalDeviceKeys(ctx, msgs))
 		if msgs[0].StreamID != 3 {
-			t.Fatal("Expected StoreLocalDeviceKeys to set StreamID=3 (new key same device) but got %d", msgs[0].StreamID)
+			t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=3 (new key same device) but got %d", msgs[0].StreamID)
 		}
 
 		dbLock.Lock()
@@ -762,18 +762,18 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 		msgs, err = db.DeviceKeysForUser(ctx, alice, deviceArray, false)
 
 		if err != nil {
-			t.Fatal("DeviceKeysForUser returned error: %s", err)
+			t.Fatalf("DeviceKeysForUser returned error: %s", err)
 		}
 		wantStreamIDs := map[string]int64{
 			"AAA":            3,
 			"another_device": 2,
 		}
 		if len(msgs) != len(wantStreamIDs) {
-			t.Fatal("DeviceKeysForUser: wrong number of devices, got %d want %d", len(msgs), len(wantStreamIDs))
+			t.Fatalf("DeviceKeysForUser: wrong number of devices, got %d want %d", len(msgs), len(wantStreamIDs))
 		}
 		for _, m := range msgs {
 			if m.StreamID != wantStreamIDs[m.DeviceID] {
-				t.Error("DeviceKeysForUser: wrong returned stream ID for key, got %d want %d", m.StreamID, wantStreamIDs[m.DeviceID])
+				t.Errorf("DeviceKeysForUser: wrong returned stream ID for key, got %d want %d", m.StreamID, wantStreamIDs[m.DeviceID])
 			}
 		}
 	})
@@ -801,7 +801,7 @@ func TestOneTimeKeys(t *testing.T) {
 		count, err := db.OneTimeKeysCount(ctx, userID, deviceID)
 		MustNotError(t, err)
 		if count.KeyCount["curve25519"] != 1 {
-			t.Fatal("Expected 1 key, got %d", count.KeyCount["curve25519"])
+			t.Fatalf("Expected 1 key, got %d", count.KeyCount["curve25519"])
 		}
 
 		// Check the actual key contents are correct
@@ -810,7 +810,7 @@ func TestOneTimeKeys(t *testing.T) {
 		keyJSON, err := keysJSON["curve25519:KEY1"].MarshalJSON()
 		MustNotError(t, err)
 		if !bytes.Equal(keyJSON, []byte(`{"key":"v1"}`)) {
-			t.Fatal("Existing keys do not match expected. Got %v", keysJSON["curve25519:KEY1"])
+			t.Fatalf("Existing keys do not match expected. Got %v", keysJSON["curve25519:KEY1"])
 		}
 
 		// Claim a one time key from the database. This should remove it from the database.
@@ -819,14 +819,14 @@ func TestOneTimeKeys(t *testing.T) {
 
 		// Check the claimed key contents are correct
 		if !reflect.DeepEqual(claimedKeys[0], otk) {
-			t.Fatal("Expected to claim stored key %v. Got %v", otk, claimedKeys[0])
+			t.Fatalf("Expected to claim stored key %v. Got %v", otk, claimedKeys[0])
 		}
 
 		// Check the count of one time keys is now zero
 		count, err = db.OneTimeKeysCount(ctx, userID, deviceID)
 		MustNotError(t, err)
 		if count.KeyCount["curve25519"] != 0 {
-			t.Fatal("Expected 0 keys, got %d", count.KeyCount["curve25519"])
+			t.Fatalf("Expected 0 keys, got %d", count.KeyCount["curve25519"])
 		}
 	})
 }

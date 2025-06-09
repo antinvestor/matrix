@@ -66,7 +66,7 @@ func TestHandleQueryDirectory(t *testing.T) {
 		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, qm, &fedClient, nil, nil, keyRing, true, nil)
 		userapi := fakeUserAPI{}
 
-		routing.Setup(routers, cfg, nil, fedapi, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, cacheutil.DisableMetrics)
+		routing.Setup(ctx, routers, cfg, nil, fedapi, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, cacheutil.DisableMetrics)
 
 		handler := fedMux.Get(routing.QueryDirectoryRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)
@@ -78,12 +78,12 @@ func TestHandleQueryDirectory(t *testing.T) {
 		content := queryContent{}
 		err := req.SetContent(content)
 		if err != nil {
-			t.Fatal("Error: %s", err.Error())
+			t.Fatalf("Error: %s", err.Error())
 		}
 		req.Sign(serverName, gomatrixserverlib.KeyID(keyID), sk)
 		httpReq, err := req.HTTPRequest()
 		if err != nil {
-			t.Fatal("Error: %s", err.Error())
+			t.Fatalf("Error: %s", err.Error())
 		}
 		// vars := map[string]string{"room_alias": "#room:server"}
 		w := httptest.NewRecorder()

@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"reflect"
 	"sync"
@@ -35,7 +36,6 @@ import (
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#put-matrix-client-r0-rooms-roomid-send-eventtype-txnid
@@ -239,11 +239,11 @@ func SendEvent(
 		}
 	}
 	timeToSubmitEvent := time.Since(startedSubmittingEvent)
-	util.GetLogger(req.Context()).WithFields(logrus.Fields{
-		"event_id":     e.EventID(),
-		"room_id":      roomID,
-		"room_version": roomVersion,
-	}).Info("Sent event to roomserver")
+	util.GetLogger(req.Context()).
+		WithField("event_id", e.EventID()).
+		WithField("room_id", roomID).
+		WithField("room_version", roomVersion).
+		Info("Sent event to roomserver")
 
 	res := util.JSONResponse{
 		Code: http.StatusOK,
@@ -369,7 +369,7 @@ func generateSendEvent(
 	}
 	err = proto.SetContent(r)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("proto.SetContent failed")
+		frame.Log(ctx).WithError(err).Error("proto.SetContent failed")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -410,7 +410,7 @@ func generateSendEvent(
 			JSON: spec.BadJSON(specificErr.Error()),
 		}
 	default:
-		util.GetLogger(ctx).WithError(err).Error("eventutil.BuildEvent failed")
+		frame.Log(ctx).WithError(err).Error("eventutil.BuildEvent failed")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -424,7 +424,7 @@ func generateSendEvent(
 	}
 	provider, err := gomatrixserverlib.NewAuthEvents(gomatrixserverlib.ToPDUs(stateEvents))
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Cannot get auth events.")
+		frame.Log(ctx).WithError(err).Error("Cannot get auth events.")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.BadJSON("Internal server error"),
@@ -444,7 +444,7 @@ func generateSendEvent(
 	if e.Type() == "m.room.tombstone" {
 		content := make(map[string]interface{})
 		if err = json.Unmarshal(e.Content(), &content); err != nil {
-			util.GetLogger(ctx).WithError(err).Error("Cannot unmarshal the event content.")
+			frame.Log(ctx).WithError(err).Error("Cannot unmarshal the event content.")
 			return nil, &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("Cannot unmarshal the event content."),

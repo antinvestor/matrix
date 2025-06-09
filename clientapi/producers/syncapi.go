@@ -19,12 +19,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
+
 	"strconv"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
@@ -46,6 +47,8 @@ func (p *SyncAPIProducer) SendReceipt(
 	userID, roomID, eventID, receiptType string, timestamp spec.Timestamp,
 ) error {
 
+	log := frame.Log(ctx)
+
 	h := map[string]string{
 		queueutil.UserID:  userID,
 		queueutil.RoomID:  roomID,
@@ -54,7 +57,7 @@ func (p *SyncAPIProducer) SendReceipt(
 		"timestamp":       fmt.Sprintf("%d", timestamp),
 	}
 
-	log.WithFields(log.Fields{}).Tracef("Producing to topic '%s'", p.TopicReceiptEvent)
+	log.WithField("receipt_type", receiptType).Debug("Producing to topic '%s'", p.TopicReceiptEvent)
 	return p.Qm.Publish(ctx, p.TopicReceiptEvent, "", h)
 }
 
@@ -62,6 +65,9 @@ func (p *SyncAPIProducer) SendToDevice(
 	ctx context.Context, sender, userID, deviceID, eventType string,
 	message json.RawMessage,
 ) error {
+
+	log := frame.Log(ctx)
+
 	devices := []string{}
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -88,11 +94,11 @@ func (p *SyncAPIProducer) SendToDevice(
 		devices = append(devices, deviceID)
 	}
 
-	log.WithFields(log.Fields{
-		"user_id":     userID,
-		"num_devices": len(devices),
-		"type":        eventType,
-	}).Tracef("Producing to topic '%s'", p.TopicSendToDeviceEvent)
+	log.
+		WithField("user_id", userID).
+		WithField("num_devices", len(devices)).
+		WithField("type", eventType).
+		Debug("Producing to topic '%s'", p.TopicSendToDeviceEvent)
 	for i, device := range devices {
 		ote := &types.OutputSendToDeviceEvent{
 			UserID:   userID,

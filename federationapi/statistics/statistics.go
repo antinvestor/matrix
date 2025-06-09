@@ -2,13 +2,12 @@ package statistics
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"math"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage"
@@ -57,6 +56,9 @@ func NewStatistics(
 // ForServer returns server statistics for the given server name. If it
 // does not exist, it will create empty statistics and return those.
 func (s *Statistics) ForServer(ctx context.Context, serverName spec.ServerName) *ServerStatistics {
+
+	logger := frame.Log(ctx).WithField("server", serverName)
+
 	// Look up if we have statistics for this server already.
 	s.mutex.RLock()
 	server, found := s.servers[serverName]
@@ -73,7 +75,7 @@ func (s *Statistics) ForServer(ctx context.Context, serverName spec.ServerName) 
 		s.mutex.Unlock()
 		blacklisted, err := s.DB.IsServerBlacklisted(ctx, serverName)
 		if err != nil {
-			logrus.WithError(err).Error("Failed to get blacklist entry %q", serverName)
+			logger.WithError(err).Error("Failed to get blacklist entry %q", serverName)
 		} else {
 			server.blacklisted.Store(blacklisted)
 		}
@@ -86,14 +88,14 @@ func (s *Statistics) ForServer(ctx context.Context, serverName spec.ServerName) 
 
 		assumedOffline, err := s.DB.IsServerAssumedOffline(ctx, serverName)
 		if err != nil {
-			logrus.WithError(err).Error("Failed to get assumed offline entry %q", serverName)
+			logger.WithError(err).Error("Failed to get assumed offline entry %q", serverName)
 		} else {
 			server.assumedOffline.Store(assumedOffline)
 		}
 
 		knownRelayServers, err := s.DB.P2PGetRelayServersForServer(ctx, serverName)
 		if err != nil {
-			logrus.WithError(err).Error("Failed to get relay server list for %q", serverName)
+			logger.WithError(err).Error("Failed to get relay server list for %q", serverName)
 		} else {
 			server.relayMutex.Lock()
 			server.knownRelayServers = knownRelayServers
@@ -172,7 +174,7 @@ func (s *ServerStatistics) Success(ctx context.Context, method SendMethod) {
 		s.successCounter.Add(1)
 		if s.blacklisted.Load() && s.statistics.DB != nil {
 			if err := s.statistics.DB.RemoveServerFromBlacklist(ctx, s.serverName); err != nil {
-				logrus.WithError(err).Error("Failed to remove %q from blacklist", s.serverName)
+				frame.Log(ctx).WithError(err).Error("Failed to remove %q from blacklist", s.serverName)
 			}
 		}
 
@@ -201,7 +203,7 @@ func (s *ServerStatistics) Failure(ctx context.Context) (time.Time, bool) {
 			s.assumedOffline.CompareAndSwap(false, true)
 			if s.statistics.DB != nil {
 				if err := s.statistics.DB.SetServerAssumedOffline(ctx, s.serverName); err != nil {
-					logrus.WithError(err).Error("Failed to set %q as assumed offline", s.serverName)
+					frame.Log(ctx).WithError(err).Error("Failed to set %q as assumed offline", s.serverName)
 				}
 			}
 		}
@@ -210,7 +212,7 @@ func (s *ServerStatistics) Failure(ctx context.Context) (time.Time, bool) {
 			s.blacklisted.Store(true)
 			if s.statistics.DB != nil {
 				if err := s.statistics.DB.AddServerToBlacklist(ctx, s.serverName); err != nil {
-					logrus.WithError(err).Error("Failed to add %q to blacklist", s.serverName)
+					frame.Log(ctx).WithError(err).Error("Failed to add %q to blacklist", s.serverName)
 				}
 			}
 			s.ClearBackoff()
@@ -337,7 +339,7 @@ func (s *ServerStatistics) AddRelayServers(ctx context.Context, relayServers []s
 
 	err := s.statistics.DB.P2PAddRelayServersForServer(ctx, s.serverName, uniqueList)
 	if err != nil {
-		logrus.WithError(err).Error("Failed to add relay servers for %q. Servers: %v", s.serverName, uniqueList)
+		frame.Log(ctx).WithError(err).Error("Failed to add relay servers for %q. Servers: %v", s.serverName, uniqueList)
 		return
 	}
 

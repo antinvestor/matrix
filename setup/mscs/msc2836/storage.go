@@ -12,7 +12,6 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/pitabwire/frame"
-	"github.com/pitabwire/util"
 )
 
 // Schema for edges and nodes tables
@@ -202,7 +201,10 @@ func (p *postgresDB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent)
 			return result.Error
 		}
 
-		util.GetLogger(ctx).Info("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
+		frame.Log(ctx).
+			WithField("child", child).
+			WithField("parent", parent).
+			WithField("rel_type", relType).Info("StoreRelation")
 
 		// Insert node
 		result = db.Exec(p.insertNodeSQL, ev.EventID(), ev.OriginServerTS(), ev.RoomID().String(), count, base64.RawStdEncoding.EncodeToString(hash), 0)

@@ -15,7 +15,9 @@
 package routing
 
 import (
+	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
 
@@ -28,7 +30,6 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -36,6 +37,7 @@ import (
 // path unescape twice (once from the router, once from MakeRelayAPI). We need to have this enabled
 // so we can decode paths like foo/bar%2Fbaz as [foo, bar/baz] - by default it will decode to [foo, bar, baz]
 func Setup(
+	ctx context.Context,
 	fedMux *mux.Router,
 	cfg *config.FederationAPI,
 	relayAPI *relayInternal.RelayInternalAPI,
@@ -46,9 +48,9 @@ func Setup(
 	v1fedmux.Handle("/send_relay/{txnID}/{userID}", MakeRelayAPI(
 		"send_relay_transaction", "", cfg.Global.IsLocalServerName, keys,
 		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
-			logrus.Info("Handling send_relay from: %s", request.Origin())
+			frame.Log(ctx).Info("Handling send_relay from: %s", request.Origin())
 			if !relayAPI.RelayingEnabled() {
-				logrus.Warn("Dropping send_relay from: %s", request.Origin())
+				frame.Log(ctx).Warn("Dropping send_relay from: %s", request.Origin())
 				return util.JSONResponse{
 					Code: http.StatusNotFound,
 				}
@@ -71,9 +73,9 @@ func Setup(
 	v1fedmux.Handle("/relay_txn/{userID}", MakeRelayAPI(
 		"get_relay_transaction", "", cfg.Global.IsLocalServerName, keys,
 		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
-			logrus.Info("Handling relay_txn from: %s", request.Origin())
+			frame.Log(ctx).Info("Handling relay_txn from: %s", request.Origin())
 			if !relayAPI.RelayingEnabled() {
-				logrus.Warn("Dropping relay_txn from: %s", request.Origin())
+				frame.Log(ctx).Warn("Dropping relay_txn from: %s", request.Origin())
 				return util.JSONResponse{
 					Code: http.StatusNotFound,
 				}

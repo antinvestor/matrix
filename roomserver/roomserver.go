@@ -16,16 +16,16 @@ package roomserver
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal"
 	"github.com/antinvestor/matrix/roomserver/storage"
+	"github.com/antinvestor/matrix/setup/config"
 )
 
 // NewInternalAPI returns a concrete implementation of the internal API.
@@ -43,12 +43,12 @@ func NewInternalAPI(
 
 	roomserverCm, err := cm.FromOptions(ctx, &cfg.RoomServer.Database)
 	if err != nil {
-		logrus.WithError(err).Panic("could not obtain connection manager for roomserver")
+		frame.Log(ctx).WithError(err).Panic("could not obtain connection manager for roomserver")
 	}
 
 	roomserverDB, err := storage.NewDatabase(ctx, roomserverCm, caches)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to room server db")
+		frame.Log(ctx).WithError(err).Panic("failed to connect to room server db")
 	}
 
 	return internal.NewRoomserverAPI(

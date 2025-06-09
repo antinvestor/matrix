@@ -18,8 +18,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -164,7 +162,7 @@ func (s *pushersTable) SelectPushers(
 		pushers = append(pushers, pusher)
 	}
 
-	logrus.Tracef("Database returned %d pushers", len(pushers))
+	frame.Log(ctx).Debug("Database returned %d pushers", len(pushers))
 	return pushers, rows.Err()
 }
 

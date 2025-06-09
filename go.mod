@@ -8,7 +8,6 @@ require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250425153114-8976f5be98c1.1
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/validate v0.3.0
-	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/antinvestor/apis/go/common v1.34.0
 	github.com/antinvestor/apis/go/partition v1.34.2
 	github.com/antinvestor/apis/go/profile v1.33.1
@@ -22,21 +21,18 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/lib/pq v1.10.9
-	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pitabwire/frame v1.38.2
+	github.com/pitabwire/frame v1.39.0
 	github.com/pitabwire/util v0.1.3
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redis/go-redis/v9 v9.8.0
-	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
-	github.com/uber/jaeger-lib v2.4.1+incompatible
 	golang.org/x/crypto v0.39.0
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6
 	golang.org/x/image v0.26.0
@@ -119,10 +115,12 @@ require (
 	github.com/rs/cors v1.8.3 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/twmb/murmur3 v1.1.8 // indirect
+	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	go.mau.fi/util v0.8.7 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

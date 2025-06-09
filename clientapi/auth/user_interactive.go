@@ -17,6 +17,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"github.com/pitabwire/frame"
 	"net/http"
 	"sync"
 
@@ -26,7 +27,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
+
 	"github.com/tidwall/gjson"
 )
 
@@ -177,10 +178,10 @@ func (u *UserInteractive) challenge(sessionID string) *util.JSONResponse {
 }
 
 // NewSession returns a challenge with a new session ID and remembers the session ID
-func (u *UserInteractive) NewSession() *util.JSONResponse {
+func (u *UserInteractive) NewSession(ctx context.Context) *util.JSONResponse {
 	sessionID, err := GenerateAccessToken()
 	if err != nil {
-		logrus.WithError(err).Error("failed to generate session ID")
+		frame.Log(ctx).WithError(err).Error("failed to generate session ID")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -230,7 +231,7 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	// https://matrix.org/docs/spec/client_server/r0.6.1#user-interactive-api-in-the-rest-api
 	hasResponse := gjson.GetBytes(bodyBytes, "auth").Exists()
 	if !hasResponse {
-		return nil, u.NewSession()
+		return nil, u.NewSession(ctx)
 	}
 
 	// extract the type so we know which login type to use

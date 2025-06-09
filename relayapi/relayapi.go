@@ -16,6 +16,7 @@ package relayapi
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -29,11 +30,11 @@ import (
 	"github.com/antinvestor/matrix/relayapi/storage"
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/sirupsen/logrus"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
+	ctx context.Context,
 	routers httputil.Routers,
 	cfg *config.Matrix,
 	keyRing gomatrixserverlib.JSONVerifier,
@@ -46,6 +47,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
+		ctx,
 		routers.Federation,
 		&cfg.FederationAPI,
 		relay,
@@ -67,11 +69,11 @@ func NewRelayInternalAPI(
 
 	relayCm, err := cm.FromOptions(ctx, &cfg.RelayAPI.Database)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to obtain relay db connection manager :%v", err)
+		frame.Log(ctx).WithError(err).Panic("failed to obtain relay db connection manager :%v", err)
 	}
 	relayDB, err := storage.NewDatabase(ctx, relayCm, caches, cfg.Global.IsLocalServerName)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to relay db")
+		frame.Log(ctx).WithError(err).Panic("failed to connect to relay db")
 	}
 
 	return internal.NewRelayInternalAPI(

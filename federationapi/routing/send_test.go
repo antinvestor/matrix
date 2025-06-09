@@ -63,7 +63,7 @@ func TestHandleSend(t *testing.T) {
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
 
-		routing.Setup(routers, cfg, nil, fedapi, keyRing, nil, nil, &cfg.MSCs, nil, cacheutil.DisableMetrics)
+		routing.Setup(ctx, routers, cfg, nil, fedapi, keyRing, nil, nil, &cfg.MSCs, nil, cacheutil.DisableMetrics)
 
 		handler := fedMux.Get(routing.SendRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)
@@ -74,12 +74,12 @@ func TestHandleSend(t *testing.T) {
 		content := sendContent{}
 		err := req.SetContent(content)
 		if err != nil {
-			t.Fatal("Error: %s", err.Error())
+			t.Fatalf("Error: %s", err.Error())
 		}
 		req.Sign(serverName, gomatrixserverlib.KeyID(keyID), sk)
 		httpReq, err := req.HTTPRequest()
 		if err != nil {
-			t.Fatal("Error: %s", err.Error())
+			t.Fatalf("Error: %s", err.Error())
 		}
 		vars := map[string]string{"txnID": "1234"}
 		w := httptest.NewRecorder()

@@ -15,11 +15,11 @@
 package routing
 
 import (
+	"github.com/pitabwire/frame"
 	"net/http"
 	"strconv"
 
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -95,7 +95,7 @@ func Relations(
 
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		logrus.WithError(err).Error("Failed to get snapshot for relations")
+		frame.Log(req.Context()).WithError(err).Error("Failed to get snapshot for relations")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

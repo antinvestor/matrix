@@ -25,11 +25,11 @@ func newMembershipsTable(ctx context.Context, svc *frame.Service, t *testing.T, 
 	tab, err := postgres.NewPostgresMembershipsTable(ctx, cm)
 
 	if err != nil {
-		t.Fatal("failed to make new table: %s", err)
+		t.Fatalf("failed to make new table: %s", err)
 	}
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatal("failed to migrate membership table: %s", err)
+		t.Fatalf("failed to migrate membership table: %s", err)
 	}
 	return tab
 }
@@ -52,7 +52,7 @@ func TestMembershipsTable(t *testing.T) {
 	}
 
 	if len(userEvents) == 0 {
-		t.Fatal("didn't find creator membership event")
+		t.Fatalf("didn't find creator membership event")
 	}
 
 	for i := 0; i < 10; i++ {
@@ -77,7 +77,7 @@ func TestMembershipsTable(t *testing.T) {
 		for _, ev := range userEvents {
 			ev.StateKeyResolved = ev.StateKey()
 			if err := table.UpsertMembership(ctx, ev, types.StreamPosition(ev.Depth()), 1); err != nil {
-				t.Fatal("failed to upsert membership: %s", err)
+				t.Fatalf("failed to upsert membership: %s", err)
 			}
 		}
 
@@ -91,21 +91,21 @@ func testMembershipCount(t *testing.T, ctx context.Context, table tables.Members
 		// After 10 events, we should have 6 users (5 create related [incl. one member event], 5 member events = 6 users)
 		count, err := table.SelectMembershipCount(ctx, room.ID, spec.Join, 10)
 		if err != nil {
-			t.Fatal("failed to get membership count: %s", err)
+			t.Fatalf("failed to get membership count: %s", err)
 		}
 		expectedCount := 6
 		if expectedCount != count {
-			t.Fatal("expected member count to be %d, got %d", expectedCount, count)
+			t.Fatalf("expected member count to be %d, got %d", expectedCount, count)
 		}
 
 		// After 100 events, we should have all 11 users
 		count, err = table.SelectMembershipCount(ctx, room.ID, spec.Join, 100)
 		if err != nil {
-			t.Fatal("failed to get membership count: %s", err)
+			t.Fatalf("failed to get membership count: %s", err)
 		}
 		expectedCount = 11
 		if expectedCount != count {
-			t.Fatal("expected member count to be %d, got %d", expectedCount, count)
+			t.Fatalf("expected member count to be %d, got %d", expectedCount, count)
 		}
 	})
 }
@@ -113,18 +113,18 @@ func testMembershipCount(t *testing.T, ctx context.Context, table tables.Members
 func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, membershipEvent *rstypes.HeaderedEvent, user *test.User, room *test.Room) {
 	t.Run("upserting works as expected", func(t *testing.T) {
 		if err := table.UpsertMembership(ctx, membershipEvent, 1, 1); err != nil {
-			t.Fatal("failed to upsert membership: %s", err)
+			t.Fatalf("failed to upsert membership: %s", err)
 		}
 		membership, pos, err := table.SelectMembershipForUser(ctx, room.ID, user.ID, 1)
 		if err != nil {
-			t.Fatal("failed to select membership: %s", err)
+			t.Fatalf("failed to select membership: %s", err)
 		}
 		var expectedPos int64 = 1
 		if pos != expectedPos {
-			t.Fatal("expected pos to be %d, got %d", expectedPos, pos)
+			t.Fatalf("expected pos to be %d, got %d", expectedPos, pos)
 		}
 		if membership != spec.Join {
-			t.Fatal("expected membership to be join, got %s", membership)
+			t.Fatalf("expected membership to be join, got %s", membership)
 		}
 		// Create a new event which gets upserted and should not cause issues
 		ev := room.CreateAndInsert(t, user, spec.MRoomMember, map[string]interface{}{
@@ -133,28 +133,28 @@ func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, mem
 		ev.StateKeyResolved = ev.StateKey()
 		// Insert the same event again, but with different positions, which should get updated
 		if err = table.UpsertMembership(ctx, ev, 2, 2); err != nil {
-			t.Fatal("failed to upsert membership: %s", err)
+			t.Fatalf("failed to upsert membership: %s", err)
 		}
 
 		// Verify the position got updated
 		membership, pos, err = table.SelectMembershipForUser(ctx, room.ID, user.ID, 10)
 		if err != nil {
-			t.Fatal("failed to select membership: %s", err)
+			t.Fatalf("failed to select membership: %s", err)
 		}
 		expectedPos = 2
 		if pos != expectedPos {
-			t.Fatal("expected pos to be %d, got %d", expectedPos, pos)
+			t.Fatalf("expected pos to be %d, got %d", expectedPos, pos)
 		}
 		if membership != spec.Join {
-			t.Fatal("expected membership to be join, got %s", membership)
+			t.Fatalf("expected membership to be join, got %s", membership)
 		}
 
 		// If we can't find a membership, it should default to leave
 		if membership, _, err = table.SelectMembershipForUser(ctx, room.ID, user.ID, 1); err != nil {
-			t.Fatal("failed to select membership: %s", err)
+			t.Fatalf("failed to select membership: %s", err)
 		}
 		if membership != spec.Leave {
-			t.Fatal("expected membership to be leave, got %s", membership)
+			t.Fatalf("expected membership to be leave, got %s", membership)
 		}
 	})
 }

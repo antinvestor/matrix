@@ -15,8 +15,10 @@
 package httputil
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,17 +26,15 @@ import (
 	"os"
 	"strings"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/clientapi/auth"
+	"github.com/antinvestor/matrix/internal"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/getsentry/sentry-go"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
-
-	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/clientapi/auth"
-	"github.com/antinvestor/matrix/internal"
-	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
 // BasicAuth is used for authorization on /metrics handlers
@@ -155,7 +155,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		nextWriter := w
 		if verbose {
-			logger := logrus.NewEntry(logrus.StandardLogger())
+			logger := frame.Log(req.Context())
 			// Log outgoing response
 			rec := httptest.NewRecorder()
 			nextWriter = rec
@@ -258,8 +258,10 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics
 func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
+	logger := frame.Log(context.TODO())
+
 	if b.Username == "" || b.Password == "" {
-		logrus.Warn("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
+		logger.Warn("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Serve without authorization if either Username or Password is unset

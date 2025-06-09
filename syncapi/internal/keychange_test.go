@@ -148,15 +148,15 @@ type wantCatchup struct {
 func assertCatchup(t *testing.T, hasNew bool, syncResponse *types.Response, want wantCatchup) {
 	t.Helper()
 	if hasNew != want.hasNew {
-		t.Error("got hasNew=%v want %v", hasNew, want.hasNew)
+		t.Errorf("got hasNew=%v want %v", hasNew, want.hasNew)
 	}
 	sort.Strings(syncResponse.DeviceLists.Left)
 	if !reflect.DeepEqual(syncResponse.DeviceLists.Left, want.left) {
-		t.Error("device_lists.left got %v want %v", syncResponse.DeviceLists.Left, want.left)
+		t.Errorf("device_lists.left got %v want %v", syncResponse.DeviceLists.Left, want.left)
 	}
 	sort.Strings(syncResponse.DeviceLists.Changed)
 	if !reflect.DeepEqual(syncResponse.DeviceLists.Changed, want.changed) {
-		t.Error("device_lists.changed got %v want %v", syncResponse.DeviceLists.Changed, want.changed)
+		t.Errorf("device_lists.changed got %v want %v", syncResponse.DeviceLists.Changed, want.changed)
 	}
 }
 
@@ -225,7 +225,7 @@ func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 	}
 	_, hasNew, err := DeviceListCatchup(ctx, rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
-		t.Fatal("DeviceListCatchup returned an error: %s", err)
+		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
 	assertCatchup(t, hasNew, syncResponse, wantCatchup{
 		hasNew:  true,
@@ -251,7 +251,7 @@ func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 	}
 	_, hasNew, err := DeviceListCatchup(ctx, rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
-		t.Fatal("DeviceListCatchup returned an error: %s", err)
+		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
 	assertCatchup(t, hasNew, syncResponse, wantCatchup{
 		hasNew: true,
@@ -278,7 +278,7 @@ func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 	}
 	_, hasNew, err := DeviceListCatchup(ctx, rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
-		t.Fatal("Catchup returned an error: %s", err)
+		t.Fatalf("Catchup returned an error: %s", err)
 	}
 	assertCatchup(t, hasNew, syncResponse, wantCatchup{
 		hasNew: false,
@@ -304,7 +304,7 @@ func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 	}
 	_, hasNew, err := DeviceListCatchup(ctx, rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
-		t.Fatal("DeviceListCatchup returned an error: %s", err)
+		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
 	assertCatchup(t, hasNew, syncResponse, wantCatchup{
 		hasNew: false,
@@ -371,7 +371,7 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 	}
 	_, hasNew, err := DeviceListCatchup(ctx, rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
-		t.Fatal("DeviceListCatchup returned an error: %s", err)
+		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
 	assertCatchup(t, hasNew, syncResponse, wantCatchup{
 		hasNew: false,
@@ -403,7 +403,7 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 	}
 	_, hasNew, err := DeviceListCatchup(ctx, rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
-		t.Fatal("Catchup returned an error: %s", err)
+		t.Fatalf("Catchup returned an error: %s", err)
 	}
 	assertCatchup(t, hasNew, syncResponse, wantCatchup{
 		hasNew:  true,
@@ -498,7 +498,7 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 		ctx, rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken,
 	)
 	if err != nil {
-		t.Fatal("DeviceListCatchup returned an error: %s", err)
+		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
 	assertCatchup(t, hasNew, syncResponse, wantCatchup{
 		hasNew: true,

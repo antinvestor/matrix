@@ -16,12 +16,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"os"
@@ -31,7 +33,6 @@ import (
 	"github.com/antinvestor/matrix/internal"
 	"github.com/tidwall/gjson"
 
-	"github.com/sirupsen/logrus"
 	"golang.org/x/term"
 
 	"github.com/antinvestor/matrix/setup"
@@ -81,12 +82,14 @@ func main() {
 	}
 	cfg := setup.ParseFlags(true)
 
+	log := frame.Log(context.Background()).WithField("cmd", "create-account")
+
 	if *resetPassword {
-		logrus.Fatal("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")
+		log.Fatal("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")
 	}
 
 	if cfg.ClientAPI.RegistrationSharedSecret == "" {
-		logrus.Fatalln("Shared secret registration is not enabled, enable it by setting a shared secret in the config: 'client_api.registration_shared_secret'")
+		log.Fatal("Shared secret registration is not enabled, enable it by setting a shared secret in the config: 'client_api.registration_shared_secret'")
 	}
 
 	if *username == "" {
@@ -95,17 +98,17 @@ func main() {
 	}
 
 	if err := internal.ValidateUsername(*username, cfg.Global.ServerName); err != nil {
-		logrus.WithError(err).Error("Specified username is invalid")
+		log.WithError(err).Error("Specified username is invalid")
 		os.Exit(1)
 	}
 
 	pass, err := getPassword(*password, *pwdFile, *pwdStdin, os.Stdin)
 	if err != nil {
-		logrus.Fatalln(err)
+		log.WithError(err).Fatal("couldn't get password")
 	}
 
 	if err = internal.ValidatePassword(pass); err != nil {
-		logrus.WithError(err).Error("Specified password is invalid")
+		log.WithError(err).Error("Specified password is invalid")
 		os.Exit(1)
 	}
 
@@ -113,10 +116,10 @@ func main() {
 
 	accessToken, err := sharedSecretRegister(cfg.ClientAPI.RegistrationSharedSecret, *serverURL, *username, pass, *isAdmin)
 	if err != nil {
-		logrus.Fatalln("Failed to create the account:", err.Error())
+		log.Fatal("Failed to create the account:", err.Error())
 	}
 
-	logrus.Info("Created account: %s (AccessToken: %s)", *username, accessToken)
+	log.Info("Created account: %s (AccessToken: %s)", *username, accessToken)
 }
 
 type sharedSecretRegistrationRequest struct {

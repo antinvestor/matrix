@@ -1,9 +1,11 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"github.com/antinvestor/gomatrixserverlib"
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/frame"
+
 	"time"
 )
 
@@ -36,7 +38,7 @@ func (c *RoomServer) Verify(configErrs *ConfigErrors) {
 	if !gomatrixserverlib.KnownRoomVersion(c.DefaultRoomVersion) {
 		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.default_room_version': unsupported room version: %q", c.DefaultRoomVersion))
 	} else if !gomatrixserverlib.StableRoomVersion(c.DefaultRoomVersion) {
-		log.Warn("WARNING: Provided default room version %q is unstable", c.DefaultRoomVersion)
+		frame.Log(context.TODO()).Warn("WARNING: Provided default room version %q is unstable", c.DefaultRoomVersion)
 	}
 
 	c.ActorSystem.Verify(configErrs)

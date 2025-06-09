@@ -15,13 +15,14 @@
 package setup
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"os"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -39,14 +40,15 @@ func ParseFlags(monolith bool) *config.Matrix {
 		os.Exit(0)
 	}
 
+	ctx := context.Background()
 	if *configPath == "" {
-		logrus.Fatal("--config must be supplied")
+		frame.Log(ctx).Fatal("--config must be supplied")
 	}
 
 	cfg, err := config.Load(*configPath)
 
 	if err != nil {
-		logrus.Fatal("Invalid config file: %s", err)
+		frame.Log(ctx).Fatal("Invalid config file: %s", err)
 	}
 
 	if *enableRegistrationWithoutVerification {

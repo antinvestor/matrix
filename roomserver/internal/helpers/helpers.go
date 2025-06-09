@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 	"sort"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -398,7 +399,7 @@ BFSLoop:
 			ev := events[0]
 			isServerInRoom, err = IsServerCurrentlyInRoom(ctx, db, querier, serverName, ev.RoomID().String())
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to check if server is currently in room, assuming not.")
+				frame.Log(ctx).WithError(err).WithField("server", serverName).WithField("room_id", ev.RoomID().String()).Error("Failed to check if server is currently in room, assuming not.")
 			}
 			checkedServerInRoom = true
 		}
@@ -421,9 +422,7 @@ BFSLoop:
 					visited[pre] = true
 					allowed, err = CheckServerAllowedToSeeEvent(ctx, db, info, ev.RoomID().String(), pre, serverName, isServerInRoom, querier)
 					if err != nil {
-						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
-							"Error checking if allowed to see event",
-						)
+						frame.Log(ctx).WithError(err).WithField("server", serverName).WithField("event_id", pre).Error("Error checking if allowed to see event")
 						// drop the error, as we will often error at the Cm level if we don't have the prev_event itself. Let's
 						// just return what we have.
 						return resultNIDs, redactEventIDs, nil
@@ -434,7 +433,7 @@ BFSLoop:
 					// the list of events to retrieve.
 					next = append(next, pre)
 					if !allowed {
-						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).Info("Not allowed to see event")
+						frame.Log(ctx).WithField("server", serverName).WithField("event_id", pre).Info("Not allowed to see event")
 						redactEventIDs[pre] = struct{}{}
 					}
 				}

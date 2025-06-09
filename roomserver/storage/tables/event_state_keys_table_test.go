@@ -27,7 +27,7 @@ func mustCreateEventStateKeysTable(ctx context.Context, svc *frame.Service, t *t
 
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatal("failed to migrate table: %s", err)
+		t.Fatalf("failed to migrate table: %s", err)
 	}
 
 	return tab
@@ -70,7 +70,7 @@ func Test_EventStateKeysTable(t *testing.T) {
 			if v, ok := stateKeyNIDs[nid]; ok {
 				assert.Equal(t, v, userID)
 			} else {
-				t.Fatal("unable to find %d in result set", nid)
+				t.Fatalf("unable to find %d in result set", nid)
 			}
 		}
 	})

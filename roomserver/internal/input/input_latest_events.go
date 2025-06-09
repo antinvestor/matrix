@@ -19,17 +19,16 @@ package input
 import (
 	"context"
 	"fmt"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/getsentry/sentry-go"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/getsentry/sentry-go"
+	"github.com/pitabwire/util"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the
@@ -283,14 +282,14 @@ func (u *latestEventsUpdater) latestState() error {
 	}
 
 	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
-		logrus.WithFields(logrus.Fields{
-			"event_id":      u.event.EventID(),
-			"room_id":       u.event.RoomID().String(),
-			"old_state_nid": u.oldStateNID,
-			"new_state_nid": u.newStateNID,
-			"old_latest":    u.oldLatest.EventIDs(),
-			"new_latest":    u.latest.EventIDs(),
-		}).Warn("State reset detected (removing %d events)", removed)
+		frame.Log(ctx).
+			WithField("event_id", u.event.EventID()).
+			WithField("room_id", u.event.RoomID().String()).
+			WithField("old_state_nid", u.oldStateNID).
+			WithField("new_state_nid", u.newStateNID).
+			WithField("old_latest", u.oldLatest.EventIDs()).
+			WithField("new_latest", u.latest.EventIDs()).
+			Warn("State reset detected (removing %d events)", removed)
 		sentry.WithScope(func(scope *sentry.Scope) {
 			scope.SetLevel("warning")
 			scope.SetTag("room_id", u.event.RoomID().String())

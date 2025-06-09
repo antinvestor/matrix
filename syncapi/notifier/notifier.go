@@ -16,6 +16,7 @@ package notifier
 
 import (
 	"context"
+	"github.com/pitabwire/frame"
 	"sync"
 	"time"
 
@@ -25,7 +26,6 @@ import (
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/types"
-	log "github.com/sirupsen/logrus"
 )
 
 // NOTE: ALL FUNCTIONS IN THIS FILE PREFIXED WITH _ ARE NOT THREAD-SAFE
@@ -97,6 +97,9 @@ func (n *Notifier) OnNewEvent(
 	// This needs to be done PRIOR to waking up users as they will read this value.
 	n.lock.Lock()
 	defer n.lock.Unlock()
+
+	log := frame.Log(ctx)
+
 	n.currPos.ApplyUpdates(posUpdate)
 	n._removeEmptyUserStreams()
 
@@ -143,9 +146,8 @@ func (n *Notifier) OnNewEvent(
 	} else if len(userIDs) > 0 {
 		n._wakeupUsers(userIDs, nil, n.currPos)
 	} else {
-		log.WithFields(log.Fields{
-			"posUpdate": posUpdate.String,
-		}).Warn("Notifier.OnNewEvent called but caller supplied no user to wake up")
+		log.WithField("posUpdate", posUpdate.String).
+			Warn("Notifier.OnNewEvent called but caller supplied no user to wake up")
 	}
 }
 
