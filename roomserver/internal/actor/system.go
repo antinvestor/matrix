@@ -2,6 +2,7 @@ package actor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	actorV1 "github.com/antinvestor/matrix/apis/actor/v1"
@@ -14,14 +15,12 @@ import (
 	"github.com/asynkron/protoactor-go/cluster/identitylookup/disthash"
 	"github.com/asynkron/protoactor-go/remote"
 	"github.com/pitabwire/frame"
+	"log/slog"
 	"strconv"
 	"time"
 )
 
 const (
-	clusterManagerKind = "manager-actor"
-	clusterManagerID   = "heimdal"
-
 	clusterName = "matrix-room-cluster"
 )
 
@@ -42,7 +41,12 @@ type Manager struct {
 // NewManager creates a new room actor system
 func NewManager(ctx context.Context, config *config.ActorConfig, qm queueutil.QueueManager, qOpts *config.QueueOptions, handlerFunc HandlerFunc) *Manager {
 
-	actorSystem := actor.NewActorSystem()
+	svc := frame.FromContext(ctx)
+
+	actorSystem := actor.NewActorSystem(actor.WithLoggerFactory(
+		func(sys *actor.ActorSystem) *slog.Logger {
+			return svc.SLog(ctx)
+		}))
 
 	manager := &Manager{
 		config:      config,
@@ -53,7 +57,6 @@ func NewManager(ctx context.Context, config *config.ActorConfig, qm queueutil.Qu
 		clusterName: clusterName,
 	}
 
-	svc := frame.FromContext(ctx)
 	svc.AddCleanupMethod(manager.Shutdown)
 
 	return manager
@@ -84,14 +87,6 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	lookup := disthash.New()
 
-	managerProps := actor.PropsFromProducer(func() actor.Actor {
-		return m
-	})
-
-	// Register the room actor kind with the cluster
-	managerKind := cluster.NewKind(clusterManagerKind, managerProps)
-	managerNodeId := clusterManagerID + "-" + frame.GenerateID(ctx)
-
 	// Create the room actor props for the cluster
 	roomProcessorKind := actorV1.NewRoomEventProcessorKind(func() actorV1.RoomEventProcessor {
 		return NewRoomActor(ctx, m.cluster, svc, m.qm, m.handlerFunc)
@@ -103,60 +98,66 @@ func (m *Manager) Start(ctx context.Context) error {
 		clusterProvider,
 		lookup,
 		remoteConfig,
-		cluster.WithKinds(managerKind, roomProcessorKind),
+		cluster.WithKinds(roomProcessorKind),
 	)
 
 	// Start the cluster
 	m.cluster = cluster.New(m.actorSystem, clusterConfig)
 	m.cluster.StartMember()
 
-	//Ensure the room manager actor is active
-	_ = m.cluster.Get(managerNodeId, clusterManagerKind)
 	return nil
 }
 
 // EnsureRoomActorExists creates or gets a room actor for the specified room
-func (m *Manager) EnsureRoomActorExists(ctx context.Context, roomID *spec.RoomID) error {
+func (m *Manager) EnsureRoomActorExists(ctx context.Context, roomID *spec.RoomID) (*actorV1.RoomEventProcessorGrainClient, error) {
 
-	m.cluster.Logger().With("room", roomID).Info("******************** Setup Room actor ***")
-
-	roomQOpts, err := RoomifyQOpts(ctx, m.qOpts, roomID, true)
+	subsQOpts, err := RoomifyQOpts(ctx, m.qOpts, roomID, true)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	pubQOpts, err := RoomifyQOpts(ctx, m.qOpts, roomID, false)
+	if err != nil {
+		return nil, err
 	}
 
 	roomActor := actorV1.GetRoomEventProcessorGrainClient(m.cluster, roomID.String())
-	_, err = roomActor.SetupRoom(&actorV1.SetupRoomRequest{
+	_, err = roomActor.Setup(&actorV1.SetupRequest{
 		RoomId:   roomID.String(),
-		QueueRef: roomQOpts.QReference,
-		QueuePfx: roomQOpts.Prefix,
-		QueueUri: string(roomQOpts.DS),
+		QPrefix:  subsQOpts.Prefix,
+		QRef:     subsQOpts.QReference,
+		QSubsUri: subsQOpts.DS.String(),
+		QPubUri:  pubQOpts.DS.String(),
 	})
+	if err != nil {
+		return nil, err
+	}
+	return roomActor, nil
+}
+
+// Publish pushes messages to publishe to the room actor for further room specific action
+func (m *Manager) Publish(ctx context.Context, roomID *spec.RoomID, event any, metadata map[string]string) error {
+
+	roomActor, err := m.EnsureRoomActorExists(ctx, roomID)
 	if err != nil {
 		return err
 	}
-	return nil
-}
 
-// handleRoomActorStarted is called when a room actor starts
-func (m *Manager) handleRoomActorStarted(roomID string) {
-	m.cluster.Logger().With("room", roomID).Info(" ***************************** Room actor started")
-}
-
-// handleRoomActorStopped is called when a room actor stops
-func (m *Manager) handleRoomActorStopped(roomID string) {
-	m.cluster.Logger().With("room", roomID).Info(" **************************** Room actor stopped")
-
-}
-
-// Receive handles messages sent to the actor system
-func (m *Manager) Receive(ctx actor.Context) {
-	switch msg := ctx.Message().(type) {
-	case *actorV1.ActorStarted:
-		m.handleRoomActorStarted(msg.GetRoomId())
-	case *actorV1.ActorStopped:
-		m.handleRoomActorStopped(msg.GetRoomId())
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return err
 	}
+
+	_, err = roomActor.Publish(&actorV1.PublishRequest{
+		RoomId:   roomID.String(),
+		Metadata: metadata,
+		Payload:  payload,
+	})
+	if err != nil {
+		m.cluster.Logger().With("room", roomID).With("error", err).Error("******************** Failed to publish to Room actor ***")
+		return err
+	}
+	return nil
 }
 
 // Shutdown stops the actor system and all actors
@@ -197,7 +198,7 @@ func RoomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.Roo
 
 		if isSubscriber {
 			ds = ds.ExtendQuery("consumer_filter_subject", subject)
-			durable := fmt.Sprintf("RoomInput%s", queueutil.Tokenise(roomId.String()))
+			durable := fmt.Sprintf("Durable%s%s", config.InputRoomEvent, queueutil.Tokenise(roomId.String()))
 
 			ds = ds.ExtendQuery("consumer_durable_name", durable)
 			ds = ds.ExtendQuery("consumer_deliver_policy", "all")
@@ -207,7 +208,7 @@ func RoomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.Roo
 			ds = ds.ExtendQuery("consumer_headers_only", "false")
 			ds = ds.ExtendQuery("receive_batch_max_batch_size", "1")
 		} else {
-			ds = ds.RemoveQuery("jetstream", "stream_storage", "stream_retention", "consumer_ack_policy",
+			ds = ds.RemoveQuery("stream_subjects", "stream_storage", "stream_retention", "consumer_ack_policy",
 				"consumer_deliver_policy", "consumer_headers_only", "consumer_replay_policy", "stream_name")
 		}
 

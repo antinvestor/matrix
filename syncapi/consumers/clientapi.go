@@ -73,7 +73,7 @@ func (s *OutputClientDataConsumer) Handle(ctx context.Context, metadata map[stri
 	var output eventutil.AccountData
 	if err := json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("client API server output log: message parse failure")
+		log.WithError(err).Error("client API server output log: message parse failure")
 		return nil
 	}
 
@@ -90,7 +90,7 @@ func (s *OutputClientDataConsumer) Handle(ctx context.Context, metadata map[stri
 			"type":       output.Type,
 			"room_id":    output.RoomID,
 			log.ErrorKey: err,
-		}).Errorf("could not save account data")
+		}).Error("could not save account data")
 		return err
 	}
 
@@ -99,7 +99,7 @@ func (s *OutputClientDataConsumer) Handle(ctx context.Context, metadata map[stri
 		if err != nil {
 			log.WithError(err).WithFields(log.Fields{
 				"user_id": userID,
-			}).Errorf("Failed to update ignored users")
+			}).Error("Failed to update ignored users")
 
 		}
 	}

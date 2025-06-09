@@ -70,7 +70,7 @@ func NewRoomserverAPI(
 
 	err := qm.RegisterPublisher(ctx, &cfg.SyncAPI.Queues.OutputRoomEvent)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for output room event")
+		logrus.WithError(err).Panic("failed to register publisher for output room event")
 	}
 
 	producer := &producers.RoomEventProducer{

@@ -190,7 +190,7 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 			if err != nil {
 				errString = err.Error()
 			}
-			logrus.Warnf("Failed to find userID for prev_sender in ClientEvent: %s", errString)
+			logrus.Warn("Failed to find userID for prev_sender in ClientEvent: %s", errString)
 			// NOTE: Not much can be done here, so leave the previous value in place.
 		}
 		ce.Unsigned, err = json.Marshal(prev)

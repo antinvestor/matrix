@@ -55,11 +55,11 @@ func AddPublicRoutes(
 
 	syncCm, err := cm.FromOptions(ctx, &cfgSyncAPI.Database)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to obtain sync db connection manager")
+		logrus.WithError(err).Panic("failed to obtain sync db connection manager")
 	}
 	syncDB, err := storage.NewSyncServerDatabase(ctx, syncCm)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to sync db")
+		logrus.WithError(err).Panic("failed to connect to sync db")
 	}
 
 	eduCache := cacheutil.NewTypingCache()
@@ -67,7 +67,7 @@ func AddPublicRoutes(
 	strms := streams.NewSyncStreamProviders(ctx, syncDB, userAPI, rsAPI, eduCache, caches, ntf)
 	ntf.SetCurrentPosition(strms.Latest(ctx))
 	if err = ntf.Load(ctx, syncDB); err != nil {
-		logrus.WithError(err).Panicf("failed to load notifier ")
+		logrus.WithError(err).Panic("failed to load notifier ")
 	}
 
 	presenceConsumer, err := consumers.NewPresenceConsumer(
@@ -77,12 +77,12 @@ func AddPublicRoutes(
 	)
 
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start presence consumer")
+		logrus.WithError(err).Panic("failed to start presence consumer")
 	}
 
 	err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputPresenceEvent)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for output presence event")
+		logrus.WithError(err).Panic("failed to register publisher for output presence event")
 	}
 
 	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
@@ -97,7 +97,7 @@ func AddPublicRoutes(
 		strms.DeviceListStreamProvider,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start key change consumer")
+		logrus.WithError(err).Panic("failed to start key change consumer")
 	}
 
 	var asProducer *producers.AppserviceEventProducer
@@ -105,7 +105,7 @@ func AddPublicRoutes(
 
 		err = qm.RegisterPublisher(ctx, &cfg.AppServiceAPI.Queues.OutputAppserviceEvent)
 		if err != nil {
-			logrus.WithError(err).Panicf("failed to register publisher for output appservice event")
+			logrus.WithError(err).Panic("failed to register publisher for output appservice event")
 		}
 
 		asProducer = &producers.AppserviceEventProducer{
@@ -118,7 +118,7 @@ func AddPublicRoutes(
 		strms.InviteStreamProvider, rsAPI, asProducer,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start room server consumer")
+		logrus.WithError(err).Panic("failed to start room server consumer")
 	}
 
 	err = consumers.NewOutputClientDataConsumer(
@@ -126,35 +126,35 @@ func AddPublicRoutes(
 		strms.AccountDataStreamProvider,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start client data consumer")
+		logrus.WithError(err).Panic("failed to start client data consumer")
 	}
 
 	err = consumers.NewOutputNotificationDataConsumer(
 		ctx, &cfgSyncAPI, qm, syncDB, ntf, strms.NotificationDataStreamProvider,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start notification data consumer")
+		logrus.WithError(err).Panic("failed to start notification data consumer")
 	}
 
 	err = consumers.NewOutputTypingEventConsumer(
 		ctx, &cfgSyncAPI, qm, eduCache, ntf, strms.TypingStreamProvider,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start typing consumer")
+		logrus.WithError(err).Panic("failed to start typing consumer")
 	}
 
 	err = consumers.NewOutputSendToDeviceEventConsumer(
 		ctx, &cfgSyncAPI, qm, syncDB, userAPI, ntf, strms.SendToDeviceStreamProvider,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
+		logrus.WithError(err).Panic("failed to start send-to-device consumer")
 	}
 
 	err = consumers.NewOutputReceiptEventConsumer(
 		ctx, &cfgSyncAPI, qm, syncDB, ntf, strms.ReceiptStreamProvider,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start receipts consumer")
+		logrus.WithError(err).Panic("failed to start receipts consumer")
 	}
 
 	rateLimits := httputil.NewRateLimits(&cfg.ClientAPI.RateLimiting)
@@ -165,6 +165,6 @@ func AddPublicRoutes(
 		rateLimits,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start receipts consumer")
+		logrus.WithError(err).Panic("failed to start receipts consumer")
 	}
 }

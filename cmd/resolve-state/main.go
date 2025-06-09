@@ -85,7 +85,7 @@ func main() {
 	cfg.Global.Cache.MaxAge = time.Minute * 5
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to create cache")
+		logrus.WithError(err).Panic("failed to create cache")
 	}
 
 	fmt.Println("Opening database")

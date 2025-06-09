@@ -99,11 +99,11 @@ func TestGetPutDevices(t *testing.T) {
 					rec := httptest.NewRecorder()
 					routers.Client.ServeHTTP(rec, req)
 					if rec.Code != http.StatusOK {
-						t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+						t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 					}
 					gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "display_name").Str
 					if gotDisplayName != "my new displayname" {
-						t.Fatalf("expected displayname '%s', got '%s'", "my new displayname", gotDisplayName)
+						t.Fatal("expected displayname '%s', got '%s'", "my new displayname", gotDisplayName)
 					}
 				},
 			},
@@ -122,7 +122,7 @@ func TestGetPutDevices(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -151,7 +151,7 @@ func TestGetPutDevices(t *testing.T) {
 				rec := httptest.NewRecorder()
 				routers.Client.ServeHTTP(rec, tc.request)
 				if rec.Code != tc.wantStatusCode {
-					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+					t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 				}
 				if tc.wantStatusCode != http.StatusOK && rec.Code != http.StatusOK {
 					return
@@ -178,7 +178,7 @@ func TestDeleteDevice(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -206,7 +206,7 @@ func TestDeleteDevice(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !devRes.DeviceCreated {
-			t.Fatalf("failed to create device")
+			t.Fatal("failed to create device")
 		}
 		secondDeviceID := devRes.Device.ID
 
@@ -216,7 +216,7 @@ func TestDeleteDevice(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusUnauthorized {
-			t.Fatalf("expected HTTP 401, got %d: %s", rec.Code, rec.Body.String())
+			t.Fatal("expected HTTP 401, got %d: %s", rec.Code, rec.Body.String())
 		}
 		// get the session ID
 		sessionID := gjson.GetBytes(rec.Body.Bytes(), "session").Str
@@ -244,7 +244,7 @@ func TestDeleteDevice(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusForbidden {
-			t.Fatalf("expected HTTP 403, got %d: %s", rec.Code, rec.Body.String())
+			t.Fatal("expected HTTP 403, got %d: %s", rec.Code, rec.Body.String())
 		}
 
 		// do the same request again, this time with our UIA, but for the correct device ID, this should be fine
@@ -253,7 +253,7 @@ func TestDeleteDevice(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+			t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 		}
 
 		// verify devices are deleted
@@ -262,11 +262,11 @@ func TestDeleteDevice(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+			t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 		}
 		for _, device := range gjson.GetBytes(rec.Body.Bytes(), "devices.#.device_id").Array() {
 			if device.Str == secondDeviceID {
-				t.Fatalf("expected device %s to be deleted, but wasn't", secondDeviceID)
+				t.Fatal("expected device %s to be deleted, but wasn't", secondDeviceID)
 			}
 		}
 	})
@@ -286,7 +286,7 @@ func TestDeleteDevices(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -316,7 +316,7 @@ func TestDeleteDevices(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !devRes.DeviceCreated {
-				t.Fatalf("failed to create device")
+				t.Fatal("failed to create device")
 			}
 			devices = append(devices, devRes.Device.ID)
 		}
@@ -327,7 +327,7 @@ func TestDeleteDevices(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusUnauthorized {
-			t.Fatalf("expected HTTP 401, got %d: %s", rec.Code, rec.Body.String())
+			t.Fatal("expected HTTP 401, got %d: %s", rec.Code, rec.Body.String())
 		}
 		// get the session ID
 		sessionID := gjson.GetBytes(rec.Body.Bytes(), "session").Str
@@ -352,7 +352,7 @@ func TestDeleteDevices(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+			t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 		}
 
 		// verify devices are deleted
@@ -361,12 +361,12 @@ func TestDeleteDevices(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+			t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 		}
 		for _, device := range gjson.GetBytes(rec.Body.Bytes(), "devices.#.device_id").Array() {
 			for _, deletedDevice := range devices[5:] {
 				if device.Str == deletedDevice {
-					t.Fatalf("expected device %s to be deleted, but wasn't", deletedDevice)
+					t.Fatal("expected device %s to be deleted, but wasn't", deletedDevice)
 				}
 			}
 		}
@@ -386,7 +386,7 @@ func createAccessTokens(t *testing.T, accessTokens map[*test.User]userDevice, us
 			Password:    password,
 			DisplayName: localpart,
 		}, userRes); err != nil {
-			t.Errorf("failed to create account: %s", err)
+			t.Error("failed to create account: %s", err)
 		}
 		req := test.NewRequest(t, http.MethodPost, "/_matrix/client/v3/login", test.WithJSONBody(t, map[string]interface{}{
 			"type": authtypes.LoginTypePassword,
@@ -399,7 +399,7 @@ func createAccessTokens(t *testing.T, accessTokens map[*test.User]userDevice, us
 		rec := httptest.NewRecorder()
 		routers.Client.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("failed to login: %s", rec.Body.String())
+			t.Fatal("failed to login: %s", rec.Body.String())
 		}
 		accessTokens[u] = userDevice{
 			accessToken: gjson.GetBytes(rec.Body.Bytes(), "access_token").String(),
@@ -454,7 +454,7 @@ func TestSetDisplayname(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(svc)
@@ -488,11 +488,11 @@ func TestSetDisplayname(t *testing.T) {
 				routers.Client.ServeHTTP(rec, req)
 
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected HTTP 200, got %d", rec.Code)
+					t.Fatal("expected HTTP 200, got %d", rec.Code)
 				}
 
 				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "displayname").Str; tc.wantOK && gotDisplayName != wantDisplayName {
-					t.Fatalf("expected displayname to be '%s', but got '%s'", wantDisplayName, gotDisplayName)
+					t.Fatal("expected displayname to be '%s', but got '%s'", wantDisplayName, gotDisplayName)
 				}
 
 				// now set the new display name
@@ -505,7 +505,7 @@ func TestSetDisplayname(t *testing.T) {
 
 				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+					t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 				}
 
 				// now only get the display name
@@ -514,11 +514,11 @@ func TestSetDisplayname(t *testing.T) {
 
 				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+					t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 				}
 
 				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "displayname").Str; tc.wantOK && gotDisplayName != wantDisplayName {
-					t.Fatalf("expected displayname to be '%s', but got '%s'", wantDisplayName, gotDisplayName)
+					t.Fatal("expected displayname to be '%s', but got '%s'", wantDisplayName, gotDisplayName)
 				}
 			})
 		}
@@ -570,7 +570,7 @@ func TestSetAvatarURL(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(svc)
@@ -604,11 +604,11 @@ func TestSetAvatarURL(t *testing.T) {
 				routers.Client.ServeHTTP(rec, req)
 
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected HTTP 200, got %d", rec.Code)
+					t.Fatal("expected HTTP 200, got %d", rec.Code)
 				}
 
 				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "avatar_url").Str; tc.wantOK && gotDisplayName != wantAvatarURL {
-					t.Fatalf("expected displayname to be '%s', but got '%s'", wantAvatarURL, gotDisplayName)
+					t.Fatal("expected displayname to be '%s', but got '%s'", wantAvatarURL, gotDisplayName)
 				}
 
 				// now set the new display name
@@ -621,7 +621,7 @@ func TestSetAvatarURL(t *testing.T) {
 
 				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+					t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 				}
 
 				// now only get the display name
@@ -630,11 +630,11 @@ func TestSetAvatarURL(t *testing.T) {
 
 				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+					t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 				}
 
 				if gotDisplayName := gjson.GetBytes(rec.Body.Bytes(), "avatar_url").Str; tc.wantOK && gotDisplayName != wantAvatarURL {
-					t.Fatalf("expected displayname to be '%s', but got '%s'", wantAvatarURL, gotDisplayName)
+					t.Fatal("expected displayname to be '%s', but got '%s'", wantAvatarURL, gotDisplayName)
 				}
 			})
 		}
@@ -654,7 +654,7 @@ func TestTyping(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -719,7 +719,7 @@ func TestTyping(t *testing.T) {
 				req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
 				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+					t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 				}
 			})
 		}
@@ -741,7 +741,7 @@ func TestMembership(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -928,10 +928,10 @@ func TestMembership(t *testing.T) {
 				tc.request.Header.Set("Authorization", "Bearer "+accessTokens[tc.asUser].accessToken)
 				routers.Client.ServeHTTP(rec, tc.request)
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+					t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 				}
 				if !tc.wantOK && rec.Code == http.StatusOK {
-					t.Fatalf("expected request to fail, but didn't: %s", rec.Body.String())
+					t.Fatal("expected request to fail, but didn't: %s", rec.Body.String())
 				}
 				t.Logf("%s", rec.Body.String())
 			})
@@ -985,7 +985,7 @@ func TestCapabilities(t *testing.T) {
 		// Needed to create accounts
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -1040,7 +1040,7 @@ func TestTurnserver(t *testing.T) {
 		// Needed to create accounts
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -1104,7 +1104,7 @@ func TestTurnserver(t *testing.T) {
 				assert.Equal(t, http.StatusOK, rec.Code)
 
 				if tc.wantEmptyResponse && rec.Body.String() != "{}" {
-					t.Fatalf("expected an empty response, but got %s", rec.Body.String())
+					t.Fatal("expected an empty response, but got %s", rec.Body.String())
 				}
 				if !tc.wantEmptyResponse {
 					assert.NotEqual(t, "{}", rec.Body.String())
@@ -1144,7 +1144,7 @@ func Test3PID(t *testing.T) {
 		// Needed to create accounts
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -1282,10 +1282,10 @@ func Test3PID(t *testing.T) {
 				routers.Client.ServeHTTP(rec, tc.request)
 				t.Logf("Response: %s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
+					t.Fatal("expected HTTP 200, got %d: %s", rec.Code, rec.Body.String())
 				}
 				if !tc.wantOK && rec.Code == http.StatusOK {
-					t.Fatalf("expected request to fail, but didn't: %s", rec.Body.String())
+					t.Fatal("expected request to fail, but didn't: %s", rec.Body.String())
 				}
 				if tc.wantLen3PIDs > 0 {
 					var resp routing.ThreePIDsResponse
@@ -1293,7 +1293,7 @@ func Test3PID(t *testing.T) {
 						t.Fatal(err)
 					}
 					if len(resp.ThreePIDs) != tc.wantLen3PIDs {
-						t.Fatalf("expected %d threepids, got %d", tc.wantLen3PIDs, len(resp.ThreePIDs))
+						t.Fatal("expected %d threepids, got %d", tc.wantLen3PIDs, len(resp.ThreePIDs))
 					}
 				}
 			})
@@ -1321,7 +1321,7 @@ func TestPushRules(t *testing.T) {
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -1574,10 +1574,10 @@ func TestPushRules(t *testing.T) {
 					rules := gjson.ParseBytes(rec.Body.Bytes())
 					for i, rule := range rules.Array() {
 						if rule.Get("rule_id").Str == ruleID1 && i != 0 {
-							t.Fatalf("expected '%s' to be the first, but wasn't", ruleID1)
+							t.Fatal("expected '%s' to be the first, but wasn't", ruleID1)
 						}
 						if rule.Get("rule_id").Str == ruleID2 && i != 1 {
-							t.Fatalf("expected '%s' to be the second, but wasn't", ruleID2)
+							t.Fatal("expected '%s' to be the second, but wasn't", ruleID2)
 						}
 					}
 				},
@@ -1598,13 +1598,13 @@ func TestPushRules(t *testing.T) {
 					rules := gjson.ParseBytes(rec.Body.Bytes())
 					for i, rule := range rules.Array() {
 						if rule.Get("rule_id").Str == ruleID3 && i != 0 {
-							t.Fatalf("expected '%s' to be the first, but wasn't", ruleID3)
+							t.Fatal("expected '%s' to be the first, but wasn't", ruleID3)
 						}
 						if rule.Get("rule_id").Str == ruleID1 && i != 1 {
-							t.Fatalf("expected '%s' to be the second, but wasn't", ruleID1)
+							t.Fatal("expected '%s' to be the second, but wasn't", ruleID1)
 						}
 						if rule.Get("rule_id").Str == ruleID2 && i != 2 {
-							t.Fatalf("expected '%s' to be the third, but wasn't", ruleID1)
+							t.Fatal("expected '%s' to be the third, but wasn't", ruleID1)
 						}
 					}
 				},
@@ -1640,13 +1640,13 @@ func TestPushRules(t *testing.T) {
 					rules := gjson.ParseBytes(rec.Body.Bytes())
 					for i, rule := range rules.Array() {
 						if rule.Get("rule_id").Str == ruleID2 && i != 0 {
-							t.Fatalf("expected '%s' to be the first, but wasn't", ruleID2)
+							t.Fatal("expected '%s' to be the first, but wasn't", ruleID2)
 						}
 						if rule.Get("rule_id").Str == ruleID3 && i != 1 {
-							t.Fatalf("expected '%s' to be the second, but wasn't", ruleID3)
+							t.Fatal("expected '%s' to be the second, but wasn't", ruleID3)
 						}
 						if rule.Get("rule_id").Str == ruleID1 && i != 2 {
-							t.Fatalf("expected '%s' to be the third, but wasn't", ruleID1)
+							t.Fatal("expected '%s' to be the third, but wasn't", ruleID1)
 						}
 					}
 				},
@@ -1711,7 +1711,7 @@ func TestKeys(t *testing.T) {
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -1778,10 +1778,10 @@ func TestKeys(t *testing.T) {
 		// Validate that the keys returned from the server are what the client has stored
 		oi := oc.OwnIdentity()
 		if oi.SigningKey != dev.SigningKey {
-			t.Fatalf("expected signing key '%s', got '%s'", oi.SigningKey, dev.SigningKey)
+			t.Fatal("expected signing key '%s', got '%s'", oi.SigningKey, dev.SigningKey)
 		}
 		if oi.IdentityKey != dev.IdentityKey {
-			t.Fatalf("expected identity '%s', got '%s'", oi.IdentityKey, dev.IdentityKey)
+			t.Fatal("expected identity '%s', got '%s'", oi.IdentityKey, dev.IdentityKey)
 		}
 
 		// tests `/keys/signatures/upload`
@@ -1815,7 +1815,7 @@ func TestKeys(t *testing.T) {
 		}
 
 		if !gjson.GetBytes(respBody, "one_time_keys."+alice.ID+"."+string(dev.DeviceID)).Exists() {
-			t.Fatalf("expected one time keys for alice, but didn't find any: %s", string(respBody))
+			t.Fatal("expected one time keys for alice, but didn't find any: %s", string(respBody))
 		}
 	})
 }
@@ -1845,7 +1845,7 @@ func TestKeyBackup(t *testing.T) {
 	handleResponseCode := func(t *testing.T, rec *httptest.ResponseRecorder, expectedCode int) {
 		t.Helper()
 		if rec.Code != expectedCode {
-			t.Fatalf("expected HTTP %d, but got %d: %s", expectedCode, rec.Code, rec.Body.String())
+			t.Fatal("expected HTTP %d, but got %d: %s", expectedCode, rec.Code, rec.Body.String())
 		}
 	}
 
@@ -1884,7 +1884,7 @@ func TestKeyBackup(t *testing.T) {
 				handleResponseCode(t, rec, http.StatusOK)
 				wantVersion := "1"
 				if gotVersion := gjson.GetBytes(rec.Body.Bytes(), "version").Str; gotVersion != wantVersion {
-					t.Fatalf("expected version '%s', got '%s'", wantVersion, gotVersion)
+					t.Fatal("expected version '%s', got '%s'", wantVersion, gotVersion)
 				}
 			},
 		},
@@ -1915,7 +1915,7 @@ func TestKeyBackup(t *testing.T) {
 				handleResponseCode(t, rec, http.StatusOK)
 				wantVersion := "1"
 				if gotVersion := gjson.GetBytes(rec.Body.Bytes(), "version").Str; gotVersion != wantVersion {
-					t.Fatalf("expected version '%s', got '%s'", wantVersion, gotVersion)
+					t.Fatal("expected version '%s', got '%s'", wantVersion, gotVersion)
 				}
 			},
 		},
@@ -1930,7 +1930,7 @@ func TestKeyBackup(t *testing.T) {
 			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				handleResponseCode(t, rec, http.StatusOK)
 				if gotRooms := gjson.GetBytes(rec.Body.Bytes(), "rooms").Map(); len(gotRooms) > 0 {
-					t.Fatalf("expected no rooms in version, but got %#v", gotRooms)
+					t.Fatal("expected no rooms in version, but got %#v", gotRooms)
 				}
 			},
 		},
@@ -1945,7 +1945,7 @@ func TestKeyBackup(t *testing.T) {
 			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				handleResponseCode(t, rec, http.StatusOK)
 				if gotSessions := gjson.GetBytes(rec.Body.Bytes(), "sessions").Map(); len(gotSessions) > 0 {
-					t.Fatalf("expected no sessions in version, but got %#v", gotSessions)
+					t.Fatal("expected no sessions in version, but got %#v", gotSessions)
 				}
 			},
 		},
@@ -2109,7 +2109,7 @@ func TestKeyBackup(t *testing.T) {
 			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				handleResponseCode(t, rec, http.StatusOK)
 				if gotRooms := gjson.GetBytes(rec.Body.Bytes(), "rooms").Map(); len(gotRooms) != 1 {
-					t.Fatalf("expected one room in response, but got %#v", rec.Body.String())
+					t.Fatal("expected one room in response, but got %#v", rec.Body.String())
 				}
 			},
 		},
@@ -2124,7 +2124,7 @@ func TestKeyBackup(t *testing.T) {
 			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				handleResponseCode(t, rec, http.StatusOK)
 				if gotRooms := gjson.GetBytes(rec.Body.Bytes(), "sessions").Map(); len(gotRooms) != 1 {
-					t.Fatalf("expected one session in response, but got %#v", rec.Body.String())
+					t.Fatal("expected one session in response, but got %#v", rec.Body.String())
 				}
 			},
 		},
@@ -2139,7 +2139,7 @@ func TestKeyBackup(t *testing.T) {
 			validate: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				handleResponseCode(t, rec, http.StatusOK)
 				if !gjson.GetBytes(rec.Body.Bytes(), "is_verified").Bool() {
-					t.Fatalf("expected session to be verified, but wasn't: %#v", rec.Body.String())
+					t.Fatal("expected session to be verified, but wasn't: %#v", rec.Body.String())
 				}
 			},
 		},
@@ -2188,7 +2188,7 @@ func TestKeyBackup(t *testing.T) {
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -2296,7 +2296,7 @@ func TestGetMembership(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 
 		qm := queueutil.NewQueueManager(svc)
@@ -2326,14 +2326,14 @@ func TestGetMembership(t *testing.T) {
 					tc.additionalEvents(t, room)
 				}
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Fatalf("failed to send events: %v", err)
+					t.Fatal("failed to send events: %v", err)
 				}
 
 				w := httptest.NewRecorder()
 				routers.Client.ServeHTTP(w, tc.request(t, room, accessTokens[tc.user].accessToken))
 				if w.Code != 200 && tc.wantOK {
 					t.Logf("%s", w.Body.String())
-					t.Fatalf("got HTTP %d want %d", w.Code, 200)
+					t.Fatal("got HTTP %d want %d", w.Code, 200)
 				}
 				t.Logf("[%s] Resp: %s", tc.name, w.Body.String())
 
@@ -2341,7 +2341,7 @@ func TestGetMembership(t *testing.T) {
 				if tc.wantOK {
 					memberCount := len(gjson.GetBytes(w.Body.Bytes(), "joined").Map())
 					if memberCount != tc.wantMemberCount {
-						t.Fatalf("expected %d members, got %d", tc.wantMemberCount, memberCount)
+						t.Fatal("expected %d members, got %d", tc.wantMemberCount, memberCount)
 					}
 				}
 			})
@@ -2362,7 +2362,7 @@ func TestCreateRoomInvite(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -2394,7 +2394,7 @@ func TestCreateRoomInvite(t *testing.T) {
 		routers.Client.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
-			t.Fatalf("expected room creation to be successful, got HTTP %d instead: %s", w.Code, w.Body.String())
+			t.Fatal("expected room creation to be successful, got HTTP %d instead: %s", w.Code, w.Body.String())
 		}
 
 		roomID := gjson.GetBytes(w.Body.Bytes(), "room_id").Str
@@ -2434,7 +2434,7 @@ func TestReportEvent(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -2444,7 +2444,7 @@ func TestReportEvent(t *testing.T) {
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
@@ -2476,7 +2476,7 @@ func TestReportEvent(t *testing.T) {
 			routers.Client.ServeHTTP(w, req)
 
 			if w.Code != http.StatusNotFound {
-				t.Fatalf("expected report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 		})
 
@@ -2488,7 +2488,7 @@ func TestReportEvent(t *testing.T) {
 			routers.Client.ServeHTTP(w, req)
 
 			if w.Code != http.StatusNotFound {
-				t.Fatalf("expected report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 		})
 
@@ -2500,7 +2500,7 @@ func TestReportEvent(t *testing.T) {
 			routers.Client.ServeHTTP(w, req)
 
 			if w.Code != http.StatusOK {
-				t.Fatalf("expected report to be successful, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected report to be successful, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 		})
 	})

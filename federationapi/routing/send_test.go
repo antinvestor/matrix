@@ -74,12 +74,12 @@ func TestHandleSend(t *testing.T) {
 		content := sendContent{}
 		err := req.SetContent(content)
 		if err != nil {
-			t.Fatalf("Error: %s", err.Error())
+			t.Fatal("Error: %s", err.Error())
 		}
 		req.Sign(serverName, gomatrixserverlib.KeyID(keyID), sk)
 		httpReq, err := req.HTTPRequest()
 		if err != nil {
-			t.Fatalf("Error: %s", err.Error())
+			t.Fatal("Error: %s", err.Error())
 		}
 		vars := map[string]string{"txnID": "1234"}
 		w := httptest.NewRecorder()

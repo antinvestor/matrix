@@ -67,12 +67,12 @@ func main() {
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			log.Errorf("Configuration error: %s", err)
+			log.Error("Configuration error: %s", err)
 		}
-		log.Fatalf("Failed to start due to configuration errors")
+		log.Fatal("Failed to start due to configuration errors")
 	}
 
-	log.Infof("Global version %s", internal.VersionString())
+	log.Info("Global version %s", internal.VersionString())
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
 		log.Warn("Open registration is enabled")
 	}
@@ -84,24 +84,17 @@ func main() {
 			globalCfg.DNSCache.CacheSize,
 			globalCfg.DNSCache.CacheLifetime,
 		)
-		log.Infof(
+		log.Info(
 			"DNS cache enabled (size %d, lifetime %s)",
 			globalCfg.DNSCache.CacheSize,
 			globalCfg.DNSCache.CacheLifetime,
 		)
 	}
 
-	// setup tracing
-	closer, err := cfg.SetupTracing()
-	if err != nil {
-		log.WithError(err).Panicf("failed to start opentracing")
-	}
-	defer closer.Close() // nolint: errcheck
-
 	// setup sentry
 	if globalCfg.Sentry.Enabled {
 		log.Info("Setting up Sentry for debugging...")
-		err = sentry.Init(sentry.ClientOptions{
+		err := sentry.Init(sentry.ClientOptions{
 			Dsn:              globalCfg.Sentry.DSN,
 			Environment:      globalCfg.Sentry.Environment,
 			Debug:            true,
@@ -125,7 +118,7 @@ func main() {
 		Info("distributed apis")
 	if globalCfg.DistributedAPI.Enabled {
 
-		err = service.RegisterForJwt(ctx)
+		err := service.RegisterForJwt(ctx)
 		if err != nil {
 			log.WithError(err).Fatal("main -- could not register fo jwt")
 		}
@@ -152,7 +145,7 @@ func main() {
 			apis.WithTokenPassword(service.JwtClientSecret()),
 			apis.WithAudiences(audienceList...))
 		if err != nil {
-			log.WithError(err).Panicf("failed to initialise profile api client")
+			log.WithError(err).Panic("failed to initialise profile api client")
 		}
 
 		partitionCli, err = partitionv1.NewPartitionsClient(ctx,
@@ -163,7 +156,7 @@ func main() {
 			apis.WithAudiences(audienceList...))
 
 		if err != nil {
-			log.WithError(err).Panicf("failed to initialise partition api client")
+			log.WithError(err).Panic("failed to initialise partition api client")
 		}
 	}
 
@@ -177,7 +170,7 @@ func main() {
 	globalCfg.Cache.EnablePrometheus = cacheutil.EnableMetrics
 	caches, err := cacheutil.NewCache(&globalCfg.Cache)
 	if err != nil {
-		log.WithError(err).Panicf("failed to create cache")
+		log.WithError(err).Panic("failed to create cache")
 	}
 
 	qm := queueutil.NewQueueManager(service)
@@ -228,7 +221,7 @@ func main() {
 	if len(cfg.MSCs.MSCs) > 0 {
 		err = mscs.Enable(ctx, cfg, cm, routers, &monolith, caches)
 		if err != nil {
-			log.WithError(err).Fatalf("Failed to enable MSCs")
+			log.WithError(err).Fatal("Failed to enable MSCs")
 		}
 	}
 

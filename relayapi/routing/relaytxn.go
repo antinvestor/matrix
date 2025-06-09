@@ -33,7 +33,7 @@ func GetTransactionFromRelay(
 	relayAPI api.RelayInternalAPI,
 	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Infof("Processing relay_txn for %s", userID.String())
+	logrus.Info("Processing relay_txn for %s", userID.String())
 
 	var previousEntry fclient.RelayEntry
 	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err != nil {
@@ -48,7 +48,7 @@ func GetTransactionFromRelay(
 			JSON: spec.BadJSON("Invalid entry id provided. Must be >= 0."),
 		}
 	}
-	logrus.Infof("Previous entry provided: %v", previousEntry.EntryID)
+	logrus.Info("Previous entry provided: %v", previousEntry.EntryID)
 
 	response, err := relayAPI.QueryTransactions(httpReq.Context(), userID, previousEntry)
 	if err != nil {

@@ -94,7 +94,7 @@ func GetPostPublicRooms(
 
 	response, err := publicRooms(req.Context(), request, rsAPI, extRoomsProvider)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Errorf("failed to work out public rooms")
+		util.GetLogger(req.Context()).WithError(err).Error("failed to work out public rooms")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

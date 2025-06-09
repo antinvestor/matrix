@@ -4,24 +4,28 @@ package actor;
 
 option go_package = "github.com/antinvestor/matrix/apis/actor/v1;actorV1";
 
-message SetupRoomRequest {
+message SetupRequest {
   string roomId = 1;
-  string queuePfx = 2;
-  string queueRef = 3;
-  string queueUri = 4;
+  string qPrefix = 2;
+  string qRef = 3;
+  string qSubsUri = 4;
+  string qPubUri = 5;
 }
 
-message SetupRoomResponse {
+message SetupResponse {
   bool success = 1;
   string message = 2;
 }
 
-message ActorStarted {
+message PublishRequest {
   string roomId = 1;
+  map<string, string> metadata = 2;
+  bytes payload = 3;
 }
 
-message ActorStopped {
-  string roomId = 1;
+message PublishResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 message WorkRequest {
@@ -30,5 +34,6 @@ message WorkRequest {
 
 
 service RoomEventProcessor {
-  rpc SetupRoom (SetupRoomRequest) returns (SetupRoomResponse) {}
+  rpc Setup (SetupRequest) returns (SetupResponse) {}
+  rpc Publish (PublishRequest) returns (PublishResponse) {}
 }

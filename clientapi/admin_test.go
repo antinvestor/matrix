@@ -46,7 +46,7 @@ func TestAdminCreateToken(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -180,7 +180,7 @@ func TestAdminCreateToken(t *testing.T) {
 				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+					t.Fatal("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}
 			})
 		}
@@ -202,7 +202,7 @@ func TestAdminListRegistrationTokens(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -303,7 +303,7 @@ func TestAdminListRegistrationTokens(t *testing.T) {
 				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+					t.Fatal("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}
 			})
 		}
@@ -324,7 +324,7 @@ func TestAdminGetRegistrationToken(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -408,7 +408,7 @@ func TestAdminGetRegistrationToken(t *testing.T) {
 				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+					t.Fatal("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}
 			})
 		}
@@ -428,7 +428,7 @@ func TestAdminDeleteRegistrationToken(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -505,7 +505,7 @@ func TestAdminDeleteRegistrationToken(t *testing.T) {
 				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+					t.Fatal("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}
 			})
 		}
@@ -525,7 +525,7 @@ func TestAdminUpdateRegistrationToken(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -681,7 +681,7 @@ func TestAdminUpdateRegistrationToken(t *testing.T) {
 				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+					t.Fatal("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}
 			})
 		}
@@ -711,7 +711,7 @@ func TestAdminResetPassword(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -777,7 +777,7 @@ func TestAdminResetPassword(t *testing.T) {
 				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+					t.Fatal("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}
 			})
 		}
@@ -800,7 +800,7 @@ func TestPurgeRoom(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -817,7 +817,7 @@ func TestPurgeRoom(t *testing.T) {
 
 		// Create the room
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
@@ -849,7 +849,7 @@ func TestPurgeRoom(t *testing.T) {
 				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+					t.Fatal("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}
 			})
 		}
@@ -873,7 +873,7 @@ func TestAdminEvacuateRoom(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -889,7 +889,7 @@ func TestAdminEvacuateRoom(t *testing.T) {
 
 		// Create the room
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", api.DoNotSendToOtherServers, nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
@@ -921,7 +921,7 @@ func TestAdminEvacuateRoom(t *testing.T) {
 				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+					t.Fatal("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}
 
 				affectedArr := gjson.GetBytes(rec.Body.Bytes(), "affected").Array()
@@ -930,7 +930,7 @@ func TestAdminEvacuateRoom(t *testing.T) {
 					affected = append(affected, x.Str)
 				}
 				if !reflect.DeepEqual(affected, tc.wantAffected) {
-					t.Fatalf("expected affected %#v, but got %#v", tc.wantAffected, affected)
+					t.Fatal("expected affected %#v, but got %#v", tc.wantAffected, affected)
 				}
 			})
 		}
@@ -940,12 +940,12 @@ func TestAdminEvacuateRoom(t *testing.T) {
 		for {
 			select {
 			case <-timeout:
-				t.Fatalf("FS API didn't process all events in time")
+				t.Fatal("FS API didn't process all events in time")
 			default:
 			}
 			subs, err0 := qm.GetSubscriber(cfg.FederationAPI.Queues.OutputRoomEvent.Ref())
 			if err0 != nil {
-				t.Fatalf("failed to get OutputRoomEvent subscriber: %v", err0)
+				t.Fatal("failed to get OutputRoomEvent subscriber: %v", err0)
 			}
 			if subs.Idle() {
 				break
@@ -975,7 +975,7 @@ func TestAdminEvacuateUser(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -991,10 +991,10 @@ func TestAdminEvacuateUser(t *testing.T) {
 
 		// Create the room
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", api.DoNotSendToOtherServers, nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room2.Events(), "test", "test", api.DoNotSendToOtherServers, nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
@@ -1028,7 +1028,7 @@ func TestAdminEvacuateUser(t *testing.T) {
 				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+					t.Fatal("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}
 
 				affectedArr := gjson.GetBytes(rec.Body.Bytes(), "affected").Array()
@@ -1037,7 +1037,7 @@ func TestAdminEvacuateUser(t *testing.T) {
 					affected = append(affected, x.Str)
 				}
 				if !reflect.DeepEqual(affected, tc.wantAffectedRooms) {
-					t.Fatalf("expected affected %#v, but got %#v", tc.wantAffectedRooms, affected)
+					t.Fatal("expected affected %#v, but got %#v", tc.wantAffectedRooms, affected)
 				}
 
 			})
@@ -1047,12 +1047,12 @@ func TestAdminEvacuateUser(t *testing.T) {
 		for {
 			select {
 			case <-timeout:
-				t.Fatalf("FS API didn't process all events in time")
+				t.Fatal("FS API didn't process all events in time")
 			default:
 			}
 			subs, err0 := qm.GetSubscriber(cfg.FederationAPI.Queues.OutputRoomEvent.Ref())
 			if err0 != nil {
-				t.Fatalf("failed to get OutputRoomEvent subscriber: %v", err0)
+				t.Fatal("failed to get OutputRoomEvent subscriber: %v", err0)
 			}
 			if subs.Idle() {
 				break
@@ -1071,7 +1071,7 @@ func TestAdminMarkAsStale(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -1110,7 +1110,7 @@ func TestAdminMarkAsStale(t *testing.T) {
 				routers.DendriteAdmin.ServeHTTP(rec, req)
 				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+					t.Fatal("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}
 			})
 		}
@@ -1152,7 +1152,7 @@ func TestAdminQueryEventReports(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -1162,10 +1162,10 @@ func TestAdminQueryEventReports(t *testing.T) {
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room2.Events(), "test", "test", "test", nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
@@ -1198,7 +1198,7 @@ func TestAdminQueryEventReports(t *testing.T) {
 				routers.Client.ServeHTTP(w, req)
 
 				if w.Code != http.StatusOK {
-					t.Fatalf("expected report to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+					t.Fatal("expected report to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
 				}
 			}
 		}
@@ -1217,7 +1217,7 @@ func TestAdminQueryEventReports(t *testing.T) {
 			routers.SynapseAdmin.ServeHTTP(w, req)
 
 			if w.Code != http.StatusOK {
-				t.Fatalf("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 			var resp response
 			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -1226,10 +1226,10 @@ func TestAdminQueryEventReports(t *testing.T) {
 			wantCount := 20
 			// Only validating the count
 			if len(resp.EventReports) != wantCount {
-				t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
+				t.Fatal("expected %d events, got %d", wantCount, len(resp.EventReports))
 			}
 			if resp.Total != int64(wantCount) {
-				t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
+				t.Fatal("expected total to be %d, got %d", wantCount, resp.Total)
 			}
 		})
 
@@ -1241,7 +1241,7 @@ func TestAdminQueryEventReports(t *testing.T) {
 			routers.SynapseAdmin.ServeHTTP(w, req)
 
 			if w.Code != http.StatusOK {
-				t.Fatalf("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 			var resp response
 			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -1250,10 +1250,10 @@ func TestAdminQueryEventReports(t *testing.T) {
 			wantCount := 10
 			// Only validating the count
 			if len(resp.EventReports) != wantCount {
-				t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
+				t.Fatal("expected %d events, got %d", wantCount, len(resp.EventReports))
 			}
 			if resp.Total != int64(wantCount) {
-				t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
+				t.Fatal("expected total to be %d, got %d", wantCount, resp.Total)
 			}
 		})
 
@@ -1265,7 +1265,7 @@ func TestAdminQueryEventReports(t *testing.T) {
 			routers.SynapseAdmin.ServeHTTP(w, req)
 
 			if w.Code != http.StatusOK {
-				t.Fatalf("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 			var resp response
 			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -1276,10 +1276,10 @@ func TestAdminQueryEventReports(t *testing.T) {
 			wantCount := 0
 			// Only validating the count
 			if len(resp.EventReports) != wantCount {
-				t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
+				t.Fatal("expected %d events, got %d", wantCount, len(resp.EventReports))
 			}
 			if resp.Total != int64(wantCount) {
-				t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
+				t.Fatal("expected total to be %d, got %d", wantCount, resp.Total)
 			}
 		})
 
@@ -1291,7 +1291,7 @@ func TestAdminQueryEventReports(t *testing.T) {
 			routers.SynapseAdmin.ServeHTTP(w, req)
 
 			if w.Code != http.StatusOK {
-				t.Fatalf("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 			var resp response
 			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -1300,16 +1300,16 @@ func TestAdminQueryEventReports(t *testing.T) {
 			wantCount := 10
 			// Only validating the count
 			if len(resp.EventReports) != wantCount {
-				t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
+				t.Fatal("expected %d events, got %d", wantCount, len(resp.EventReports))
 			}
 			if resp.Total != int64(wantCount) {
-				t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
+				t.Fatal("expected total to be %d, got %d", wantCount, resp.Total)
 			}
 			// we now should have the first reported event
 			wantEventID := eventsToReportPerRoom[room.ID][0]
 			gotEventID := resp.EventReports[0].EventID
 			if gotEventID != wantEventID {
-				t.Fatalf("expected eventID to be %v, got %v", wantEventID, gotEventID)
+				t.Fatal("expected eventID to be %v, got %v", wantEventID, gotEventID)
 			}
 		})
 
@@ -1328,7 +1328,7 @@ func TestAdminQueryEventReports(t *testing.T) {
 				routers.SynapseAdmin.ServeHTTP(w, req)
 
 				if w.Code != http.StatusOK {
-					t.Fatalf("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+					t.Fatal("expected getting reports to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
 				}
 
 				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -1337,10 +1337,10 @@ func TestAdminQueryEventReports(t *testing.T) {
 
 				wantCount := 5 // we are limited to 5
 				if len(resp.EventReports) != wantCount {
-					t.Fatalf("expected %d events, got %d", wantCount, len(resp.EventReports))
+					t.Fatal("expected %d events, got %d", wantCount, len(resp.EventReports))
 				}
 				if resp.Total != wantTotal {
-					t.Fatalf("expected total to be %d, got %d", wantCount, resp.Total)
+					t.Fatal("expected total to be %d, got %d", wantCount, resp.Total)
 				}
 
 				// We've reached the end
@@ -1386,7 +1386,7 @@ func TestEventReportsGetDelete(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 
 		qm := queueutil.NewQueueManager(svc)
@@ -1397,7 +1397,7 @@ func TestEventReportsGetDelete(t *testing.T) {
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
@@ -1428,7 +1428,7 @@ func TestEventReportsGetDelete(t *testing.T) {
 		routers.Client.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
-			t.Fatalf("expected report to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
+			t.Fatal("expected report to succeed, got HTTP %d instead: %s", w.Code, w.Body.String())
 		}
 
 		t.Run("Can not query with invalid ID", func(t *testing.T) {
@@ -1439,7 +1439,7 @@ func TestEventReportsGetDelete(t *testing.T) {
 			routers.SynapseAdmin.ServeHTTP(w, req)
 
 			if w.Code != http.StatusBadRequest {
-				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 		})
 
@@ -1451,7 +1451,7 @@ func TestEventReportsGetDelete(t *testing.T) {
 			routers.SynapseAdmin.ServeHTTP(w, req)
 
 			if w.Code != http.StatusOK {
-				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 			resp := api.QueryAdminEventReportResponse{}
 			if err = json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -1459,13 +1459,13 @@ func TestEventReportsGetDelete(t *testing.T) {
 			}
 			// test a few things
 			if resp.EventID != eventIDToReport.EventID() {
-				t.Fatalf("expected eventID to be %s, got %s instead", eventIDToReport.EventID(), resp.EventID)
+				t.Fatal("expected eventID to be %s, got %s instead", eventIDToReport.EventID(), resp.EventID)
 			}
 			if resp.RoomName != roomName {
-				t.Fatalf("expected roomName to be %s, got %s instead", roomName, resp.RoomName)
+				t.Fatal("expected roomName to be %s, got %s instead", roomName, resp.RoomName)
 			}
 			if resp.CanonicalAlias != alias {
-				t.Fatalf("expected alias to be %s, got %s instead", alias, resp.CanonicalAlias)
+				t.Fatal("expected alias to be %s, got %s instead", alias, resp.CanonicalAlias)
 			}
 			if reflect.DeepEqual(resp.EventJSON, eventIDToReport.JSON()) {
 				t.Fatal("mismatching eventJSON")
@@ -1480,7 +1480,7 @@ func TestEventReportsGetDelete(t *testing.T) {
 			routers.SynapseAdmin.ServeHTTP(w, req)
 
 			if w.Code != http.StatusOK {
-				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 		})
 
@@ -1492,7 +1492,7 @@ func TestEventReportsGetDelete(t *testing.T) {
 			routers.SynapseAdmin.ServeHTTP(w, req)
 
 			if w.Code == http.StatusOK {
-				t.Fatalf("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
+				t.Fatal("expected getting report to fail, got HTTP %d instead: %s", w.Code, w.Body.String())
 			}
 		})
 	})

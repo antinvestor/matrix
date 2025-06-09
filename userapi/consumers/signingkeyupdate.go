@@ -58,7 +58,7 @@ func NewSigningKeyUpdateConsumer(
 func (t *SigningKeyUpdateConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	var updatePayload api.CrossSigningKeyUpdate
 	if err := json.Unmarshal(message, &updatePayload); err != nil {
-		logrus.WithError(err).Errorf("Failed to read from signing key update input topic")
+		logrus.WithError(err).Error("Failed to read from signing key update input topic")
 		return nil
 	}
 	origin := spec.ServerName(metadata["origin"])
@@ -69,7 +69,7 @@ func (t *SigningKeyUpdateConsumer) Handle(ctx context.Context, metadata map[stri
 		logrus.Warn("dropping device key update from ourself")
 		return nil
 	} else if serverName != origin {
-		logrus.Warnf("dropping device key update, %s != %s", serverName, origin)
+		logrus.Warn("dropping device key update, %s != %s", serverName, origin)
 		return nil
 	}
 

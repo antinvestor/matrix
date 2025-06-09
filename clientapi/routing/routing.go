@@ -119,9 +119,9 @@ func Setup(
 	sf := singleflight.Group{}
 
 	if cfg.Global.WellKnownClientName != "" {
-		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Global.WellKnownClientName)
+		logrus.Info("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Global.WellKnownClientName)
 		if cfg.Global.WellKnownSlidingSyncProxy != "" {
-			logrus.Infof("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Global.WellKnownSlidingSyncProxy)
+			logrus.Info("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Global.WellKnownSlidingSyncProxy)
 		}
 		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
 			response := WellKnownClientResponse{

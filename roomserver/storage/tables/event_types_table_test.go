@@ -27,7 +27,7 @@ func mustCreateEventTypesTable(ctx context.Context, svc *frame.Service, t *testi
 
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatalf("failed to migrate table: %s", err)
+		t.Fatal("failed to migrate table: %s", err)
 	}
 
 	return tab
@@ -70,7 +70,7 @@ func Test_EventTypesTable(t *testing.T) {
 			if v, ok := eventTypeMap[eventType]; ok {
 				assert.Equal(t, v, nid)
 			} else {
-				t.Fatalf("unable to find %d in result set", nid)
+				t.Fatal("unable to find %d in result set", nid)
 			}
 		}
 	})

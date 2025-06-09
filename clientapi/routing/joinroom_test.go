@@ -37,7 +37,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
@@ -55,7 +55,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 				ServerName:  serverName,
 				Password:    "someRandomPassword",
 			}, userRes); err != nil {
-				t.Errorf("failed to create account: %s", err)
+				t.Error("failed to create account: %s", err)
 			}
 
 		}
@@ -76,7 +76,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
 		crResp, ok := resp.JSON.(createRoomResponse)
 		if !ok {
-			t.Fatalf("response is not a createRoomResponse: %+v", resp)
+			t.Fatal("response is not a createRoomResponse: %+v", resp)
 		}
 
 		// create a room with guest access enabled and invite Charlie
@@ -90,7 +90,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		}, aliceDev, &cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
 		crRespWithGuestAccess, ok := resp.JSON.(createRoomResponse)
 		if !ok {
-			t.Fatalf("response is not a createRoomResponse: %+v", resp)
+			t.Fatal("response is not a createRoomResponse: %+v", resp)
 		}
 
 		// Dummy request
@@ -160,7 +160,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 
 				joinResp := JoinRoomByIDOrAlias(req, tc.device, rsAPI, userAPI, tc.roomID)
 				if tc.wantHTTP200 && !joinResp.Is2xx() {
-					t.Fatalf("expected join room to succeed, but didn't: %+v", joinResp)
+					t.Fatal("expected join room to succeed, but didn't: %+v", joinResp)
 				}
 			})
 		}

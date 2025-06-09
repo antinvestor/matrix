@@ -58,22 +58,22 @@ func AddPublicRoutes(
 
 	err := qm.RegisterPublisher(ctx, &syncApiCfg.OutputReceiptEvent)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for receipt event")
+		logrus.WithError(err).Panic("failed to register publisher for receipt event")
 	}
 
 	err = qm.RegisterPublisher(ctx, &syncApiCfg.OutputSendToDeviceEvent)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for send to device event")
+		logrus.WithError(err).Panic("failed to register publisher for send to device event")
 	}
 
 	err = qm.RegisterPublisher(ctx, &syncApiCfg.OutputTypingEvent)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for typing event")
+		logrus.WithError(err).Panic("failed to register publisher for typing event")
 	}
 
 	err = qm.RegisterPublisher(ctx, &syncApiCfg.OutputPresenceEvent)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for presence event")
+		logrus.WithError(err).Panic("failed to register publisher for presence event")
 	}
 
 	syncProducer := &producers.SyncAPIProducer{

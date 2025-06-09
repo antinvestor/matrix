@@ -46,7 +46,7 @@ func NewFederationInternalAPI(
 ) *FederationInternalAPI {
 	serverKeyDB, err := cache.NewKeyDatabase(db, caches)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to set up caching wrapper for server key database")
+		logrus.WithError(err).Panic("failed to set up caching wrapper for server key database")
 	}
 
 	if keyRing == nil {

@@ -86,10 +86,10 @@ func TestStateEntryMap(t *testing.T) {
 		keyTuple := types.StateKeyTuple{EventTypeNID: testCase.inputTypeNID, EventStateKeyNID: testCase.inputStateKey}
 		gotEventNID, gotOK := entryMap.lookup(keyTuple)
 		if testCase.wantOK != gotOK {
-			t.Fatalf("stateEntryMap lookup(%v): want ok to be %v, got %v", keyTuple, testCase.wantOK, gotOK)
+			t.Fatal("stateEntryMap lookup(%v): want ok to be %v, got %v", keyTuple, testCase.wantOK, gotOK)
 		}
 		if testCase.wantEventNID != gotEventNID {
-			t.Fatalf("stateEntryMap lookup(%v): want eventNID to be %v, got %v", keyTuple, testCase.wantEventNID, gotEventNID)
+			t.Fatal("stateEntryMap lookup(%v): want eventNID to be %v, got %v", keyTuple, testCase.wantEventNID, gotEventNID)
 		}
 	}
 }
@@ -125,11 +125,11 @@ func TestEventMap(t *testing.T) {
 	for _, testCase := range testCases {
 		gotEvent, gotOK := events.Lookup(testCase.inputEventNID)
 		if testCase.wantOK != gotOK {
-			t.Fatalf("eventMap lookup(%v): want ok to be %v, got %v", testCase.inputEventNID, testCase.wantOK, gotOK)
+			t.Fatal("eventMap lookup(%v): want ok to be %v, got %v", testCase.inputEventNID, testCase.wantOK, gotOK)
 		}
 
 		if testCase.wantEvent != gotEvent {
-			t.Fatalf("eventMap lookup(%v): want event to be %v, got %v", testCase.inputEventNID, testCase.wantEvent, gotEvent)
+			t.Fatal("eventMap lookup(%v): want event to be %v, got %v", testCase.inputEventNID, testCase.wantEvent, gotEvent)
 		}
 	}
 

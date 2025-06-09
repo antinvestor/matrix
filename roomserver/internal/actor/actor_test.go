@@ -31,22 +31,19 @@ func TestRoomActorIntegration(t *testing.T) {
 		name          string
 		roomID        string
 		messageCount  int
-		messagePrefix string
 		sentMsgs      []map[string]any
 		processedMsgs []map[string]any
 	}{
 		{
-			name:          "process single message",
-			roomID:        "!room1:test.com",
-			messageCount:  1,
-			messagePrefix: "single-message",
+			name:         "process single message",
+			roomID:       "!room1:test.com",
+			messageCount: 1,
 		},
-		//{
-		//	name:          "process multiple messages sequentially",
-		//	roomID:        "!room2:test.com",
-		//	messageCount:  3,
-		//	messagePrefix: "sequential-message",
-		//},
+		{
+			name:         "process multiple messages sequentially",
+			roomID:       "!room2:test.com",
+			messageCount: 3,
+		},
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
@@ -63,8 +60,6 @@ func TestRoomActorIntegration(t *testing.T) {
 				// Define the message handler function that will collect processed messages
 				handlerFunc := func(ctx context.Context, metadata map[string]string, message []byte) error {
 
-					t.Logf("  | +++++++++++++++++++++++++++ metadata [%v]", metadata)
-					t.Logf("  | +++++++++++++++++++++++++++ message: %v", message)
 					var msg map[string]any
 					err := json.Unmarshal(message, &msg)
 					if err != nil {
@@ -82,55 +77,32 @@ func TestRoomActorIntegration(t *testing.T) {
 				err := actorSystem.Start(ctx)
 				require.NoError(t, err, "Failed to start actor system")
 
-				// Get the queue URI for the room
-				qopts := &cfg.RoomServer.Queues.InputRoomEvent
-
-				err = qm.RegisterSubscriber(ctx, qopts, &actorHeaders{t: t})
-				require.NoError(t, err, "Failed to register headers subscriber")
-
-				t.Logf("  | +++++++++++++++++++++++++++ qopts: %v", qopts.DSrc())
-
 				var roomID *spec.RoomID
 				// Create a room ID
 				roomID, err = spec.NewRoomID(tc.roomID)
 				require.NoError(t, err, "Failed to create room ID")
 
-				// Setup the actor by ensuring it exists
-				err = actorSystem.EnsureRoomActorExists(ctx, roomID)
-				require.NoError(t, err, "Failed to ensure room actor exists")
-
-				roomOpts, err := actor.RoomifyQOpts(ctx, qopts, roomID, false)
-				require.NoError(t, err, "Failed to roomify queue options for room ID to publish")
-
-				t.Logf("  | +++++++++++++++++++++++++++ qopts: %v", qopts.DSrc())
-				t.Logf("  | +++++++++++++++++++++++++++ roomOpts: %v", roomOpts.DSrc())
-
-				err = qm.EnsurePublisherOk(ctx, roomOpts)
-				require.NoError(t, err, "Failed to ensure publisher for room actor messages exists")
-
 				// Generate and push messages to the queue
 				for i := 0; i < tc.messageCount; i++ {
-					messageID := fmt.Sprintf("%s-%d", tc.messagePrefix, i)
 
 					message := map[string]any{
-						"id":      messageID,
+						"id":      fmt.Sprintf("id-%d", i),
 						"content": fmt.Sprintf("Test message content %d", i),
 						"index":   float64(i),
 					}
 
 					metadata := map[string]string{
-						"id":    messageID,
 						"index": fmt.Sprintf("%d", i),
 					}
 
-					err = qm.Publish(ctx, roomOpts.Ref(), message, metadata)
+					err = actorSystem.Publish(ctx, roomID, message, metadata)
 					require.NoError(t, err, " | ++++++++++++++++++++++++++++++++++++++ Failed to publish message")
 
 					tc.sentMsgs = append(tc.sentMsgs, message)
 				}
 
 				// Give a bit more time for any remaining processing
-				for i := 0; i < 3; i++ {
+				for i := 0; i < 10; i++ {
 					if len(tc.sentMsgs) == len(tc.processedMsgs) {
 						break
 					}

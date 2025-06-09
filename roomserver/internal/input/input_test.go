@@ -29,7 +29,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -57,7 +57,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 			Event: &types.HeaderedEvent{PDU: event},
 		}
 
-		inputter, err := input.NewInputer(ctx, &cfg.RoomServer, nil, qm, "", nil, nil, nil, nil, nil, nil, nil, nil,false)
+		inputter, err := input.NewInputer(ctx, &cfg.RoomServer, nil, qm, "", nil, nil, nil, nil, nil, nil, nil, nil, false)
 		if err != nil {
 			t.Fatal(err)
 		}

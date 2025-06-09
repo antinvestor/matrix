@@ -128,27 +128,27 @@ func TestLoginFromJSONReader(t *testing.T) {
 
 			login, cleanup, jsonErr := LoginFromJSONReader(req, &userAPI, &userAPI, cfg)
 			if jsonErr != nil {
-				t.Fatalf("LoginFromJSONReader failed: %+v", jsonErr)
+				t.Fatal("LoginFromJSONReader failed: %+v", jsonErr)
 			}
 
 			cleanup(ctx, &util.JSONResponse{Code: http.StatusOK})
 
 			if login.Username() != tst.WantUsername {
-				t.Errorf("Username: got %q, want %q", login.Username(), tst.WantUsername)
+				t.Error("Username: got %q, want %q", login.Username(), tst.WantUsername)
 			}
 
 			if login.DeviceID == nil {
 				if tst.WantDeviceID != "" {
-					t.Errorf("DeviceID: got %v, want %q", login.DeviceID, tst.WantDeviceID)
+					t.Error("DeviceID: got %v, want %q", login.DeviceID, tst.WantDeviceID)
 				}
 			} else {
 				if *login.DeviceID != tst.WantDeviceID {
-					t.Errorf("DeviceID: got %q, want %q", *login.DeviceID, tst.WantDeviceID)
+					t.Error("DeviceID: got %q, want %q", *login.DeviceID, tst.WantDeviceID)
 				}
 			}
 
 			if !reflect.DeepEqual(userAPI.DeletedTokens, tst.WantDeletedTokens) {
-				t.Errorf("DeletedTokens: got %+v, want %+v", userAPI.DeletedTokens, tst.WantDeletedTokens)
+				t.Error("DeletedTokens: got %+v, want %+v", userAPI.DeletedTokens, tst.WantDeletedTokens)
 			}
 		})
 	}
@@ -273,9 +273,9 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 			_, cleanup, errRes := LoginFromJSONReader(req, &userAPI, &userAPI, cfg)
 			if errRes == nil {
 				cleanup(ctx, nil)
-				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
+				t.Fatal("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
 			} else if merr, ok := errRes.JSON.(spec.MatrixError); ok && merr.ErrCode != tst.WantErrCode {
-				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
+				t.Fatal("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
 			}
 		})
 	}

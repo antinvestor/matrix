@@ -78,12 +78,12 @@ func TestHandleQueryDirectory(t *testing.T) {
 		content := queryContent{}
 		err := req.SetContent(content)
 		if err != nil {
-			t.Fatalf("Error: %s", err.Error())
+			t.Fatal("Error: %s", err.Error())
 		}
 		req.Sign(serverName, gomatrixserverlib.KeyID(keyID), sk)
 		httpReq, err := req.HTTPRequest()
 		if err != nil {
-			t.Fatalf("Error: %s", err.Error())
+			t.Fatal("Error: %s", err.Error())
 		}
 		// vars := map[string]string{"room_alias": "#room:server"}
 		w := httptest.NewRecorder()

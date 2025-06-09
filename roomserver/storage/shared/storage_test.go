@@ -29,7 +29,7 @@ func mustCreateRoomServerDatabase(ctx context.Context, svc *frame.Service, cfg *
 	cache, err := cacheutil.NewCache(&cfg.Global.Cache)
 
 	if err != nil {
-		t.Fatalf("Could not create cache %s", err)
+		t.Fatal("Could not create cache %s", err)
 	}
 
 	cm := sqlutil.NewConnectionManager(svc)
@@ -51,7 +51,7 @@ func mustCreateRoomServerDatabase(ctx context.Context, svc *frame.Service, cfg *
 
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatalf("failed to migrate table: %s", err)
+		t.Fatal("failed to migrate table: %s", err)
 	}
 
 	evDb := shared.EventDatabase{

@@ -106,7 +106,7 @@ func SSORedirect(
 		}
 	}
 
-	util.GetLogger(ctx).Infof("LoginSSO redirect to %s.", u)
+	util.GetLogger(ctx).Info("LoginSSO redirect to %s.", u)
 
 	resp := util.RedirectResponse(u)
 	nonceCookie := &http.Cookie{
@@ -269,7 +269,7 @@ func SSOCallback(
 
 	token, err := createLoginToken(ctx, userAPI, account.UserID, result.Token)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("PerformLoginTokenCreation failed")
+		util.GetLogger(ctx).WithError(err).Error("PerformLoginTokenCreation failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

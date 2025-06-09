@@ -91,7 +91,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 	err := json.Unmarshal(message, &output)
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
+		log.WithError(err).Error("roomserver output log: message parse failure")
 		return nil
 	}
 
@@ -107,7 +107,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 				"add":        output.NewRoomEvent.AddsStateEventIDs,
 				"del":        output.NewRoomEvent.RemovesStateEventIDs,
 				log.ErrorKey: err,
-			}).Panicf("roomserver output log: write room event failure")
+			}).Panic("roomserver output log: write room event failure")
 		}
 
 	case api.OutputTypeNewInboundPeek:
@@ -116,7 +116,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 			log.WithFields(log.Fields{
 				"event":      output.NewInboundPeek,
 				log.ErrorKey: err,
-			}).Panicf("roomserver output log: remote peek event failure")
+			}).Panic("roomserver output log: remote peek event failure")
 			return err
 		}
 
@@ -266,7 +266,7 @@ func (s *OutputRoomEventConsumer) sendPresence(ctx context.Context, roomID strin
 			UserId: ev.Sender,
 		}))
 		if err0 != nil {
-			log.WithError(err0).Errorf("unable to get presence")
+			log.WithError(err0).Error("unable to get presence")
 			continue
 		}
 

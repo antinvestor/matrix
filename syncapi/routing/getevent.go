@@ -77,7 +77,7 @@ func GetEvent(
 
 	// The requested event does not exist in our database
 	if len(events) == 0 {
-		logger.Debugf("GetEvent: requested event doesn't exist locally")
+		logger.Debug("GetEvent: requested event doesn't exist locally")
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("The event was not found or you do not have permission to read this event"),

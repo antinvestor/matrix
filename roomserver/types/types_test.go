@@ -17,11 +17,11 @@ func TestDeduplicateStateEntries(t *testing.T) {
 	expected := []EventNID{3, 4, 5, 6}
 	entries = DeduplicateStateEntries(entries)
 	if len(entries) != 4 {
-		t.Fatalf("Expected 4 entries, got %d entries", len(entries))
+		t.Fatal("Expected 4 entries, got %d entries", len(entries))
 	}
 	for i, v := range entries {
 		if v.EventNID != expected[i] {
-			t.Fatalf("Expected position %d to be %d but got %d", i, expected[i], v.EventNID)
+			t.Fatal("Expected position %d to be %d but got %d", i, expected[i], v.EventNID)
 		}
 	}
 }
@@ -54,37 +54,37 @@ func TestStateKeyTupleSorter(t *testing.T) {
 
 	for i := range want {
 		if input[i] != want[i] {
-			t.Errorf("Wanted %#v at index %d got %#v", want[i], i, input[i])
+			t.Error("Wanted %#v at index %d got %#v", want[i], i, input[i])
 		}
 
 		if !input.contains(want[i]) {
-			t.Errorf("Wanted %#v.contains(%#v) to be true but got false", input, want[i])
+			t.Error("Wanted %#v.contains(%#v) to be true but got false", input, want[i])
 		}
 	}
 
 	for i := range doNotWant {
 		if input.contains(doNotWant[i]) {
-			t.Errorf("Wanted %#v.contains(%#v) to be false but got true", input, doNotWant[i])
+			t.Error("Wanted %#v.contains(%#v) to be false but got true", input, doNotWant[i])
 		}
 	}
 
 	if len(wantTypeNIDs) != len(gotTypeNIDs) {
-		t.Fatalf("Wanted type NIDs %#v got %#v", wantTypeNIDs, gotTypeNIDs)
+		t.Fatal("Wanted type NIDs %#v got %#v", wantTypeNIDs, gotTypeNIDs)
 	}
 
 	for i := range wantTypeNIDs {
 		if wantTypeNIDs[i] != gotTypeNIDs[i] {
-			t.Fatalf("Wanted type NIDs %#v got %#v", wantTypeNIDs, gotTypeNIDs)
+			t.Fatal("Wanted type NIDs %#v got %#v", wantTypeNIDs, gotTypeNIDs)
 		}
 	}
 
 	if len(wantStateKeyNIDs) != len(gotStateKeyNIDs) {
-		t.Fatalf("Wanted state key NIDs %#v got %#v", wantStateKeyNIDs, gotStateKeyNIDs)
+		t.Fatal("Wanted state key NIDs %#v got %#v", wantStateKeyNIDs, gotStateKeyNIDs)
 	}
 
 	for i := range wantStateKeyNIDs {
 		if wantStateKeyNIDs[i] != gotStateKeyNIDs[i] {
-			t.Fatalf("Wanted type NIDs %#v got %#v", wantTypeNIDs, gotTypeNIDs)
+			t.Fatal("Wanted type NIDs %#v got %#v", wantTypeNIDs, gotTypeNIDs)
 		}
 	}
 }

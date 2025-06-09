@@ -74,7 +74,7 @@ func (t *OutputSendToDeviceConsumer) Handle(ctx context.Context, metadata map[st
 	var ote types.OutputSendToDeviceEvent
 	if err = json.Unmarshal(message, &ote); err != nil {
 
-		log.WithError(err).Errorf("output log: message parse failed (expected send-to-device)")
+		log.WithError(err).Error("output log: message parse failed (expected send-to-device)")
 		return nil
 	}
 
@@ -111,7 +111,7 @@ func (t *OutputSendToDeviceConsumer) Handle(ctx context.Context, metadata map[st
 		return nil
 	}
 
-	log.Debugf("Sending send-to-device message into %q destination queue", destServerName)
+	log.Debug("Sending send-to-device message into %q destination queue", destServerName)
 	err = t.queues.SendEDU(ctx, edu, originServerName, []spec.ServerName{destServerName})
 	if err != nil {
 		log.WithError(err).Error("failed to send EDU")

@@ -40,11 +40,11 @@ func TestAnyIdentifierJSON(t *testing.T) {
 				if tst.Want == nil {
 					return
 				}
-				t.Fatalf("Unmarshal failed: %v", err)
+				t.Fatal("Unmarshal failed: %v", err)
 			}
 
 			if !reflect.DeepEqual(got.Identifier, tst.Want) {
-				t.Errorf("got %+v, want %+v", got.Identifier, tst.Want)
+				t.Error("got %+v, want %+v", got.Identifier, tst.Want)
 			}
 		})
 
@@ -55,7 +55,7 @@ func TestAnyIdentifierJSON(t *testing.T) {
 			id := AnyIdentifier{Identifier: tst.Want}
 			bs, err := json.Marshal(id)
 			if err != nil {
-				t.Fatalf("Marshal failed: %v", err)
+				t.Fatal("Marshal failed: %v", err)
 			}
 			t.Logf("Marshalled JSON: %q", string(bs))
 
@@ -64,11 +64,11 @@ func TestAnyIdentifierJSON(t *testing.T) {
 				if tst.Want == nil {
 					return
 				}
-				t.Fatalf("Unmarshal failed: %v", err)
+				t.Fatal("Unmarshal failed: %v", err)
 			}
 
 			if !reflect.DeepEqual(got.Identifier, tst.Want) {
-				t.Errorf("got %+v, want %+v", got.Identifier, tst.Want)
+				t.Error("got %+v, want %+v", got.Identifier, tst.Want)
 			}
 		})
 	}

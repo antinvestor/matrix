@@ -35,7 +35,7 @@ type AppServiceInternalAPI interface {
 		req *RoomAliasExistsRequest,
 		resp *RoomAliasExistsResponse,
 	) error
-	// Check whether a user ID exists within any application service namespaces
+	// UserIDExists Check whether a user ID exists within any application service namespaces
 	UserIDExists(
 		ctx context.Context,
 		req *UserIDExistsRequest,

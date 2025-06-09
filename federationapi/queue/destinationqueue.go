@@ -70,7 +70,7 @@ type destinationQueue struct {
 // start sending events to that destination.
 func (oq *destinationQueue) sendEvent(ctx context.Context, event *types.HeaderedEvent, dbReceipt *receipt.Receipt) {
 	if event == nil {
-		logrus.Errorf("attempt to send nil PDU with destination %q", oq.destination)
+		logrus.Error("attempt to send nil PDU with destination %q", oq.destination)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (oq *destinationQueue) sendEvent(ctx context.Context, event *types.Headered
 // start sending events to that destination.
 func (oq *destinationQueue) sendEDU(ctx context.Context, event *gomatrixserverlib.EDU, dbReceipt *receipt.Receipt) {
 	if event == nil {
-		logrus.Errorf("attempt to send nil EDU with destination %q", oq.destination)
+		logrus.Error("attempt to send nil EDU with destination %q", oq.destination)
 		return
 	}
 
@@ -231,7 +231,7 @@ func (oq *destinationQueue) getPendingFromDatabase(ctx context.Context) {
 				}
 			}
 		} else {
-			logrus.WithError(err).Errorf("Failed to get pending PDUs for %q", oq.destination)
+			logrus.WithError(err).Error("Failed to get pending PDUs for %q", oq.destination)
 		}
 	}
 
@@ -252,7 +252,7 @@ func (oq *destinationQueue) getPendingFromDatabase(ctx context.Context) {
 				}
 			}
 		} else {
-			logrus.WithError(err).Errorf("Failed to get pending EDUs for %q", oq.destination)
+			logrus.WithError(err).Error("Failed to get pending EDUs for %q", oq.destination)
 		}
 	}
 
@@ -396,7 +396,7 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 ) (sendMethod statistics.SendMethod, err error) {
 	// Create the transaction.
 	t, pduReceipts, eduReceipts := oq.createTransaction(pdus, edus)
-	logrus.WithField("server_name", oq.destination).Debugf("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
+	logrus.WithField("server_name", oq.destination).Debug("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
 
 	// Try to send the transaction to the destination server.
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
@@ -416,7 +416,7 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 			// The destination is still offline, try sending to relays.
 			sendMethod = statistics.SendViaRelay
 			relaySuccess := false
-			logrus.Infof("Sending %q to relay servers: %v", t.TransactionID, relayServers)
+			logrus.Info("Sending %q to relay servers: %v", t.TransactionID, relayServers)
 			// TODO : how to pass through actual userID here?!?!?!?!
 			userID, userErr := spec.NewUserID("@user:"+string(oq.destination), false)
 			if userErr != nil {
@@ -451,15 +451,15 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 	case nil:
 		// Clean up the transaction in the database.
 		if pduReceipts != nil {
-			//logrus.Infof("Cleaning PDUs %q", pduReceipt.String())
+			//logrus.Info("Cleaning PDUs %q", pduReceipt.String())
 			if err = oq.db.CleanPDUs(ctx, oq.destination, pduReceipts); err != nil {
-				logrus.WithError(err).Errorf("Failed to clean PDUs for server %q", t.Destination)
+				logrus.WithError(err).Error("Failed to clean PDUs for server %q", t.Destination)
 			}
 		}
 		if eduReceipts != nil {
-			//logrus.Infof("Cleaning EDUs %q", eduReceipt.String())
+			//logrus.Info("Cleaning EDUs %q", eduReceipt.String())
 			if err = oq.db.CleanEDUs(ctx, oq.destination, eduReceipts); err != nil {
-				logrus.WithError(err).Errorf("Failed to clean EDUs for server %q", t.Destination)
+				logrus.WithError(err).Error("Failed to clean EDUs for server %q", t.Destination)
 			}
 		}
 		// Reset the transaction ID.
@@ -481,7 +481,7 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 		logrus.WithFields(logrus.Fields{
 			"destination":   oq.destination,
 			logrus.ErrorKey: err,
-		}).Debugf("Failed to send transaction %q", t.TransactionID)
+		}).Debug("Failed to send transaction %q", t.TransactionID)
 		return sendMethod, err
 	}
 }
@@ -548,7 +548,7 @@ func (oq *destinationQueue) blacklistDestination() {
 	// It's been suggested that we should give up because the backoff
 	// has exceeded a maximum allowable value. Clean up the in-memory
 	// buffers at this point. The PDU clean-up is already on a defer.
-	logrus.Warnf("Blacklisting %q due to exceeding backoff threshold", oq.destination)
+	logrus.Warn("Blacklisting %q due to exceeding backoff threshold", oq.destination)
 
 	oq.pendingMutex.Lock()
 	for i := range oq.pendingPDUs {

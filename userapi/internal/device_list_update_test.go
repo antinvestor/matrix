@@ -182,7 +182,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 	}
 	err := updater.Update(ctx, event)
 	if err != nil {
-		t.Fatalf("Update returned an error: %s", err)
+		t.Fatal("Update returned an error: %s", err)
 	}
 	want := api.DeviceMessage{
 		Type:     api.TypeDeviceKeyUpdate,
@@ -195,13 +195,13 @@ func TestUpdateHavePrevID(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(producer.events, []api.DeviceMessage{want}) {
-		t.Errorf("Update didn't produce correct event, got %v want %v", producer.events, want)
+		t.Error("Update didn't produce correct event, got %v want %v", producer.events, want)
 	}
 	if !reflect.DeepEqual(db.storedKeys, []api.DeviceMessage{want}) {
-		t.Errorf("Cm didn't store correct event, got %v want %v", db.storedKeys, want)
+		t.Error("Cm didn't store correct event, got %v want %v", db.storedKeys, want)
 	}
 	if db.isStale(event.UserID) {
-		t.Errorf("%s incorrectly marked as stale", event.UserID)
+		t.Error("%s incorrectly marked as stale", event.UserID)
 	}
 }
 
@@ -248,7 +248,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 	})
 	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 2, nil, "example.test", cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 	if err := updater.Start(ctx); err != nil {
-		t.Fatalf("failed to start updater: %s", err)
+		t.Fatal("failed to start updater: %s", err)
 	}
 	event := gomatrixserverlib.DeviceListUpdateEvent{
 		DeviceDisplayName: "Mobile Phone",
@@ -262,7 +262,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 	err := updater.Update(ctx, event)
 
 	if err != nil {
-		t.Fatalf("Update returned an error: %s", err)
+		t.Fatal("Update returned an error: %s", err)
 	}
 	t.Log("waiting for /users/devices to be called...")
 	wg.Wait()
@@ -280,14 +280,14 @@ func TestUpdateNoPrevID(t *testing.T) {
 	}
 	// Now we should have a fresh list and the keys and emitted something
 	if db.isStale(event.UserID) {
-		t.Errorf("%s still marked as stale", event.UserID)
+		t.Error("%s still marked as stale", event.UserID)
 	}
 	if !reflect.DeepEqual(producer.events, []api.DeviceMessage{want}) {
 		t.Logf("len got %d len want %d", len(producer.events[0].KeyJSON), len(want.KeyJSON))
-		t.Errorf("Update didn't produce correct event, got %v want %v", producer.events, want)
+		t.Error("Update didn't produce correct event, got %v want %v", producer.events, want)
 	}
 	if !reflect.DeepEqual(db.storedKeys, []api.DeviceMessage{want}) {
-		t.Errorf("Cm didn't store correct event, got %v want %v", db.storedKeys, want)
+		t.Error("Cm didn't store correct event, got %v want %v", db.storedKeys, want)
 	}
 
 }
@@ -322,7 +322,7 @@ func TestDebounce(t *testing.T) {
 	})
 	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 1, nil, "example.test", cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 	if err := updater.Start(ctx); err != nil {
-		t.Fatalf("failed to start updater: %s", err)
+		t.Fatal("failed to start updater: %s", err)
 	}
 
 	// hit this 5 times
@@ -332,7 +332,7 @@ func TestDebounce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			if err := updater.ManualUpdate(ctx, srv, userID); err != nil {
-				t.Errorf("ManualUpdate: %s", err)
+				t.Error("ManualUpdate: %s", err)
 			}
 		}()
 	}
@@ -341,12 +341,12 @@ func TestDebounce(t *testing.T) {
 	select {
 	case <-incomingFedReq:
 	case <-time.After(time.Second):
-		t.Fatalf("timed out waiting for updater to hit federation")
+		t.Fatal("timed out waiting for updater to hit federation")
 	}
 
 	// user should be marked as stale
 	if !db.isStale(userID) {
-		t.Errorf("user %s not marked as stale", userID)
+		t.Error("user %s not marked as stale", userID)
 	}
 	// now send the response over federation
 	fedCh <- &http.Response{
@@ -372,7 +372,7 @@ func TestDebounce(t *testing.T) {
 
 	// user is no longer stale now
 	if db.isStale(userID) {
-		t.Errorf("user %s is marked as stale", userID)
+		t.Error("user %s is marked as stale", userID)
 	}
 }
 
@@ -437,11 +437,11 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 		// There should only be Alice
 		wantCount := 1
 		if count := len(staleUsers); count != wantCount {
-			t.Fatalf("expected there to be %d stale device lists, got %d", wantCount, count)
+			t.Fatal("expected there to be %d stale device lists, got %d", wantCount, count)
 		}
 
 		if staleUsers[0] != alice.ID {
-			t.Fatalf("unexpected stale device list user: %s, want %s", staleUsers[0], alice.ID)
+			t.Fatal("unexpected stale device list user: %s, want %s", staleUsers[0], alice.ID)
 		}
 	})
 }
@@ -486,7 +486,7 @@ func Test_dedupeStateList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := dedupeStaleLists(tt.staleLists); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("dedupeStaleLists() = %v, want %v", got, tt.want)
+				t.Error("dedupeStaleLists() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -553,10 +553,10 @@ func TestDeviceListUpdaterIgnoreBlacklisted(t *testing.T) {
 	updater.notifyWorkers(ctx, string(bob))
 
 	for server := range expectedServers {
-		t.Errorf("Server still in expectedServers map: %s", server)
+		t.Error("Server still in expectedServers map: %s", server)
 	}
 
 	for server := range unexpectedServers {
-		t.Errorf("unexpected server in result: %s", server)
+		t.Error("unexpected server in result: %s", server)
 	}
 }

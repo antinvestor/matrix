@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"path"
@@ -29,12 +28,10 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v3"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
-	jaegermetrics "github.com/uber/jaeger-lib/metrics"
 )
 
 // keyIDRegexp defines allowable characters in Key IDs.
@@ -237,6 +234,10 @@ func (d DataSource) RemoveQuery(key ...string) DataSource {
 	nuUri.RawQuery = q.Encode()
 
 	return DataSource(nuUri.String())
+}
+
+func (d DataSource) String() string {
+	return string(d)
 }
 
 // A Topic in kafka.
@@ -604,29 +605,4 @@ func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserv
 			return gomatrixserverlib.KeyID(keyID), privKey, nil
 		}
 	}
-}
-
-// SetupTracing configures the opentracing using the supplied configuration.
-func (config *Matrix) SetupTracing() (closer io.Closer, err error) {
-	if !config.Tracing.Enabled {
-		return io.NopCloser(bytes.NewReader([]byte{})), nil
-	}
-	return config.Tracing.Jaeger.InitGlobalTracer(
-		"Matrix",
-		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
-		jaegerconfig.Metrics(jaegermetrics.NullFactory),
-	)
-}
-
-// logrusLogger is a small wrapper that implements jaeger.Logger using logrus.
-type logrusLogger struct {
-	l *logrus.Logger
-}
-
-func (l logrusLogger) Error(msg string) {
-	l.l.Error(msg)
-}
-
-func (l logrusLogger) Infof(msg string, args ...interface{}) {
-	l.l.Infof(msg, args...)
 }

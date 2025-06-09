@@ -241,21 +241,21 @@ func (r *Leaver) performFederatedRejectInvite(
 	if err := r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
 		// failures in PerformLeave should NEVER stop us from telling other components like the
 		// sync API that the invite was withdrawn. Otherwise we can end up with stuck invites.
-		util.GetLogger(ctx).WithError(err).Errorf("failed to PerformLeave, still retiring invite event")
+		util.GetLogger(ctx).WithError(err).Error("failed to PerformLeave, still retiring invite event")
 	}
 
 	info, err := r.DB.RoomInfo(ctx, req.RoomID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("failed to get RoomInfo, still retiring invite event")
+		util.GetLogger(ctx).WithError(err).Error("failed to get RoomInfo, still retiring invite event")
 	}
 
 	ctx, updater, err := r.DB.MembershipUpdater(ctx, req.RoomID, string(leaver), true, info.RoomVersion)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("failed to get MembershipUpdater, still retiring invite event")
+		util.GetLogger(ctx).WithError(err).Error("failed to get MembershipUpdater, still retiring invite event")
 	}
 	if updater != nil {
 		if err = updater.Delete(ctx); err != nil {
-			util.GetLogger(ctx).WithError(err).Errorf("failed to delete membership, still retiring invite event")
+			util.GetLogger(ctx).WithError(err).Error("failed to delete membership, still retiring invite event")
 		}
 	}
 

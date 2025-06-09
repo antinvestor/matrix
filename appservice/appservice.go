@@ -60,7 +60,7 @@ func NewInternalAPI(
 		if err := generateAppServiceAccount(ctx, userAPI, appservice, cfg.Global.ServerName); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"appservice": appservice.ID,
-			}).WithError(err).Panicf("failed to generate bot account for appservice")
+			}).WithError(err).Panic("failed to generate bot account for appservice")
 		}
 	}
 
@@ -71,7 +71,7 @@ func NewInternalAPI(
 		qm, rsAPI,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
+		logrus.WithError(err).Panic("failed to start appservice roomserver consumer")
 	}
 
 	return appserviceQueryAPI

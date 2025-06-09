@@ -186,7 +186,7 @@ func SendRedaction(
 	}
 	domain := device.UserDomain()
 	if err = roomserverAPI.SendEvents(ctx, rsAPI, roomserverAPI.KindNew, []*types.HeaderedEvent{e}, device.UserDomain(), domain, domain, nil, false); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
+		util.GetLogger(req.Context()).WithError(err).Error("failed to SendEvents")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

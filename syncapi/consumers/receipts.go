@@ -69,7 +69,7 @@ func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[st
 	timestamp, err := strconv.ParseUint(metadata["timestamp"], 10, 64)
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("output log: message parse failure")
+		log.WithError(err).Error("output log: message parse failure")
 		return err
 	}
 

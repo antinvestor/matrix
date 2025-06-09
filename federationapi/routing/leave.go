@@ -61,7 +61,7 @@ func MakeLeave(
 	createLeaveTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
 		identity, signErr := cfg.Global.SigningIdentityFor(request.Destination())
 		if signErr != nil {
-			util.GetLogger(httpReq.Context()).WithError(signErr).Errorf("obtaining signing identity for %s failed", request.Destination())
+			util.GetLogger(httpReq.Context()).WithError(signErr).Error("obtaining signing identity for %s failed", request.Destination())
 			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
 		}
 
@@ -303,7 +303,7 @@ func SendLeave(
 	// Check that the event is signed by the server sending the request.
 	redacted, err := verImpl.RedactEventJSON(event.JSON())
 	if err != nil {
-		logrus.WithError(err).Errorf("XXX: leave.go")
+		logrus.WithError(err).Error("XXX: leave.go")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("The event JSON could not be redacted"),

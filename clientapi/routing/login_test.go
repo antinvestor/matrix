@@ -45,7 +45,7 @@ func TestLogin(t *testing.T) {
 		routers := httputil.NewRouters()
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -69,10 +69,10 @@ func TestLogin(t *testing.T) {
 				ServerName:  serverName,
 				Password:    password,
 			}, userRes); err != nil {
-				t.Errorf("failed to create account: %s", err)
+				t.Error("failed to create account: %s", err)
 			}
 			if !userRes.AccountCreated {
-				t.Fatalf("account not created")
+				t.Fatal("account not created")
 			}
 		}
 
@@ -123,7 +123,7 @@ func TestLogin(t *testing.T) {
 			rec := httptest.NewRecorder()
 			routers.Client.ServeHTTP(rec, req)
 			if rec.Code != http.StatusOK {
-				t.Fatalf("failed to get log-in flows: %s", rec.Body.String())
+				t.Fatal("failed to get log-in flows: %s", rec.Body.String())
 			}
 
 			t.Logf("response: %s", rec.Body.String())
@@ -144,7 +144,7 @@ func TestLogin(t *testing.T) {
 				case "m.login.application_service":
 					appServiceFound = true
 				default:
-					t.Fatalf("got unknown login flow: %s", flow.Type)
+					t.Fatal("got unknown login flow: %s", flow.Type)
 				}
 			}
 			if !appServiceFound {
@@ -172,7 +172,7 @@ func TestLogin(t *testing.T) {
 				rec := httptest.NewRecorder()
 				routers.Client.ServeHTTP(rec, req)
 				if tc.wantOK && rec.Code != http.StatusOK {
-					t.Fatalf("failed to login: %s", rec.Body.String())
+					t.Fatal("failed to login: %s", rec.Body.String())
 				}
 
 				t.Logf("Response: %s", rec.Body.String())
@@ -186,7 +186,7 @@ func TestLogin(t *testing.T) {
 					return
 				}
 				if tc.wantOK && resp.AccessToken == "" {
-					t.Fatalf("expected accessToken after successful login but got none: %+v", resp)
+					t.Fatal("expected accessToken after successful login but got none: %+v", resp)
 				}
 
 				devicesResp := &uapi.QueryDevicesResponse{}
@@ -196,7 +196,7 @@ func TestLogin(t *testing.T) {
 				for _, dev := range devicesResp.Devices {
 					// We expect the userID on the device to be the same as resp.UserID
 					if dev.UserID != resp.UserID {
-						t.Fatalf("unexpected userID on device: %s", dev.UserID)
+						t.Fatal("unexpected userID on device: %s", dev.UserID)
 					}
 				}
 			})

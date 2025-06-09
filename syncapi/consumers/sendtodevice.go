@@ -72,7 +72,7 @@ func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata m
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 
-		log.WithError(err).Errorf("send-to-device: failed to split user id, dropping message")
+		log.WithError(err).Error("send-to-device: failed to split user id, dropping message")
 		return nil
 	}
 	if !s.isLocalServerName(domain) {
@@ -83,7 +83,7 @@ func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata m
 	var output types.OutputSendToDeviceEvent
 	if err = json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("send-to-device: message parse failure")
+		log.WithError(err).Error("send-to-device: message parse failure")
 		return err
 	}
 
@@ -93,7 +93,7 @@ func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata m
 		"device_id":  output.DeviceID,
 		"event_type": output.Type,
 	})
-	logger.Debugf("sync API received send-to-device event from the clientapi/federationsender")
+	logger.Debug("sync API received send-to-device event from the clientapi/federationsender")
 
 	// Check we actually got the requesting device in our store, if we receive a room key request
 	if output.Type == "m.room_key_request" {
@@ -104,7 +104,7 @@ func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata m
 			if err = s.userAPI.PerformMarkAsStaleIfNeeded(ctx, &api.PerformMarkAsStaleRequest{
 				UserID: output.Sender, Domain: senderDomain, DeviceID: requestingDeviceID,
 			}, &struct{}{}); err != nil {
-				logger.WithError(err).Errorf("failed to mark as stale if needed")
+				logger.WithError(err).Error("failed to mark as stale if needed")
 				return err
 			}
 		}
@@ -115,7 +115,7 @@ func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata m
 	)
 	if err != nil {
 
-		log.WithError(err).Errorf("send-to-device: failed to store message")
+		log.WithError(err).Error("send-to-device: failed to store message")
 		return err
 	}
 

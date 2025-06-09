@@ -139,7 +139,7 @@ func (f *fedClient) MakeJoin(ctx context.Context, origin, s spec.ServerName, roo
 			var needed gomatrixserverlib.StateNeeded
 			needed, err = gomatrixserverlib.StateNeededForProtoEvent(&res.JoinEvent)
 			if err != nil {
-				f.t.Errorf("StateNeededForEventBuilder: %v", err)
+				f.t.Error("StateNeededForEventBuilder: %v", err)
 				return
 			}
 			res.JoinEvent.AuthEvents = r.MustGetAuthEventRefsForEvent(f.t, needed)
@@ -189,7 +189,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
+		t.Fatal("failed to create a cache: %v", err)
 	}
 	qm := queueutil.NewQueueManager(svc)
 	cfg.FederationAPI.PreferDirectFetch = true
@@ -209,13 +209,13 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 
 	roomID, err := spec.NewRoomID(room.ID)
 	if err != nil {
-		t.Fatalf("Invalid room ID: %q", roomID)
+		t.Fatal("Invalid room ID: %q", roomID)
 	}
 
 	fedRSApi := &fedRoomserverAPI{
 		inputRoomEvents: func(ctx context.Context, req *rsapi.InputRoomEventsRequest, res *rsapi.InputRoomEventsResponse) {
 			if req.Asynchronous {
-				t.Errorf("InputRoomEvents from PerformJoin MUST be synchronous")
+				t.Error("InputRoomEvents from PerformJoin MUST be synchronous")
 			}
 		},
 		queryRoomsForUser: func(ctx context.Context, userID spec.UserID, desiredMembership string) ([]spec.RoomID, error) {
@@ -251,10 +251,10 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 		ServerNames: []spec.ServerName{serverA},
 	}, &resp)
 	if resp.JoinedVia != serverA {
-		t.Errorf("PerformJoin: joined via %v want %v", resp.JoinedVia, serverA)
+		t.Error("PerformJoin: joined via %v want %v", resp.JoinedVia, serverA)
 	}
 	if resp.LastError != nil {
-		t.Fatalf("PerformJoin: returned error: %+v", *resp.LastError)
+		t.Fatal("PerformJoin: returned error: %+v", *resp.LastError)
 	}
 
 	// Inject a keyserver key change event and ensure we try to send it out. If we don't, then the
@@ -279,13 +279,13 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 
 	err = testrig.MustPublishMsgs(ctx, t, &cfg.KeyServer.Queues.OutputKeyChangeEvent, qm, msg)
 	if err != nil {
-		t.Fatalf("MustPublishMsgs: failed to publish message: %s", err)
+		t.Fatal("MustPublishMsgs: failed to publish message: %s", err)
 	}
 	time.Sleep(500 * time.Millisecond)
 	fc.fedClientMutex.Lock()
 	defer fc.fedClientMutex.Unlock()
 	if !fc.sentTxn {
-		t.Fatalf("did not send device list update")
+		t.Fatal("did not send device list update")
 	}
 }
 
@@ -346,26 +346,26 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	for _, tc := range testCases {
 		ev, err := gomatrixserverlib.MustGetRoomVersion(tc.roomVer).NewEventFromTrustedJSON([]byte(tc.eventJSON), false)
 		if err != nil {
-			t.Errorf("failed to parse event: %s", err)
+			t.Error("failed to parse event: %s", err)
 		}
 		invReq, err := fclient.NewInviteV2Request(ev, nil)
 		if err != nil {
-			t.Errorf("failed to create invite v2 request: %s", err)
+			t.Error("failed to create invite v2 request: %s", err)
 			continue
 		}
 		_, err = fedCli.SendInviteV2(ctx, cfg.Global.ServerName, serverName, invReq)
 		if err == nil {
-			t.Errorf("expected an error, got none")
+			t.Error("expected an error, got none")
 			continue
 		}
 		gerr, ok := err.(gomatrix.HTTPError)
 		if !ok {
-			t.Errorf("failed to cast response error as gomatrix.HTTPError: %s", err)
+			t.Error("failed to cast response error as gomatrix.HTTPError: %s", err)
 			continue
 		}
 		t.Logf("Error: %+v", gerr)
 		if gerr.Code == 404 {
-			t.Errorf("invite event resulted in a 404")
+			t.Error("invite event resulted in a 404")
 		}
 	}
 }
@@ -449,7 +449,7 @@ func TestNotaryServer(t *testing.T) {
 					assert.True(t, gjson.GetBytes(js, "verify_keys.ed25519:someID").Exists())
 				}
 				if len(wantServers) > 0 {
-					t.Fatalf("expected response to also contain: %#v", wantServers)
+					t.Fatal("expected response to also contain: %#v", wantServers)
 				}
 			},
 		},
@@ -462,7 +462,7 @@ func TestNotaryServer(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 		fc := &fedClient{

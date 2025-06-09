@@ -47,11 +47,11 @@ func TestFindDuplicateStateKeys(t *testing.T) {
 	for _, test := range testCases {
 		got := findDuplicateStateKeys(test.Input)
 		if len(got) != len(test.Want) {
-			t.Fatalf("Wanted %v, got %v", test.Want, got)
+			t.Fatal("Wanted %v, got %v", test.Want, got)
 		}
 		for i := range got {
 			if got[i] != test.Want[i] {
-				t.Fatalf("Wanted %v, got %v", test.Want, got)
+				t.Fatal("Wanted %v, got %v", test.Want, got)
 			}
 		}
 	}

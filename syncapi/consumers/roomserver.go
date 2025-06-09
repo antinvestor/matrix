@@ -87,7 +87,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 	var output api.OutputEvent
 	if err = json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
+		log.WithError(err).Error("roomserver output log: message parse failure")
 		return nil
 	}
 
@@ -267,7 +267,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 			log.ErrorKey: err,
 			"add":        msg.AddsStateEventIDs,
 			"del":        msg.RemovesStateEventIDs,
-		}).Panicf("roomserver output log: write new event failure")
+		}).Panic("roomserver output log: write new event failure")
 		return nil
 	}
 
@@ -279,7 +279,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
-		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		log.WithError(err).Error("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
@@ -322,7 +322,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 			"event_id":   ev.EventID(),
 			"event":      string(ev.JSON()),
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: write old event failure")
+		}).Panic("roomserver output log: write old event failure")
 		return nil
 	}
 
@@ -343,7 +343,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
-		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
+		log.WithError(err).Error("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
 	}
 
@@ -413,7 +413,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 			"event":      string(msg.Event.JSON()),
 			"pdupos":     pduPos,
 			log.ErrorKey: err,
-		}).Errorf("roomserver output log: write invite failure")
+		}).Error("roomserver output log: write invite failure")
 		return
 	}
 
@@ -432,7 +432,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,
 			log.ErrorKey: err,
-		}).Errorf("roomserver output log: remove invite failure")
+		}).Error("roomserver output log: remove invite failure")
 		return
 	}
 
@@ -451,7 +451,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 			"event_id":   msg.EventID,
 			"room_id":    msg.RoomID,
 			log.ErrorKey: err,
-		}).Errorf("roomID is invalid")
+		}).Error("roomID is invalid")
 		return
 	}
 	userID, err := s.rsAPI.QueryUserIDForSender(ctx, *validRoomID, msg.TargetSenderID)
@@ -460,7 +460,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 			"event_id":   msg.EventID,
 			"sender_id":  msg.TargetSenderID,
 			log.ErrorKey: err,
-		}).Errorf("failed to find userID for sender")
+		}).Error("failed to find userID for sender")
 		return
 	}
 	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, userID.String())
@@ -474,7 +474,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
-		}).Errorf("roomserver output log: write peek failure")
+		}).Error("roomserver output log: write peek failure")
 		return
 	}
 
@@ -493,7 +493,7 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
-		}).Errorf("roomserver output log: write peek failure")
+		}).Error("roomserver output log: write peek failure")
 		return
 	}
 

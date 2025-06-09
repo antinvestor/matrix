@@ -150,7 +150,7 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 
 	deleted, err := a.DB.DeleteNotificationsUpTo(ctx, localpart, domain, req.RoomID, uint64(spec.AsTimestamp(time.Now())))
 	if err != nil {
-		logrus.WithError(err).Errorf("UserInternalAPI.setFullyRead: DeleteNotificationsUpTo failed")
+		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: DeleteNotificationsUpTo failed")
 		return err
 	}
 
@@ -182,7 +182,7 @@ func postRegisterJoinRooms(ctx context.Context, cfg *config.UserAPI, acc *api.Ac
 				logrus.WithFields(logrus.Fields{
 					"user_id": userID,
 					"room":    cfg.AutoJoinRooms[room],
-				}).WithError(err).Errorf("user failed to auto-join room")
+				}).WithError(err).Error("user failed to auto-join room")
 			}
 		}
 	}
@@ -665,7 +665,7 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 	userID := fmt.Sprintf("@%s:%s", req.Localpart, serverName)
 	_, err := a.RSAPI.PerformAdminEvacuateUser(ctx, userID)
 	if err != nil {
-		logrus.WithError(err).WithField("userID", userID).Errorf("Failed to evacuate user after account deactivation")
+		logrus.WithError(err).WithField("userID", userID).Error("Failed to evacuate user after account deactivation")
 	}
 
 	deviceReq := &api.PerformDeviceDeletionRequest{
@@ -870,7 +870,7 @@ func (a *UserInternalAPI) PerformPusherDeletion(ctx context.Context, req *api.Pe
 		return err
 	}
 	for i := range pushers {
-		logrus.Warnf("pusher session: %d, req session: %d", pushers[i].SessionID, req.SessionID)
+		logrus.Warn("pusher session: %d, req session: %d", pushers[i].SessionID, req.SessionID)
 		if pushers[i].SessionID != req.SessionID {
 			err := a.DB.RemovePusher(ctx, pushers[i].AppID, pushers[i].PushKey, req.Localpart, req.ServerName)
 			if err != nil {

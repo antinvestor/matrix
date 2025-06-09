@@ -25,13 +25,13 @@ func mustCreateFederationDatabase(ctx context.Context, svc *frame.Service, cfg *
 
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("Could not create cache from options %s", err)
+		t.Fatal("Could not create cache from options %s", err)
 	}
 
 	cm := sqlutil.NewConnectionManager(svc)
 	db, err := storage.NewDatabase(ctx, cm, caches, func(server spec.ServerName) bool { return server == "localhost" })
 	if err != nil {
-		t.Fatalf("NewDatabase returned %s", err)
+		t.Fatal("NewDatabase returned %s", err)
 	}
 	return db
 }
@@ -117,16 +117,16 @@ func TestOutboundPeeking(t *testing.T) {
 
 		// Assert fields are set as expected
 		if outboundPeek1.PeekID != peekID {
-			t.Fatalf("unexpected outbound peek ID: %s, want %s", outboundPeek1.PeekID, peekID)
+			t.Fatal("unexpected outbound peek ID: %s, want %s", outboundPeek1.PeekID, peekID)
 		}
 		if outboundPeek1.RoomID != room.ID {
-			t.Fatalf("unexpected outbound peek room ID: %s, want %s", outboundPeek1.RoomID, peekID)
+			t.Fatal("unexpected outbound peek room ID: %s, want %s", outboundPeek1.RoomID, peekID)
 		}
 		if outboundPeek1.ServerName != serverName {
-			t.Fatalf("unexpected outbound peek servername: %s, want %s", outboundPeek1.ServerName, serverName)
+			t.Fatal("unexpected outbound peek servername: %s, want %s", outboundPeek1.ServerName, serverName)
 		}
 		if outboundPeek1.RenewalInterval != renewalInterval {
-			t.Fatalf("unexpected outbound peek renewal interval: %d, want %d", outboundPeek1.RenewalInterval, renewalInterval)
+			t.Fatal("unexpected outbound peek renewal interval: %d, want %d", outboundPeek1.RenewalInterval, renewalInterval)
 		}
 		// Renew the peek
 		if err = db.RenewOutboundPeek(ctx, serverName, room.ID, peekID, 2000); err != nil {
@@ -142,10 +142,10 @@ func TestOutboundPeeking(t *testing.T) {
 			t.Fatal("expected a change peek, but they are the same")
 		}
 		if outboundPeek1.ServerName != outboundPeek2.ServerName {
-			t.Fatalf("unexpected servername change: %s -> %s", outboundPeek1.ServerName, outboundPeek2.ServerName)
+			t.Fatal("unexpected servername change: %s -> %s", outboundPeek1.ServerName, outboundPeek2.ServerName)
 		}
 		if outboundPeek1.RoomID != outboundPeek2.RoomID {
-			t.Fatalf("unexpected roomID change: %s -> %s", outboundPeek1.RoomID, outboundPeek2.RoomID)
+			t.Fatal("unexpected roomID change: %s -> %s", outboundPeek1.RoomID, outboundPeek2.RoomID)
 		}
 
 		// insert some peeks
@@ -164,7 +164,7 @@ func TestOutboundPeeking(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(outboundPeeks) != len(peekIDs) {
-			t.Fatalf("inserted %d peeks, selected %d", len(peekIDs), len(outboundPeeks))
+			t.Fatal("inserted %d peeks, selected %d", len(peekIDs), len(outboundPeeks))
 		}
 		gotPeekIDs := make([]string, 0, len(outboundPeeks))
 		for _, p := range outboundPeeks {
@@ -202,16 +202,16 @@ func TestInboundPeeking(t *testing.T) {
 
 		// Assert fields are set as expected
 		if inboundPeek1.PeekID != peekID {
-			t.Fatalf("unexpected inbound peek ID: %s, want %s", inboundPeek1.PeekID, peekID)
+			t.Fatal("unexpected inbound peek ID: %s, want %s", inboundPeek1.PeekID, peekID)
 		}
 		if inboundPeek1.RoomID != room.ID {
-			t.Fatalf("unexpected inbound peek room ID: %s, want %s", inboundPeek1.RoomID, peekID)
+			t.Fatal("unexpected inbound peek room ID: %s, want %s", inboundPeek1.RoomID, peekID)
 		}
 		if inboundPeek1.ServerName != serverName {
-			t.Fatalf("unexpected inbound peek servername: %s, want %s", inboundPeek1.ServerName, serverName)
+			t.Fatal("unexpected inbound peek servername: %s, want %s", inboundPeek1.ServerName, serverName)
 		}
 		if inboundPeek1.RenewalInterval != renewalInterval {
-			t.Fatalf("unexpected inbound peek renewal interval: %d, want %d", inboundPeek1.RenewalInterval, renewalInterval)
+			t.Fatal("unexpected inbound peek renewal interval: %d, want %d", inboundPeek1.RenewalInterval, renewalInterval)
 		}
 		// Renew the peek
 		if err = db.RenewInboundPeek(ctx, serverName, room.ID, peekID, 2000); err != nil {
@@ -227,10 +227,10 @@ func TestInboundPeeking(t *testing.T) {
 			t.Fatal("expected a change peek, but they are the same")
 		}
 		if inboundPeek1.ServerName != inboundPeek2.ServerName {
-			t.Fatalf("unexpected servername change: %s -> %s", inboundPeek1.ServerName, inboundPeek2.ServerName)
+			t.Fatal("unexpected servername change: %s -> %s", inboundPeek1.ServerName, inboundPeek2.ServerName)
 		}
 		if inboundPeek1.RoomID != inboundPeek2.RoomID {
-			t.Fatalf("unexpected roomID change: %s -> %s", inboundPeek1.RoomID, inboundPeek2.RoomID)
+			t.Fatal("unexpected roomID change: %s -> %s", inboundPeek1.RoomID, inboundPeek2.RoomID)
 		}
 
 		// insert some peeks
@@ -249,7 +249,7 @@ func TestInboundPeeking(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(inboundPeeks) != len(peekIDs) {
-			t.Fatalf("inserted %d peeks, selected %d", len(peekIDs), len(inboundPeeks))
+			t.Fatal("inserted %d peeks, selected %d", len(peekIDs), len(inboundPeeks))
 		}
 		gotPeekIDs := make([]string, 0, len(inboundPeeks))
 		for _, p := range inboundPeeks {

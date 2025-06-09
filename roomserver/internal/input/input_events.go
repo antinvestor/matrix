@@ -154,12 +154,12 @@ func (r *Inputer) processRoomEvent(
 		case werr != nil:
 			// Something has gone wrong trying to find out if we rejected
 			// this event already.
-			logger.WithError(werr).Errorf("Failed to check if event %q is already seen", event.EventID())
+			logger.WithError(werr).Error("Failed to check if event %q is already seen", event.EventID())
 			return werr
 		case !wasRejected:
 			// We've seen this event before and it wasn't rejected so we
 			// should ignore it.
-			logger.Debugf("Already processed event %q, ignoring", event.EventID())
+			logger.Debug("Already processed event %q, ignoring", event.EventID())
 			return nil
 		}
 	}
@@ -309,7 +309,7 @@ func (r *Inputer) processRoomEvent(
 	}); err != nil {
 		isRejected = true
 		rejectionErr = err
-		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
+		logger.WithError(rejectionErr).Warn("Event %s not allowed by auth events", event.EventID())
 	}
 
 	// Accumulate the auth event NIDs.
@@ -748,7 +748,7 @@ func (r *Inputer) fetchAuthEvents(
 		// so we'll need to filter through those in the next section.
 		res, err = r.FSAPI.GetEventAuth(ctx, virtualHost, serverName, event.Version(), event.RoomID().String(), event.EventID())
 		if err != nil {
-			logger.WithError(err).Warnf("Failed to get event auth from federation for %q: %s", event.EventID(), err)
+			logger.WithError(err).Warn("Failed to get event auth from federation for %q: %s", event.EventID(), err)
 			continue
 		}
 		found = true
@@ -798,7 +798,7 @@ nextAuthEvent:
 			return r.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		if isRejected = err != nil; isRejected {
-			logger.WithError(err).Warnf("Auth event %s rejected", authEvent.EventID())
+			logger.WithError(err).Warn("Auth event %s rejected", authEvent.EventID())
 		}
 
 		if roomInfo == nil {

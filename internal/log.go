@@ -120,11 +120,11 @@ func SetupStdLogging() {
 func checkFileHookParams(params map[string]interface{}) {
 	path, ok := params["path"]
 	if !ok {
-		logrus.Fatalf("Expecting a parameter \"path\" for logging hook of type \"file\"")
+		logrus.Fatal("Expecting a parameter \"path\" for logging hook of type \"file\"")
 	}
 
 	if _, ok := path.(string); !ok {
-		logrus.Fatalf("Parameter \"path\" for logging hook of type \"file\" should be a string")
+		logrus.Fatal("Parameter \"path\" for logging hook of type \"file\" should be a string")
 	}
 }
 
@@ -134,7 +134,7 @@ func setupFileHook(hook config.LogrusHook, level logrus.Level) {
 	fullPath := filepath.Join(dirPath, "dendrite.log")
 
 	if err := os.MkdirAll(path.Dir(fullPath), os.ModePerm); err != nil {
-		logrus.Fatalf("Couldn't create directory %s: %q", path.Dir(fullPath), err)
+		logrus.Fatal("Couldn't create directory %s: %q", path.Dir(fullPath), err)
 	}
 
 	logrus.AddHook(&logLevelHook{

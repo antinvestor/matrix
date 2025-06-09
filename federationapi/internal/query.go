@@ -59,7 +59,7 @@ func (r *FederationInternalAPI) fetchServerKeysFromCache(
 		}
 		// we should only get 1 result as we only gave 1 key ID
 		sk := serverKeysResponses[0]
-		util.GetLogger(ctx).Infof("fetchServerKeysFromCache: minvalid:%v  keys: %+v", criteria.MinimumValidUntilTS, sk)
+		util.GetLogger(ctx).Info("fetchServerKeysFromCache: minvalid:%v  keys: %+v", criteria.MinimumValidUntilTS, sk)
 		if criteria.MinimumValidUntilTS != 0 {
 			// check if it's still valid. if they have the same value that's also valid
 			if sk.ValidUntilTS < criteria.MinimumValidUntilTS {

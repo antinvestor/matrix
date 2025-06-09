@@ -34,7 +34,7 @@ func TestConnectionManager(t *testing.T) {
 			assert.NoError(t, err0)
 
 			if !reflect.DeepEqual(sqlDb, sqlDb2) {
-				t.Fatalf("expected database connection to be reused")
+				t.Fatal("expected database connection to be reused")
 			}
 
 		})
@@ -69,7 +69,7 @@ func TestConnectionManager(t *testing.T) {
 
 			//We check the underlaying database connection as gorm mutates quickly
 			if !reflect.DeepEqual(sqlDb1, sqlDb2) {
-				t.Fatalf("expected database connection to be reused")
+				t.Fatal("expected database connection to be reused")
 			}
 		})
 	})

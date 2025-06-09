@@ -24,12 +24,12 @@ func mustCreateDatabase(ctx context.Context, svc *frame.Service, cfg *config.Mat
 
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
+		t.Fatal("failed to create a cache: %v", err)
 	}
 	cm := sqlutil.NewConnectionManager(svc)
 	db, err := storage.NewDatabase(ctx, cm, caches)
 	if err != nil {
-		t.Fatalf("failed to create Database: %v", err)
+		t.Fatal("failed to create Database: %v", err)
 	}
 	return db
 }

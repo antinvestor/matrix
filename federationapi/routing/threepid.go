@@ -217,7 +217,7 @@ func ExchangeThirdPartyInvite(
 	}
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Errorf("unknown room version: %s", roomVersion)
+		util.GetLogger(httpReq.Context()).WithError(err).Error("unknown room version: %s", roomVersion)
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -415,7 +415,7 @@ func sendToRemoteServer(
 		if err == nil {
 			return
 		}
-		logrus.WithError(err).Warnf("failed to send 3PID invite via %s", server)
+		logrus.WithError(err).Warn("failed to send 3PID invite via %s", server)
 	}
 
 	return errors.New("failed to send 3PID invite via any server")

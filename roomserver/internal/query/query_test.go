@@ -112,12 +112,12 @@ func TestGetAuthChainSingle(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Fatalf("Failed to add events to db: %v", err)
+		t.Fatal("Failed to add events to db: %v", err)
 	}
 
 	result, err := GetAuthChain(ctx, db.EventsFromIDs, nil, []string{"e"})
 	if err != nil {
-		t.Fatalf("getAuthChain failed: %v", err)
+		t.Fatal("getAuthChain failed: %v", err)
 	}
 
 	var returnedIDs []string
@@ -128,7 +128,7 @@ func TestGetAuthChainSingle(t *testing.T) {
 	expectedIDs := []string{"a", "b", "c", "d", "e"}
 
 	if !test.UnsortedStringSliceEqual(expectedIDs, returnedIDs) {
-		t.Fatalf("returnedIDs got '%v', expected '%v'", returnedIDs, expectedIDs)
+		t.Fatal("returnedIDs got '%v', expected '%v'", returnedIDs, expectedIDs)
 	}
 }
 
@@ -148,12 +148,12 @@ func TestGetAuthChainMultiple(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Fatalf("Failed to add events to db: %v", err)
+		t.Fatal("Failed to add events to db: %v", err)
 	}
 
 	result, err := GetAuthChain(ctx, db.EventsFromIDs, nil, []string{"e", "f"})
 	if err != nil {
-		t.Fatalf("getAuthChain failed: %v", err)
+		t.Fatal("getAuthChain failed: %v", err)
 	}
 
 	var returnedIDs []string
@@ -164,7 +164,7 @@ func TestGetAuthChainMultiple(t *testing.T) {
 	expectedIDs := []string{"a", "b", "c", "d", "e", "f"}
 
 	if !test.UnsortedStringSliceEqual(expectedIDs, returnedIDs) {
-		t.Fatalf("returnedIDs got '%v', expected '%v'", returnedIDs, expectedIDs)
+		t.Fatal("returnedIDs got '%v', expected '%v'", returnedIDs, expectedIDs)
 	}
 }
 
@@ -174,12 +174,12 @@ func mustCreateDatabase(ctx context.Context, svc *frame.Service, cfg *config.Mat
 
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("Could not create redis container %s", err)
+		t.Fatal("Could not create redis container %s", err)
 	}
 
 	db, err := storage.NewDatabase(ctx, cm, caches)
 	if err != nil {
-		t.Fatalf("failed to create Database: %v", err)
+		t.Fatal("failed to create Database: %v", err)
 	}
 	return db
 }

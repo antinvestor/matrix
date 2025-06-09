@@ -25,12 +25,12 @@ func newTopologyTable(ctx context.Context, svc *frame.Service, t *testing.T, _ t
 	tab, err := postgres.NewPostgresTopologyTable(ctx, cm)
 
 	if err != nil {
-		t.Fatalf("failed to make new table: %s", err)
+		t.Fatal("failed to make new table: %s", err)
 	}
 
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatalf("failed to migrate table: %s", err)
+		t.Fatal("failed to migrate table: %s", err)
 	}
 
 	return cm, tab
@@ -96,7 +96,7 @@ func TestTopologyTable(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatalf("err: %s", err)
+			t.Fatal("err: %s", err)
 		}
 	})
 }

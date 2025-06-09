@@ -108,7 +108,7 @@ func (s *OutputRoomEventConsumer) Handle(
 	var output api.OutputEvent
 	if err := json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithField("appservice", state.ID).WithError(err).Errorf("Appservice failed to parse message, ignoring")
+		log.WithField("appservice", state.ID).WithError(err).Error("Appservice failed to parse message, ignoring")
 		return nil
 	}
 	switch output.Type {
@@ -131,7 +131,7 @@ func (s *OutputRoomEventConsumer) Handle(
 			}
 			if len(eventsReq.EventIDs) > 0 {
 				if err := s.rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
-					log.WithError(err).Errorf("s.rsAPI.QueryEventsByID failed")
+					log.WithError(err).Error("s.rsAPI.QueryEventsByID failed")
 					return err
 				}
 				events = append(events, eventsRes.Events...)
@@ -155,7 +155,7 @@ func (s *OutputRoomEventConsumer) Handle(
 
 	// Send event to any relevant application services. If we hit
 	// an error here, return false, so that we negatively ack.
-	log.WithField("appservice", state.ID).Debugf("Appservice worker sending %d events(s) from roomserver", len(events))
+	log.WithField("appservice", state.ID).Debug("Appservice worker sending %d events(s) from roomserver", len(events))
 	return s.sendEvents(ctx, state, events, txnID)
 }
 
@@ -221,7 +221,7 @@ func (s *appserviceState) backoffAndPause(err error) error {
 		s.backoff++
 	}
 	duration := time.Second * time.Duration(math.Pow(2, float64(s.backoff)))
-	log.WithField("appservice", s.ID).WithError(err).Errorf("Unable to send transaction to appservice, backing off for %s", duration.String())
+	log.WithField("appservice", s.ID).WithError(err).Error("Unable to send transaction to appservice, backing off for %s", duration.String())
 	time.Sleep(duration)
 	return err
 }
@@ -265,7 +265,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 		log.WithFields(log.Fields{
 			"appservice": appservice.ID,
 			"room_id":    event.RoomID().String(),
-		}).WithError(err).Errorf("Unable to get aliases for room")
+		}).WithError(err).Error("Unable to get aliases for room")
 	}
 
 	// Check if any of the members in the room match the appservice
@@ -310,7 +310,7 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 		log.WithFields(log.Fields{
 			"appservice": appservice.ID,
 			"room_id":    event.RoomID().String(),
-		}).WithError(err).Errorf("Unable to get membership for room")
+		}).WithError(err).Error("Unable to get membership for room")
 	}
 	return false
 }

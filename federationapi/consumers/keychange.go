@@ -64,7 +64,7 @@ func NewKeyChangeConsumer(
 func (t *KeyChangeConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	var m api.DeviceMessage
 	if err := json.Unmarshal(message, &m); err != nil {
-		logrus.WithError(err).Errorf("failed to read device message from key change topic")
+		logrus.WithError(err).Error("failed to read device message from key change topic")
 		return nil
 	}
 	if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {
@@ -145,7 +145,7 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(ctx context.Context, m api.Device
 		return nil
 	}
 
-	logger.Debugf("Sending device list update message to %q", destinations)
+	logger.Debug("Sending device list update message to %q", destinations)
 	return t.queues.SendEDU(ctx, edu, originServerName, destinations)
 }
 
@@ -153,7 +153,7 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(ctx context.Context, m api.Dev
 	output := m.CrossSigningKeyUpdate
 	_, host, err := gomatrixserverlib.SplitID('@', output.UserID)
 	if err != nil {
-		logrus.WithError(err).Errorf("fedsender key change consumer: user ID parse failure")
+		logrus.WithError(err).Error("fedsender key change consumer: user ID parse failure")
 		return nil
 	}
 	if !t.isLocalServerName(host) {
@@ -165,7 +165,7 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(ctx context.Context, m api.Dev
 
 	outputUserID, err := spec.NewUserID(output.UserID, true)
 	if err != nil {
-		logrus.WithError(err).Errorf("invalid user ID")
+		logrus.WithError(err).Error("invalid user ID")
 		return nil
 	}
 
@@ -203,7 +203,7 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(ctx context.Context, m api.Dev
 		return nil
 	}
 
-	logger.Debugf("Sending cross-signing update message to %q", destinations)
+	logger.Debug("Sending cross-signing update message to %q", destinations)
 	return t.queues.SendEDU(ctx, edu, host, destinations)
 }
 

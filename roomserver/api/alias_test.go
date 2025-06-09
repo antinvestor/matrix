@@ -55,7 +55,7 @@ func TestAliasEvent_Valid(t *testing.T) {
 				AltAliases: tt.fields.AltAliases,
 			}
 			if got := a.Valid(); got != tt.want {
-				t.Errorf("Valid() = %v, want %v", got, tt.want)
+				t.Error("Valid() = %v, want %v", got, tt.want)
 			}
 		})
 	}

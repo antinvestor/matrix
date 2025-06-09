@@ -42,18 +42,18 @@ func TestCollect(t *testing.T) {
 			// verify the received data matches our expectations
 			dbEngine, ok := data["database_engine"]
 			if !ok {
-				t.Errorf("missing database_engine in JSON request: %+v", data)
+				t.Error("missing database_engine in JSON request: %+v", data)
 			}
 			version, ok := data["version"]
 			if !ok {
-				t.Errorf("missing version in JSON request: %+v", data)
+				t.Error("missing version in JSON request: %+v", data)
 			}
 			if version != internal.VersionString() {
-				t.Errorf("unexpected version: %q, expected %q", version, internal.VersionString())
+				t.Error("unexpected version: %q, expected %q", version, internal.VersionString())
 			}
 			switch {
 			case testOpts == test.DependancyOption{} && dbEngine != "Postgres":
-				t.Errorf("unexpected database_engine: %s", dbEngine)
+				t.Error("unexpected database_engine: %s", dbEngine)
 			}
 			close(receivedRequest)
 		}))

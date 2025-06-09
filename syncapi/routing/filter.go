@@ -113,7 +113,7 @@ func PutFilter(
 	// limit if it is unset, which is what this does.
 	limitRes := gjson.GetBytes(body, "room.timeline.limit")
 	if !limitRes.Exists() {
-		util.GetLogger(req.Context()).Infof("missing timeline limit, using default")
+		util.GetLogger(req.Context()).Info("missing timeline limit, using default")
 		filter.Room.Timeline.Limit = sync.DefaultTimelineLimit
 	}
 

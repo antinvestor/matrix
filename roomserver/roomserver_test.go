@@ -55,7 +55,7 @@ func TestUsers(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 		cm := sqlutil.NewConnectionManager(svc)
@@ -93,25 +93,25 @@ func testSharedUsers(ctx context.Context, t *testing.T, rsAPI api.RoomserverInte
 	// Create the room
 	err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false)
 	if err != nil {
-		t.Errorf("failed to send events: %v", err)
+		t.Error("failed to send events: %v", err)
 	}
 
 	// Query the shared users for Alice, there should only be Bob.
 	// This is used by the SyncAPI keychange consumer.
 	res := &api.QuerySharedUsersResponse{}
 	if err := rsAPI.QuerySharedUsers(ctx, &api.QuerySharedUsersRequest{UserID: alice.ID}, res); err != nil {
-		t.Errorf("unable to query known users: %v", err)
+		t.Error("unable to query known users: %v", err)
 	}
 	if _, ok := res.UserIDsToCount[bob.ID]; !ok {
-		t.Errorf("expected to find %s in shared users, but didn't: %+v", bob.ID, res.UserIDsToCount)
+		t.Error("expected to find %s in shared users, but didn't: %+v", bob.ID, res.UserIDsToCount)
 	}
 	// Also verify that we get the expected result when specifying OtherUserIDs.
 	// This is used by the SyncAPI when getting device list changes.
 	if err := rsAPI.QuerySharedUsers(ctx, &api.QuerySharedUsersRequest{UserID: alice.ID, OtherUserIDs: []string{bob.ID}}, res); err != nil {
-		t.Errorf("unable to query known users: %v", err)
+		t.Error("unable to query known users: %v", err)
 	}
 	if _, ok := res.UserIDsToCount[bob.ID]; !ok {
-		t.Errorf("expected to find %s in shared users, but didn't: %+v", bob.ID, res.UserIDsToCount)
+		t.Error("expected to find %s in shared users, but didn't: %+v", bob.ID, res.UserIDsToCount)
 	}
 }
 
@@ -137,25 +137,25 @@ func testKickUsers(ctx context.Context, t *testing.T, rsAPI api.RoomserverIntern
 			ServerName:  serverName,
 			Password:    "someRandomPassword",
 		}, userRes); err != nil {
-			t.Errorf("failed to create account: %s", err)
+			t.Error("failed to create account: %s", err)
 		}
 	}
 
 	// Create the room in the database
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-		t.Errorf("failed to send events: %v", err)
+		t.Error("failed to send events: %v", err)
 	}
 
 	// Get the membership events BEFORE revoking guest access
 	membershipRes := &api.QueryMembershipsForRoomResponse{}
 	if err := rsAPI.QueryMembershipsForRoom(ctx, &api.QueryMembershipsForRoomRequest{LocalOnly: true, JoinedOnly: true, RoomID: room.ID}, membershipRes); err != nil {
-		t.Errorf("failed to query membership for room: %s", err)
+		t.Error("failed to query membership for room: %s", err)
 	}
 
 	// revoke guest access
 	revokeEvent := room.CreateAndInsert(t, alice, spec.MRoomGuestAccess, map[string]string{"guest_access": "forbidden"}, test.WithStateKey(""))
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{revokeEvent}, "test", "test", "test", nil, false); err != nil {
-		t.Errorf("failed to send events: %v", err)
+		t.Error("failed to send events: %v", err)
 	}
 
 	// TODO: Even though we are sending the events sync, the "kickUsers" function is sending the events async, so we need
@@ -165,7 +165,7 @@ func testKickUsers(ctx context.Context, t *testing.T, rsAPI api.RoomserverIntern
 		membershipRes2 := &api.QueryMembershipsForRoomResponse{}
 		err := rsAPI.QueryMembershipsForRoom(ctx, &api.QueryMembershipsForRoomRequest{LocalOnly: true, JoinedOnly: true, RoomID: room.ID}, membershipRes2)
 		if err != nil {
-			t.Errorf("failed to query membership for room: %s", err)
+			t.Error("failed to query membership for room: %s", err)
 		}
 
 		// The membership events should NOT match, as Bob (guest user) should now be kicked from the room
@@ -175,7 +175,7 @@ func testKickUsers(ctx context.Context, t *testing.T, rsAPI api.RoomserverIntern
 		time.Sleep(time.Millisecond * 200)
 	}
 
-	t.Errorf("memberships didn't change in time")
+	t.Error("memberships didn't change in time")
 }
 
 func Test_QueryLeftUsers(t *testing.T) {
@@ -197,7 +197,7 @@ func Test_QueryLeftUsers(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 		cm := sqlutil.NewConnectionManager(svc)
@@ -206,7 +206,7 @@ func Test_QueryLeftUsers(t *testing.T) {
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		// Create the room
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 
 		// Query the left users, there should only be "@idontexist:test",
@@ -217,14 +217,14 @@ func Test_QueryLeftUsers(t *testing.T) {
 
 		testCase := func(rsAPI api.RoomserverInternalAPI) {
 			if err := rsAPI.QueryLeftUsers(ctx, &api.QueryLeftUsersRequest{StaleDeviceListUsers: getLeftUsersList}, res); err != nil {
-				t.Fatalf("unable to query left users: %v", err)
+				t.Fatal("unable to query left users: %v", err)
 			}
 			wantCount := 1
 			if count := len(res.LeftUsers); count > wantCount {
-				t.Fatalf("unexpected left users count: want %d, got %d", wantCount, count)
+				t.Fatal("unexpected left users count: want %d, got %d", wantCount, count)
 			}
 			if res.LeftUsers[0] != leftUserID {
-				t.Fatalf("unexpected left users : want %s, got %s", leftUserID, res.LeftUsers[0])
+				t.Fatal("unexpected left users : want %s, got %s", leftUserID, res.LeftUsers[0])
 			}
 		}
 
@@ -256,7 +256,7 @@ func TestPurgeRoom(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		db, err := storage.NewDatabase(ctx, cm, caches)
 		if err != nil {
@@ -274,7 +274,7 @@ func TestPurgeRoom(t *testing.T) {
 
 		// Create the room
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 
 		// some dummy entries to validate after purging
@@ -287,7 +287,7 @@ func TestPurgeRoom(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !isPublished {
-			t.Fatalf("room should be published before purging")
+			t.Fatal("room should be published before purging")
 		}
 		if _, err = rsAPI.SetRoomAlias(ctx, spec.SenderID(alice.ID), *roomID, "myalias"); err != nil {
 			t.Fatal(err)
@@ -299,7 +299,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 		wantAliases := 1
 		if gotAliases := len(aliasesResp.Aliases); gotAliases != wantAliases {
-			t.Fatalf("expected %d aliases, got %d", wantAliases, gotAliases)
+			t.Fatal("expected %d aliases, got %d", wantAliases, gotAliases)
 		}
 
 		// validate the room exists before purging
@@ -309,7 +309,7 @@ func TestPurgeRoom(t *testing.T) {
 			return
 		}
 		if roomInfo == nil {
-			t.Fatalf("room does not exist")
+			t.Fatal("room does not exist")
 			return
 		}
 
@@ -320,7 +320,7 @@ func TestPurgeRoom(t *testing.T) {
 			return
 		}
 		if !reflect.DeepEqual(roomInfo, roomInfo2) {
-			t.Fatalf("expected roomInfos to be the same, but they aren't")
+			t.Fatal("expected roomInfos to be the same, but they aren't")
 		}
 
 		// remember the roomInfo before purging
@@ -333,7 +333,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 		bobNID, ok := nids[bob.ID]
 		if !ok {
-			t.Fatalf("%s does not exist", bob.ID)
+			t.Fatal("%s does not exist", bob.ID)
 		}
 
 		_, inviteEventIDs, _, err := db.GetInvitesForUser(ctx, roomInfo.RoomNID, bobNID)
@@ -342,10 +342,10 @@ func TestPurgeRoom(t *testing.T) {
 		}
 		wantInviteCount := 1
 		if inviteCount := len(inviteEventIDs); inviteCount != wantInviteCount {
-			t.Fatalf("expected there to be only %d invite events, got %d", wantInviteCount, inviteCount)
+			t.Fatal("expected there to be only %d invite events, got %d", wantInviteCount, inviteCount)
 		}
 		if inviteEventIDs[0] != inviteEvent.EventID() {
-			t.Fatalf("expected invite event ID %s, got %s", inviteEvent.EventID(), inviteEventIDs[0])
+			t.Fatal("expected invite event ID %s, got %s", inviteEvent.EventID(), inviteEventIDs[0])
 		}
 
 		// purge the room from the database
@@ -359,7 +359,7 @@ func TestPurgeRoom(t *testing.T) {
 		//
 		//for sum > 0 {
 		//	if deadline.Err() != nil {
-		//		t.Fatalf("test timed out after %s", timeout)
+		//		t.Fatal("test timed out after %s", timeout)
 		//	}
 		//	sum = 0
 		//	consumerCh := jsCtx.Consumers(cfg.Global.JetStream.Prefixed(queueutil.OutputRoomEvent))
@@ -374,12 +374,12 @@ func TestPurgeRoom(t *testing.T) {
 			t.Fatal(err)
 		}
 		if roomInfo != nil {
-			t.Fatalf("room should not exist after purging: %+v", roomInfo)
+			t.Fatal("room should not exist after purging: %+v", roomInfo)
 			return
 		}
 		roomInfo2, err = db.RoomInfoByNID(ctx, existingRoomInfo.RoomNID)
 		if err == nil {
-			t.Fatalf("expected room to not exist, but it does: %#v", roomInfo2)
+			t.Fatal("expected room to not exist, but it does: %#v", roomInfo2)
 			return
 		}
 
@@ -393,7 +393,7 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		if inviteCount := len(inviteEventIDs); inviteCount > 0 {
-			t.Fatalf("expected there to be only %d invite events, got %d", wantInviteCount, inviteCount)
+			t.Fatal("expected there to be only %d invite events, got %d", wantInviteCount, inviteCount)
 			return
 		}
 
@@ -404,7 +404,7 @@ func TestPurgeRoom(t *testing.T) {
 			return
 		}
 		if aliasCount := len(aliases); aliasCount > 0 {
-			t.Fatalf("expected there to be only %d invite events, got %d", 0, aliasCount)
+			t.Fatal("expected there to be only %d invite events, got %d", 0, aliasCount)
 		}
 
 		// published room should be deleted
@@ -413,7 +413,7 @@ func TestPurgeRoom(t *testing.T) {
 			t.Fatal(err)
 		}
 		if isPublished {
-			t.Fatalf("room should not be published after purging")
+			t.Fatal("room should not be published after purging")
 		}
 	})
 }
@@ -452,12 +452,12 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	}
 	err := eb.SetContent(ev.Content)
 	if err != nil {
-		t.Fatalf("mustCreateEvent: failed to marshal event content %v", err)
+		t.Fatal("mustCreateEvent: failed to marshal event content %v", err)
 	}
 
 	signedEvent, err := eb.Build(time.Now(), "localhost", "ed25519:test", key)
 	if err != nil {
-		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
+		t.Fatal("mustCreateEvent: failed to sign event: %s", err)
 	}
 	h := &types.HeaderedEvent{PDU: signedEvent}
 	return h
@@ -549,7 +549,7 @@ func TestRedaction(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		db, err := storage.NewDatabase(ctx, cm, caches)
 		if err != nil {
@@ -745,7 +745,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
@@ -759,11 +759,11 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 				testRoom := tc.prepareRoomFunc(t)
 				// Create the room
 				if err = api.SendEvents(ctx, rsAPI, api.KindNew, testRoom.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 
 				if err = api.SendEvents(ctx, rsAPI, api.KindNew, allowedByRoomExists.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 
 				roomID, _ := spec.NewRoomID(testRoom.ID)
@@ -778,7 +778,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 					t.Fatal(err)
 				}
 				if !reflect.DeepEqual(tc.wantResponse, got) {
-					t.Fatalf("unexpected response, want %#v - got %#v", tc.wantResponse, got)
+					t.Fatal("unexpected response, want %#v - got %#v", tc.wantResponse, got)
 				}
 			})
 		}
@@ -826,14 +826,14 @@ func TestUpgrade(t *testing.T) {
 		ev := oldRoomState.StateEvents[gomatrixserverlib.StateKeyTuple{EventType: "m.room.tombstone"}]
 		replacementRoom := gjson.GetBytes(ev.Content(), "replacement_room").Str
 		if replacementRoom != newRoomID {
-			t.Fatalf("tombstone event has replacement_room '%s', expected '%s'", replacementRoom, newRoomID)
+			t.Fatal("tombstone event has replacement_room '%s', expected '%s'", replacementRoom, newRoomID)
 		}
 
 		// the new room should have a predecessor equal to the old room
 		ev = newRoomState.StateEvents[gomatrixserverlib.StateKeyTuple{EventType: spec.MRoomCreate}]
 		predecessor := gjson.GetBytes(ev.Content(), "predecessor.room_id").Str
 		if predecessor != oldRoomID {
-			t.Fatalf("got predecessor room '%s', expected '%s'", predecessor, oldRoomID)
+			t.Fatal("got predecessor room '%s', expected '%s'", predecessor, oldRoomID)
 		}
 
 		for _, tuple := range validateTuples {
@@ -856,7 +856,7 @@ func TestUpgrade(t *testing.T) {
 			if !reflect.DeepEqual(oldEv.Content(), newEv.Content()) {
 				t.Logf("OldEvent QueryCurrentState: %s", string(oldEv.Content()))
 				t.Logf("NewEvent QueryCurrentState: %s", string(newEv.Content()))
-				t.Errorf("event content mismatch")
+				t.Error("event content mismatch")
 			}
 		}
 	}
@@ -881,7 +881,7 @@ func TestUpgrade(t *testing.T) {
 			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				room := test.NewRoom(t, alice)
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return room.ID
 			},
@@ -892,7 +892,7 @@ func TestUpgrade(t *testing.T) {
 			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				room := test.NewRoom(t, alice)
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return room.ID
 			},
@@ -922,7 +922,7 @@ func TestUpgrade(t *testing.T) {
 				}, test.WithStateKey(alice.ID))
 
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return r.ID
 			},
@@ -935,7 +935,7 @@ func TestUpgrade(t *testing.T) {
 			roomFunc: func(ctx context.Context, rsAPI api.RoomserverInternalAPI) string {
 				r := test.NewRoom(t, alice)
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 
 				if err := rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{
@@ -956,7 +956,7 @@ func TestUpgrade(t *testing.T) {
 					t.Fatal(err)
 				}
 				if len(res.RoomIDs) == 0 {
-					t.Fatalf("expected room to be published, but wasn't: %#v", res.RoomIDs)
+					t.Fatal("expected room to be published, but wasn't: %#v", res.RoomIDs)
 				}
 			},
 		},
@@ -970,7 +970,7 @@ func TestUpgrade(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 
 				if _, err := rsAPI.SetRoomAlias(ctx, spec.SenderID(alice.ID),
@@ -990,7 +990,7 @@ func TestUpgrade(t *testing.T) {
 					t.Fatal(err)
 				}
 				if len(res.Aliases) != 0 {
-					t.Fatalf("expected old room aliases to be empty, but wasn't: %#v", res.Aliases)
+					t.Fatal("expected old room aliases to be empty, but wasn't: %#v", res.Aliases)
 				}
 
 				// check that the new room has aliases
@@ -998,7 +998,7 @@ func TestUpgrade(t *testing.T) {
 					t.Fatal(err)
 				}
 				if len(res.Aliases) == 0 {
-					t.Fatalf("expected room aliases to be transferred, but wasn't: %#v", res.Aliases)
+					t.Fatal("expected room aliases to be transferred, but wasn't: %#v", res.Aliases)
 				}
 			},
 		},
@@ -1011,7 +1011,7 @@ func TestUpgrade(t *testing.T) {
 					"membership": spec.Ban,
 				}, test.WithStateKey(charlie.ID))
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return r.ID
 			},
@@ -1026,7 +1026,7 @@ func TestUpgrade(t *testing.T) {
 
 				r.CreateAndInsert(t, alice, "m.space.child", map[string]interface{}{}, test.WithStateKey(spaceChild.ID))
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return r.ID
 			},
@@ -1056,7 +1056,7 @@ func TestUpgrade(t *testing.T) {
 				r.CreateAndInsert(t, alice, spec.MRoomMember, map[string]interface{}{"membership": spec.Leave}, test.WithStateKey(alice.ID))
 
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, r.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Errorf("failed to send events: %v", err)
+					t.Error("failed to send events: %v", err)
 				}
 				return r.ID
 			},
@@ -1075,7 +1075,7 @@ func TestUpgrade(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
@@ -1086,7 +1086,7 @@ func TestUpgrade(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				if tc.roomFunc == nil {
-					t.Fatalf("missing roomFunc")
+					t.Fatal("missing roomFunc")
 				}
 				if tc.upgradeUser == "" {
 					tc.upgradeUser = alice.ID
@@ -1095,7 +1095,7 @@ func TestUpgrade(t *testing.T) {
 
 				userID, err := spec.NewUserID(tc.upgradeUser, true)
 				if err != nil {
-					t.Fatalf("upgrade userID is invalid")
+					t.Fatal("upgrade userID is invalid")
 				}
 				newRoomID, err := rsAPI.PerformRoomUpgrade(ctx, roomID, *userID, rsAPI.DefaultRoomVersion())
 				if err != nil && tc.wantNewRoom {
@@ -1103,10 +1103,10 @@ func TestUpgrade(t *testing.T) {
 				}
 
 				if tc.wantNewRoom && newRoomID == "" {
-					t.Fatalf("expected a new room, but the upgrade failed")
+					t.Fatal("expected a new room, but the upgrade failed")
 				}
 				if !tc.wantNewRoom && newRoomID != "" {
-					t.Fatalf("expected no new room, but the upgrade succeeded")
+					t.Fatal("expected no new room, but the upgrade succeeded")
 				}
 				if tc.validateFunc != nil {
 					tc.validateFunc(ctx, t, roomID, newRoomID, rsAPI)
@@ -1130,7 +1130,7 @@ func TestStateReset(t *testing.T) {
 		qm := queueutil.NewQueueManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -1144,7 +1144,7 @@ func TestStateReset(t *testing.T) {
 
 		// Send and create the room
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// send a message
@@ -1152,7 +1152,7 @@ func TestStateReset(t *testing.T) {
 		charlieMsg := room.CreateAndInsert(t, charlie, "m.room.message", map[string]any{"body": "hello world"})
 
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobMsg, charlieMsg}, "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// Bob changes his name
@@ -1160,13 +1160,13 @@ func TestStateReset(t *testing.T) {
 		bobDisplayname := room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]any{"membership": "join", "displayname": expectedDisplayname}, test.WithStateKey(bob.ID))
 
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobDisplayname}, "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// Change another state event
 		jrEv := room.CreateAndInsert(t, alice, spec.MRoomJoinRules, gomatrixserverlib.JoinRuleContent{JoinRule: "invite"}, test.WithStateKey(""))
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{jrEv}, "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// send a message
@@ -1174,7 +1174,7 @@ func TestStateReset(t *testing.T) {
 		charlieMsg = room.CreateAndInsert(t, charlie, "m.room.message", map[string]any{"body": "hello world"})
 
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobMsg, charlieMsg}, "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// Craft the state reset message, which is using Bobs initial join event and the
@@ -1198,7 +1198,7 @@ func TestStateReset(t *testing.T) {
 
 		// Send the state reset message
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{stateResetMsg}, "test", "test", "test", nil, false); err != nil {
-			t.Errorf("failed to send events: %v", err)
+			t.Error("failed to send events: %v", err)
 		}
 
 		// Validate that there is a membership event for Bob
@@ -1208,11 +1208,11 @@ func TestStateReset(t *testing.T) {
 		})
 
 		if bobMembershipEv == nil {
-			t.Fatalf("Membership event for Bob does not exist. State reset?")
+			t.Fatal("Membership event for Bob does not exist. State reset?")
 		} else {
 			// Validate it's the correct membership event
 			if dn := gjson.GetBytes(bobMembershipEv.Content(), "displayname").Str; dn != expectedDisplayname {
-				t.Fatalf("Expected displayname to be %q, got %q", expectedDisplayname, dn)
+				t.Fatal("Expected displayname to be %q, got %q", expectedDisplayname, dn)
 			}
 		}
 	})
@@ -1238,7 +1238,7 @@ func TestNewServerACLs(t *testing.T) {
 		qm := queueutil.NewQueueManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		// start JetStream listeners
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
@@ -1278,7 +1278,7 @@ func TestRoomConsumerRecreation(t *testing.T) {
 
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
+		t.Fatal("failed to create a cache: %v", err)
 	}
 	// start JetStream listeners
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
@@ -1308,7 +1308,7 @@ func TestRoomsWithACLs(t *testing.T) {
 		qm := queueutil.NewQueueManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		// start JetStream listeners
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)

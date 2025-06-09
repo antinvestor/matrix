@@ -76,7 +76,7 @@ func MakeAuthAPI(
 		logger := util.GetLogger(req.Context())
 		device, err := auth.VerifyUserFromRequest(req, userAPI)
 		if err != nil {
-			logger.Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
+			logger.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
 			return *err
 		}
 		// add the user ID to the logger
@@ -163,7 +163,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 				resp := rec.Result()
 				dump, err := httputil.DumpResponse(resp, true)
 				if err != nil {
-					logger.Debugf("Failed to dump outgoing response: %s", err)
+					logger.Debug("Failed to dump outgoing response: %s", err)
 				} else {
 					strSlice := strings.Split(string(dump), "\n")
 					for _, s := range strSlice {
@@ -185,7 +185,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 			// Log incoming request
 			dump, err := httputil.DumpRequest(req, true)
 			if err != nil {
-				logger.Debugf("Failed to dump incoming request: %s", err)
+				logger.Debug("Failed to dump incoming request: %s", err)
 			} else {
 				strSlice := strings.Split(string(dump), "\n")
 				for _, s := range strSlice {

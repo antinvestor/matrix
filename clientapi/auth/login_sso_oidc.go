@@ -272,13 +272,13 @@ func httpDo(ctx context.Context, hc *http.Client, req *http.Request) (*http.Resp
 				if len(bs) > 80 {
 					bs = bs[:80]
 				}
-				util.GetLogger(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).Warnf("OAuth2 HTTP request failed: %s", string(bs))
+				util.GetLogger(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).Warn("OAuth2 HTTP request failed: %s", string(bs))
 			}
 		case strings.HasPrefix(contentType, "application/json"):
 			// https://openid.net/specs/openid-connect-core-1_0.html#TokenErrorResponse
 			var body oauth2Error
 			if err := json.NewDecoder(resp.Body).Decode(&body); err == nil {
-				util.GetLogger(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).Warnf("OAuth2 HTTP request failed: %+v", &body)
+				util.GetLogger(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).Warn("OAuth2 HTTP request failed: %+v", &body)
 			}
 			if body.Error != "" {
 				return nil, fmt.Errorf("OAuth2 request %q failed: %s (%s)", req.URL.String(), resp.Status, body.Error)

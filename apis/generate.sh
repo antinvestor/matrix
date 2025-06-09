@@ -31,8 +31,10 @@ if [ -z "$MODULE_DIRS" ]; then
     exit 0
 fi
 
-echo "Installing proto plugins required ..."
-go install github.com/asynkron/protoactor-go/protobuf/protoc-gen-go-grain@latest
+if [ ! -x "$HOME/go/bin/protoc-gen-go-grain" ]; then
+  echo "Installing proto plugins required ..."
+  go install github.com/asynkron/protoactor-go/protobuf/protoc-gen-go-grain@latest
+fi
 
 echo "Generating Go code for APIs..."
 

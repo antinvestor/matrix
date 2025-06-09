@@ -88,7 +88,7 @@ func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string
 		logger.Tracef("Producing to topic '%s'", r.Topic)
 		err = r.Qm.Publish(ctx, r.Topic.Ref(), update, h)
 		if err != nil {
-			logger.WithError(err).Errorf("Failed to produce to topic '%s': %s", r.Topic, err)
+			logger.WithError(err).Error("Failed to produce to topic '%s': %s", r.Topic, err)
 			return err
 		}
 	}

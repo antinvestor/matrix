@@ -66,7 +66,7 @@ func NewInternalAPI(
 
 	userapiCm, err := cm.FromOptions(ctx, &cfgUsrApi.AccountDatabase)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to obtain accounts db connection manager :%v", err)
+		logrus.WithError(err).Panic("failed to obtain accounts db connection manager :%v", err)
 	}
 	db, err := storage.NewUserDatabase(
 		ctx,
@@ -79,26 +79,26 @@ func NewInternalAPI(
 		cfg.UserAPI.Global.ServerNotices.LocalPart,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to accounts db")
+		logrus.WithError(err).Panic("failed to connect to accounts db")
 	}
 
 	keyCm, err := cm.FromOptions(ctx, &cfgKeySrv.Database)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to obtain key db connection manager")
+		logrus.WithError(err).Panic("failed to obtain key db connection manager")
 	}
 	keyDB, err := storage.NewKeyDatabase(ctx, keyCm)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to key db")
+		logrus.WithError(err).Panic("failed to connect to key db")
 	}
 
 	err = qm.RegisterPublisher(ctx, &cfgSyncApi.Queues.OutputClientData)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for client data")
+		logrus.WithError(err).Panic("failed to register publisher for client data")
 	}
 
 	err = qm.RegisterPublisher(ctx, &cfgSyncApi.Queues.OutputNotificationData)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for notification data")
+		logrus.WithError(err).Panic("failed to register publisher for notification data")
 	}
 
 	syncProducer, err := producers.NewSyncAPI(
@@ -106,12 +106,12 @@ func NewInternalAPI(
 		db, qm,
 	)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to obtain sync publisher")
+		logrus.WithError(err).Panic("failed to obtain sync publisher")
 	}
 
 	err = qm.RegisterPublisher(ctx, &cfgKeySrv.Queues.OutputKeyChangeEvent)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for key change events")
+		logrus.WithError(err).Panic("failed to register publisher for key change events")
 	}
 
 	keyChangeProducer := &producers.KeyChange{
@@ -142,7 +142,7 @@ func NewInternalAPI(
 
 	go func() {
 		if err = updater.Start(ctx); err != nil {
-			logrus.WithError(err).Panicf("failed to start device list updater")
+			logrus.WithError(err).Panic("failed to start device list updater")
 		}
 	}()
 
@@ -182,7 +182,7 @@ func NewInternalAPI(
 		default:
 			// Context is still valid, continue with operation
 
-			logrus.Infof("Cleaning old notifications")
+			logrus.Info("Cleaning old notifications")
 			if err = db.DeleteOldNotifications(ctx); err != nil {
 				logrus.WithError(err).Error("Failed to clean old notifications")
 			}

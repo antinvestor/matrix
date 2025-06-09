@@ -52,40 +52,40 @@ type EventFieldsToVerify struct {
 
 func verifyEventFields(t *testing.T, got EventFieldsToVerify, want EventFieldsToVerify) {
 	if got.EventID != want.EventID {
-		t.Errorf("ClientEvent.EventID: wanted %s, got %s", want.EventID, got.EventID)
+		t.Error("ClientEvent.EventID: wanted %s, got %s", want.EventID, got.EventID)
 	}
 	if got.OriginServerTS != want.OriginServerTS {
-		t.Errorf("ClientEvent.OriginServerTS: wanted %d, got %d", want.OriginServerTS, got.OriginServerTS)
+		t.Error("ClientEvent.OriginServerTS: wanted %d, got %d", want.OriginServerTS, got.OriginServerTS)
 	}
 	if got.StateKey == nil && want.StateKey != nil {
-		t.Errorf("ClientEvent.StateKey: no state key present when one was wanted: %s", *want.StateKey)
+		t.Error("ClientEvent.StateKey: no state key present when one was wanted: %s", *want.StateKey)
 	}
 	if got.StateKey != nil && want.StateKey == nil {
-		t.Errorf("ClientEvent.StateKey: state key present when one was not wanted: %s", *got.StateKey)
+		t.Error("ClientEvent.StateKey: state key present when one was not wanted: %s", *got.StateKey)
 	}
 	if got.StateKey != nil && want.StateKey != nil && *got.StateKey != *want.StateKey {
-		t.Errorf("ClientEvent.StateKey: wanted %s, got %s", *want.StateKey, *got.StateKey)
+		t.Error("ClientEvent.StateKey: wanted %s, got %s", *want.StateKey, *got.StateKey)
 	}
 	if got.Type != want.Type {
-		t.Errorf("ClientEvent.Type: wanted %s, got %s", want.Type, got.Type)
+		t.Error("ClientEvent.Type: wanted %s, got %s", want.Type, got.Type)
 	}
 	if !bytes.Equal(got.Content, want.Content) {
-		t.Errorf("ClientEvent.Content: wanted %s, got %s", string(want.Content), string(got.Content))
+		t.Error("ClientEvent.Content: wanted %s, got %s", string(want.Content), string(got.Content))
 	}
 	if !bytes.Equal(got.Unsigned, want.Unsigned) {
-		t.Errorf("ClientEvent.Unsigned: wanted %s, got %s", string(want.Unsigned), string(got.Unsigned))
+		t.Error("ClientEvent.Unsigned: wanted %s, got %s", string(want.Unsigned), string(got.Unsigned))
 	}
 	if got.Sender != want.Sender {
-		t.Errorf("ClientEvent.Sender: wanted %s, got %s", want.Sender, got.Sender)
+		t.Error("ClientEvent.Sender: wanted %s, got %s", want.Sender, got.Sender)
 	}
 	if got.Depth != want.Depth {
-		t.Errorf("ClientEvent.Depth: wanted %d, got %d", want.Depth, got.Depth)
+		t.Error("ClientEvent.Depth: wanted %d, got %d", want.Depth, got.Depth)
 	}
 	if !reflect.DeepEqual(got.PrevEvents, want.PrevEvents) {
-		t.Errorf("ClientEvent.PrevEvents: wanted %v, got %v", want.PrevEvents, got.PrevEvents)
+		t.Error("ClientEvent.PrevEvents: wanted %v, got %v", want.PrevEvents, got.PrevEvents)
 	}
 	if !reflect.DeepEqual(got.AuthEvents, want.AuthEvents) {
-		t.Errorf("ClientEvent.AuthEvents: wanted %v, got %v", want.AuthEvents, got.AuthEvents)
+		t.Error("ClientEvent.AuthEvents: wanted %v, got %v", want.AuthEvents, got.AuthEvents)
 	}
 }
 
@@ -107,18 +107,18 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 		}
 	}`), false)
 	if err != nil {
-		t.Fatalf("failed to create Event: %s", err)
+		t.Fatal("failed to create Event: %s", err)
 	}
 	userID, err := spec.NewUserID("@test:localhost", true)
 	if err != nil {
-		t.Fatalf("failed to create userID: %s", err)
+		t.Fatal("failed to create userID: %s", err)
 	}
 	sk := ""
 	ce, err := ToClientEvent(ev, FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return queryUserIDForSender(senderID)
 	})
 	if err != nil {
-		t.Fatalf("failed to create ClientEvent: %s", err)
+		t.Fatal("failed to create ClientEvent: %s", err)
 	}
 
 	verifyEventFields(t,
@@ -143,14 +143,14 @@ func TestToClientEvent(t *testing.T) { // nolint: gocyclo
 
 	j, err := json.Marshal(ce)
 	if err != nil {
-		t.Fatalf("failed to Marshal ClientEvent: %s", err)
+		t.Fatal("failed to Marshal ClientEvent: %s", err)
 	}
 	// Marshal sorts keys in structs by the order they are defined in the struct, which is alphabetical
 	out := `{"content":{"name":"Hello World"},"event_id":"$test:localhost","origin_server_ts":123456,` +
 		`"room_id":"!test:localhost","sender":"@test:localhost","state_key":"","type":"m.room.name",` +
 		`"unsigned":{"prev_content":{"name":"Goodbye World"}}}`
 	if !bytes.Equal([]byte(out), j) {
-		t.Errorf("ClientEvent marshalled to wrong bytes: wanted %s, got %s", out, string(j))
+		t.Error("ClientEvent marshalled to wrong bytes: wanted %s, got %s", out, string(j))
 	}
 }
 
@@ -172,16 +172,16 @@ func TestToClientFormatSync(t *testing.T) {
 		}
 	}`), false)
 	if err != nil {
-		t.Fatalf("failed to create Event: %s", err)
+		t.Fatal("failed to create Event: %s", err)
 	}
 	ce, err := ToClientEvent(ev, FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return queryUserIDForSender(senderID)
 	})
 	if err != nil {
-		t.Fatalf("failed to create ClientEvent: %s", err)
+		t.Fatal("failed to create ClientEvent: %s", err)
 	}
 	if ce.RoomID != "" {
-		t.Errorf("ClientEvent.RoomID: wanted '', got %s", ce.RoomID)
+		t.Error("ClientEvent.RoomID: wanted '', got %s", ce.RoomID)
 	}
 }
 
@@ -212,18 +212,18 @@ func TestToClientEventFormatSyncFederation(t *testing.T) { // nolint: gocyclo
         ]
 	}`), false)
 	if err != nil {
-		t.Fatalf("failed to create Event: %s", err)
+		t.Fatal("failed to create Event: %s", err)
 	}
 	userID, err := spec.NewUserID("@test:localhost", true)
 	if err != nil {
-		t.Fatalf("failed to create userID: %s", err)
+		t.Fatal("failed to create userID: %s", err)
 	}
 	sk := ""
 	ce, err := ToClientEvent(ev, FormatSyncFederation, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return queryUserIDForSender(senderID)
 	})
 	if err != nil {
-		t.Fatalf("failed to create ClientEvent: %s", err)
+		t.Fatal("failed to create ClientEvent: %s", err)
 	}
 
 	verifyEventFields(t,
@@ -287,7 +287,7 @@ func TestToClientEventsFormatSyncFederation(t *testing.T) { // nolint: gocyclo
         ]
 	}`), false)
 	if err != nil {
-		t.Fatalf("failed to create Event: %s", err)
+		t.Fatal("failed to create Event: %s", err)
 	}
 	ev2, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
@@ -316,7 +316,7 @@ func TestToClientEventsFormatSyncFederation(t *testing.T) { // nolint: gocyclo
         ]
     }`), false)
 	if err != nil {
-		t.Fatalf("failed to create Event: %s", err)
+		t.Fatal("failed to create Event: %s", err)
 	}
 
 	clientEvents := ToClientEvents([]gomatrixserverlib.PDU{ev, ev2}, FormatSyncFederation, userIDForSender)
@@ -394,7 +394,7 @@ func TestToClientEventsFormatSync(t *testing.T) { // nolint: gocyclo
 		}
     }`), false)
 	if err != nil {
-		t.Fatalf("failed to create Event: %s", err)
+		t.Fatal("failed to create Event: %s", err)
 	}
 	ev2, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
@@ -415,7 +415,7 @@ func TestToClientEventsFormatSync(t *testing.T) { // nolint: gocyclo
         "depth": 9	
     }`), false)
 	if err != nil {
-		t.Fatalf("failed to create Event: %s", err)
+		t.Fatal("failed to create Event: %s", err)
 	}
 
 	clientEvents := ToClientEvents([]gomatrixserverlib.PDU{ev, ev2}, FormatSync, userIDForSender)
@@ -486,7 +486,7 @@ func TestToClientEventsFormatSyncUnknownPrevSender(t *testing.T) { // nolint: go
 		}
     }`), false)
 	if err != nil {
-		t.Fatalf("failed to create Event: %s", err)
+		t.Fatal("failed to create Event: %s", err)
 	}
 	ev2, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
@@ -507,7 +507,7 @@ func TestToClientEventsFormatSyncUnknownPrevSender(t *testing.T) { // nolint: go
         "depth": 9	
     }`), false)
 	if err != nil {
-		t.Fatalf("failed to create Event: %s", err)
+		t.Fatal("failed to create Event: %s", err)
 	}
 
 	clientEvents := ToClientEvents([]gomatrixserverlib.PDU{ev, ev2}, FormatSync, userIDForSender)

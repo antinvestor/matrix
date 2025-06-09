@@ -230,7 +230,7 @@ func SendServerNotice(
 	}
 	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, rsAPI, time.Now())
 	if resErr != nil {
-		logrus.Errorf("failed to send message: %+v", resErr)
+		logrus.Error("failed to send message: %+v", resErr)
 		return *resErr
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)

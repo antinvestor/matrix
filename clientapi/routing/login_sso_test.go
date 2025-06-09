@@ -101,13 +101,13 @@ func TestSSORedirect(t *testing.T) {
 			got := SSORedirect(&tst.Req, tst.IDPID, &tst.Auth, &tst.Config)
 
 			if want := http.StatusFound; got.Code != want {
-				t.Errorf("SSORedirect Code: got %v, want %v", got.Code, want)
+				t.Error("SSORedirect Code: got %v, want %v", got.Code, want)
 			}
 
 			if m, err := regexp.MatchString(tst.WantLocationRE, got.Headers["Location"].(string)); err != nil {
-				t.Fatalf("WantSetCookieRE failed: %v", err)
+				t.Fatal("WantSetCookieRE failed: %v", err)
 			} else if !m {
-				t.Errorf("SSORedirect Location: got %q, want match %v", got.Headers["Location"], tst.WantLocationRE)
+				t.Error("SSORedirect Location: got %q, want match %v", got.Headers["Location"], tst.WantLocationRE)
 			}
 
 			cookies := got.Headers["Set-Cookie"].([]*http.Cookie)
@@ -115,9 +115,9 @@ func TestSSORedirect(t *testing.T) {
 
 				if cookie.Name == "sso_nonce" {
 					if m, err := regexp.MatchString(tst.WantSetCookieRE, cookie.String()); err != nil {
-						t.Fatalf("WantSetCookieRE failed: %v", err)
+						t.Fatal("WantSetCookieRE failed: %v", err)
 					} else if !m {
-						t.Errorf("SSORedirect Set-Cookie: got %q, want match %v ", got.Headers["Set-Cookie"], tst.WantSetCookieRE)
+						t.Error("SSORedirect Set-Cookie: got %q, want match %v ", got.Headers["Set-Cookie"], tst.WantSetCookieRE)
 					}
 				}
 
@@ -166,7 +166,7 @@ func TestSSORedirectError(t *testing.T) {
 			got := SSORedirect(&tst.Req, tst.IDPID, &tst.Auth, &tst.Config)
 
 			if got.Code != tst.WantCode {
-				t.Errorf("SSORedirect Code: got %v, want %v", got.Code, tst.WantCode)
+				t.Error("SSORedirect Code: got %v, want %v", got.Code, tst.WantCode)
 			}
 		})
 	}
@@ -330,13 +330,13 @@ func TestSSOCallback(t *testing.T) {
 
 			if want := http.StatusFound; got.Code != want {
 				t.Log(got)
-				t.Errorf("SSOCallback Code: got %v, want %v", got.Code, want)
+				t.Error("SSOCallback Code: got %v, want %v", got.Code, want)
 			}
 
 			if m, err := regexp.MatchString(tst.WantLocationRE, got.Headers["Location"].(string)); err != nil {
-				t.Fatalf("WantSetCookieRE failed: %v", err)
+				t.Fatal("WantSetCookieRE failed: %v", err)
 			} else if !m {
-				t.Errorf("SSOCallback Location: got %q, want match %v", got.Headers["Location"], tst.WantLocationRE)
+				t.Error("SSOCallback Location: got %q, want match %v", got.Headers["Location"], tst.WantLocationRE)
 			}
 
 			if got.Headers["Set-Cookes"] != nil {
@@ -346,9 +346,9 @@ func TestSSOCallback(t *testing.T) {
 					if cookie.Name == "sso_nonce" {
 
 						if m, err := regexp.MatchString(tst.WantSetCookieRE, cookie.String()); err != nil {
-							t.Fatalf("WantSetCookieRE failed: %v", err)
+							t.Fatal("WantSetCookieRE failed: %v", err)
 						} else if !m {
-							t.Errorf("SSOCallback Set-Cookie: got %q, want match %v", got.Headers["Set-Cookie"], tst.WantSetCookieRE)
+							t.Error("SSOCallback Set-Cookie: got %q, want match %v", got.Headers["Set-Cookie"], tst.WantSetCookieRE)
 						}
 					}
 
@@ -356,10 +356,10 @@ func TestSSOCallback(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(tst.WantAccountCreation, tst.UserAPI.gotAccountCreation); diff != "" {
-				t.Errorf("PerformAccountCreation: +got -want:\n%s", diff)
+				t.Error("PerformAccountCreation: +got -want:\n%s", diff)
 			}
 			if diff := cmp.Diff(tst.WantLoginTokenCreation, tst.UserAPI.gotLoginTokenCreation); diff != "" {
-				t.Errorf("PerformLoginTokenCreation: +got -want:\n%s", diff)
+				t.Error("PerformLoginTokenCreation: +got -want:\n%s", diff)
 			}
 
 		})
@@ -519,7 +519,7 @@ func TestSSOCallbackError(t *testing.T) {
 
 			if got.Code != tst.WantCode {
 				t.Log(got)
-				t.Errorf("SSOCallback Code: got %v, want %v", got.Code, tst.WantCode)
+				t.Error("SSOCallback Code: got %v, want %v", got.Code, tst.WantCode)
 			}
 		})
 	}

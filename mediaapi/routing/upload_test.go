@@ -33,7 +33,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		t.Errorf("failed to get current working directory: %v", err)
+		t.Error("failed to get current working directory: %v", err)
 	}
 
 	maxSize := config.FileSizeBytes(8)
@@ -129,7 +129,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 				cm := sqlutil.NewConnectionManager(svc)
 				db, err0 := storage.NewMediaAPIDatasource(ctx, cm)
 				if err0 != nil {
-					t.Errorf("error opening mediaapi database: %v", err0)
+					t.Error("error opening mediaapi database: %v", err0)
 				}
 
 				r := &uploadRequest{
@@ -137,7 +137,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 					Logger:        tt.fields.Logger,
 				}
 				if got := r.doUpload(ctx, tt.args.reqReader, tt.args.cfg, db, tt.args.activeThumbnailGeneration); !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("doUpload() = %+v, want %+v", got, tt.want)
+					t.Error("doUpload() = %+v, want %+v", got, tt.want)
 				}
 			})
 		})

@@ -72,7 +72,7 @@ func TestShoudInsertQueueTransaction(t *testing.T) {
 		nid := int64(1)
 		err := db.Table.InsertQueueEntry(ctx, transactionID, serverName, nid)
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 	})
 }
@@ -89,12 +89,12 @@ func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 
 		err := db.Table.InsertQueueEntry(ctx, transactionID, serverName, nid)
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 
 		retrievedNids, err := db.Table.SelectQueueEntries(ctx, serverName, 10)
 		if err != nil {
-			t.Fatalf("Failed retrieving transaction: %s", err.Error())
+			t.Fatal("Failed retrieving transaction: %s", err.Error())
 		}
 
 		assert.Equal(t, nid, retrievedNids[0])
@@ -113,7 +113,7 @@ func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 		nid := int64(2)
 		err := db.Table.InsertQueueEntry(ctx, transactionID, serverName, nid)
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 
 		transactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
@@ -121,12 +121,12 @@ func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 		oldestNID := int64(1)
 		err = db.Table.InsertQueueEntry(ctx, transactionID, serverName, oldestNID)
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 
 		retrievedNids, err := db.Table.SelectQueueEntries(ctx, serverName, 1)
 		if err != nil {
-			t.Fatalf("Failed retrieving transaction: %s", err.Error())
+			t.Fatal("Failed retrieving transaction: %s", err.Error())
 		}
 
 		assert.Equal(t, oldestNID, retrievedNids[0])
@@ -134,7 +134,7 @@ func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
 
 		retrievedNids, err = db.Table.SelectQueueEntries(ctx, serverName, 10)
 		if err != nil {
-			t.Fatalf("Failed retrieving transaction: %s", err.Error())
+			t.Fatal("Failed retrieving transaction: %s", err.Error())
 		}
 
 		assert.Equal(t, oldestNID, retrievedNids[0])
@@ -155,7 +155,7 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 
 		err := db.Table.InsertQueueEntry(ctx, transactionID, serverName, nid)
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 
 		_ = db.Cm.Do(ctx, func(ctx context.Context) error {
@@ -163,12 +163,12 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 			return err
 		})
 		if err != nil {
-			t.Fatalf("Failed deleting transaction: %s", err.Error())
+			t.Fatal("Failed deleting transaction: %s", err.Error())
 		}
 
 		count, err := db.Table.SelectQueueEntryCount(ctx, serverName)
 		if err != nil {
-			t.Fatalf("Failed retrieving transaction count: %s", err.Error())
+			t.Fatal("Failed retrieving transaction count: %s", err.Error())
 		}
 		assert.Equal(t, int64(0), count)
 	})
@@ -190,15 +190,15 @@ func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
 
 		err := db.Table.InsertQueueEntry(ctx, transactionID, serverName, nid)
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 		err = db.Table.InsertQueueEntry(ctx, transactionID2, serverName2, nid)
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 		err = db.Table.InsertQueueEntry(ctx, transactionID3, serverName, nid2)
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 
 		_ = db.Cm.Do(ctx, func(ctx context.Context) error {
@@ -206,18 +206,18 @@ func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
 			return err
 		})
 		if err != nil {
-			t.Fatalf("Failed deleting transaction: %s", err.Error())
+			t.Fatal("Failed deleting transaction: %s", err.Error())
 		}
 
 		count, err := db.Table.SelectQueueEntryCount(ctx, serverName)
 		if err != nil {
-			t.Fatalf("Failed retrieving transaction count: %s", err.Error())
+			t.Fatal("Failed retrieving transaction count: %s", err.Error())
 		}
 		assert.Equal(t, int64(1), count)
 
 		count, err = db.Table.SelectQueueEntryCount(ctx, serverName2)
 		if err != nil {
-			t.Fatalf("Failed retrieving transaction count: %s", err.Error())
+			t.Fatal("Failed retrieving transaction count: %s", err.Error())
 		}
 		assert.Equal(t, int64(1), count)
 	})

@@ -660,7 +660,7 @@ func (r *downloadRequest) getRemoteFile(
 				cfg.MaxThumbnailGenerators,
 			)
 			if err != nil {
-				r.Logger.WithError(err).Errorf("r.fetchRemoteFileAndStoreMetadata: failed to fetch remote file")
+				r.Logger.WithError(err).Error("r.fetchRemoteFileAndStoreMetadata: failed to fetch remote file")
 				return err
 			}
 		} else {

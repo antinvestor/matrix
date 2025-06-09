@@ -128,12 +128,12 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	)
 	// Only return an error if we really couldn't get any events.
 	if err != nil && len(events) == 0 {
-		logrus.WithError(err).Errorf("gomatrixserverlib.RequestBackfill failed")
+		logrus.WithError(err).Error("gomatrixserverlib.RequestBackfill failed")
 		return err
 	}
 	// If we got an error but still got events, that's fine, because a server might have returned a 404 (or something)
 	// but other servers could provide the missing event.
-	logrus.WithError(err).WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
+	logrus.WithError(err).WithField("room_id", req.RoomID).Info("backfilled %d events", len(events))
 
 	// persist these new events - auth checks have already been done
 	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, r.Querier, events)
@@ -198,7 +198,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 			missingMap[id] = nil
 		}
 	}
-	util.GetLogger(ctx).Infof("Fetching %d missing state events (from %d possible servers)", len(missingMap), len(servers))
+	util.GetLogger(ctx).Info("Fetching %d missing state events (from %d possible servers)", len(missingMap), len(servers))
 
 	// fetch the events from federation. Loop the servers first so if we find one that works we stick with them
 	for _, srv := range servers {
@@ -220,14 +220,14 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 				logger.WithError(err).Warn("failed to load and verify event")
 				continue
 			}
-			logger.Infof("returned %d PDUs which made events %+v", len(res.PDUs), result)
+			logger.Info("returned %d PDUs which made events %+v", len(res.PDUs), result)
 			for _, res := range result {
 				switch err := res.Error.(type) {
 				case nil:
 				case gomatrixserverlib.SignatureErr:
 					// The signature of the event might not be valid anymore, for example if
 					// the key ID was reused with a different signature.
-					logger.WithError(err).Errorf("event failed PDU checks, storing anyway")
+					logger.WithError(err).Error("event failed PDU checks, storing anyway")
 				case gomatrixserverlib.AuthChainErr, gomatrixserverlib.AuthRulesErr:
 					logger.WithError(err).Warn("event failed PDU checks")
 					continue
@@ -246,7 +246,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 			newEvents = append(newEvents, ev.PDU)
 		}
 	}
-	util.GetLogger(ctx).Infof("Persisting %d new events", len(newEvents))
+	util.GetLogger(ctx).Info("Persisting %d new events", len(newEvents))
 	persistEvents(ctx, r.DB, r.Querier, newEvents)
 }
 
@@ -393,7 +393,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 		// non-fatal, fallthrough
 		logrus.WithError(err).Info("Failed to fetch events")
 	} else {
-		logrus.Infof("Fetched %d/%d events from the database", len(events), len(eventIDs))
+		logrus.Info("Fetched %d/%d events from the database", len(events), len(eventIDs))
 		if len(events) == len(eventIDs) {
 			result := make(map[string]gomatrixserverlib.PDU)
 			for i := range events {
@@ -479,7 +479,7 @@ FindSuccessor:
 		logrus.WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
 		return nil
 	}
-	logrus.Infof("ServersAtEvent including %d current events from history visibility", len(memberEventsFromVis))
+	logrus.Info("ServersAtEvent including %d current events from history visibility", len(memberEventsFromVis))
 
 	// Retrieve all "m.room.member" state events of "join" membership, which
 	// contains the list of users in the room before the event, therefore all
@@ -586,7 +586,7 @@ func joinEventsFromHistoryVisibility(
 	canSeeEvents := auth.IsServerAllowed(ctx, querier, thisServer, true, events)
 	visibility := auth.HistoryVisibilityForRoom(events)
 	if !canSeeEvents {
-		logrus.Infof("ServersAtEvent history not visible to us: %s", visibility)
+		logrus.Info("ServersAtEvent history not visible to us: %s", visibility)
 		return nil, visibility, nil
 	}
 	// get joined members

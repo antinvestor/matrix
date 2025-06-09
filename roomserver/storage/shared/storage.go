@@ -1830,7 +1830,7 @@ func (d *Database) SelectUserIDsForPublicKeys(ctx context.Context, publicKeys ma
 				return nil, rErr
 			}
 			if roomInfo == nil {
-				logrus.Warnf("missing room info for %s, there will be missing users in the response", roomID.String())
+				logrus.Warn("missing room info for %s, there will be missing users in the response", roomID.String())
 				continue
 			}
 			roomNID = roomInfo.RoomNID
@@ -2006,7 +2006,7 @@ func (d *Database) QueryAdminEventReports(ctx context.Context, from uint64, limi
 				return nil, 0, err
 			}
 			if len(roomIDs) == 0 || len(roomIDs) > 1 {
-				logrus.Warnf("unable to map roomNID %d to a roomID, was this room deleted?", roomNID)
+				logrus.Warn("unable to map roomNID %d to a roomID, was this room deleted?", roomNID)
 				continue
 			}
 			roomNIDIDCache[reports[i].RoomNID] = roomIDs[0]

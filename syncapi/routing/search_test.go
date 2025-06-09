@@ -246,7 +246,7 @@ func TestSearch(t *testing.T) {
 				}
 				resp, ok := res.JSON.(SearchResponse)
 				if !ok && !tc.wantOK {
-					t.Fatalf("not a SearchResponse: %T: %s", res.JSON, res.JSON)
+					t.Fatal("not a SearchResponse: %T: %s", res.JSON, res.JSON)
 				}
 				assert.Equal(t, tc.wantResponseCount, resp.SearchCategories.RoomEvents.Count)
 

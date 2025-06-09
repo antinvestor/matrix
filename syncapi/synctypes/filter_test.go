@@ -49,10 +49,10 @@ func Test_Filter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var f RoomEventFilter
 			if err := json.Unmarshal(tt.input, &f); err != nil {
-				t.Fatalf("unable to parse filter: %v", err)
+				t.Fatal("unable to parse filter: %v", err)
 			}
 			if !reflect.DeepEqual(f, tt.want) {
-				t.Fatalf("Expected %+v\ngot %+v", tt.want, f)
+				t.Fatal("Expected %+v\ngot %+v", tt.want, f)
 			}
 		})
 	}

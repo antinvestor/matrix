@@ -162,7 +162,7 @@ func (p *SyncAPIProducer) SendDeviceListUpdate(
 		"origin": string(origin),
 	}
 
-	log.Debugf("Sending device list update: %+v", h)
+	log.Debug("Sending device list update: %+v", h)
 	return p.Qm.Publish(ctx, p.TopicPresenceEvent, []byte(deviceListUpdate), h)
 }
 
@@ -173,6 +173,6 @@ func (p *SyncAPIProducer) SendSigningKeyUpdate(
 		"origin": string(origin),
 	}
 
-	log.Debugf("Sending signing key update")
+	log.Debug("Sending signing key update")
 	return p.Qm.Publish(ctx, p.TopicSigningKeyUpdate, []byte(data), h)
 }

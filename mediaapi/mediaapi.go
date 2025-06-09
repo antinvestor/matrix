@@ -41,12 +41,12 @@ func AddPublicRoutes(
 ) {
 	mediaCm, err := cm.FromOptions(ctx, &cfg.MediaAPI.Database)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to obtain a media db connection manager :%v", err)
+		logrus.WithError(err).Panic("failed to obtain a media db connection manager :%v", err)
 	}
 
 	mediaDB, err := storage.NewMediaAPIDatasource(ctx, mediaCm)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to media db")
+		logrus.WithError(err).Panic("failed to connect to media db")
 	}
 
 	routing.Setup(

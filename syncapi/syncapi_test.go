@@ -143,7 +143,7 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
+		t.Fatal("failed to create a cache: %v", err)
 	}
 	qm := queueutil.NewQueueManager(svc)
 
@@ -153,7 +153,7 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 
 	err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
 	if err != nil {
-		t.Fatalf("failed to publish events: %v", err)
+		t.Fatal("failed to publish events: %v", err)
 	}
 
 	testCases := []struct {
@@ -198,15 +198,15 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 		w := httptest.NewRecorder()
 		routers.Client.ServeHTTP(w, tc.req)
 		if w.Code != tc.wantCode {
-			t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+			t.Fatal("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 		}
 		if tc.wantJoinedRooms != nil {
 			var res types.Response
 			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-				t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
+				t.Fatal("%s: failed to decode response body: %s", tc.name, err)
 			}
 			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
-				t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
+				t.Error("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
 			}
 			t.Logf("res: %+v", res.Rooms.Join[room.ID])
 
@@ -251,7 +251,7 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
+		t.Fatal("failed to create a cache: %v", err)
 	}
 	qm := queueutil.NewQueueManager(svc)
 
@@ -260,7 +260,7 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 
 	err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
 	if err != nil {
-		t.Fatalf("failed to publish events: %v", err)
+		t.Fatal("failed to publish events: %v", err)
 	}
 
 	testCases := []struct {
@@ -302,15 +302,15 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 			"filter":       fmt.Sprintf(`{"event_format":"%s"}`, format),
 		})))
 		if w.Code != tc.wantCode {
-			t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+			t.Fatal("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 		}
 		if tc.wantJoinedRooms != nil {
 			var res types.Response
 			if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
-				t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
+				t.Fatal("%s: failed to decode response body: %s", tc.name, err)
 			}
 			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
-				t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
+				t.Error("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
 			}
 			t.Logf("res: %+v", res.Rooms.Join[room.ID])
 
@@ -330,7 +330,7 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 			msgs = toQueueMsgs(t, event)
 			err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
 			if err != nil {
-				t.Fatalf("failed to publish events: %v", err)
+				t.Fatal("failed to publish events: %v", err)
 			}
 
 			syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
@@ -348,15 +348,15 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 				"since":        since,
 			})))
 			if w.Code != 200 {
-				t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+				t.Error("since=%s got HTTP %d want 200", since, w.Code)
 			}
 
 			res = *types.NewResponse()
 			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-				t.Errorf("failed to decode response body: %s", err)
+				t.Error("failed to decode response body: %s", err)
 			}
 			if len(res.Rooms.Join) != 1 {
-				t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
+				t.Fatal("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
 			}
 			gotEventIDs = make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
 			for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
@@ -365,11 +365,11 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 					content := gomatrixserverlib.PowerLevelContent{}
 					err := json.Unmarshal(ev.Content, &content)
 					if err != nil {
-						t.Errorf("failed to unmarshal power level content: %s", err)
+						t.Error("failed to unmarshal power level content: %s", err)
 					}
 					otherUserLevel := content.UserLevel("@otheruser:localhost")
 					if otherUserLevel != 50 {
-						t.Errorf("Expected user PL of %d but got %d", 50, otherUserLevel)
+						t.Error("Expected user PL of %d but got %d", 50, otherUserLevel)
 					}
 				}
 			}
@@ -406,7 +406,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
+		t.Fatal("failed to create a cache: %v", err)
 	}
 	qm := queueutil.NewQueueManager(svc)
 
@@ -424,7 +424,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 
 		err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msg)
 		if err != nil {
-			t.Fatalf("failed to publish events: %v", err)
+			t.Fatal("failed to publish events: %v", err)
 		}
 
 		time.Sleep(100 * time.Millisecond)
@@ -434,21 +434,21 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 			"timeout":      "0",
 		})))
 		if w.Code != 200 {
-			t.Errorf("got HTTP %d want 200", w.Code)
+			t.Error("got HTTP %d want 200", w.Code)
 			continue
 		}
 		var res types.Response
 		if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
-			t.Errorf("failed to decode response body: %s", err)
+			t.Error("failed to decode response body: %s", err)
 		}
 		sinceTokens[i] = res.NextBatch.String()
 		if i == 0 { // create event does not produce a room section
 			if res.Rooms != nil && len(res.Rooms.Join) != 0 {
-				t.Fatalf("i=%v got %d joined rooms, want 0", i, len(res.Rooms.Join))
+				t.Fatal("i=%v got %d joined rooms, want 0", i, len(res.Rooms.Join))
 			}
 		} else { // we should have that room somewhere
 			if res.Rooms != nil && len(res.Rooms.Join) != 1 {
-				t.Fatalf("i=%v got %d joined rooms, want 1", i, len(res.Rooms.Join))
+				t.Fatal("i=%v got %d joined rooms, want 1", i, len(res.Rooms.Join))
 			}
 		}
 	}
@@ -464,14 +464,14 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 			"since":        since,
 		})))
 		if w.Code != 200 {
-			t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+			t.Error("since=%s got HTTP %d want 200", since, w.Code)
 		}
 		var res types.Response
 		if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
-			t.Errorf("failed to decode response body: %s", err)
+			t.Error("failed to decode response body: %s", err)
 		}
 		if len(res.Rooms.Join) != 1 {
-			t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
+			t.Fatal("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
 		}
 		//t.Logf("since=%s res state:%+v res timeline:%+v", since, res.Rooms.Join[room.ID].State.Events, res.Rooms.Join[room.ID].Timeline.Events)
 		gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
@@ -514,7 +514,7 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
+		t.Fatal("failed to create a cache: %v", err)
 	}
 	cfg.Global.Presence.EnableOutbound = true
 	cfg.Global.Presence.EnableInbound = true
@@ -528,23 +528,23 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 		"set_presence": "online",
 	})))
 	if w.Code != 200 {
-		t.Fatalf("got HTTP %d want %d", w.Code, 200)
+		t.Fatal("got HTTP %d want %d", w.Code, 200)
 	}
 	var res types.Response
 	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-		t.Errorf("failed to decode response body: %s", err)
+		t.Error("failed to decode response body: %s", err)
 	}
 	if len(res.Presence.Events) != 1 {
-		t.Fatalf("expected 1 presence events, got: %+v", res.Presence.Events)
+		t.Fatal("expected 1 presence events, got: %+v", res.Presence.Events)
 	}
 	if res.Presence.Events[0].Sender != alice.UserID {
-		t.Errorf("sender: got %v want %v", res.Presence.Events[0].Sender, alice.UserID)
+		t.Error("sender: got %v want %v", res.Presence.Events[0].Sender, alice.UserID)
 	}
 	if res.Presence.Events[0].Type != "m.presence" {
-		t.Errorf("type: got %v want %v", res.Presence.Events[0].Type, "m.presence")
+		t.Error("type: got %v want %v", res.Presence.Events[0].Type, "m.presence")
 	}
 	if gjson.ParseBytes(res.Presence.Events[0].Content).Get("presence").Str != "online" {
-		t.Errorf("content: not online,  got %v", res.Presence.Events[0].Content)
+		t.Error("content: not online,  got %v", res.Presence.Events[0].Content)
 	}
 
 }
@@ -635,7 +635,7 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -655,7 +655,7 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 				beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": beforeJoinBody})
 				eventsToSend := append(room.Events(), beforeJoinEv)
 				if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
-					t.Fatalf("failed to send events: %v", err)
+					t.Fatal("failed to send events: %v", err)
 				}
 				syncUntil(t, routers, aliceDev.AccessToken, false,
 					func(syncBody string) bool {
@@ -673,14 +673,14 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 				})))
 				if w.Code != 200 {
 					t.Logf("%s", w.Body.String())
-					t.Fatalf("got HTTP %d want %d", w.Code, 200)
+					t.Fatal("got HTTP %d want %d", w.Code, 200)
 				}
 				// We only care about the returned events at this point
 				var res struct {
 					Chunk []synctypes.ClientEvent `json:"chunk"`
 				}
 				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-					t.Errorf("failed to decode response body: %s", err)
+					t.Error("failed to decode response body: %s", err)
 				}
 
 				verifyEventVisible(t, tc.wantResult.seeWithoutJoin, beforeJoinEv, res.Chunk)
@@ -695,7 +695,7 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 				eventsToSend = append([]*rstypes.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
 
 				if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
-					t.Fatalf("failed to send events: %v", err)
+					t.Fatal("failed to send events: %v", err)
 				}
 				syncUntil(t, routers, aliceDev.AccessToken, false,
 					func(syncBody string) bool {
@@ -712,10 +712,10 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 				})))
 				if w.Code != 200 {
 					t.Logf("%s", w.Body.String())
-					t.Fatalf("got HTTP %d want %d", w.Code, 200)
+					t.Fatal("got HTTP %d want %d", w.Code, 200)
 				}
 				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-					t.Errorf("failed to decode response body: %s", err)
+					t.Error("failed to decode response body: %s", err)
 				}
 				// verify results
 				verifyEventVisible(t, tc.wantResult.seeBeforeJoin, beforeJoinEv, res.Chunk)
@@ -733,11 +733,11 @@ func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *rstype
 				return
 			}
 		}
-		t.Fatalf("expected to see event %s but didn't: %+v", wantVisibleEvent.EventID(), chunk)
+		t.Fatal("expected to see event %s but didn't: %+v", wantVisibleEvent.EventID(), chunk)
 	} else {
 		for _, ev := range chunk {
 			if ev.EventID == wantVisibleEvent.EventID() {
-				t.Fatalf("expected not to see event %s: %+v", wantVisibleEvent.EventID(), string(ev.Content))
+				t.Fatal("expected not to see event %s: %+v", wantVisibleEvent.EventID(), string(ev.Content))
 			}
 		}
 	}
@@ -906,7 +906,7 @@ func TestGetMembership(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -927,7 +927,7 @@ func TestGetMembership(t *testing.T) {
 					tc.additionalEvents(t, room)
 				}
 				if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-					t.Fatalf("failed to send events: %v", err)
+					t.Fatal("failed to send events: %v", err)
 				}
 
 				// wait for the events to come down sync
@@ -945,7 +945,7 @@ func TestGetMembership(t *testing.T) {
 				routers.Client.ServeHTTP(w, tc.request(t, room))
 				if w.Code != 200 && tc.wantOK {
 					t.Logf("%s", w.Body.String())
-					t.Fatalf("got HTTP %d want %d", w.Code, 200)
+					t.Fatal("got HTTP %d want %d", w.Code, 200)
 				}
 				t.Logf("[%s] Resp: %s", tc.name, w.Body.String())
 
@@ -953,7 +953,7 @@ func TestGetMembership(t *testing.T) {
 				if tc.wantOK {
 					memberCount := len(gjson.GetBytes(w.Body.Bytes(), "chunk").Array())
 					if memberCount != tc.wantMemberCount {
-						t.Fatalf("expected %d members, got %d", tc.wantMemberCount, memberCount)
+						t.Fatal("expected %d members, got %d", tc.wantMemberCount, memberCount)
 					}
 				}
 			})
@@ -982,7 +982,7 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
+		t.Fatal("failed to create a cache: %v", err)
 	}
 
 	qm := queueutil.NewQueueManager(svc)
@@ -992,7 +992,7 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 	cfgSyncAPI := cfg.SyncAPI
 	err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputSendToDeviceEvent)
 	if err != nil {
-		t.Fatalf("failed to register publisher: %v", err)
+		t.Fatal("failed to register publisher: %v", err)
 	}
 
 	producer := producers.SyncAPIProducer{
@@ -1077,7 +1077,7 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 			msgCounter++
 			msg := json.RawMessage(fmt.Sprintf(`{"dummy":"message %d"}`, msgCounter))
 			if err := producer.SendToDevice(ctx, user.ID, user.ID, alice.ID, "m.dendrite.test", msg); err != nil {
-				t.Fatalf("unable to send to device message: %v", err)
+				t.Fatal("unable to send to device message: %v", err)
 			}
 		}
 
@@ -1105,7 +1105,7 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 		// Ensure the messages we received are as we expect them to be
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Logf("[%s|since=%s]: Sync: %s", tc.name, tc.since, w.Body.String())
-			t.Fatalf("[%s|since=%s]: got: %+v, want: %+v", tc.name, tc.since, got, tc.want)
+			t.Fatal("[%s|since=%s]: got: %+v, want: %+v", tc.name, tc.since, got, tc.want)
 		}
 	}
 }
@@ -1211,7 +1211,7 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
+		t.Fatal("failed to create a cache: %v", err)
 	}
 
 	// Use an actual roomserver for this
@@ -1229,7 +1229,7 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 	room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world4!"})
 
 	if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-		t.Fatalf("failed to send events: %v", err)
+		t.Fatal("failed to send events: %v", err)
 	}
 
 	syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
@@ -1262,7 +1262,7 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", requestPath, test.WithQueryParams(params)))
 
 			if tc.wantError && w.Code == 200 {
-				t.Fatalf("Expected an error, but got none")
+				t.Fatal("Expected an error, but got none")
 			}
 			t.Log(w.Body.String())
 			resp := routing.ContextRespsonse{}
@@ -1270,17 +1270,17 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 				t.Fatal(err)
 			}
 			if tc.wantStateLength > 0 && tc.wantStateLength != len(resp.State) {
-				t.Fatalf("expected %d state events, got %d", tc.wantStateLength, len(resp.State))
+				t.Fatal("expected %d state events, got %d", tc.wantStateLength, len(resp.State))
 			}
 			if tc.wantBeforeLength > 0 && tc.wantBeforeLength != len(resp.EventsBefore) {
-				t.Fatalf("expected %d before events, got %d", tc.wantBeforeLength, len(resp.EventsBefore))
+				t.Fatal("expected %d before events, got %d", tc.wantBeforeLength, len(resp.EventsBefore))
 			}
 			if tc.wantAfterLength > 0 && tc.wantAfterLength != len(resp.EventsAfter) {
-				t.Fatalf("expected %d after events, got %d", tc.wantAfterLength, len(resp.EventsAfter))
+				t.Fatal("expected %d after events, got %d", tc.wantAfterLength, len(resp.EventsAfter))
 			}
 
 			if !tc.wantError && resp.Event.EventID != eventID {
-				t.Fatalf("unexpected eventID %s, expected %s", resp.Event.EventID, eventID)
+				t.Fatal("unexpected eventID %s, expected %s", resp.Event.EventID, eventID)
 			}
 		})
 	}
@@ -1391,7 +1391,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 	cm := sqlutil.NewConnectionManager(svc)
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
+		t.Fatal("failed to create a cache: %v", err)
 	}
 
 	// Use an actual roomserver for this
@@ -1404,7 +1404,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
 	if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-		t.Fatalf("failed to send events: %v", err)
+		t.Fatal("failed to send events: %v", err)
 	}
 
 	ev1 := room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "first"})
@@ -1424,7 +1424,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 	for _, e := range events {
 		roomEvents := append([]*rstypes.HeaderedEvent{}, e)
 		if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, roomEvents, "test", "test", "test", nil, false); err != nil {
-			t.Fatalf("failed to send events: %v", err)
+			t.Fatal("failed to send events: %v", err)
 		}
 
 		syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
@@ -1471,7 +1471,7 @@ func syncUntil(t *testing.T,
 ) {
 	t.Helper()
 	if checkFunc == nil {
-		t.Fatalf("No checkFunc defined")
+		t.Fatal("No checkFunc defined")
 	}
 	if skip {
 		return
@@ -1497,7 +1497,7 @@ func syncUntil(t *testing.T,
 	select {
 	case <-done:
 	case <-time.After(time.Second * 5):
-		t.Fatalf("Timed out waiting for messages")
+		t.Fatal("Timed out waiting for messages")
 	}
 }
 

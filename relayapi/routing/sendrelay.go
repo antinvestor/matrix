@@ -35,7 +35,7 @@ func SendTransactionToRelay(
 	txnID gomatrixserverlib.TransactionID,
 	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Infof("Processing send_relay for %s", userID.String())
+	logrus.Info("Processing send_relay for %s", userID.String())
 
 	var txnEvents fclient.RelayEvents
 	if err := json.Unmarshal(fedReq.Content(), &txnEvents); err != nil {
@@ -62,7 +62,7 @@ func SendTransactionToRelay(
 	t.TransactionID = txnID
 	t.Destination = userID.Domain()
 
-	util.GetLogger(httpReq.Context()).Warnf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
+	util.GetLogger(httpReq.Context()).Warn("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
 
 	err := relayAPI.PerformStoreTransaction(httpReq.Context(), t, userID)
 	if err != nil {

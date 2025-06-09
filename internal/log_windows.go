@@ -28,7 +28,7 @@ func SetupHookLogging(hooks []config.LogrusHook) {
 		// Check we received a proper logging level
 		level, err := logrus.ParseLevel(hook.Level)
 		if err != nil {
-			logrus.Fatalf("Unrecognised logging level %s: %q", hook.Level, err)
+			logrus.Fatal("Unrecognised logging level %s: %q", hook.Level, err)
 		}
 
 		// Perform a first filter on the logs according to the lowest level of all
@@ -42,7 +42,7 @@ func SetupHookLogging(hooks []config.LogrusHook) {
 			checkFileHookParams(hook.Params)
 			setupFileHook(hook, level)
 		default:
-			logrus.Fatalf("Unrecognised logging hook type: %s", hook.Type)
+			logrus.Fatal("Unrecognised logging hook type: %s", hook.Type)
 		}
 	}
 }

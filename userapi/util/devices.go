@@ -43,7 +43,7 @@ func GetPushDevices(ctx context.Context, localpart string, serverName spec.Serve
 				log.WithFields(log.Fields{
 					"localpart": localpart,
 					"app_id":    pusher.AppID,
-				}).Errorf("Only data.format event_id_only or empty is supported")
+				}).Error("Only data.format event_id_only or empty is supported")
 				continue
 			}
 
@@ -53,7 +53,7 @@ func GetPushDevices(ctx context.Context, localpart string, serverName spec.Serve
 				log.WithFields(log.Fields{
 					"localpart": localpart,
 					"app_id":    pusher.AppID,
-				}).Errorf("No data.url configured for HTTP Pusher")
+				}).Error("No data.url configured for HTTP Pusher")
 				continue
 			}
 			data = mapWithout(data, "url")
@@ -63,7 +63,7 @@ func GetPushDevices(ctx context.Context, localpart string, serverName spec.Serve
 				"localpart": localpart,
 				"app_id":    pusher.AppID,
 				"kind":      pusher.Kind,
-			}).Errorf("Unhandled pusher kind")
+			}).Error("Unhandled pusher kind")
 			continue
 		}
 

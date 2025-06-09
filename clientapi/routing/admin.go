@@ -414,7 +414,7 @@ func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *userapi.Devi
 
 	err := qm.RegisterPublisher(ctx, &cfg.Queues.InputFulltextReindex)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to register publisher for receipt event")
+		logrus.WithError(err).Panic("failed to register publisher for receipt event")
 	}
 
 	err = qm.Publish(ctx, cfg.Queues.InputFulltextReindex.Ref(), []byte{})

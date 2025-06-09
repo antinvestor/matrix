@@ -57,7 +57,7 @@ func (t *DeviceListUpdateConsumer) Handle(ctx context.Context, metadata map[stri
 
 	var m gomatrixserverlib.DeviceListUpdateEvent
 	if err := json.Unmarshal(message, &m); err != nil {
-		logrus.WithError(err).Errorf("Failed to read from device list update input topic")
+		logrus.WithError(err).Error("Failed to read from device list update input topic")
 		return nil
 	}
 	origin := spec.ServerName(metadata["origin"])
@@ -79,7 +79,7 @@ func (t *DeviceListUpdateConsumer) Handle(ctx context.Context, metadata map[stri
 			"device_id": m.DeviceID,
 			"stream_id": m.StreamID,
 			"prev_id":   m.PrevID,
-		}).WithError(err).Errorf("Failed to update device list")
+		}).WithError(err).Error("Failed to update device list")
 		return err
 	}
 	return nil

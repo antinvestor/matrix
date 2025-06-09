@@ -52,10 +52,10 @@ func TestRuleSetEvaluatorMatchEvent(t *testing.T) {
 			rse := NewRuleSetEvaluator(fakeEvaluationContext{3}, &tst.RuleSet)
 			got, err := rse.MatchEvent(tst.Event, UserIDForSender)
 			if err != nil {
-				t.Fatalf("MatchEvent failed: %v", err)
+				t.Fatal("MatchEvent failed: %v", err)
 			}
 			if diff := cmp.Diff(tst.Want, got); diff != "" {
-				t.Errorf("MatchEvent rule: +got -want:\n%s", diff)
+				t.Error("MatchEvent rule: +got -want:\n%s", diff)
 			}
 		})
 	}
@@ -96,10 +96,10 @@ func TestRuleMatches(t *testing.T) {
 		t.Run(tst.Name, func(t *testing.T) {
 			got, err := ruleMatches(&tst.Rule, tst.Kind, mustEventFromJSON(t, tst.EventJSON), nil, UserIDForSender)
 			if err != nil {
-				t.Fatalf("ruleMatches failed: %v", err)
+				t.Fatal("ruleMatches failed: %v", err)
 			}
 			if got != tst.Want {
-				t.Errorf("ruleMatches: got %v, want %v", got, tst.Want)
+				t.Error("ruleMatches: got %v, want %v", got, tst.Want)
 			}
 		})
 	}
@@ -144,10 +144,10 @@ func TestConditionMatches(t *testing.T) {
 		t.Run(tst.Name, func(t *testing.T) {
 			got, err := conditionMatches(&tst.Cond, mustEventFromJSON(t, tst.EventJSON), &fakeEvaluationContext{2})
 			if err != nil && !tst.WantErr {
-				t.Fatalf("conditionMatches failed: %v", err)
+				t.Fatal("conditionMatches failed: %v", err)
 			}
 			if got != tst.WantMatch {
-				t.Errorf("conditionMatches: got %v, want %v on %s", got, tst.WantMatch, tst.Name)
+				t.Error("conditionMatches: got %v, want %v on %s", got, tst.WantMatch, tst.Name)
 			}
 		})
 	}
@@ -183,10 +183,10 @@ func TestPatternMatches(t *testing.T) {
 		t.Run(tst.Name, func(t *testing.T) {
 			got, err := patternMatches(tst.Key, tst.Pattern, mustEventFromJSON(t, tst.EventJSON))
 			if err != nil {
-				t.Fatalf("patternMatches failed: %v", err)
+				t.Fatal("patternMatches failed: %v", err)
 			}
 			if got != tst.Want {
-				t.Errorf("patternMatches: got %v, want %v on %s", got, tst.Want, tst.Name)
+				t.Error("patternMatches: got %v, want %v on %s", got, tst.Want, tst.Name)
 			}
 		})
 	}

@@ -202,7 +202,7 @@ func (p *postgresDB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent)
 			return result.Error
 		}
 
-		util.GetLogger(ctx).Infof("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
+		util.GetLogger(ctx).Info("StoreRelation child=%s parent=%s rel_type=%s", child, parent, relType)
 
 		// Insert node
 		result = db.Exec(p.insertNodeSQL, ev.EventID(), ev.OriginServerTS(), ev.RoomID().String(), count, base64.RawStdEncoding.EncodeToString(hash), 0)

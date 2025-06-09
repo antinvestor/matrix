@@ -238,7 +238,7 @@ func (u *DeviceListUpdater) CleanUp(ctx context.Context) error {
 	if len(res.LeftUsers) == 0 {
 		return nil
 	}
-	logrus.Debugf("Deleting %d stale device list entries", len(res.LeftUsers))
+	logrus.Debug("Deleting %d stale device list entries", len(res.LeftUsers))
 	return u.db.DeleteStaleDeviceLists(ctx, res.LeftUsers)
 }
 
@@ -336,7 +336,7 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 		// fetch what keys we had already and only emit changes
 		if err = u.db.DeviceKeysJSON(ctx, existingKeys); err != nil {
 			// non-fatal, log and continue
-			util.GetLogger(ctx).WithError(err).WithField("user_id", event.UserID).Errorf(
+			util.GetLogger(ctx).WithError(err).WithField("user_id", event.UserID).Error(
 				"failed to query device keys json for calculating diffs",
 			)
 		}
@@ -548,7 +548,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 		}
 		switch e := err.(type) {
 		case *json.UnmarshalTypeError, *json.SyntaxError:
-			logger.WithError(err).Debugf("Device list update for %q contained invalid JSON", userID)
+			logger.WithError(err).Debug("Device list update for %q contained invalid JSON", userID)
 			return defaultWaitTime, nil
 		case *fedsenderapi.FederationClientError:
 			if e.RetryAfter > 0 {
@@ -572,12 +572,12 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 			}
 		default:
 			// Something else failed
-			logger.WithError(err).Debugf("GetUserDevices returned unknown error type: %T", err)
+			logger.WithError(err).Debug("GetUserDevices returned unknown error type: %T", err)
 			return time.Minute * 10, err
 		}
 	}
 	if res.UserID != userID {
-		logger.WithError(err).Debugf("User ID %q in device list update response doesn't match expected %q", res.UserID, userID)
+		logger.WithError(err).Debug("User ID %q in device list update response doesn't match expected %q", res.UserID, userID)
 		return defaultWaitTime, nil
 	}
 	if res.MasterKey != nil || res.SelfSigningKey != nil {
@@ -635,7 +635,7 @@ func (u *DeviceListUpdater) updateDeviceList(ctx context.Context, res *fclient.R
 	// fetch what keys we had already and only emit changes
 	if err := u.db.DeviceKeysJSON(ctx, existingKeys); err != nil {
 		// non-fatal, log and continue
-		util.GetLogger(ctx).WithError(err).WithField("user_id", res.UserID).Errorf(
+		util.GetLogger(ctx).WithError(err).WithField("user_id", res.UserID).Error(
 			"failed to query device keys json for calculating diffs",
 		)
 	}

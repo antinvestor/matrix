@@ -34,24 +34,24 @@ func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
 
 	got, err := idp.AuthorizationURL(ctx, "https://matrix.example.com/continue", "anonce", "codeVerifier")
 	if err != nil {
-		t.Fatalf("AuthorizationURL failed: %v", err)
+		t.Fatal("AuthorizationURL failed: %v", err)
 	}
 
 	parsedURL, err := url.Parse(got)
 	if err != nil {
-		t.Fatalf("Parse obtained url failed: %v", err)
+		t.Fatal("Parse obtained url failed: %v", err)
 	}
 
 	if parsedURL.Scheme != "http" {
-		t.Errorf("Expected scheme 'http', got '%s'", parsedURL.Scheme)
+		t.Error("Expected scheme 'http', got '%s'", parsedURL.Scheme)
 	}
 	if parsedURL.Host != "oidc.example.com" {
-		t.Errorf("Expected host 'oidc.example.com', got '%s'", parsedURL.Host)
+		t.Error("Expected host 'oidc.example.com', got '%s'", parsedURL.Host)
 	}
 
 	// Verify the path
 	if parsedURL.Path != "/authorize" {
-		t.Errorf("Expected path '/authorize', got '%s'", parsedURL.Path)
+		t.Error("Expected path '/authorize', got '%s'", parsedURL.Path)
 	}
 
 	// Verify query parameters
@@ -69,7 +69,7 @@ func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
 	for key, expectedValue := range expectedParams {
 		actualValue := queryParams.Get(key)
 		if actualValue != expectedValue {
-			t.Errorf("Expected query param '%s' to have value '%s', got '%s'", key, expectedValue, actualValue)
+			t.Error("Expected query param '%s' to have value '%s', got '%s'", key, expectedValue, actualValue)
 		}
 	}
 }
@@ -133,12 +133,12 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 
 			got, err := idp.ProcessCallback(ctx, callbackURL, "anonce", "codeVerifier", tst.Query)
 			if err != nil {
-				t.Fatalf("ProcessCallback failed: %v", err)
+				t.Fatal("ProcessCallback failed: %v", err)
 			}
 
 			got.Token = nil
 			if !reflect.DeepEqual(got, tst.Want) {
-				t.Errorf("ProcessCallback: got %+v, want %+v", got, tst.Want)
+				t.Error("ProcessCallback: got %+v, want %+v", got, tst.Want)
 			}
 		})
 	}
@@ -167,11 +167,11 @@ func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
 
 	got, err := idp.AuthorizationURL(ctx, "https://matrix.example.com/continue", "anonce", "codeVerifier")
 	if err != nil {
-		t.Fatalf("AuthorizationURL failed: %v", err)
+		t.Fatal("AuthorizationURL failed: %v", err)
 	}
 
 	if want := "https://oauth2.example.com/authorize?access_type=offline&client_id=aclientid&code_challenge=N1E4yRMD7xixn_oFyO_W3htYN3rY7-HMDKJe6z6r928&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fmatrix.example.com%2Fcontinue&response_type=code&scope=&state=anonce"; got != want {
-		t.Errorf("AuthorizationURL: got %q, want %q", got, want)
+		t.Error("AuthorizationURL: got %q, want %q", got, want)
 	}
 }
 
@@ -243,13 +243,13 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 
 			got, err := idp.ProcessCallback(ctx, callbackURL, "anonce", "codeVerifier", tst.Query)
 			if err != nil {
-				t.Fatalf("ProcessCallback failed: %v", err)
+				t.Fatal("ProcessCallback failed: %v", err)
 			}
 
 			got.Token = nil
 
 			if !reflect.DeepEqual(got, tst.Want) {
-				t.Errorf("ProcessCallback: got %+v, want %+v", got, tst.Want)
+				t.Error("ProcessCallback: got %+v, want %+v", got, tst.Want)
 			}
 		})
 	}
@@ -285,17 +285,17 @@ func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
 
 	gotSub, gotName, gotSuggestedUser, err := idp.getUserInfo(ctx, "atoken")
 	if err != nil {
-		t.Fatalf("getUserInfo failed: %v", err)
+		t.Fatal("getUserInfo failed: %v", err)
 	}
 
 	if want := "asub"; gotSub != want {
-		t.Errorf("getUserInfo subject: got %q, want %q", gotSub, want)
+		t.Error("getUserInfo subject: got %q, want %q", gotSub, want)
 	}
 	if want := "aname"; gotName != want {
-		t.Errorf("getUserInfo displayName: got %q, want %q", gotName, want)
+		t.Error("getUserInfo displayName: got %q, want %q", gotName, want)
 	}
 	if want := "auser"; gotSuggestedUser != want {
-		t.Errorf("getUserInfo suggestedUser: got %q, want %q", gotSuggestedUser, want)
+		t.Error("getUserInfo suggestedUser: got %q, want %q", gotSuggestedUser, want)
 	}
 
 	gotHeader.Del("Accept-Encoding")
@@ -305,6 +305,6 @@ func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
 		"Authorization": []string{"Bearer atoken"},
 	}
 	if !reflect.DeepEqual(gotHeader, wantHeader) {
-		t.Errorf("getUserInfo header: got %+v, want %+v", gotHeader, wantHeader)
+		t.Error("getUserInfo header: got %+v, want %+v", gotHeader, wantHeader)
 	}
 }

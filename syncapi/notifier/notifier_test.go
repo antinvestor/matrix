@@ -105,7 +105,7 @@ func init() {
 
 func mustEqualPositions(t *testing.T, got, want types.StreamingToken) {
 	if got.String() != want.String() {
-		t.Fatalf("mustEqualPositions got %s want %s", got.String(), want.String())
+		t.Fatal("mustEqualPositions got %s want %s", got.String(), want.String())
 	}
 }
 
@@ -121,7 +121,7 @@ func TestImmediateNotification(t *testing.T) {
 	n.SetCurrentPosition(syncPositionBefore)
 	pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionVeryOld))
 	if err != nil {
-		t.Fatalf("TestImmediateNotification error: %s", err)
+		t.Fatal("TestImmediateNotification error: %s", err)
 	}
 	mustEqualPositions(t, pos, syncPositionBefore)
 }
@@ -142,7 +142,7 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestNewEventAndJoinedToRoom error: %s", err)
+			t.Error("TestNewEventAndJoinedToRoom error: %s", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
@@ -161,10 +161,10 @@ func TestCorrectStream(t *testing.T) {
 	n.SetCurrentPosition(syncPositionBefore)
 	stream := lockedFetchUserStream(n, bob, bobDev)
 	if stream.UserID != bob {
-		t.Fatalf("expected user %q, got %q", bob, stream.UserID)
+		t.Fatal("expected user %q, got %q", bob, stream.UserID)
 	}
 	if stream.DeviceID != bobDev {
-		t.Fatalf("expected device %q, got %q", bobDev, stream.DeviceID)
+		t.Fatal("expected device %q, got %q", bobDev, stream.DeviceID)
 	}
 }
 
@@ -191,7 +191,7 @@ func TestCorrectStreamWakeup(t *testing.T) {
 	n._wakeupUserDevice(alice, []string{wake}, syncPositionAfter)
 
 	if result := <-awoken; result != wake {
-		t.Fatalf("expected to wake %q, got %q", wake, result)
+		t.Fatal("expected to wake %q, got %q", wake, result)
 	}
 }
 
@@ -211,7 +211,7 @@ func TestNewInviteEventForUser(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestNewInviteEventForUser error: %s", err)
+			t.Error("TestNewInviteEventForUser error: %s", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
@@ -240,7 +240,7 @@ func TestEDUWakeup(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionAfter))
 		if err != nil {
-			t.Errorf("TestNewInviteEventForUser error: %v", err)
+			t.Error("TestNewInviteEventForUser error: %v", err)
 		}
 		mustEqualPositions(t, pos, syncPositionNewEDU)
 		wg.Done()
@@ -271,7 +271,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 	poll := func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestMultipleRequestWakeup error: %s", err)
+			t.Error("TestMultipleRequestWakeup error: %s", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter)
 		wg.Done()
@@ -289,7 +289,7 @@ func TestMultipleRequestWakeup(t *testing.T) {
 
 	numWaiting := stream.NumWaiting()
 	if numWaiting != 0 {
-		t.Errorf("TestMultipleRequestWakeup NumWaiting() want 0, got %d", numWaiting)
+		t.Error("TestMultipleRequestWakeup NumWaiting() want 0, got %d", numWaiting)
 	}
 }
 
@@ -314,7 +314,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionBefore))
 		if err != nil {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
+			t.Error("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter)
 		leaveWG.Done()
@@ -331,7 +331,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionAfter))
 		if err != nil {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
+			t.Error("TestNewEventAndWasPreviouslyJoinedToRoom error: %s", err)
 		}
 		mustEqualPositions(t, pos, syncPositionAfter2)
 		aliceWG.Done()
@@ -341,7 +341,7 @@ func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 		// this should timeout with an error (but the main goroutine won't wait for the timeout explicitly)
 		_, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionAfter))
 		if err == nil {
-			t.Errorf("TestNewEventAndWasPreviouslyJoinedToRoom expect error but got nil")
+			t.Error("TestNewEventAndWasPreviouslyJoinedToRoom expect error but got nil")
 		}
 	}()
 

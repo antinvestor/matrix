@@ -37,7 +37,7 @@ func SetupHookLogging(hooks []config.LogrusHook) {
 		// Check we received a proper logging level
 		level, err := logrus.ParseLevel(hook.Level)
 		if err != nil {
-			logrus.Fatalf("Unrecognised logging level %s: %q", hook.Level, err)
+			logrus.Fatal("Unrecognised logging level %s: %q", hook.Level, err)
 		}
 
 		// Perform a first filter on the logs according to the lowest level of all
@@ -56,7 +56,7 @@ func SetupHookLogging(hooks []config.LogrusHook) {
 		case "std":
 			setupStdLogHook(level)
 		default:
-			logrus.Fatalf("Unrecognised logging hook type: %s", hook.Type)
+			logrus.Fatal("Unrecognised logging hook type: %s", hook.Type)
 		}
 	}
 	setupStdLogHook(logrus.InfoLevel)
@@ -67,20 +67,20 @@ func SetupHookLogging(hooks []config.LogrusHook) {
 func checkSyslogHookParams(params map[string]interface{}) {
 	addr, ok := params["address"]
 	if !ok {
-		logrus.Fatalf("Expecting a parameter \"address\" for logging hook of type \"syslog\"")
+		logrus.Fatal("Expecting a parameter \"address\" for logging hook of type \"syslog\"")
 	}
 
 	if _, ok := addr.(string); !ok {
-		logrus.Fatalf("Parameter \"address\" for logging hook of type \"syslog\" should be a string")
+		logrus.Fatal("Parameter \"address\" for logging hook of type \"syslog\" should be a string")
 	}
 
 	proto, ok2 := params["protocol"]
 	if !ok2 {
-		logrus.Fatalf("Expecting a parameter \"protocol\" for logging hook of type \"syslog\"")
+		logrus.Fatal("Expecting a parameter \"protocol\" for logging hook of type \"syslog\"")
 	}
 
 	if _, ok2 := proto.(string); !ok2 {
-		logrus.Fatalf("Parameter \"protocol\" for logging hook of type \"syslog\" should be a string")
+		logrus.Fatal("Parameter \"protocol\" for logging hook of type \"syslog\" should be a string")
 	}
 
 }

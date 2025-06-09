@@ -251,7 +251,7 @@ func NotaryKeys(
 		for _, keys := range keyList {
 			j, err := json.Marshal(keys)
 			if err != nil {
-				logrus.WithError(err).Errorf("Failed to marshal %q response", serverName)
+				logrus.WithError(err).Error("Failed to marshal %q response", serverName)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -262,7 +262,7 @@ func NotaryKeys(
 				string(cfg.Global.ServerName), cfg.Global.KeyID, cfg.Global.PrivateKey, j,
 			)
 			if err != nil {
-				logrus.WithError(err).Errorf("Failed to sign %q response", serverName)
+				logrus.WithError(err).Error("Failed to sign %q response", serverName)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},

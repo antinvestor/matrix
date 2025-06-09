@@ -214,7 +214,7 @@ func (oqs *OutgoingQueues) SendEvent(
 
 	log.WithFields(log.Fields{
 		"destinations": len(destmap), "event": ev.EventID(),
-	}).Infof("Sending event")
+	}).Info("Sending event")
 
 	headeredJSON, err := json.Marshal(ev)
 	if err != nil {
@@ -243,7 +243,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		destmap,
 		nid, // NIDs from federationapi_queue_json table
 	); err != nil {
-		log.WithError(err).Errorf("failed to associate PDUs %q with destinations", nid)
+		log.WithError(err).Error("failed to associate PDUs %q with destinations", nid)
 		return err
 	}
 
@@ -326,7 +326,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		e.Type,
 		nil, // this will use the default expireEDUTypes map
 	); err != nil {
-		log.WithError(err).Errorf("failed to associate EDU with destinations")
+		log.WithError(err).Error("failed to associate EDU with destinations")
 		return err
 	}
 

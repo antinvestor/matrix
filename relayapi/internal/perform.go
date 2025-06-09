@@ -51,7 +51,7 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	prevEntry := fclient.RelayEntry{}
 	asyncResponse, err := r.fedClient.P2PGetTransactionFromRelay(ctx, userID, prevEntry, relayServer)
 	if err != nil {
-		logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
+		logrus.Error("P2PGetTransactionFromRelay: %s", err.Error())
 		return err
 	}
 	r.processTransaction(&asyncResponse.Transaction)
@@ -59,11 +59,11 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	prevEntry = fclient.RelayEntry{EntryID: asyncResponse.EntryID}
 	for asyncResponse.EntriesQueued {
 		// There are still more entries available for this node from the relay.
-		logrus.Infof("Retrieving next entry from relay, previous: %v", prevEntry)
+		logrus.Info("Retrieving next entry from relay, previous: %v", prevEntry)
 		asyncResponse, err = r.fedClient.P2PGetTransactionFromRelay(ctx, userID, prevEntry, relayServer)
 		prevEntry = fclient.RelayEntry{EntryID: asyncResponse.EntryID}
 		if err != nil {
-			logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
+			logrus.Error("P2PGetTransactionFromRelay: %s", err.Error())
 			return err
 		}
 		r.processTransaction(&asyncResponse.Transaction)
@@ -78,10 +78,10 @@ func (r *RelayInternalAPI) PerformStoreTransaction(
 	transaction gomatrixserverlib.Transaction,
 	userID spec.UserID,
 ) error {
-	logrus.Warnf("Storing transaction for %v", userID)
+	logrus.Warn("Storing transaction for %v", userID)
 	receiptTx, err := r.db.StoreTransaction(ctx, transaction)
 	if err != nil {
-		logrus.Errorf("db.StoreTransaction: %s", err.Error())
+		logrus.Error("db.StoreTransaction: %s", err.Error())
 		return err
 	}
 	err = r.db.AssociateTransactionWithDestinations(
@@ -101,34 +101,34 @@ func (r *RelayInternalAPI) QueryTransactions(
 	userID spec.UserID,
 	previousEntry fclient.RelayEntry,
 ) (api.QueryRelayTransactionsResponse, error) {
-	logrus.Infof("QueryTransactions for %s", userID.String())
+	logrus.Info("QueryTransactions for %s", userID.String())
 	if previousEntry.EntryID > 0 {
-		logrus.Infof("Cleaning previous entry (%v) from db for %s",
+		logrus.Info("Cleaning previous entry (%v) from db for %s",
 			previousEntry.EntryID,
 			userID.String(),
 		)
 		prevReceipt := receipt.NewReceipt(previousEntry.EntryID)
 		err := r.db.CleanTransactions(ctx, userID, []*receipt.Receipt{&prevReceipt})
 		if err != nil {
-			logrus.Errorf("db.CleanTransactions: %s", err.Error())
+			logrus.Error("db.CleanTransactions: %s", err.Error())
 			return api.QueryRelayTransactionsResponse{}, err
 		}
 	}
 
 	transaction, receiptTx, err := r.db.GetTransaction(ctx, userID)
 	if err != nil {
-		logrus.Errorf("db.GetTransaction: %s", err.Error())
+		logrus.Error("db.GetTransaction: %s", err.Error())
 		return api.QueryRelayTransactionsResponse{}, err
 	}
 
 	response := api.QueryRelayTransactionsResponse{}
 	if transaction != nil && receiptTx != nil {
-		logrus.Infof("Obtained transaction (%v) for %s", transaction.TransactionID, userID.String())
+		logrus.Info("Obtained transaction (%v) for %s", transaction.TransactionID, userID.String())
 		response.Transaction = *transaction
 		response.EntryID = receiptTx.GetNID()
 		response.EntriesQueued = true
 	} else {
-		logrus.Infof("No more entries in the queue for %s", userID.String())
+		logrus.Info("No more entries in the queue for %s", userID.String())
 		response.EntryID = 0
 		response.EntriesQueued = false
 	}

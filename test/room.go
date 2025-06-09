@@ -61,12 +61,12 @@ func NewRoom(t *testing.T, creator *User, modifiers ...roomModifier) *Room {
 	t.Helper()
 	counter := atomic.AddInt64(&roomIDCounter, 1)
 	if creator.srvName == "" {
-		t.Fatalf("NewRoom: creator doesn't belong to a server: %+v", *creator)
+		t.Fatal("NewRoom: creator doesn't belong to a server: %+v", *creator)
 	}
 
 	authEnvents, err := gomatrixserverlib.NewAuthEvents(nil)
 	if err != nil {
-		t.Fatalf("NewAuthEvents: %v", err)
+		t.Fatal("NewAuthEvents: %v", err)
 	}
 	r := &Room{
 		ID:           fmt.Sprintf("!%d:%s", counter, creator.srvName),
@@ -88,7 +88,7 @@ func (r *Room) MustGetAuthEventRefsForEvent(t *testing.T, needed gomatrixserverl
 	t.Helper()
 	a, err := needed.AuthEventReferences(r.authEvents)
 	if err != nil {
-		t.Fatalf("MustGetAuthEvents: %v", err)
+		t.Fatal("MustGetAuthEvents: %v", err)
 	}
 	return a
 }
@@ -168,7 +168,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	if mod.unsigned != nil {
 		unsigned, err = json.Marshal(mod.unsigned)
 		if err != nil {
-			t.Fatalf("CreateEvent[%s]: failed to marshal unsigned field: %s", eventType, err)
+			t.Fatal("CreateEvent[%s]: failed to marshal unsigned field: %s", eventType, err)
 		}
 	}
 
@@ -182,7 +182,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	})
 	err = builder.SetContent(content)
 	if err != nil {
-		t.Fatalf("CreateEvent[%s]: failed to SetContent: %s", eventType, err)
+		t.Fatal("CreateEvent[%s]: failed to SetContent: %s", eventType, err)
 	}
 	if depth > 1 {
 		builder.PrevEvents = []string{r.events[len(r.events)-1].EventID()}
@@ -190,7 +190,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 
 	err = builder.AddAuthEvents(r.authEvents)
 	if err != nil {
-		t.Fatalf("CreateEvent[%s]: failed to AuthEventReferences: %s", eventType, err)
+		t.Fatal("CreateEvent[%s]: failed to AuthEventReferences: %s", eventType, err)
 	}
 
 	if len(mod.authEvents) > 0 {
@@ -202,10 +202,10 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 		mod.privKey,
 	)
 	if err != nil {
-		t.Fatalf("CreateEvent[%s]: failed to build event: %s", eventType, err)
+		t.Fatal("CreateEvent[%s]: failed to build event: %s", eventType, err)
 	}
 	if err = gomatrixserverlib.Allowed(ev, r.authEvents, UserIDForSender); err != nil {
-		t.Fatalf("CreateEvent[%s]: failed to verify event was allowed: %s", eventType, err)
+		t.Fatal("CreateEvent[%s]: failed to verify event was allowed: %s", eventType, err)
 	}
 	headeredEvent := &rstypes.HeaderedEvent{PDU: ev}
 	headeredEvent.Visibility = r.visibility
@@ -220,7 +220,7 @@ func (r *Room) InsertEvent(t *testing.T, he *rstypes.HeaderedEvent) {
 	if he.StateKey() != nil {
 		err := r.authEvents.AddEvent(he.PDU)
 		if err != nil {
-			t.Fatalf("InsertEvent: failed to add event to auth events: %s", err)
+			t.Fatal("InsertEvent: failed to add event to auth events: %s", err)
 		}
 		r.currentState[he.Type()+" "+*he.StateKey()] = he
 	}
@@ -263,7 +263,7 @@ func RoomPreset(p Preset) roomModifier {
 		case PresetNone:
 			r.preset = p
 		default:
-			t.Errorf("invalid RoomPreset: %v", p)
+			t.Error("invalid RoomPreset: %v", p)
 		}
 	}
 }

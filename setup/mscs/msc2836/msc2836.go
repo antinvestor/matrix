@@ -492,7 +492,7 @@ func walkThread(
 	}
 	limited, err := eventWalker.WalkFrom(rc.req.EventID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("Failed to WalkFrom %s", rc.req.EventID)
+		util.GetLogger(ctx).WithError(err).Error("Failed to WalkFrom %s", rc.req.EventID)
 	}
 	return result, limited
 }
@@ -565,7 +565,7 @@ func (rc *reqCtx) getServersForEventID(ctx context.Context, eventID string) []sp
 		return nil
 	}
 	if rc.roomVersion == "" {
-		util.GetLogger(ctx).WithField("event_id", eventID).Errorf(
+		util.GetLogger(ctx).WithField("event_id", eventID).Error(
 			"getServersForEventID: event exists in %s with unknown room version", rc.req.RoomID,
 		)
 		return nil
@@ -627,7 +627,7 @@ func (rc *reqCtx) lookForEvent(ctx context.Context, eventID string) *types.Heade
 			rc.injectResponseToRoomserver(ctx, queryRes)
 			err := rc.db.MarkChildrenExplored(ctx, eventID)
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).Warnf("failed to mark children of %s as explored", eventID)
+				util.GetLogger(ctx).WithError(err).Warn("failed to mark children of %s as explored", eventID)
 			}
 		}
 	}
@@ -648,7 +648,7 @@ func (rc *reqCtx) getLocalEvent(ctx context.Context, roomID, eventID string) *ty
 		return nil
 	}
 	if len(queryEventsRes.Events) == 0 {
-		util.GetLogger(ctx).WithField("event_id", eventID).Infof("getLocalEvent: event does not exist")
+		util.GetLogger(ctx).WithField("event_id", eventID).Info("getLocalEvent: event does not exist")
 		return nil // event does not exist
 	}
 	return queryEventsRes.Events[0]

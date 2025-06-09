@@ -213,7 +213,7 @@ func InviteV1(
 	var strippedState []gomatrixserverlib.InviteStrippedState
 	if jsonErr := json.Unmarshal(event.Unsigned(), &strippedState); jsonErr != nil {
 		// just warn, they may not have added any.
-		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
+		util.GetLogger(httpReq.Context()).Warn("failed to extract stripped state from invite event")
 	}
 
 	if event.StateKey() == nil {

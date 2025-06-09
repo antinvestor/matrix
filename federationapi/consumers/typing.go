@@ -63,7 +63,7 @@ func (t *OutputTypingConsumer) Handle(ctx context.Context, metadata map[string]s
 	userID := metadata[queueutil.UserID]
 	typing, err := strconv.ParseBool(metadata["typing"])
 	if err != nil {
-		log.WithError(err).Errorf("EDU output log: typing parse failure")
+		log.WithError(err).Error("EDU output log: typing parse failure")
 		return nil
 	}
 

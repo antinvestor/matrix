@@ -27,11 +27,11 @@ func mustPresenceTable(ctx context.Context, svc *frame.Service, t *testing.T, _ 
 	tab, err := postgres.NewPostgresPresenceTable(ctx, cm)
 
 	if err != nil {
-		t.Fatalf("failed to make new table: %s", err)
+		t.Fatal("failed to make new table: %s", err)
 	}
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatalf("failed to migrate table: %s", err)
+		t.Fatal("failed to migrate table: %s", err)
 	}
 	return tab
 }
@@ -57,7 +57,7 @@ func TestPresence(t *testing.T) {
 		}
 		wantPos := types.StreamPosition(1)
 		if pos != wantPos {
-			t.Errorf("expected pos to be %d, got %d", wantPos, pos)
+			t.Error("expected pos to be %d, got %d", wantPos, pos)
 		}
 		pos, err = tab.UpsertPresence(ctx, bob.ID, &statusMsg, types.PresenceOnline, timestamp, false)
 		if err != nil {
@@ -65,7 +65,7 @@ func TestPresence(t *testing.T) {
 		}
 		wantPos = 2
 		if pos != wantPos {
-			t.Errorf("expected pos to be %d, got %d", wantPos, pos)
+			t.Error("expected pos to be %d, got %d", wantPos, pos)
 		}
 
 		// verify the expected max presence ID
@@ -74,7 +74,7 @@ func TestPresence(t *testing.T) {
 			t.Error(err)
 		}
 		if maxPos != wantPos {
-			t.Errorf("expected max pos to be %d, got %d", wantPos, maxPos)
+			t.Error("expected max pos to be %d, got %d", wantPos, maxPos)
 		}
 
 		// This should increment the position
@@ -84,7 +84,7 @@ func TestPresence(t *testing.T) {
 		}
 		wantPos = pos
 		if wantPos <= maxPos {
-			t.Errorf("expected pos to be %d incremented, got %d", wantPos, pos)
+			t.Error("expected pos to be %d incremented, got %d", wantPos, pos)
 		}
 
 		// This should return only Bobs status
@@ -94,7 +94,7 @@ func TestPresence(t *testing.T) {
 		}
 
 		if c := len(presences); c > 1 {
-			t.Errorf("expected only one presence, got %d", c)
+			t.Error("expected only one presence, got %d", c)
 		}
 
 		// Validate the response
@@ -110,7 +110,7 @@ func TestPresence(t *testing.T) {
 			},
 		}
 		if !reflect.DeepEqual(wantPresence, presences[bob.ID]) {
-			t.Errorf("unexpected presence result:\n%+v, want\n%+v", presences[bob.ID], wantPresence)
+			t.Error("unexpected presence result:\n%+v, want\n%+v", presences[bob.ID], wantPresence)
 		}
 
 		// Try getting presences for existing and non-existing users
@@ -121,7 +121,7 @@ func TestPresence(t *testing.T) {
 		}
 
 		if len(presencesForUsers) >= len(getUsers) {
-			t.Errorf("expected less presences, but they are the same/more as requested: %d >= %d", len(presencesForUsers), len(getUsers))
+			t.Error("expected less presences, but they are the same/more as requested: %d >= %d", len(presencesForUsers), len(getUsers))
 		}
 	})
 

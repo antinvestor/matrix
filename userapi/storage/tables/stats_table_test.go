@@ -37,20 +37,20 @@ func mustMakeDBs(ctx context.Context, svc *frame.Service, t *testing.T, _ test.D
 
 	accTable, err = postgres.NewPostgresAccountsTable(ctx, cm, "localhost")
 	if err != nil {
-		t.Fatalf("unable to create acc db: %v", err)
+		t.Fatal("unable to create acc db: %v", err)
 	}
 	devTable, err = postgres.NewPostgresDevicesTable(ctx, cm, "localhost")
 	if err != nil {
-		t.Fatalf("unable to open device db: %v", err)
+		t.Fatal("unable to open device db: %v", err)
 	}
 	statsTable, err = postgres.NewPostgresStatsTable(ctx, cm, "localhost")
 	if err != nil {
-		t.Fatalf("unable to open stats db: %v", err)
+		t.Fatal("unable to open stats db: %v", err)
 	}
 
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatalf("unable to migrate db: %v", err)
+		t.Fatal("unable to migrate db: %v", err)
 	}
 
 	return cm, accTable, devTable, statsTable
@@ -75,11 +75,11 @@ func mustMakeAccountAndDevice(
 
 	_, err := accDB.InsertAccount(ctx, localpart, serverName, "", appServiceID, accType)
 	if err != nil {
-		t.Fatalf("unable to create account: %v", err)
+		t.Fatal("unable to create account: %v", err)
 	}
 	_, err = devDB.InsertDevice(ctx, "deviceID", localpart, serverName, util.RandomString(16), nil, nil, "", userAgent)
 	if err != nil {
-		t.Fatalf("unable to create device: %v", err)
+		t.Fatal("unable to create device: %v", err)
 	}
 }
 
@@ -93,7 +93,7 @@ func mustUpdateDeviceLastSeen(
 	t.Helper()
 	err := cm.Connection(ctx, false).Exec("UPDATE userapi_devices SET last_seen_ts = $1 WHERE localpart = $2", spec.AsTimestamp(timestamp), localpart).Error
 	if err != nil {
-		t.Fatalf("unable to update device last seen")
+		t.Fatal("unable to update device last seen")
 	}
 }
 
@@ -106,7 +106,7 @@ func mustUserUpdateRegistered(
 ) {
 	err := cm.Connection(ctx, false).Exec("UPDATE userapi_accounts SET created_ts = $1 WHERE localpart = $2", spec.AsTimestamp(timestamp), localpart).Error
 	if err != nil {
-		t.Fatalf("unable to update device last seen")
+		t.Fatal("unable to update device last seen")
 	}
 }
 
@@ -124,11 +124,11 @@ func Test_UserStatistics(t *testing.T) {
 		t.Run(fmt.Sprintf("want %s database engine", wantType), func(t *testing.T) {
 			_, gotDB, err := statsDB.UserStatistics(ctx)
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				t.Fatal("unexpected error: %v", err)
 			}
 
 			if wantType != gotDB.Engine { // can't use DeepEqual, as the Version might differ
-				t.Errorf("UserStatistics() got Cm engine = %+v, want %s", gotDB.Engine, wantType)
+				t.Error("UserStatistics() got Cm engine = %+v, want %s", gotDB.Engine, wantType)
 			}
 		})
 
@@ -141,7 +141,7 @@ func Test_UserStatistics(t *testing.T) {
 			mustMakeAccountAndDevice(ctx, t, accDB, devDB, "user6", "localhost", api.AccountTypeAppService, "gecko")
 			gotStats, _, err := statsDB.UserStatistics(ctx)
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				t.Fatal("unexpected error: %v", err)
 			}
 
 			wantStats := &types.UserStatistics{
@@ -164,7 +164,7 @@ func Test_UserStatistics(t *testing.T) {
 				MonthlyUsers:    6,
 			}
 			if !reflect.DeepEqual(gotStats, wantStats) {
-				t.Errorf("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
+				t.Error("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
 			}
 		})
 
@@ -173,7 +173,7 @@ func Test_UserStatistics(t *testing.T) {
 			mustUpdateDeviceLastSeen(ctx, t, cm, "user2", time.Now().AddDate(0, 0, -30))
 			gotStats, _, err := statsDB.UserStatistics(ctx)
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				t.Fatal("unexpected error: %v", err)
 			}
 
 			wantStats := &types.UserStatistics{
@@ -196,7 +196,7 @@ func Test_UserStatistics(t *testing.T) {
 				MonthlyUsers:    4,
 			}
 			if !reflect.DeepEqual(gotStats, wantStats) {
-				t.Errorf("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
+				t.Error("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
 			}
 		})
 
@@ -213,12 +213,12 @@ func Test_UserStatistics(t *testing.T) {
 			startTime := time.Now().AddDate(0, 0, -2)
 			err := statsDB.UpdateUserDailyVisits(ctx, startTime, startTime.Truncate(time.Hour*24))
 			if err != nil {
-				t.Fatalf("unable to update daily visits stats: %v", err)
+				t.Fatal("unable to update daily visits stats: %v", err)
 			}
 
 			gotStats, _, err := statsDB.UserStatistics(ctx)
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				t.Fatal("unexpected error: %v", err)
 			}
 
 			wantStats := &types.UserStatistics{
@@ -244,7 +244,7 @@ func Test_UserStatistics(t *testing.T) {
 				MonthlyUsers:    5,
 			}
 			if !reflect.DeepEqual(gotStats, wantStats) {
-				t.Errorf("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
+				t.Error("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
 			}
 		})
 
@@ -264,12 +264,12 @@ func Test_UserStatistics(t *testing.T) {
 				startTime := time.Now().AddDate(0, 0, -i)
 				err := statsDB.UpdateUserDailyVisits(ctx, startTime, startTime.Truncate(time.Hour*24))
 				if err != nil {
-					t.Fatalf("unable to update daily visits stats: %v", err)
+					t.Fatal("unable to update daily visits stats: %v", err)
 				}
 			}
 			gotStats, _, err := statsDB.UserStatistics(ctx)
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				t.Fatal("unexpected error: %v", err)
 			}
 
 			wantStats := &types.UserStatistics{
@@ -295,7 +295,7 @@ func Test_UserStatistics(t *testing.T) {
 				MonthlyUsers:    5,
 			}
 			if !reflect.DeepEqual(gotStats, wantStats) {
-				t.Errorf("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
+				t.Error("UserStatistics() gotStats = \n%+v\nwant\n%+v", gotStats, wantStats)
 			}
 		})
 	})

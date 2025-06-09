@@ -130,7 +130,7 @@ func Send(
 		txnID,
 		cfg.Global.ServerName)
 
-	util.GetLogger(httpReq.Context()).Debugf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, request.Origin(), len(t.PDUs), len(t.EDUs))
+	util.GetLogger(httpReq.Context()).Debug("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, request.Origin(), len(t.PDUs), len(t.EDUs))
 
 	resp, jsonErr := t.ProcessTransaction(httpReq.Context())
 	if jsonErr != nil {

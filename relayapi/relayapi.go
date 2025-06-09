@@ -67,7 +67,7 @@ func NewRelayInternalAPI(
 
 	relayCm, err := cm.FromOptions(ctx, &cfg.RelayAPI.Database)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to obtain relay db connection manager :%v", err)
+		logrus.WithError(err).Panic("failed to obtain relay db connection manager :%v", err)
 	}
 	relayDB, err := storage.NewDatabase(ctx, relayCm, caches, cfg.Global.IsLocalServerName)
 	if err != nil {

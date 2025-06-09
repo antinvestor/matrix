@@ -65,7 +65,7 @@ func GetNotifications(
 			JSON: spec.InternalServerError{},
 		}
 	}
-	util.GetLogger(req.Context()).WithField("from", req.URL.Query().Get("from")).WithField("limit", limit).WithField("only", req.URL.Query().Get("only")).WithField("next", queryRes.NextToken).Infof("QueryNotifications: len %d", len(queryRes.Notifications))
+	util.GetLogger(req.Context()).WithField("from", req.URL.Query().Get("from")).WithField("limit", limit).WithField("only", req.URL.Query().Get("only")).WithField("next", queryRes.NextToken).Info("QueryNotifications: len %d", len(queryRes.Notifications))
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: queryRes,

@@ -70,7 +70,7 @@ func SetPresence(
 	}
 	err := producer.SendPresence(req.Context(), userID, presenceStatus, presence.StatusMsg)
 	if err != nil {
-		log.WithError(err).Errorf("failed to update presence")
+		log.WithError(err).Error("failed to update presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -97,7 +97,7 @@ func GetPresence(
 	}))
 
 	if err != nil {
-		log.WithError(err).Errorf("unable to get presence")
+		log.WithError(err).Error("unable to get presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

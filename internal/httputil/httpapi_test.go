@@ -102,7 +102,7 @@ func TestWrapHandlerInBasicAuth(t *testing.T) {
 			resp := w.Result()
 
 			if resp.StatusCode != tt.want {
-				t.Errorf("Expected status code %d, got %d", resp.StatusCode, tt.want)
+				t.Error("Expected status code %d, got %d", resp.StatusCode, tt.want)
 			}
 		})
 	}

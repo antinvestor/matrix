@@ -117,7 +117,7 @@ func (t *loginTokenTable) DeleteLoginToken(ctx context.Context, token string) er
 	}
 
 	if n := result.RowsAffected; n > 1 {
-		util.GetLogger(ctx).WithField("num_deleted", n).Infof("Deleted %d login tokens (%d likely additional expired token)", n, n-1)
+		util.GetLogger(ctx).WithField("num_deleted", n).Info("Deleted %d login tokens (%d likely additional expired token)", n, n-1)
 	}
 	return nil
 }

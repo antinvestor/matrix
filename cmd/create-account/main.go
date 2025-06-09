@@ -82,7 +82,7 @@ func main() {
 	cfg := setup.ParseFlags(true)
 
 	if *resetPassword {
-		logrus.Fatalf("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")
+		logrus.Fatal("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")
 	}
 
 	if cfg.ClientAPI.RegistrationSharedSecret == "" {
@@ -116,7 +116,7 @@ func main() {
 		logrus.Fatalln("Failed to create the account:", err.Error())
 	}
 
-	logrus.Infof("Created account: %s (AccessToken: %s)", *username, accessToken)
+	logrus.Info("Created account: %s (AccessToken: %s)", *username, accessToken)
 }
 
 type sharedSecretRegistrationRequest struct {

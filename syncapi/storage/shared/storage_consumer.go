@@ -120,14 +120,14 @@ func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Dev
 			if err != nil {
 				logrus.WithFields(logrus.Fields{
 					"event_id": out[i].EventID(),
-				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				}).WithError(err).Warn("Failed to add transaction ID to event")
 				continue
 			}
 			deviceSenderID, err := rsAPI.QuerySenderIDForUser(ctx, in[i].RoomID(), *userID)
 			if err != nil || deviceSenderID == nil {
 				logrus.WithFields(logrus.Fields{
 					"event_id": out[i].EventID(),
-				}).WithError(err).Warnf("Failed to add transaction ID to event")
+				}).WithError(err).Warn("Failed to add transaction ID to event")
 				continue
 			}
 			if *deviceSenderID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
@@ -137,7 +137,7 @@ func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Dev
 				if err != nil {
 					logrus.WithFields(logrus.Fields{
 						"event_id": out[i].EventID(),
-					}).WithError(err).Warnf("Failed to add transaction ID to event")
+					}).WithError(err).Warn("Failed to add transaction ID to event")
 				}
 			}
 		}
@@ -382,7 +382,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 		return err
 	}
 	if len(redactedEvents) == 0 {
-		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warnf("missing redacted event for redaction")
+		logrus.WithField("event_id", redactedEventID).WithField("redaction_event", redactedBecause.EventID()).Warn("missing redacted event for redaction")
 		return nil
 	}
 	eventToRedact := redactedEvents[0].PDU
@@ -478,7 +478,7 @@ func (d *Database) fetchMissingStateEvents(
 		return nil, err
 	}
 	if len(stateEvents) != len(missing) {
-		logrus.WithContext(ctx).Warnf("Failed to map all event IDs to events (got %d, wanted %d)", len(stateEvents), len(missing))
+		logrus.WithContext(ctx).Warn("Failed to map all event IDs to events (got %d, wanted %d)", len(stateEvents), len(missing))
 
 		// TODO: Why is this happening? It's probably the roomserver. Uncomment
 		// this error again when we work out what it is and fix it, otherwise we
@@ -518,7 +518,7 @@ func (d *Database) CleanSendToDeviceUpdates(
 	if err = d.Cm.Do(ctx, func(ctx context.Context) error {
 		return d.SendToDevice.DeleteSendToDeviceMessages(ctx, userID, deviceID, before)
 	}); err != nil {
-		logrus.WithError(err).Errorf("Failed to clean up old send-to-device messages for user %q device %q", userID, deviceID)
+		logrus.WithError(err).Error("Failed to clean up old send-to-device messages for user %q device %q", userID, deviceID)
 		return err
 	}
 	return nil

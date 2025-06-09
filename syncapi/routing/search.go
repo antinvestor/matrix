@@ -277,7 +277,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		},
 	}
 
-	logrus.Debugf("Full search request took %v", time.Since(start))
+	logrus.Debug("Full search request took %v", time.Since(start))
 
 	succeeded = true
 	return util.JSONResponse{

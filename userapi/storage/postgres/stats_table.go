@@ -268,7 +268,7 @@ func (s *statsTable) startTimers(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 		default:
-			logrus.Infof("Executing UpdateUserDailyVisits")
+			logrus.Info("Executing UpdateUserDailyVisits")
 			if err := s.UpdateUserDailyVisits(ctx, time.Now(), s.lastUpdate); err != nil {
 				logrus.WithError(err).Error("failed to update daily user visits")
 			}

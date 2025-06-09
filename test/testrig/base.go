@@ -93,11 +93,6 @@ func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *fr
 
 	srv.Init(srvOpts...)
 
-	err = srv.Run(ctx, "")
-	if err != nil {
-		t.Fatalf("Could not run service %s", err)
-	}
-
 	return ctx, srv, cfg
 }
 

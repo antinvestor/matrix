@@ -537,7 +537,7 @@ func applyHistoryVisibilityFilter(
 		"room_id":  roomID,
 		"before":   len(recentEvents),
 		"after":    len(events),
-	}).Debugf("Applied history visibility (sync)")
+	}).Debug("Applied history visibility (sync)")
 	return events, nil
 }
 

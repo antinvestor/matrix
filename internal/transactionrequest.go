@@ -155,7 +155,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 					JSON: spec.BadJSON("PDU contains bad JSON"),
 				}
 			}
-			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Failed to parse event JSON of event %s", string(pdu))
+			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to parse event JSON of event %s", string(pdu))
 			continue
 		}
 		if event.Type() == spec.MRoomCreate && event.StateKeyEquals("") {
@@ -170,7 +170,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		if err = gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return t.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
-			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Couldn't validate signature of event %q", event.EventID())
+			util.GetLogger(ctx).WithError(err).Debug("Transaction: Couldn't validate signature of event %q", event.EventID())
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
 			}
@@ -193,7 +193,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			nil,
 			true,
 		); err != nil {
-			util.GetLogger(ctx).WithError(err).Errorf("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
+			util.GetLogger(ctx).WithError(err).Error("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
 			}
@@ -283,7 +283,7 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 						continue
 					}
 					if t.Origin != domain {
-						util.GetLogger(ctx).Debugf("Dropping receipt event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
+						util.GetLogger(ctx).Debug("Dropping receipt event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
 						continue
 					}
 					if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs); err != nil {
@@ -300,12 +300,12 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 		case types.MSigningKeyUpdate:
 			if err := t.producer.SendSigningKeyUpdate(ctx, e.Content, t.Origin); err != nil {
 
-				logrus.WithError(err).Errorf("Failed to process signing key update")
+				logrus.WithError(err).Error("Failed to process signing key update")
 			}
 		case spec.MPresence:
 			if t.inboundPresenceEnabled {
 				if err := t.processPresence(ctx, e); err != nil {
-					logrus.WithError(err).Errorf("Failed to process presence update")
+					logrus.WithError(err).Error("Failed to process presence update")
 				}
 			}
 		default:

@@ -86,7 +86,7 @@ func TestIsServerAllowed(t *testing.T) {
 			defer svc.Stop(ctx)
 
 			if tt.roomFunc == nil {
-				t.Fatalf("missing roomFunc")
+				t.Fatal("missing roomFunc")
 			}
 			var authEvents []gomatrixserverlib.PDU
 			for _, ev := range tt.roomFunc().Events() {
@@ -94,7 +94,7 @@ func TestIsServerAllowed(t *testing.T) {
 			}
 
 			if got := IsServerAllowed(ctx, &FakeQuerier{}, tt.serverName, tt.serverCurrentlyInRoom, authEvents); got != tt.want {
-				t.Errorf("IsServerAllowed() = %v, want %v", got, tt.want)
+				t.Error("IsServerAllowed() = %v, want %v", got, tt.want)
 			}
 		})
 	}

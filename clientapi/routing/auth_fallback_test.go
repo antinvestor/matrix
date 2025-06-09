@@ -39,7 +39,7 @@ func Test_AuthFallback(t *testing.T) {
 						cfgErrs := &config.ConfigErrors{}
 						cfg.ClientAPI.Verify(cfgErrs)
 						if len(*cfgErrs) > 0 {
-							t.Fatalf("(hCaptcha=%v) unexpected config errors: %s", useHCaptcha, cfgErrs.Error())
+							t.Fatal("(hCaptcha=%v) unexpected config errors: %s", useHCaptcha, cfgErrs.Error())
 						}
 
 						req := httptest.NewRequest(http.MethodGet, "/?session=1337", nil)
@@ -48,14 +48,14 @@ func Test_AuthFallback(t *testing.T) {
 						AuthFallback(rec, req, authtypes.LoginTypeRecaptcha, &cfg.ClientAPI)
 						if !recaptchaEnabled {
 							if rec.Code != http.StatusBadRequest {
-								t.Fatalf("unexpected response code: %d, want %d", rec.Code, http.StatusBadRequest)
+								t.Fatal("unexpected response code: %d, want %d", rec.Code, http.StatusBadRequest)
 							}
 							if rec.Body.String() != "Recaptcha login is disabled on this Homeserver" {
-								t.Fatalf("unexpected response body: %s", rec.Body.String())
+								t.Fatal("unexpected response body: %s", rec.Body.String())
 							}
 						} else {
 							if !strings.Contains(rec.Body.String(), cfg.ClientAPI.RecaptchaSitekeyClass) {
-								t.Fatalf("body does not contain %s: %s", cfg.ClientAPI.RecaptchaSitekeyClass, rec.Body.String())
+								t.Fatal("body does not contain %s: %s", cfg.ClientAPI.RecaptchaSitekeyClass, rec.Body.String())
 							}
 						}
 
@@ -79,26 +79,26 @@ func Test_AuthFallback(t *testing.T) {
 						if recaptchaEnabled {
 							if !wantErr {
 								if rec.Code != http.StatusOK {
-									t.Fatalf("unexpected response code: %d, want %d", rec.Code, http.StatusOK)
+									t.Fatal("unexpected response code: %d, want %d", rec.Code, http.StatusOK)
 								}
 								if rec.Body.String() != successTemplate {
-									t.Fatalf("unexpected response: %s, want %s", rec.Body.String(), successTemplate)
+									t.Fatal("unexpected response: %s, want %s", rec.Body.String(), successTemplate)
 								}
 							} else {
 								if rec.Code != http.StatusUnauthorized {
-									t.Fatalf("unexpected response code: %d, want %d", rec.Code, http.StatusUnauthorized)
+									t.Fatal("unexpected response code: %d, want %d", rec.Code, http.StatusUnauthorized)
 								}
 								wantString := "Authentication"
 								if !strings.Contains(rec.Body.String(), wantString) {
-									t.Fatalf("expected response to contain '%s', but didn't: %s", wantString, rec.Body.String())
+									t.Fatal("expected response to contain '%s', but didn't: %s", wantString, rec.Body.String())
 								}
 							}
 						} else {
 							if rec.Code != http.StatusBadRequest {
-								t.Fatalf("unexpected response code: %d, want %d", rec.Code, http.StatusBadRequest)
+								t.Fatal("unexpected response code: %d, want %d", rec.Code, http.StatusBadRequest)
 							}
 							if rec.Body.String() != "Recaptcha login is disabled on this Homeserver" {
-								t.Fatalf("unexpected response: %s, want %s", rec.Body.String(), "successTemplate")
+								t.Fatal("unexpected response: %s, want %s", rec.Body.String(), "successTemplate")
 							}
 						}
 					})
@@ -111,7 +111,7 @@ func Test_AuthFallback(t *testing.T) {
 			rec := httptest.NewRecorder()
 			AuthFallback(rec, req, "DoesNotExist", &cfg.ClientAPI)
 			if rec.Code != http.StatusNotImplemented {
-				t.Fatalf("unexpected http status: %d, want %d", rec.Code, http.StatusNotImplemented)
+				t.Fatal("unexpected http status: %d, want %d", rec.Code, http.StatusNotImplemented)
 			}
 		})
 
@@ -120,7 +120,7 @@ func Test_AuthFallback(t *testing.T) {
 			rec := httptest.NewRecorder()
 			AuthFallback(rec, req, authtypes.LoginTypeRecaptcha, &cfg.ClientAPI)
 			if rec.Code != http.StatusMethodNotAllowed {
-				t.Fatalf("unexpected http status: %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+				t.Fatal("unexpected http status: %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 			}
 		})
 
@@ -129,7 +129,7 @@ func Test_AuthFallback(t *testing.T) {
 			rec := httptest.NewRecorder()
 			AuthFallback(rec, req, authtypes.LoginTypeRecaptcha, &cfg.ClientAPI)
 			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("unexpected http status: %d, want %d", rec.Code, http.StatusBadRequest)
+				t.Fatal("unexpected http status: %d, want %d", rec.Code, http.StatusBadRequest)
 			}
 		})
 
@@ -138,7 +138,7 @@ func Test_AuthFallback(t *testing.T) {
 			rec := httptest.NewRecorder()
 			AuthFallback(rec, req, authtypes.LoginTypeRecaptcha, &cfg.ClientAPI)
 			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("unexpected http status: %d, want %d", rec.Code, http.StatusBadRequest)
+				t.Fatal("unexpected http status: %d, want %d", rec.Code, http.StatusBadRequest)
 			}
 		})
 
@@ -147,7 +147,7 @@ func Test_AuthFallback(t *testing.T) {
 			rec := httptest.NewRecorder()
 			AuthFallback(rec, req, authtypes.LoginTypeRecaptcha, &cfg.ClientAPI)
 			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("unexpected http status: %d, want %d", rec.Code, http.StatusBadRequest)
+				t.Fatal("unexpected http status: %d, want %d", rec.Code, http.StatusBadRequest)
 			}
 		})
 

@@ -177,7 +177,7 @@ func OnIncomingMessagesRequest(
 			fromStream = &streamToken
 			from, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
 			if err != nil {
-				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
+				logrus.WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -202,7 +202,7 @@ func OnIncomingMessagesRequest(
 			} else {
 				to, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
 				if err != nil {
-					logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
+					logrus.WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
 					return util.JSONResponse{
 						Code: http.StatusInternalServerError,
 						JSON: spec.InternalServerError{},
@@ -358,7 +358,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 		"start":     r.from,
 		"end":       r.to,
 		"backwards": r.backwardOrdering,
-	}).Infof("Fetched %d events locally", len(streamEvents))
+	}).Info("Fetched %d events locally", len(streamEvents))
 
 	// There can be two reasons for streamEvents to be empty: either we've
 	// reached the oldest event in the room (or the most recent one, depending

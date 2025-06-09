@@ -109,7 +109,7 @@ func Setup(
 	})
 
 	if cfg.Global.WellKnownServerName != "" {
-		logrus.Infof("Setting m.server as %s at /.well-known/matrix/server", cfg.Global.WellKnownServerName)
+		logrus.Info("Setting m.server as %s at /.well-known/matrix/server", cfg.Global.WellKnownServerName)
 		wkMux.Handle("/server", httputil.MakeExternalAPI("wellknown", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -390,7 +390,7 @@ func Setup(
 				}
 			}
 
-			logrus.Debugf("Processing make_join for user %s, room %s", userID.String(), roomID.String())
+			logrus.Debug("Processing make_join for user %s, room %s", userID.String(), roomID.String())
 			return MakeJoin(
 				httpReq, request, cfg, rsAPI, *roomID, *userID, remoteVersions,
 			)
@@ -694,7 +694,7 @@ func MakeFedHTTPAPI(
 		logger := util.GetLogger(req.Context())
 		if fedReq == nil {
 
-			logger.Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, errResp.Code)
+			logger.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, errResp.Code)
 			w.WriteHeader(errResp.Code)
 			if err := enc.Encode(errResp); err != nil {
 				logger.WithError(err).Error("failed to encode JSON response")

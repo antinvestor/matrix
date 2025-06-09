@@ -402,8 +402,16 @@ func (q *QueueOptions) DSrc() DataSource {
 		query.Set("stream_name", fmt.Sprintf("%s%s", q.Prefix, query.Get("stream_name")))
 	}
 
+	if query.Has("stream_subjects") {
+		query.Set("stream_subjects", fmt.Sprintf("%s%s", q.Prefix, query.Get("stream_subjects")))
+	}
+
 	if query.Has("consumer_durable_name") {
 		query.Set("consumer_durable_name", fmt.Sprintf("%s%s", q.Prefix, query.Get("consumer_durable_name")))
+	}
+
+	if query.Has("consumer_filter_subject") {
+		query.Set("consumer_filter_subject", fmt.Sprintf("%s%s", q.Prefix, query.Get("consumer_filter_subject")))
 	}
 
 	uri.RawQuery = query.Encode()

@@ -28,7 +28,7 @@ func mustCreateInviteTable(ctx context.Context, svc *frame.Service, t *testing.T
 
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatalf("failed to migrate table: %s", err)
+		t.Fatal("failed to migrate table: %s", err)
 	}
 
 	return tab

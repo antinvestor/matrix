@@ -392,11 +392,11 @@ func newReq(t *testing.T, jsonBody map[string]interface{}) *msc2836.EventRelatio
 	t.Helper()
 	b, err := json.Marshal(jsonBody)
 	if err != nil {
-		t.Fatalf("Failed to marshal request: %s", err)
+		t.Fatal("Failed to marshal request: %s", err)
 	}
 	r, err := msc2836.NewEventRelationshipRequest(bytes.NewBuffer(b))
 	if err != nil {
-		t.Fatalf("Failed to NewEventRelationshipRequest: %s", err)
+		t.Fatal("Failed to NewEventRelationshipRequest: %s", err)
 	}
 	return r
 }
@@ -424,7 +424,7 @@ func postRelationships(t *testing.T, expectCode int, accessToken string, req *ms
 	r.Defaults()
 	data, err := json.Marshal(req)
 	if err != nil {
-		t.Fatalf("failed to marshal request: %s", err)
+		t.Fatal("failed to marshal request: %s", err)
 	}
 	httpReq, err := http.NewRequest(
 		"POST", "http://localhost:8009/_matrix/client/unstable/event_relationships",
@@ -432,24 +432,24 @@ func postRelationships(t *testing.T, expectCode int, accessToken string, req *ms
 	)
 	httpReq.Header.Set("Authorization", "Bearer "+accessToken)
 	if err != nil {
-		t.Fatalf("failed to prepare request: %s", err)
+		t.Fatal("failed to prepare request: %s", err)
 	}
 	res, err := client.Do(httpReq)
 	if err != nil {
-		t.Fatalf("failed to do request: %s", err)
+		t.Fatal("failed to do request: %s", err)
 	}
 	if res.StatusCode != expectCode {
 		body, _ := io.ReadAll(res.Body)
-		t.Fatalf("wrong response code, got %d want %d - body: %s", res.StatusCode, expectCode, string(body))
+		t.Fatal("wrong response code, got %d want %d - body: %s", res.StatusCode, expectCode, string(body))
 	}
 	if res.StatusCode == 200 {
 		var result msc2836.EventRelationshipResponse
 		body, err := io.ReadAll(res.Body)
 		if err != nil {
-			t.Fatalf("response 200 OK but failed to read response body: %s", err)
+			t.Fatal("response 200 OK but failed to read response body: %s", err)
 		}
 		if err := json.Unmarshal(body, &result); err != nil {
-			t.Fatalf("response 200 OK but failed to deserialise JSON : %s\nbody: %s", err, string(body))
+			t.Fatal("response 200 OK but failed to deserialise JSON : %s\nbody: %s", err, string(body))
 		}
 		return &result
 	}
@@ -463,11 +463,11 @@ func assertContains(t *testing.T, result *msc2836.EventRelationshipResponse, wan
 		gotEventIDs[i] = ev.EventID
 	}
 	if len(gotEventIDs) != len(wantEventIDs) {
-		t.Fatalf("length mismatch: got %v want %v", gotEventIDs, wantEventIDs)
+		t.Fatal("length mismatch: got %v want %v", gotEventIDs, wantEventIDs)
 	}
 	for i := range gotEventIDs {
 		if gotEventIDs[i] != wantEventIDs[i] {
-			t.Errorf("wrong item in position %d - got %s want %s", i, gotEventIDs[i], wantEventIDs[i])
+			t.Error("wrong item in position %d - got %s want %s", i, gotEventIDs[i], wantEventIDs[i])
 		}
 	}
 }
@@ -482,18 +482,18 @@ func assertUnsignedChildren(t *testing.T, ev synctypes.ClientEvent, relType stri
 		if wantCount == 0 {
 			return // no children so possible there is no unsigned field at all
 		}
-		t.Fatalf("Failed to unmarshal unsigned field: %s", err)
+		t.Fatal("Failed to unmarshal unsigned field: %s", err)
 	}
 	// zero checks
 	if wantCount == 0 {
 		if len(unsigned.Children) != 0 || unsigned.Hash != "" {
-			t.Fatalf("want 0 children but got unsigned fields %+v", unsigned)
+			t.Fatal("want 0 children but got unsigned fields %+v", unsigned)
 		}
 		return
 	}
 	gotCount := unsigned.Children[relType]
 	if gotCount != wantCount {
-		t.Errorf("Got %d count, want %d count for rel_type %s", gotCount, wantCount, relType)
+		t.Error("Got %d count, want %d count for rel_type %s", gotCount, wantCount, relType)
 	}
 	// work out the hash
 	sort.Strings(childrenEventIDs)
@@ -505,7 +505,7 @@ func assertUnsignedChildren(t *testing.T, ev synctypes.ClientEvent, relType stri
 	hashValBytes := sha256.Sum256([]byte(b.String()))
 	wantHash := base64.RawStdEncoding.EncodeToString(hashValBytes[:])
 	if wantHash != unsigned.Hash {
-		t.Errorf("Got unsigned hash %s want hash %s", unsigned.Hash, wantHash)
+		t.Error("Got unsigned hash %s want hash %s", unsigned.Hash, wantHash)
 	}
 }
 
@@ -574,7 +574,7 @@ func injectEvents(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t
 	routers := httputil.NewRouters()
 	err := msc2836.Enable(ctx, cfg, cm, routers, rsAPI, nil, userAPI, nil)
 	if err != nil {
-		t.Fatalf("failed to enable MSC2836: %s", err)
+		t.Fatal("failed to enable MSC2836: %s", err)
 	}
 	for _, ev := range events {
 		hooks.Run(hooks.KindNewEventPersisted, ev)
@@ -604,13 +604,13 @@ func mustCreateEvent(t *testing.T, ev fledglingEvent) (result *types.HeaderedEve
 	})
 	err := eb.SetContent(ev.Content)
 	if err != nil {
-		t.Fatalf("mustCreateEvent: failed to marshal event content %+v", ev.Content)
+		t.Fatal("mustCreateEvent: failed to marshal event content %+v", ev.Content)
 	}
 	// make sure the origin_server_ts changes so we can test recency
 	time.Sleep(1 * time.Millisecond)
 	signedEvent, err := eb.Build(time.Now(), spec.ServerName("localhost"), "ed25519:test", key)
 	if err != nil {
-		t.Fatalf("mustCreateEvent: failed to sign event: %s", err)
+		t.Fatal("mustCreateEvent: failed to sign event: %s", err)
 	}
 	h := &types.HeaderedEvent{PDU: signedEvent}
 	return h

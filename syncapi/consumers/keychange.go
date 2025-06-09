@@ -65,7 +65,7 @@ func NewOutputKeyChangeEventConsumer(
 func (s *OutputKeyChangeEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	var m api.DeviceMessage
 	if err := json.Unmarshal(message, &m); err != nil {
-		logrus.WithError(err).Errorf("failed to read device message from key change topic")
+		logrus.WithError(err).Error("failed to read device message from key change topic")
 		return nil
 	}
 	if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {

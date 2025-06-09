@@ -72,7 +72,7 @@ func GetUserDevices(
 		var key fclient.RespUserDeviceKeys
 		err := json.Unmarshal(dev.KeyJSON, &key)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Warnf("malformed device key: %s", string(dev.KeyJSON))
+			util.GetLogger(req.Context()).WithError(err).Warn("malformed device key: %s", string(dev.KeyJSON))
 			continue
 		}
 

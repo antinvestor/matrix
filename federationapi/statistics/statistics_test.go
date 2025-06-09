@@ -31,7 +31,7 @@ func TestBackoff(t *testing.T) {
 	// Start by checking that counting successes works.
 	server.Success(ctx, SendDirect)
 	if successes := server.SuccessCount(); successes != 1 {
-		t.Fatalf("Expected success count 1, got %d", successes)
+		t.Fatal("Expected success count 1, got %d", successes)
 	}
 
 	// Register a failure.
@@ -57,20 +57,20 @@ func TestBackoff(t *testing.T) {
 
 		if i >= stats.FailuresUntilAssumedOffline {
 			if !assumedOffline {
-				t.Fatalf("Backoff %d should have resulted in assuming the destination was offline but didn't", i)
+				t.Fatal("Backoff %d should have resulted in assuming the destination was offline but didn't", i)
 			}
 		}
 
 		// Check if we should be assumed offline by now.
 		if i >= stats.FailuresUntilAssumedOffline {
 			if !assumedOffline {
-				t.Fatalf("Backoff %d should have resulted in assumed offline but didn't", i)
+				t.Fatal("Backoff %d should have resulted in assumed offline but didn't", i)
 			} else {
 				t.Logf("Backoff %d is assumed offline as expected", i)
 			}
 		} else {
 			if assumedOffline {
-				t.Fatalf("Backoff %d should not have resulted in assumed offline but did", i)
+				t.Fatal("Backoff %d should not have resulted in assumed offline but did", i)
 			} else {
 				t.Logf("Backoff %d is not assumed offline as expected", i)
 			}
@@ -79,16 +79,16 @@ func TestBackoff(t *testing.T) {
 		// Check if we should be blacklisted by now.
 		if i >= stats.FailuresUntilBlacklist {
 			if !blacklist {
-				t.Fatalf("Backoff %d should have resulted in blacklist but didn't", i)
+				t.Fatal("Backoff %d should have resulted in blacklist but didn't", i)
 			} else if blacklist != blacklisted {
-				t.Fatalf("Blacklisted and Failure returned different blacklist values")
+				t.Fatal("Blacklisted and Failure returned different blacklist values")
 			} else {
 				t.Logf("Backoff %d is blacklisted as expected", i)
 				continue
 			}
 		} else {
 			if blacklist {
-				t.Fatalf("Backoff %d should not have resulted in blacklist but did", i)
+				t.Fatal("Backoff %d should not have resulted in blacklist but did", i)
 			} else {
 				t.Logf("Backoff %d is not blacklisted as expected", i)
 			}
@@ -106,7 +106,7 @@ func TestBackoff(t *testing.T) {
 			inJitterRange = false
 		}
 		if !blacklist && !inJitterRange {
-			t.Fatalf("Backoff %d should have been between %s and %s but was %s", i, minDuration, maxDuration, duration)
+			t.Fatal("Backoff %d should have been between %s and %s but was %s", i, minDuration, maxDuration, duration)
 		}
 	}
 }

@@ -92,7 +92,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 				}()
 			}
 			if err != nil {
-				log.WithError(err).Errorf("Issue querying room alias on application service %s", appservice.ID)
+				log.WithError(err).Error("Issue querying room alias on application service %s", appservice.ID)
 				return err
 			}
 			switch resp.StatusCode {

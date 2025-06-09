@@ -23,11 +23,11 @@ func mustCreateTable(ctx context.Context, svc *frame.Service, t *testing.T, _ te
 	tab, err := postgres.NewPostgresStaleDeviceListsTable(ctx, cm)
 
 	if err != nil {
-		t.Fatalf("failed to create new table: %s", err)
+		t.Fatal("failed to create new table: %s", err)
 	}
 	err = cm.Migrate(ctx)
 	if err != nil {
-		t.Fatalf("failed to migrate stale device lists table: %s", err)
+		t.Fatal("failed to migrate stale device lists table: %s", err)
 	}
 	return tab
 }
@@ -45,49 +45,49 @@ func TestStaleDeviceLists(t *testing.T) {
 		tab := mustCreateTable(ctx, svc, t, testOpts)
 
 		if err := tab.InsertStaleDeviceList(ctx, alice.ID, true); err != nil {
-			t.Fatalf("failed to insert stale device: %s", err)
+			t.Fatal("failed to insert stale device: %s", err)
 		}
 		if err := tab.InsertStaleDeviceList(ctx, bob.ID, true); err != nil {
-			t.Fatalf("failed to insert stale device: %s", err)
+			t.Fatal("failed to insert stale device: %s", err)
 		}
 		if err := tab.InsertStaleDeviceList(ctx, charlie, true); err != nil {
-			t.Fatalf("failed to insert stale device: %s", err)
+			t.Fatal("failed to insert stale device: %s", err)
 		}
 
 		// Query one server
 		wantStaleUsers := []string{alice.ID, bob.ID}
 		gotStaleUsers, err := tab.SelectUserIDsWithStaleDeviceLists(ctx, []spec.ServerName{"test"})
 		if err != nil {
-			t.Fatalf("failed to query stale device lists: %s", err)
+			t.Fatal("failed to query stale device lists: %s", err)
 		}
 		if !test.UnsortedStringSliceEqual(wantStaleUsers, gotStaleUsers) {
-			t.Fatalf("expected stale users %v, got %v", wantStaleUsers, gotStaleUsers)
+			t.Fatal("expected stale users %v, got %v", wantStaleUsers, gotStaleUsers)
 		}
 
 		// Query all servers
 		wantStaleUsers = []string{alice.ID, bob.ID, charlie}
 		gotStaleUsers, err = tab.SelectUserIDsWithStaleDeviceLists(ctx, []spec.ServerName{})
 		if err != nil {
-			t.Fatalf("failed to query stale device lists: %s", err)
+			t.Fatal("failed to query stale device lists: %s", err)
 		}
 		if !test.UnsortedStringSliceEqual(wantStaleUsers, gotStaleUsers) {
-			t.Fatalf("expected stale users %v, got %v", wantStaleUsers, gotStaleUsers)
+			t.Fatal("expected stale users %v, got %v", wantStaleUsers, gotStaleUsers)
 		}
 
 		// Delete stale devices
 		deleteUsers := []string{alice.ID, bob.ID}
 		if err = tab.DeleteStaleDeviceLists(ctx, deleteUsers); err != nil {
-			t.Fatalf("failed to delete stale device lists: %s", err)
+			t.Fatal("failed to delete stale device lists: %s", err)
 		}
 
 		// Verify we don't get anything back after deleting
 		gotStaleUsers, err = tab.SelectUserIDsWithStaleDeviceLists(ctx, []spec.ServerName{"test"})
 		if err != nil {
-			t.Fatalf("failed to query stale device lists: %s", err)
+			t.Fatal("failed to query stale device lists: %s", err)
 		}
 
 		if gotCount := len(gotStaleUsers); gotCount > 0 {
-			t.Fatalf("expected no stale users, got %d", gotCount)
+			t.Fatal("expected no stale users, got %d", gotCount)
 		}
 	})
 }

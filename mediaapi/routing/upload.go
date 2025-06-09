@@ -152,7 +152,7 @@ func (r *uploadRequest) doUpload(
 		if cfg.MaxFileSizeBytes+1 <= 0 {
 			r.Logger.WithFields(log.Fields{
 				"MaxFileSizeBytes": cfg.MaxFileSizeBytes,
-			}).Warnf("Configured MaxFileSizeBytes overflows int64, defaulting to %d bytes", config.DefaultMaxFileSizeBytes)
+			}).Warn("Configured MaxFileSizeBytes overflows int64, defaulting to %d bytes", config.DefaultMaxFileSizeBytes)
 			cfg.MaxFileSizeBytes = config.DefaultMaxFileSizeBytes
 		}
 		reqReader = io.LimitReader(reqReader, int64(cfg.MaxFileSizeBytes)+1)
@@ -334,7 +334,7 @@ func (r *uploadRequest) storeFileAndMetadata(
 		// Check if we need to generate thumbnails
 		fileType := http.DetectContentType(buf)
 		if !strings.HasPrefix(fileType, "image") {
-			r.Logger.WithField("contentType", fileType).Debugf("uploaded file is not an image or can not be thumbnailed, not generating thumbnails")
+			r.Logger.WithField("contentType", fileType).Debug("uploaded file is not an image or can not be thumbnailed, not generating thumbnails")
 			return
 		}
 

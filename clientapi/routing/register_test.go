@@ -177,7 +177,7 @@ func TestValidationOfApplicationServices(t *testing.T) {
 	regex := "@_appservice_.*"
 	regExpression, err := regexp.Compile(regex)
 	if err != nil {
-		t.Errorf("Error compiling regex: %s", regex)
+		t.Error("Error compiling regex: %s", regex)
 	}
 
 	fakeNamespace := config.ApplicationServiceNamespace{
@@ -209,25 +209,25 @@ func TestValidationOfApplicationServices(t *testing.T) {
 	// Access token is correct, user_id omitted so we are acting as SenderLocalpart
 	asID, resp := validateApplicationService(&cfg.ClientAPI, fakeSenderLocalpart, "1234")
 	if resp != nil || asID != fakeID {
-		t.Errorf("appservice should have validated and returned correct ID: %s", resp.JSON)
+		t.Error("appservice should have validated and returned correct ID: %s", resp.JSON)
 	}
 
 	// Access token is incorrect, user_id omitted so we are acting as SenderLocalpart
 	asID, resp = validateApplicationService(&cfg.ClientAPI, fakeSenderLocalpart, "xxxx")
 	if resp == nil || asID == fakeID {
-		t.Errorf("access_token should have been marked as invalid")
+		t.Error("access_token should have been marked as invalid")
 	}
 
 	// Access token is correct, acting as valid user_id
 	asID, resp = validateApplicationService(&cfg.ClientAPI, "_appservice_bob", "1234")
 	if resp != nil || asID != fakeID {
-		t.Errorf("access_token and user_id should've been valid: %s", resp.JSON)
+		t.Error("access_token and user_id should've been valid: %s", resp.JSON)
 	}
 
 	// Access token is correct, acting as invalid user_id
 	asID, resp = validateApplicationService(&cfg.ClientAPI, "_something_else", "1234")
 	if resp == nil || asID == fakeID {
-		t.Errorf("user_id should not have been valid: @_something_else:localhost")
+		t.Error("user_id should not have been valid: @_something_else:localhost")
 	}
 }
 
@@ -242,7 +242,7 @@ func TestSessionCleanUp(t *testing.T) {
 		s.startTimer(time.Millisecond, dummySession)
 		time.Sleep(time.Millisecond * 50)
 		if data, ok := s.getParams(dummySession); ok {
-			t.Errorf("expected session to be deleted: %+v", data)
+			t.Error("expected session to be deleted: %+v", data)
 		}
 	})
 
@@ -252,7 +252,7 @@ func TestSessionCleanUp(t *testing.T) {
 		s.startTimer(time.Minute, dummySession)
 		s.deleteSession(dummySession)
 		if data, ok := s.getParams(dummySession); ok {
-			t.Errorf("expected session to be deleted: %+v", data)
+			t.Error("expected session to be deleted: %+v", data)
 		}
 	})
 
@@ -269,7 +269,7 @@ func TestSessionCleanUp(t *testing.T) {
 		s.startTimer(time.Millisecond, dummySession)
 		time.Sleep(time.Millisecond * 50)
 		if data, ok := s.getParams(dummySession); ok {
-			t.Errorf("expected session to be deleted: %+v", data)
+			t.Error("expected session to be deleted: %+v", data)
 		}
 		if _, ok := s.timer[dummySession]; ok {
 			t.Error("expected timer to be delete")
@@ -421,7 +421,7 @@ func Test_register(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 
@@ -454,7 +454,7 @@ func Test_register(t *testing.T) {
 				}
 
 				if err := cfg.Derive(); err != nil {
-					t.Fatalf("failed to derive config: %s", err)
+					t.Fatal("failed to derive config: %s", err)
 				}
 
 				cfg.ClientAPI.RecaptchaEnabled = tc.enableRecaptcha
@@ -495,33 +495,33 @@ func Test_register(t *testing.T) {
 				case userInteractiveResponse:
 					// Check that the flows are the ones we configured
 					if !reflect.DeepEqual(r.Flows, cfg.Derived.Registration.Flows) {
-						t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, cfg.Derived.Registration.Flows)
+						t.Fatal("unexpected registration flows: %+v, want %+v", r.Flows, cfg.Derived.Registration.Flows)
 					}
 				case spec.MatrixError:
 					if !reflect.DeepEqual(tc.wantErrorResponse, resp) {
-						t.Fatalf("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantErrorResponse)
+						t.Fatal("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantErrorResponse)
 					}
 					return
 				case registerResponse:
 					// this should only be possible on guest user registration, never for normal users
 					if tc.kind != "guest" {
-						t.Fatalf("got register response on first request: %+v", r)
+						t.Fatal("got register response on first request: %+v", r)
 					}
 					// assert we've got a UserID, AccessToken and DeviceID
 					if r.UserID == "" {
-						t.Fatalf("missing userID in response")
+						t.Fatal("missing userID in response")
 					}
 					if r.AccessToken == "" {
-						t.Fatalf("missing accessToken in response")
+						t.Fatal("missing accessToken in response")
 					}
 					if r.DeviceID == "" {
-						t.Fatalf("missing deviceID in response")
+						t.Fatal("missing deviceID in response")
 					}
 					// if an expected username is provided, assert that it is a match
 					if tc.wantUsername != "" {
 						wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", tc.wantUsername, "test"))
 						if wantUserID != r.UserID {
-							t.Fatalf("unexpected userID: %s, want %s", r.UserID, wantUserID)
+							t.Fatal("unexpected userID: %s, want %s", r.UserID, wantUserID)
 						}
 					}
 					return
@@ -532,7 +532,7 @@ func Test_register(t *testing.T) {
 				// If we reached this, we should have received a UIA response
 				uia, ok := resp.JSON.(userInteractiveResponse)
 				if !ok {
-					t.Fatalf("did not receive a userInteractiveResponse: %T", resp.JSON)
+					t.Fatal("did not receive a userInteractiveResponse: %T", resp.JSON)
 				}
 				t.Logf("%+v", uia)
 
@@ -563,7 +563,7 @@ func Test_register(t *testing.T) {
 				switch rr := resp.JSON.(type) {
 				case spec.InternalServerError, spec.MatrixError, util.JSONResponse:
 					if !reflect.DeepEqual(tc.wantErrorResponse, resp) {
-						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantErrorResponse)
+						t.Fatal("unexpected response: %+v, want: %+v", resp, tc.wantErrorResponse)
 					}
 					return
 				case registerResponse:
@@ -572,17 +572,17 @@ func Test_register(t *testing.T) {
 						// if an expected username is provided, assert that it is a match
 						wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", tc.wantUsername, "test"))
 						if wantUserID != rr.UserID {
-							t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
+							t.Fatal("unexpected userID: %s, want %s", rr.UserID, wantUserID)
 						}
 					}
 					if rr.DeviceID != *reg.DeviceID {
-						t.Fatalf("unexpected deviceID: %s, want %s", rr.DeviceID, *reg.DeviceID)
+						t.Fatal("unexpected deviceID: %s, want %s", rr.DeviceID, *reg.DeviceID)
 					}
 					if rr.AccessToken == "" {
-						t.Fatalf("missing accessToken in response")
+						t.Fatal("missing accessToken in response")
 					}
 				default:
-					t.Fatalf("expected one of internalservererror, matrixerror, jsonresponse, registerresponse, got %T", resp.JSON)
+					t.Fatal("expected one of internalservererror, matrixerror, jsonresponse, registerresponse, got %T", resp.JSON)
 				}
 			})
 		}
@@ -598,7 +598,7 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
 		cm := sqlutil.NewConnectionManager(svc)
@@ -645,7 +645,7 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
@@ -656,7 +656,7 @@ func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 		req, err := NewSharedSecretRegistrationRequest(ctx, io.NopCloser(bytes.NewBuffer(jsonStr)))
 		assert.NoError(t, err)
 		if err != nil {
-			t.Fatalf("failed to read request: %s", err)
+			t.Fatal("failed to read request: %s", err)
 		}
 
 		r := NewSharedSecretRegistration(sharedSecret)

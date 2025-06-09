@@ -109,13 +109,13 @@ func (n *Notifier) OnNewEvent(
 		if ev.Type() == "m.room.member" && ev.StateKey() != nil {
 			targetUserID, err := n.rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
 			if err != nil || targetUserID == nil {
-				log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
+				log.WithError(err).WithField("event_id", ev.EventID()).Error(
 					"Notifier.OnNewEvent: Failed to find the userID for this event",
 				)
 			} else {
 				membership, err := ev.Membership()
 				if err != nil {
-					log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
+					log.WithError(err).WithField("event_id", ev.EventID()).Error(
 						"Notifier.OnNewEvent: Failed to unmarshal member event",
 					)
 				} else {

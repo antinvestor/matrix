@@ -421,10 +421,10 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 	}
 	resp, ok := querier.Cache.GetRoomHierarchy(ctx, roomID.String())
 	if ok {
-		util.GetLogger(ctx).Debugf("Returning cached response for %s", roomID)
+		util.GetLogger(ctx).Debug("Returning cached response for %s", roomID)
 		return &resp
 	}
-	util.GetLogger(ctx).Debugf("Querying %s via %+v", roomID, vias)
+	util.GetLogger(ctx).Debug("Querying %s via %+v", roomID, vias)
 	// query more of the spaces graph using these servers
 	for _, serverName := range vias {
 		if serverName == string(querier.Cfg.Global.ServerName) {
@@ -432,7 +432,7 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 		}
 		res, err := querier.FSAPI.RoomHierarchies(ctx, querier.Cfg.Global.ServerName, spec.ServerName(serverName), roomID.String(), suggestedOnly)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Warnf("failed to call RoomHierarchies on server %s", serverName)
+			util.GetLogger(ctx).WithError(err).Warn("failed to call RoomHierarchies on server %s", serverName)
 			continue
 		}
 		// ensure nil slices are empty as we send this to the client sometimes
@@ -448,7 +448,7 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 		}
 		err = querier.Cache.StoreRoomHierarchy(ctx, roomID.String(), res)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Warnf("failed to cache RoomHierarchies on server %s", serverName)
+			util.GetLogger(ctx).WithError(err).Warn("failed to cache RoomHierarchies on server %s", serverName)
 		}
 
 		return &res
@@ -552,14 +552,14 @@ func restrictedJoinRuleAllowedRooms(ctx context.Context, joinRuleEv *types.Heade
 	}
 	var jrContent gomatrixserverlib.JoinRuleContent
 	if err := json.Unmarshal(joinRuleEv.Content(), &jrContent); err != nil {
-		util.GetLogger(ctx).Warnf("failed to check join_rule on room %s: %s", joinRuleEv.RoomID().String(), err)
+		util.GetLogger(ctx).Warn("failed to check join_rule on room %s: %s", joinRuleEv.RoomID().String(), err)
 		return nil
 	}
 	for _, allow := range jrContent.Allow {
 		if allow.Type == spec.MRoomMembership {
 			allowedRoomID, err := spec.NewRoomID(allow.RoomID)
 			if err != nil {
-				util.GetLogger(ctx).Warnf("invalid room ID '%s' found in join_rule on room %s: %s", allow.RoomID, joinRuleEv.RoomID().String(), err)
+				util.GetLogger(ctx).Warn("invalid room ID '%s' found in join_rule on room %s: %s", allow.RoomID, joinRuleEv.RoomID().String(), err)
 			} else {
 				allows = append(allows, *allowedRoomID)
 			}

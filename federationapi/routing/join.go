@@ -67,7 +67,7 @@ func MakeJoin(
 	createJoinTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
 		identity, signErr := cfg.Global.SigningIdentityFor(request.Destination())
 		if signErr != nil {
-			util.GetLogger(httpReq.Context()).WithError(signErr).Errorf("obtaining signing identity for %s failed", request.Destination())
+			util.GetLogger(httpReq.Context()).WithError(signErr).Error("obtaining signing identity for %s failed", request.Destination())
 			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
 		}
 

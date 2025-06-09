@@ -43,7 +43,7 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 
 		cm := sqlutil.NewConnectionManager(svc)
@@ -120,7 +120,7 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 		routers := httputil.NewRouters()
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 
 		cm := sqlutil.NewConnectionManager(svc)
@@ -163,7 +163,7 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			routers.Federation.ServeHTTP(w, tc.req)
 			if w.Code != tc.wantCode {
-				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+				t.Fatal("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}
 		}
 	})
@@ -177,7 +177,7 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 		routers := httputil.NewRouters()
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
+			t.Fatal("failed to create a cache: %v", err)
 		}
 
 		cm := sqlutil.NewConnectionManager(svc)
@@ -210,7 +210,7 @@ func TestDisableRelayPublicRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			routers.Federation.ServeHTTP(w, tc.req)
 			if w.Code != tc.wantCode {
-				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+				t.Fatal("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}
 		}
 	})

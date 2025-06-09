@@ -160,7 +160,7 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 				JSON: spec.NotFound("room is unknown/forbidden"),
 			}
 		default:
-			log.WithError(err).Errorf("failed to fetch next page of room hierarchy (SS API)")
+			log.WithError(err).Error("failed to fetch next page of room hierarchy (SS API)")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),

@@ -148,7 +148,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 		return
 	}
 
-	logrus.Infof("Reporting stats to %s: %s", p.cfg.Global.ReportStats.Endpoint, output.String())
+	logrus.Info("Reporting stats to %s: %s", p.cfg.Global.ReportStats.Endpoint, output.String())
 
 	request, err := http.NewRequestWithContext(iCtx, http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
 	if err != nil {

@@ -22,7 +22,7 @@ func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _
 	cm := sqlutil.NewConnectionManager(svc)
 	db, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
-		t.Fatalf("failed to create new user db: %v", err)
+		t.Fatal("failed to create new user db: %v", err)
 	}
 	return db
 }
@@ -140,7 +140,7 @@ func Test_QueryDeviceMessages(t *testing.T) {
 		db := mustCreateDatabase(ctx, svc, t, testOpts)
 
 		if err := db.StoreLocalDeviceKeys(ctx, deviceMessages); err != nil {
-			t.Fatalf("failed to store local devicesKeys")
+			t.Fatal("failed to store local devicesKeys")
 		}
 
 		for _, tt := range tests {
@@ -149,11 +149,11 @@ func Test_QueryDeviceMessages(t *testing.T) {
 					KeyDatabase: db,
 				}
 				if err := a.QueryDeviceMessages(ctx, tt.args.req, tt.args.res); (err != nil) != tt.wantErr {
-					t.Errorf("QueryDeviceMessages() error = %v, wantErr %v", err, tt.wantErr)
+					t.Error("QueryDeviceMessages() error = %v, wantErr %v", err, tt.wantErr)
 				}
 				got := tt.args.res
 				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("QueryDeviceMessages(): got:\n%+v, want:\n%+v", got, tt.want)
+					t.Error("QueryDeviceMessages(): got:\n%+v, want:\n%+v", got, tt.want)
 				}
 			})
 		}

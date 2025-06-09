@@ -131,7 +131,7 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, messag
 		return err
 	}
 
-	err = r.actorSystem.EnsureRoomActorExists(ctx, roomId)
+	_, err = r.actorSystem.EnsureRoomActorExists(ctx, roomId)
 	if err != nil {
 		return err
 	}
@@ -336,32 +336,14 @@ func (r *Inputer) queueInputRoomEvents(
 			header["sync_uri"] = string(replyToOpts.DS)
 		}
 
-		roomOpts, err0 := actor.RoomifyQOpts(ctx, &r.Cfg.Queues.InputRoomEvent, &roomID, false)
-		if err0 != nil {
-			return nil, err0
-		}
-
-		err = r.Qm.EnsurePublisherOk(ctx, roomOpts)
-		if err != nil {
-			return nil, err
-		}
-
-		err = r.Qm.Publish(ctx, roomOpts.Ref(), e, header)
+		err = r.actorSystem.Publish(ctx, &roomID, e, header)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"room_id":  roomID,
 				"event_id": e.Event.EventID(),
-				"subj_ref": roomOpts.Ref(),
-				"subj_uri": roomOpts.DS,
 			}).Error("Roomserver failed to queue async event")
 			return nil, fmt.Errorf("r.Qm.Publish: %w", err)
 		}
-
-		err = r.Qm.DiscardPublisher(ctx, roomOpts.Ref())
-		if err != nil {
-			return
-		}
-
 	}
 	return
 }

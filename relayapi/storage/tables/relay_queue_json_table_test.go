@@ -80,12 +80,12 @@ func TestShoudInsertTransaction(t *testing.T) {
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)
 		if err != nil {
-			t.Fatalf("Invalid transaction: %s", err.Error())
+			t.Fatal("Invalid transaction: %s", err.Error())
 		}
 
 		_, err = db.Table.InsertQueueJSON(ctx, string(tx))
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 	})
 }
@@ -99,12 +99,12 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)
 		if err != nil {
-			t.Fatalf("Invalid transaction: %s", err.Error())
+			t.Fatal("Invalid transaction: %s", err.Error())
 		}
 
 		nid, err := db.Table.InsertQueueJSON(ctx, string(tx))
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 
 		var storedJSON map[int64][]byte
@@ -113,7 +113,7 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 			return err
 		})
 		if err != nil {
-			t.Fatalf("Failed retrieving transaction: %s", err.Error())
+			t.Fatal("Failed retrieving transaction: %s", err.Error())
 		}
 
 		assert.Equal(t, 1, len(storedJSON))
@@ -121,7 +121,7 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 		var storedTx gomatrixserverlib.Transaction
 		err = json.Unmarshal(storedJSON[1], &storedTx)
 		if err != nil {
-			t.Fatalf("Invalid transaction: %s", err.Error())
+			t.Fatal("Invalid transaction: %s", err.Error())
 		}
 
 		assert.Equal(t, transaction, storedTx)
@@ -137,12 +137,12 @@ func TestShouldDeleteTransaction(t *testing.T) {
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)
 		if err != nil {
-			t.Fatalf("Invalid transaction: %s", err.Error())
+			t.Fatal("Invalid transaction: %s", err.Error())
 		}
 
 		nid, err := db.Table.InsertQueueJSON(ctx, string(tx))
 		if err != nil {
-			t.Fatalf("Failed inserting transaction: %s", err.Error())
+			t.Fatal("Failed inserting transaction: %s", err.Error())
 		}
 
 		storedJSON := map[int64][]byte{}
@@ -151,7 +151,7 @@ func TestShouldDeleteTransaction(t *testing.T) {
 			return err
 		})
 		if err != nil {
-			t.Fatalf("Failed deleting transaction: %s", err.Error())
+			t.Fatal("Failed deleting transaction: %s", err.Error())
 		}
 
 		storedJSON = map[int64][]byte{}
@@ -160,7 +160,7 @@ func TestShouldDeleteTransaction(t *testing.T) {
 			return err
 		})
 		if err != nil {
-			t.Fatalf("Failed retrieving transaction: %s", err.Error())
+			t.Fatal("Failed retrieving transaction: %s", err.Error())
 		}
 
 		assert.Equal(t, 0, len(storedJSON))
