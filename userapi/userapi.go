@@ -16,9 +16,10 @@ package userapi
 
 import (
 	"context"
+	"time"
+
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/pitabwire/frame"
-	"time"
 
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 

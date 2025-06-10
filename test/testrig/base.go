@@ -16,13 +16,10 @@ package testrig
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/pitabwire/frame"
-
-	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
@@ -67,7 +64,6 @@ func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.
 	cfg.Global.ServerName = "test"
 	// use a distinct prefix else concurrent postgres runs will clash since NATS will use
 	// the file system event with InMemory=true :(
-	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%s_", util.RandomString(8))
 	cfg.SyncAPI.Fulltext.InMemory = true
 
 	return &cfg, func(ctx context.Context) {

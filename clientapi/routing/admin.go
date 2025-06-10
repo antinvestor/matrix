@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

@@ -19,6 +19,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/pitabwire/frame"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
@@ -42,7 +44,7 @@ func GetFilter(
 	}
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		frame.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -85,7 +87,7 @@ func PutFilter(
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		frame.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -113,7 +115,7 @@ func PutFilter(
 	// limit if it is unset, which is what this does.
 	limitRes := gjson.GetBytes(body, "room.timeline.limit")
 	if !limitRes.Exists() {
-		util.GetLogger(req.Context()).Info("missing timeline limit, using default")
+		frame.Log(req.Context()).Info("missing timeline limit, using default")
 		filter.Room.Timeline.Limit = sync.DefaultTimelineLimit
 	}
 
@@ -127,7 +129,7 @@ func PutFilter(
 
 	filterID, err := syncDB.PutFilter(req.Context(), localpart, &filter)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("syncDB.PutFilter failed")
+		frame.Log(req.Context()).WithError(err).Error("syncDB.PutFilter failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

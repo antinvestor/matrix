@@ -535,7 +535,7 @@ func (config *Matrix) check() error { // monolithic
 	// This is because the following equalities hold:
 	// error(nil) == nil
 	// error(configErrors(nil)) != nil
-	if configErrs != nil {
+	if len(configErrs) > 0 {
 		return &configErrs
 	}
 	return nil

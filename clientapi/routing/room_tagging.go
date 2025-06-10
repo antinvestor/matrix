@@ -23,6 +23,7 @@ import (
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
@@ -45,7 +46,7 @@ func GetTags(
 
 	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
+		frame.Log(req.Context()).WithError(err).Error("obtainSavedTags failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -85,7 +86,7 @@ func PutTag(
 
 	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
+		frame.Log(req.Context()).WithError(err).Error("obtainSavedTags failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -98,7 +99,7 @@ func PutTag(
 	tagContent.Tags[tag] = properties
 
 	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
+		frame.Log(req.Context()).WithError(err).Error("saveTagData failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -133,7 +134,7 @@ func DeleteTag(
 
 	tagContent, err := obtainSavedTags(req, userID, roomID, userAPI)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("obtainSavedTags failed")
+		frame.Log(req.Context()).WithError(err).Error("obtainSavedTags failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -152,7 +153,7 @@ func DeleteTag(
 	}
 
 	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
+		frame.Log(req.Context()).WithError(err).Error("saveTagData failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

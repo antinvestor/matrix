@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"strconv"
+	"time"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	actorV1 "github.com/antinvestor/matrix/apis/actor/v1"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -15,9 +19,6 @@ import (
 	"github.com/asynkron/protoactor-go/cluster/identitylookup/disthash"
 	"github.com/asynkron/protoactor-go/remote"
 	"github.com/pitabwire/frame"
-	"log/slog"
-	"strconv"
-	"time"
 )
 
 const (

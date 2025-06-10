@@ -17,6 +17,7 @@ package perform
 import (
 	"context"
 	"fmt"
+
 	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -52,6 +53,7 @@ func (r *Backfiller) PerformBackfill(
 	request *api.PerformBackfillRequest,
 	response *api.PerformBackfillResponse,
 ) error {
+	log := frame.Log(ctx)
 	// if we are requesting the backfill then we need to do a federation hit
 	// TODO: we could be more sensible and fetch as many events we already have then request the rest
 	//       which is what the syncapi does already.
@@ -74,6 +76,7 @@ func (r *Backfiller) PerformBackfill(
 		return err
 	}
 	if info == nil || info.IsStub() {
+		log.WithField("room_id", request.RoomID).Error("PerformBackfill: missing room info for room")
 		return fmt.Errorf("PerformBackfill: missing room info for room %s", request.RoomID)
 	}
 
@@ -105,11 +108,13 @@ func (r *Backfiller) PerformBackfill(
 }
 
 func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.PerformBackfillRequest, res *api.PerformBackfillResponse) error {
+	log := frame.Log(ctx)
 	info, err := r.DB.RoomInfo(ctx, req.RoomID)
 	if err != nil {
 		return err
 	}
 	if info == nil || info.IsStub() {
+		log.WithField("room_id", req.RoomID).Error("backfillViaFederation: missing room info for room")
 		return fmt.Errorf("backfillViaFederation: missing room info for room %s", req.RoomID)
 	}
 	requester := newBackfillRequester(r.DB, r.FSAPI, r.Querier, req.VirtualHost, r.IsLocalServerName, req.BackwardsExtremities, r.PreferServers, info.RoomVersion)
@@ -126,12 +131,12 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	)
 	// Only return an error if we really couldn't get any events.
 	if err != nil && len(events) == 0 {
-		frame.Log(ctx).WithError(err).Error("gomatrixserverlib.RequestBackfill failed")
+		log.WithError(err).Error("gomatrixserverlib.RequestBackfill failed")
 		return err
 	}
 	// If we got an error but still got events, that's fine, because a server might have returned a 404 (or something)
 	// but other servers could provide the missing event.
-	frame.Log(ctx).WithError(err).WithField("room_id", req.RoomID).Info("backfilled %d events", len(events))
+	log.WithError(err).WithField("room_id", req.RoomID).WithField("count", len(events)).Info("backfilled events")
 
 	// persist these new events - auth checks have already been done
 	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, r.Querier, events)
@@ -142,7 +147,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 		if !ok {
 			// this should be impossible as all events returned must have pass Step 5 of the PDU checks
 			// which requires a list of state IDs.
-			frame.Log(ctx).WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to find state IDs for event which passed auth checks")
+			log.WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to find state IDs for event which passed auth checks")
 			continue
 		}
 		var entries []types.StateEntry
@@ -152,18 +157,18 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 			// try again
 			entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs, true)
 			if err != nil {
-				frame.Log(ctx).WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to get state entries for event")
+				log.WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to get state entries for event")
 				return err
 			}
 		}
 
 		var beforeStateSnapshotNID types.StateSnapshotNID
 		if beforeStateSnapshotNID, err = r.DB.AddState(ctx, roomNID, nil, entries); err != nil {
-			frame.Log(ctx).WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to persist state entries to get snapshot nid")
+			log.WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to persist state entries to get snapshot nid")
 			return err
 		}
 		if err = r.DB.SetState(ctx, ev.EventNID, beforeStateSnapshotNID); err != nil {
-			frame.Log(ctx).WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to persist snapshot nid")
+			log.WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to persist snapshot nid")
 		}
 	}
 
@@ -182,12 +187,13 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
 	backfillRequester *backfillRequester, stateIDs []string, virtualHost spec.ServerName) {
 
+	baseLog := frame.Log(ctx)
 	servers := backfillRequester.servers
 
 	// work out which are missing
 	nidMap, err := r.DB.EventNIDs(ctx, stateIDs)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Warn("cannot query missing events")
+		baseLog.WithError(err).Warn("cannot query missing events")
 		return
 	}
 	missingMap := make(map[string]*types.HeaderedEvent) // id -> event
@@ -196,7 +202,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 			missingMap[id] = nil
 		}
 	}
-	frame.Log(ctx).WithField("num_missing_events", len(missingMap)).WithField("num_servers", len(servers)).Info("Fetching missing state events")
+	baseLog.WithField("num_missing_events", len(missingMap)).WithField("num_servers", len(servers)).Info("Fetching missing state events")
 
 	// fetch the events from federation. Loop the servers first so if we find one that works we stick with them
 	for _, srv := range servers {
@@ -204,10 +210,10 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 			if ev != nil {
 				continue // already found
 			}
-			logger := frame.Log(ctx).WithField("server", srv).WithField("event_id", id)
+			loopLog := baseLog.WithField("server", srv).WithField("event_id", id)
 			res, err := r.FSAPI.GetEvent(ctx, virtualHost, srv, id)
 			if err != nil {
-				logger.WithError(err).Warn("failed to get event from server")
+				loopLog.WithError(err).Warn("failed to get event from server")
 				continue
 			}
 			loader := gomatrixserverlib.NewEventsLoader(roomVer, r.KeyRing, backfillRequester, backfillRequester.ProvideEvents, false)
@@ -215,22 +221,22 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 				return r.Querier.QueryUserIDForSender(ctx, roomID, senderID)
 			})
 			if err != nil {
-				logger.WithError(err).Warn("failed to load and verify event")
+				loopLog.WithError(err).Warn("failed to load and verify event")
 				continue
 			}
-			logger.WithField("num_pdus", len(res.PDUs)).WithField("num_events", len(result)).Info("returned PDUs which made events")
+			loopLog.WithField("num_pdus", len(res.PDUs)).WithField("num_events", len(result)).Info("returned PDUs which made events")
 			for _, res := range result {
 				switch err := res.Error.(type) {
 				case nil:
 				case gomatrixserverlib.SignatureErr:
 					// The signature of the event might not be valid anymore, for example if
 					// the key ID was reused with a different signature.
-					logger.WithError(err).Error("event failed PDU checks, storing anyway")
+					loopLog.WithError(err).Error("event failed PDU checks, storing anyway")
 				case gomatrixserverlib.AuthChainErr, gomatrixserverlib.AuthRulesErr:
-					logger.WithError(err).Warn("event failed PDU checks")
+					loopLog.WithError(err).Warn("event failed PDU checks")
 					continue
 				default:
-					logger.WithError(err).Warn("event failed PDU checks")
+					loopLog.WithError(err).Warn("event failed PDU checks")
 					continue
 				}
 				missingMap[id] = &types.HeaderedEvent{PDU: res.Event}
@@ -244,7 +250,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 			newEvents = append(newEvents, ev.PDU)
 		}
 	}
-	frame.Log(ctx).WithField("num_new_events", len(newEvents)).Info("Persisting new events")
+	baseLog.WithField("num_new_events", len(newEvents)).Info("Persisting new events")
 	persistEvents(ctx, r.DB, r.Querier, newEvents)
 }
 
@@ -294,12 +300,13 @@ func newBackfillRequester(
 }
 
 func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent gomatrixserverlib.PDU) ([]string, error) {
+	log := frame.Log(ctx)
 	b.eventIDMap[targetEvent.EventID()] = targetEvent
 	if ids, ok := b.eventIDToBeforeStateIDs[targetEvent.EventID()]; ok {
 		return ids, nil
 	}
 	if len(targetEvent.PrevEventIDs()) == 0 && targetEvent.Type() == "m.room.create" && targetEvent.StateKeyEquals("") {
-		frame.Log(ctx).WithField("room_id", targetEvent.RoomID().String()).Info("Backfilled to the beginning of the room")
+		log.WithField("room_id", targetEvent.RoomID().String()).Info("Backfilled to the beginning of the room")
 		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = []string{}
 		return nil, nil
 	}
@@ -326,7 +333,7 @@ func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent
 
 FederationHit:
 	var lastErr error
-	frame.Log(ctx).WithField("event_id", targetEvent.EventID()).Info("Requesting /state_ids at event")
+	log.WithField("event_id", targetEvent.EventID()).Info("Requesting /state_ids at event")
 	for _, srv := range b.servers { // hit any valid server
 		c := gomatrixserverlib.FederatedStateProvider{
 			FedClient:          b.fsAPI,
@@ -385,13 +392,14 @@ func (b *backfillRequester) calculateNewStateIDs(targetEvent, prevEvent gomatrix
 func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
 	event gomatrixserverlib.PDU, eventIDs []string) (map[string]gomatrixserverlib.PDU, error) {
 
+	log := frame.Log(ctx)
 	// try to fetch the events from the database first
 	events, err := b.ProvideEvents(ctx, roomVer, eventIDs)
 	if err != nil {
 		// non-fatal, fallthrough
-		frame.Log(ctx).WithError(err).Info("Failed to fetch events")
+		log.WithError(err).WithField("event_ids_count", len(eventIDs)).Error("Failed to fetch events from DB for StateBeforeEvent")
 	} else {
-		frame.Log(ctx).Info("Fetched %d/%d events from the database", len(events), len(eventIDs))
+		log.WithField("fetched_count", len(events)).WithField("requested_count", len(eventIDs)).Info("Fetched events from DB for StateBeforeEvent")
 		if len(events) == len(eventIDs) {
 			result := make(map[string]gomatrixserverlib.PDU)
 			for i := range events {
@@ -428,6 +436,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
 func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) []spec.ServerName {
+	log := frame.Log(ctx)
 	// eventID will be a prev_event ID of a backwards extremity, meaning we will not have a database entry for it. Instead, use
 	// its successor, so look it up.
 	successor := ""
@@ -441,7 +450,7 @@ FindSuccessor:
 		}
 	}
 	if successor == "" {
-		frame.Log(ctx).WithField("event_id", eventID).Error("ServersAtEvent: failed to find successor of this event to determine room state")
+		log.WithField("event_id", eventID).Error("ServersAtEvent: failed to find successor of this event to determine room state")
 		return nil
 	}
 	eventID = successor
@@ -450,23 +459,23 @@ FindSuccessor:
 	// the event is necessary.
 	NIDs, err := b.db.EventNIDs(ctx, []string{eventID})
 	if err != nil {
-		frame.Log(ctx).WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get event NID for event")
+		log.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get event NID for event")
 		return nil
 	}
 
 	info, err := b.db.RoomInfo(ctx, roomID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room")
+		log.WithError(err).WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room")
 		return nil
 	}
 	if info == nil || info.IsStub() {
-		frame.Log(ctx).WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room, room is missing")
+		log.WithField("room_id", roomID).Error("ServersAtEvent: RoomInfo missing or stub")
 		return nil
 	}
 
 	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, info, NIDs[eventID].EventNID, b.querier)
 	if err != nil {
-		frame.Log(ctx).WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
+		log.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
 		return nil
 	}
 
@@ -474,17 +483,17 @@ FindSuccessor:
 	memberEventsFromVis, visibility, err := joinEventsFromHistoryVisibility(ctx, b.db, b.querier, info, stateEntries, b.virtualHost)
 	b.historyVisiblity = visibility
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
+		log.WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
 		return nil
 	}
-	frame.Log(ctx).Info("ServersAtEvent including %d current events from history visibility", len(memberEventsFromVis))
+	log.WithField("count", len(memberEventsFromVis)).WithField("visibility", visibility).Info("ServersAtEvent: current events from history visibility")
 
 	// Retrieve all "m.room.member" state events of "join" membership, which
 	// contains the list of users in the room before the event, therefore all
 	// the servers in it at that moment.
 	memberEvents, err := helpers.GetMembershipsAtState(ctx, b.db, info, stateEntries, true)
 	if err != nil {
-		frame.Log(ctx).WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get memberships before event")
+		log.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to get memberships before event")
 		return nil
 	}
 	memberEvents = append(memberEvents, memberEventsFromVis...)
@@ -525,9 +534,10 @@ func (b *backfillRequester) Backfill(ctx context.Context, origin, server spec.Se
 }
 
 func (b *backfillRequester) ProvideEvents(ctx context.Context, roomVer gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.PDU, error) {
+	log := frame.Log(ctx)
 	nidMap, err := b.db.EventNIDs(ctx, eventIDs)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("event_ids", eventIDs).Error("Failed to find events")
+		log.WithError(err).WithField("event_ids_count", len(eventIDs)).Error("Failed to find event NIDs")
 		return nil, err
 	}
 	eventNIDs := make([]types.EventNID, len(nidMap))
@@ -538,7 +548,7 @@ func (b *backfillRequester) ProvideEvents(ctx context.Context, roomVer gomatrixs
 	}
 	eventsWithNids, err := b.db.Events(ctx, b.roomVersion, eventNIDs)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("event_nids", eventNIDs).Error("Failed to load events")
+		log.WithError(err).WithField("event_nids_count", len(eventNIDs)).Error("Failed to load events from NIDs")
 		return nil, err
 	}
 	events := make([]gomatrixserverlib.PDU, len(eventsWithNids))
@@ -556,6 +566,7 @@ func joinEventsFromHistoryVisibility(
 	ctx context.Context, db storage.RoomDatabase, querier api.QuerySenderIDAPI, roomInfo *types.RoomInfo, stateEntries []types.StateEntry,
 	thisServer spec.ServerName) ([]types.Event, gomatrixserverlib.HistoryVisibility, error) {
 
+	log := frame.Log(ctx)
 	var eventNIDs []types.EventNID
 	for _, entry := range stateEntries {
 		// Filter the events to retrieve to only keep the membership events
@@ -584,7 +595,7 @@ func joinEventsFromHistoryVisibility(
 	canSeeEvents := auth.IsServerAllowed(ctx, querier, thisServer, true, events)
 	visibility := auth.HistoryVisibilityForRoom(events)
 	if !canSeeEvents {
-		frame.Log(ctx).Info("ServersAtEvent history not visible to us: %s", visibility)
+		log.WithField("visibility", visibility).Info("ServersAtEvent history not visible to us")
 		return nil, visibility, nil
 	}
 	// get joined members
@@ -597,13 +608,14 @@ func joinEventsFromHistoryVisibility(
 }
 
 func persistEvents(ctx context.Context, db storage.Database, querier api.QuerySenderIDAPI, events []gomatrixserverlib.PDU) (types.RoomNID, map[string]types.Event) {
+	log := frame.Log(ctx)
 	var roomNID types.RoomNID
 	var eventNID types.EventNID
 	backfilledEventMap := make(map[string]types.Event)
 	for j, ev := range events {
 		nidMap, err := db.EventNIDs(ctx, ev.AuthEventIDs())
 		if err != nil { // this shouldn't happen as RequestBackfill already found them
-			frame.Log(ctx).WithError(err).WithField("auth_events", ev.AuthEventIDs()).Error("Failed to find one or more auth events")
+			log.WithError(err).WithField("auth_events_count", len(ev.AuthEventIDs())).Error("Failed to find one or more auth events")
 			continue
 		}
 		authNids := make([]types.EventNID, len(nidMap))
@@ -615,26 +627,26 @@ func persistEvents(ctx context.Context, db storage.Database, querier api.QuerySe
 
 		roomInfo, err := db.GetOrCreateRoomInfo(ctx, ev)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("failed to get or create roomNID")
+			log.WithError(err).Error("failed to get or create roomNID")
 			continue
 		}
 		roomNID = roomInfo.RoomNID
 
 		eventTypeNID, err := db.GetOrCreateEventTypeNID(ctx, ev.Type())
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("failed to get or create eventType NID")
+			log.WithError(err).Error("failed to get or create eventType NID")
 			continue
 		}
 
 		eventStateKeyNID, err := db.GetOrCreateEventStateKeyNID(ctx, ev.StateKey())
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("failed to get or create eventStateKey NID")
+			log.WithError(err).Error("failed to get or create eventStateKey NID")
 			continue
 		}
 
 		eventNID, _, err = db.StoreEvent(ctx, ev, roomInfo, eventTypeNID, eventStateKeyNID, authNids, false)
 		if err != nil {
-			frame.Log(ctx).WithError(err).WithField("event_id", ev.EventID()).Error("Failed to persist event")
+			log.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to persist event")
 			continue
 		}
 
@@ -642,7 +654,7 @@ func persistEvents(ctx context.Context, db storage.Database, querier api.QuerySe
 
 		_, redactedEvent, err := db.MaybeRedactEvent(ctx, roomInfo, eventNID, ev, &resolver, querier)
 		if err != nil {
-			frame.Log(ctx).WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
+			log.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
 			continue
 		}
 		// If storing this event results in it being redacted, then do so.

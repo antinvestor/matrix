@@ -16,10 +16,11 @@ package producers
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"strconv"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 

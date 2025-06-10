@@ -18,12 +18,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/setup/config"
 

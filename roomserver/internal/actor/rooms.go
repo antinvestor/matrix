@@ -3,13 +3,14 @@ package actor
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+	"time"
+
 	actorV1 "github.com/antinvestor/matrix/apis/actor/v1"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/asynkron/protoactor-go/cluster"
 	"github.com/pitabwire/frame"
-	"sync/atomic"
-	"time"
 
 	"github.com/asynkron/protoactor-go/actor"
 )

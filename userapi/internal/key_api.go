@@ -20,9 +20,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"sync"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -641,9 +642,9 @@ func (a *UserInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Pe
 
 	if len(toClean) > 0 {
 		if err = a.KeyDatabase.DeleteDeviceKeys(ctx, req.UserID, toClean); err != nil {
-			frame.Log(ctx).WithField("user_id", req.UserID).WithError(err).Error("Failed to clean up %d stale keyserver device key entries", len(toClean))
+			frame.Log(ctx).WithField("user_id", req.UserID).WithError(err).WithField("count", len(toClean)).Error("Failed to clean up stale keyserver device key entries")
 		} else {
-			frame.Log(ctx).WithField("user_id", req.UserID).Debug("Cleaned up %d stale keyserver device key entries", len(toClean))
+			frame.Log(ctx).WithField("user_id", req.UserID).WithField("count", len(toClean)).Debug("Cleaned up stale keyserver device key entries")
 		}
 	}
 

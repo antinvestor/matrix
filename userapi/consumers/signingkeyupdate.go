@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/pitabwire/frame"
 
@@ -55,20 +56,24 @@ func NewSigningKeyUpdateConsumer(
 // Handle is called in response to a message received on the
 // signing key update events topic from the key server.
 func (t *SigningKeyUpdateConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+	log := frame.Log(ctx)
 	var updatePayload api.CrossSigningKeyUpdate
-	if err := json.Unmarshal(message, &updatePayload); err != nil {
-		frame.Log(ctx).WithError(err).Error("Failed to read from signing key update input topic")
+	err := json.Unmarshal(message, &updatePayload)
+	if err != nil {
+		log.WithError(err).Error("Failed to read from signing key update input topic")
 		return nil
 	}
 	origin := spec.ServerName(metadata["origin"])
-	if _, serverName, err := gomatrixserverlib.SplitID('@', updatePayload.UserID); err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to split user id")
+	var serverName spec.ServerName
+	_, serverName, err = gomatrixserverlib.SplitID('@', updatePayload.UserID)
+	if err != nil {
+		log.WithError(err).Error("Failed to split user id")
 		return nil
 	} else if t.isLocalServerName(serverName) {
-		frame.Log(ctx).Warn("dropping device key update from ourself")
+		log.Warn("Dropping device key update from ourself")
 		return nil
 	} else if serverName != origin {
-		frame.Log(ctx).Warn("dropping device key update, %s != %s", serverName, origin)
+		log.WithField("server_name", serverName).WithField("origin", origin).Warn("Dropping device key update due to server name mismatch")
 		return nil
 	}
 
@@ -86,7 +91,7 @@ func (t *SigningKeyUpdateConsumer) Handle(ctx context.Context, metadata map[stri
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
 	t.userAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
 	if uploadRes.Error != nil {
-		frame.Log(ctx).WithError(uploadRes.Error).Error("failed to upload device keys")
+		log.WithError(uploadRes.Error).Error("Failed to upload device keys")
 		return nil
 	}
 

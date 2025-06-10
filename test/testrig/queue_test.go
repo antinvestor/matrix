@@ -2,13 +2,14 @@ package testrig
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/pitabwire/frame"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 type h struct {

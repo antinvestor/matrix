@@ -17,9 +17,10 @@ package routing
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"

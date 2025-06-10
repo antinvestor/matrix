@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"github.com/pitabwire/frame"
 	"io"
 	"log/slog"
 	"os"
@@ -9,6 +8,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test"
 

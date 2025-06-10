@@ -2,10 +2,11 @@ package input_test
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/antinvestor/matrix/userapi"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/userapi"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal/cacheutil"

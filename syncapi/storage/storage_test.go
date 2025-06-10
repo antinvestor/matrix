@@ -104,7 +104,7 @@ func TestRecentEventsPDU(t *testing.T) {
 		WithSnapshot(ctx, t, db, func(snapshot storage.DatabaseTransaction) {
 			var err error
 			if latest, err = snapshot.MaxStreamPositionForPDUs(ctx); err != nil {
-				t.Fatalf("failed to get MaxStreamPositionForPDUs: %w", err)
+				t.Fatalf("failed to get MaxStreamPositionForPDUs: %v", err)
 			}
 		})
 

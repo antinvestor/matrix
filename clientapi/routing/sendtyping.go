@@ -15,6 +15,7 @@ package routing
 import (
 	"net/http"
 
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -65,7 +66,7 @@ func SendTyping(
 	}
 
 	if err := syncProducer.SendTyping(req.Context(), userID, roomID, r.Typing, r.Timeout); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("eduProducer.Send failed")
+		frame.Log(req.Context()).WithError(err).Error("eduProducer.Send failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

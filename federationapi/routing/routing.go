@@ -18,10 +18,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -692,10 +693,10 @@ func MakeFedHTTPAPI(
 		)
 
 		enc := json.NewEncoder(w)
-		logger := util.GetLogger(req.Context())
+		logger := frame.Log(req.Context())
 		if fedReq == nil {
 
-			logger.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, errResp.Code)
+			logger.Debug("VerifyUserFromRequest -> HTTP ", req.RemoteAddr, errResp.Code)
 			w.WriteHeader(errResp.Code)
 			if err := enc.Encode(errResp); err != nil {
 				logger.WithError(err).Error("failed to encode JSON response")

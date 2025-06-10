@@ -111,7 +111,7 @@ func SetupHTTPOption(
 
 ) (frame.Option, error) {
 
-	logger := frame.Log(ctx)
+	log := frame.Log(ctx)
 
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 
@@ -143,7 +143,7 @@ func SetupHTTPOption(
 	// We only need the files beneath the static/client/login folder.
 	sub, err := fs.Sub(loginFallback, "static/client/login")
 	if err != nil {
-		logger.Panic("unable to read embedded files, this should never happen: %s", err)
+		log.WithError(err).Panic("unable to read embedded files, this should never happen")
 	}
 	// Serve a static page for login fallback
 	routers.Static.PathPrefix("/client/login/").Handler(http.StripPrefix("/_matrix/static/client/login/", http.FileServer(http.FS(sub))))

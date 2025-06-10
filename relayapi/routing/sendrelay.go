@@ -16,8 +16,9 @@ package routing
 
 import (
 	"encoding/json"
-	"github.com/pitabwire/frame"
 	"net/http"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -63,7 +64,7 @@ func SendTransactionToRelay(
 	t.TransactionID = txnID
 	t.Destination = userID.Domain()
 
-	util.GetLogger(httpReq.Context()).Warn("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
+	frame.Log(httpReq.Context()).Warn("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
 
 	err := relayAPI.PerformStoreTransaction(httpReq.Context(), t, userID)
 	if err != nil {

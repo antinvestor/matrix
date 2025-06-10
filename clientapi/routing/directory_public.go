@@ -16,13 +16,14 @@ package routing
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"math/rand"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -81,7 +82,7 @@ func GetPostPublicRooms(
 			"",
 		)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("failed to get public rooms")
+			frame.Log(req.Context()).WithError(err).Error("failed to get public rooms")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -95,7 +96,7 @@ func GetPostPublicRooms(
 
 	response, err := publicRooms(req.Context(), request, rsAPI, extRoomsProvider)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("failed to work out public rooms")
+		frame.Log(req.Context()).WithError(err).Error("failed to work out public rooms")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -187,7 +188,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 		// Atoi returns 0 and an error when trying to parse an empty string
 		// In that case, we want to assign 0 so we ignore the error
 		if err != nil && len(httpReq.FormValue("limit")) > 0 {
-			util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
+			frame.Log(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 			return &util.JSONResponse{
 				Code: 400,
 				JSON: spec.BadJSON("limit param is not a number"),

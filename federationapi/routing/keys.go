@@ -16,9 +16,10 @@ package routing
 
 import (
 	"encoding/json"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/pitabwire/util"
 	"golang.org/x/crypto/ed25519"
@@ -67,7 +68,7 @@ func QueryDeviceKeys(
 		UserToDevices: qkr.DeviceKeys,
 	}, &queryRes)
 	if queryRes.Error != nil {
-		util.GetLogger(httpReq.Context()).WithError(queryRes.Error).Error("Failed to QueryKeys")
+		frame.Log(httpReq.Context()).WithError(queryRes.Error).Error("Failed to QueryKeys")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -122,7 +123,7 @@ func ClaimOneTimeKeys(
 		OneTimeKeys: cor.OneTimeKeys,
 	}, &claimRes)
 	if claimRes.Error != nil {
-		util.GetLogger(httpReq.Context()).WithError(claimRes.Error).Error("Failed to PerformClaimKeys")
+		frame.Log(httpReq.Context()).WithError(claimRes.Error).Error("Failed to PerformClaimKeys")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

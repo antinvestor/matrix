@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"regexp"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/setup/config"
 )

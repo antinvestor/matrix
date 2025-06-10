@@ -17,13 +17,14 @@ package internal
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"os"
 	"path"
 	"runtime"
 	"strings"
+
+	"github.com/pitabwire/frame"
 )
 
 // callerPrettyfier is a function that given a runtime.Frame object, will

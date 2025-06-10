@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+
 	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"

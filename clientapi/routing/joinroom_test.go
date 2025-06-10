@@ -3,10 +3,11 @@ package routing
 import (
 	"bytes"
 	"context"
-	"github.com/antinvestor/matrix/internal/queueutil"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

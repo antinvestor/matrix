@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"

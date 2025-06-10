@@ -16,8 +16,9 @@ package routing
 
 import (
 	"encoding/json"
-	"github.com/pitabwire/frame"
 	"net/http"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib/spec"

@@ -18,9 +18,10 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"strings"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
@@ -115,7 +116,7 @@ func (r *Joiner) performJoinRoomByAlias(
 		dirRes := fsAPI.PerformDirectoryLookupResponse{}
 		err = r.FSAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("error looking up alias %q", req.RoomIDOrAlias)
+			frame.Log(ctx).WithError(err).WithField("room_alias", req.RoomIDOrAlias).Error("error looking up alias")
 			return "", "", fmt.Errorf("looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
 		}
 		roomID = dirRes.RoomID

@@ -20,9 +20,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"strconv"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -853,12 +854,13 @@ func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.Perform
 }
 
 func (a *UserInternalAPI) PerformPusherDeletion(ctx context.Context, req *api.PerformPusherDeletionRequest, res *struct{}) error {
+	log := frame.Log(ctx)
 	pushers, err := a.DB.GetPushers(ctx, req.Localpart, req.ServerName)
 	if err != nil {
 		return err
 	}
 	for i := range pushers {
-		frame.Log(ctx).Warn("pusher session: %d, req session: %d", pushers[i].SessionID, req.SessionID)
+		log.WithField("pusher_session_id", pushers[i].SessionID).WithField("request_session_id", req.SessionID).Warn("pusher session details")
 		if pushers[i].SessionID != req.SessionID {
 			err := a.DB.RemovePusher(ctx, pushers[i].AppID, pushers[i].PushKey, req.Localpart, req.ServerName)
 			if err != nil {

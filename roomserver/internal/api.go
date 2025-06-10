@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"crypto/ed25519"
+
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/pitabwire/frame"
 

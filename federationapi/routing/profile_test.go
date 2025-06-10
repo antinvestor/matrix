@@ -17,11 +17,12 @@ package routing_test
 import (
 	"context"
 	"encoding/hex"
-	"github.com/antinvestor/matrix/internal/queueutil"
 	"io"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"

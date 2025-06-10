@@ -3,11 +3,12 @@ package consumers
 import (
 	"context"
 	"crypto/ed25519"
-	"github.com/antinvestor/matrix/internal/queueutil"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/pitabwire/frame"
 

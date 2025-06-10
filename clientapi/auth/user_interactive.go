@@ -17,9 +17,10 @@ package auth
 import (
 	"context"
 	"encoding/json"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"sync"
+
+	"github.com/pitabwire/frame"
 
 	"golang.org/x/oauth2"
 

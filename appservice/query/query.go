@@ -20,11 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"net/url"
 	"sync"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/internal"

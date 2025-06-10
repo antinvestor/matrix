@@ -17,8 +17,9 @@ package routing
 import (
 	"errors"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"net/http"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
@@ -63,7 +64,7 @@ func RoomAliasToID(
 		}
 		queryRes := &roomserverAPI.GetRoomIDForAliasResponse{}
 		if err = rsAPI.GetRoomIDForAlias(httpReq.Context(), queryReq, queryRes); err != nil {
-			util.GetLogger(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
+			frame.Log(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -74,7 +75,7 @@ func RoomAliasToID(
 			serverQueryReq := federationAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: queryRes.RoomID}
 			var serverQueryRes federationAPI.QueryJoinedHostServerNamesInRoomResponse
 			if err = senderAPI.QueryJoinedHostServerNamesInRoom(httpReq.Context(), &serverQueryReq, &serverQueryRes); err != nil {
-				util.GetLogger(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
+				frame.Log(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -107,7 +108,7 @@ func RoomAliasToID(
 			}
 			// TODO: Return 502 if the remote server errored.
 			// TODO: Return 504 if the remote server timed out.
-			util.GetLogger(httpReq.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
+			frame.Log(httpReq.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -172,7 +173,7 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 	}
 
 	if len(discoveredRooms) == 0 {
-		util.GetLogger(httpReq.Context()).Debugln("no rooms found when handling SS room hierarchy request")
+		frame.Log(httpReq.Context()).Debug("no rooms found when handling SS room hierarchy request")
 		return util.JSONResponse{
 			Code: 404,
 			JSON: spec.NotFound("room is unknown/forbidden"),

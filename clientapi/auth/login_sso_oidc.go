@@ -20,13 +20,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"golang.org/x/oauth2"
 

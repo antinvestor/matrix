@@ -17,6 +17,7 @@ package mscs
 
 import (
 	"context"
+
 	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/cacheutil"
@@ -45,7 +46,7 @@ func EnableMSC(ctx context.Context, cfg *config.Matrix, cm sqlutil.ConnectionMan
 	case "msc2444": // enabled inside federationapi
 	case "msc2753": // enabled inside clientapi
 	default:
-		frame.Log(ctx).Warn("EnableMSC: unknown MSC '%s', this MSC is either not supported or is natively supported by Matrix", msc)
+		frame.Log(ctx).WithField("msc", msc).Warn("EnableMSC: unknown MSC, this MSC is either not supported or is natively supported by Matrix")
 	}
 	return nil
 }

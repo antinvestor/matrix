@@ -16,9 +16,10 @@ package consumers
 
 import (
 	"context"
+	"time"
+
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/pitabwire/frame"
-	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

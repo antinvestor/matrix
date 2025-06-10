@@ -15,10 +15,11 @@
 package routing
 
 import (
-	"github.com/pitabwire/frame"
 	"net/http"
 	"strconv"
 	"sync"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -147,7 +148,7 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 	if err != nil {
 		switch err.(type) {
 		case roomserverAPI.ErrRoomUnknownOrNotAllowed:
-			util.GetLogger(req.Context()).WithError(err).Debugln("room unknown/forbidden when handling CS room hierarchy request")
+			frame.Log(req.Context()).WithError(err).Debug("room unknown/forbidden when handling CS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden("room is unknown/forbidden"),

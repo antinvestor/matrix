@@ -21,12 +21,13 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -172,7 +173,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 	return func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		relation, err := NewEventRelationshipRequest(req.Body)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("failed to decode HTTP request as JSON")
+			frame.Log(req.Context()).WithError(err).Error("failed to decode HTTP request as JSON")
 			return util.JSONResponse{
 				Code: 400,
 				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
@@ -792,7 +793,7 @@ type walker struct {
 func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
 	children, err := w.childrenForParent(eventID)
 	if err != nil {
-		util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
+		frame.Log(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
 		return false, err
 	}
 	var next *walkInfo
@@ -806,7 +807,7 @@ func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
 		// find the children's children
 		children, err = w.childrenForParent(next.EventID)
 		if err != nil {
-			util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
+			frame.Log(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
 			return false, err
 		}
 		toWalk = w.addChildren(toWalk, children, next.Depth+1)

@@ -27,6 +27,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
@@ -88,7 +89,7 @@ func Backfill(
 		VirtualHost: request.Destination(),
 	}
 	if req.Limit, err = strconv.Atoi(limit); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
+		frame.Log(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam(fmt.Sprintf("limit %q is invalid format", limit)),
@@ -103,7 +104,7 @@ func Backfill(
 
 	// Query the Roomserver.
 	if err = rsAPI.PerformBackfill(httpReq.Context(), &req, &res); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
+		frame.Log(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

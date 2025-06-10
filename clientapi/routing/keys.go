@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -66,14 +67,14 @@ func UploadKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *api.Device) 
 		return util.ErrorResponse(err)
 	}
 	if uploadRes.Error != nil {
-		util.GetLogger(req.Context()).WithError(uploadRes.Error).Error("Failed to PerformUploadKeys")
+		frame.Log(req.Context()).WithError(uploadRes.Error).Error("Failed to PerformUploadKeys")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 	if len(uploadRes.KeyErrors) > 0 {
-		util.GetLogger(req.Context()).WithField("key_errors", uploadRes.KeyErrors).Error("Failed to upload one or more keys")
+		frame.Log(req.Context()).WithField("key_errors", uploadRes.KeyErrors).Error("Failed to upload one or more keys")
 		return util.JSONResponse{
 			Code: 400,
 			JSON: uploadRes.KeyErrors,
@@ -156,7 +157,7 @@ func ClaimKeys(req *http.Request, keyAPI api.ClientKeyAPI) util.JSONResponse {
 		Timeout:     r.GetTimeout(),
 	}, &claimRes)
 	if claimRes.Error != nil {
-		util.GetLogger(req.Context()).WithError(claimRes.Error).Error("failed to PerformClaimKeys")
+		frame.Log(req.Context()).WithError(claimRes.Error).Error("failed to PerformClaimKeys")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

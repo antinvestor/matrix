@@ -19,8 +19,9 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"strings"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
@@ -465,10 +466,11 @@ func (a *UserInternalAPI) processOtherSignatures(
 func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 	ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse,
 ) {
+	log := frame.Log(ctx)
 	for targetUserID := range req.UserToDevices {
 		keys, err := a.KeyDatabase.CrossSigningKeysForUser(ctx, targetUserID)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("Failed to get cross-signing keys for user %q", targetUserID)
+			log.WithError(err).WithField("target_user_id", targetUserID).Error("Failed to get cross-signing keys for user")
 			continue
 		}
 
@@ -481,7 +483,7 @@ func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 
 			sigMap, err := a.KeyDatabase.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, keyID)
 			if err != nil && !sqlutil.ErrorIsNoRows(err) {
-				frame.Log(ctx).WithError(err).Error("Failed to get cross-signing signatures for user %q key %q", targetUserID, keyID)
+				log.WithError(err).WithField("target_user_id", targetUserID).WithField("key_id", keyID).Error("Failed to get cross-signing signatures for user key")
 				continue
 			}
 

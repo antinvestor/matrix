@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrix"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -59,7 +60,7 @@ func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.Client
 		_, err := mac.Write([]byte(resp.Username))
 
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("mac.Write failed")
+			frame.Log(req.Context()).WithError(err).Error("mac.Write failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

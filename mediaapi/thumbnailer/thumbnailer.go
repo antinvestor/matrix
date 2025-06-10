@@ -17,11 +17,12 @@ package thumbnailer
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"math"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"

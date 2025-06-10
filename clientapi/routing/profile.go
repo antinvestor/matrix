@@ -17,9 +17,10 @@ package routing
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -53,7 +54,7 @@ func GetProfile(
 			}
 		}
 
-		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
+		frame.Log(req.Context()).WithError(err).Error("getProfile failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -109,7 +110,7 @@ func SetAvatarURL(
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		frame.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -133,7 +134,7 @@ func SetAvatarURL(
 
 	profile, changed, err := profileAPI.SetAvatarURL(req.Context(), localpart, domain, r.AvatarURL)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
+		frame.Log(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -198,7 +199,7 @@ func SetDisplayName(
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		frame.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -222,7 +223,7 @@ func SetDisplayName(
 
 	profile, changed, err := profileAPI.SetDisplayName(req.Context(), localpart, domain, r.DisplayName)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
+		frame.Log(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

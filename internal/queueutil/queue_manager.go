@@ -2,9 +2,10 @@ package queueutil
 
 import (
 	"context"
+	"regexp"
+
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/frame"
-	"regexp"
 )
 
 type queues struct {

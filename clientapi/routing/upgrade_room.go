@@ -27,6 +27,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/version"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
@@ -61,7 +62,7 @@ func UpgradeRoom(
 
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("device UserID is invalid")
+		frame.Log(req.Context()).WithError(err).Error("device UserID is invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

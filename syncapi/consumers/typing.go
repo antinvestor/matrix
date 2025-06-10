@@ -16,10 +16,11 @@ package consumers
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 	"strconv"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/setup/config"

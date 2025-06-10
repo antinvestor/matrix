@@ -60,10 +60,11 @@ func MakeLeave(
 	}
 
 	createLeaveTemplate := func(proto *gomatrixserverlib.ProtoEvent) (gomatrixserverlib.PDU, []gomatrixserverlib.PDU, error) {
-		identity, signErr := cfg.Global.SigningIdentityFor(request.Destination())
+		destination := request.Destination()
+		identity, signErr := cfg.Global.SigningIdentityFor(destination)
 		if signErr != nil {
-			frame.Log(httpReq.Context()).WithError(signErr).Error("obtaining signing identity for %s failed", request.Destination())
-			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", request.Destination()))
+			frame.Log(httpReq.Context()).WithError(signErr).WithField("destination", destination).Error("Failed to obtain signing identity for destination")
+			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", destination))
 		}
 
 		queryRes := api.QueryLatestEventsAndStateResponse{}

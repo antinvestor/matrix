@@ -17,9 +17,10 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"strconv"
+
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/pitabwire/frame"
-	"strconv"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

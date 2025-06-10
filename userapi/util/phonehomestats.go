@@ -18,12 +18,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/pitabwire/frame"
 	"math"
 	"net/http"
 	"runtime"
 	"syscall"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
@@ -142,7 +143,9 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 		return
 	}
 
-	frame.Log(ctx).Info("Reporting stats to %s: %s", p.cfg.Global.ReportStats.Endpoint, output.String())
+	frame.Log(ctx).WithField("endpoint", p.cfg.Global.ReportStats.Endpoint).
+		WithField("output", output.String()).
+		Info("Reporting stats")
 
 	request, err := http.NewRequestWithContext(iCtx, http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
 	if err != nil {

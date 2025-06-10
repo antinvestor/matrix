@@ -17,10 +17,11 @@ package userapi_test
 import (
 	"context"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/queueutil"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/pitabwire/frame"
 

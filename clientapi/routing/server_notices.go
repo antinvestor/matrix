@@ -18,9 +18,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib/tokens"
@@ -233,7 +234,7 @@ func SendServerNotice(
 	}
 	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, rsAPI, time.Now())
 	if resErr != nil {
-		log.Error("failed to send message: %+v", resErr)
+		log.WithField("error", resErr).Error("failed to send message")
 		return *resErr
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)

@@ -2,6 +2,7 @@ package queueutil
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/frame"
 )

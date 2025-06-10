@@ -18,8 +18,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"os"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/setup/config"
@@ -41,14 +42,15 @@ func ParseFlags(monolith bool) *config.Matrix {
 	}
 
 	ctx := context.Background()
+	log := frame.Log(ctx)
 	if *configPath == "" {
-		frame.Log(ctx).Fatal("--config must be supplied")
+		log.Fatal("--config must be supplied")
 	}
 
 	cfg, err := config.Load(*configPath)
 
 	if err != nil {
-		frame.Log(ctx).Fatal("Invalid config file: %s", err)
+		log.WithError(err).Fatal("Invalid config file")
 	}
 
 	if *enableRegistrationWithoutVerification {

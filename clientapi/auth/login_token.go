@@ -16,8 +16,9 @@ package auth
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"net/http"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"

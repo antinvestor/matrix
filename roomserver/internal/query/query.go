@@ -19,6 +19,7 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"fmt"
+
 	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"

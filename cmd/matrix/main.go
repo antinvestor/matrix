@@ -15,11 +15,12 @@
 package main
 
 import (
-	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/queueutil"
 	"net/http"
 	"strings"
+
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"github.com/pitabwire/frame"
@@ -67,12 +68,12 @@ func main() {
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			log.Error("Configuration error: %s", err)
+			log.WithField("error", err).Error("Configuration error")
 		}
 		log.Fatal("Failed to start due to configuration errors")
 	}
 
-	log.Info("Global version %s", internal.VersionString())
+	log.WithField("version", internal.VersionString()).Info("Global version")
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
 		log.Warn("Open registration is enabled")
 	}

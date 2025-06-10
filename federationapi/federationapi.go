@@ -15,12 +15,13 @@
 package federationapi
 
 import (
-	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"context"
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"time"
+
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal/cacheutil"

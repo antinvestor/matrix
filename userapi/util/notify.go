@@ -2,9 +2,10 @@ package util
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"strings"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/pushgateway"

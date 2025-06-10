@@ -18,13 +18,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
 	"os"
 	"strings"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth"
@@ -73,15 +74,15 @@ func MakeAuthAPI(
 	checks ...AuthAPIOption,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
-		logger := util.GetLogger(req.Context())
+		log := frame.Log(req.Context())
 		device, err := auth.VerifyUserFromRequest(req, userAPI)
 		if err != nil {
-			logger.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
+			log.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
 			return *err
 		}
-		// add the user ID to the logger
-		logger = logger.WithField("user_id", device.UserID)
-		req = req.WithContext(util.ContextWithLogger(req.Context(), logger))
+		// add the user ID to the log
+		log = log.WithField("user_id", device.UserID)
+		req = req.WithContext(frame.LogToContext(req.Context(), log))
 		// add the user to Sentry, if enabled
 		hub := sentry.GetHubFromContext(req.Context())
 		if hub != nil {
@@ -225,7 +226,7 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 		}
 
 		if opts.WithAuth {
-			logger := util.GetLogger(req.Context())
+			logger := frame.Log(req.Context())
 			_, jsonErr := auth.VerifyUserFromRequest(req, userAPI)
 			if jsonErr != nil {
 				w.WriteHeader(jsonErr.Code)

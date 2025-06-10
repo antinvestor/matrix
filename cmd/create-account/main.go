@@ -23,12 +23,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/tidwall/gjson"
@@ -116,10 +117,10 @@ func main() {
 
 	accessToken, err := sharedSecretRegister(cfg.ClientAPI.RegistrationSharedSecret, *serverURL, *username, pass, *isAdmin)
 	if err != nil {
-		log.Fatal("Failed to create the account:", err.Error())
+		log.WithError(err).Fatal("Failed to create the account")
 	}
 
-	log.Info("Created account: %s (AccessToken: %s)", *username, accessToken)
+	log.WithField("account", *username).WithField("token", accessToken).Info("Created account")
 }
 
 type sharedSecretRegistrationRequest struct {

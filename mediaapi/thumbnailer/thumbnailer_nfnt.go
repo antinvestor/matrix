@@ -18,9 +18,10 @@ package thumbnailer
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"image"
 	"image/draw"
+
+	"github.com/pitabwire/frame"
 
 	// Imported for gif codec
 	_ "image/gif"

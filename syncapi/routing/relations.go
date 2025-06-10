@@ -15,9 +15,10 @@
 package routing
 
 import (
-	"github.com/pitabwire/frame"
 	"net/http"
 	"strconv"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/pitabwire/util"
 
@@ -55,7 +56,7 @@ func Relations(
 
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
+		frame.Log(req.Context()).WithError(err).Error("device.UserID invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -134,7 +135,7 @@ func Relations(
 			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 		})
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
+			frame.Log(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
 			continue
 		}
 		res.Chunk = append(

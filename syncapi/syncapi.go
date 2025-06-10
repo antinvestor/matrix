@@ -16,6 +16,7 @@ package syncapi
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/pitabwire/frame"
 

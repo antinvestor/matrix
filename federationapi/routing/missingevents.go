@@ -20,6 +20,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
@@ -62,7 +63,7 @@ func GetMissingEvents(
 		},
 		&eventsResponse,
 	); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("query.QueryMissingEvents failed")
+		frame.Log(httpReq.Context()).WithError(err).Error("query.QueryMissingEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

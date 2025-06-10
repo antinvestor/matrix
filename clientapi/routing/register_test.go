@@ -71,7 +71,7 @@ func TestFlowCheckingCompleteFlowOrdered(t *testing.T) {
 	}
 
 	if !checkFlowCompleted(testFlow, allowedFlows) {
-		t.Errorf("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be true.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be true.", testFlow, allowedFlows)
 	}
 }
 
@@ -83,7 +83,7 @@ func TestFlowCheckingStagesFromDifferentFlows(t *testing.T) {
 	}
 
 	if checkFlowCompleted(testFlow, allowedFlows) {
-		t.Errorf("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be false.", testFlow, allowedFlows)
 	}
 }
 
@@ -97,7 +97,7 @@ func TestFlowCheckingCompleteOrderedExtraneous(t *testing.T) {
 		authtypes.LoginType("stage5"),
 	}
 	if !checkFlowCompleted(testFlow, allowedFlows) {
-		t.Errorf("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be true.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be true.", testFlow, allowedFlows)
 	}
 }
 
@@ -105,7 +105,7 @@ func TestFlowCheckingCompleteOrderedExtraneous(t *testing.T) {
 func TestFlowCheckingEmptyFlow(t *testing.T) {
 	testFlow := []authtypes.LoginType{}
 	if checkFlowCompleted(testFlow, allowedFlows) {
-		t.Errorf("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be false.", testFlow, allowedFlows)
 	}
 }
 
@@ -115,7 +115,7 @@ func TestFlowCheckingInvalidStage(t *testing.T) {
 		authtypes.LoginType("stage8"),
 	}
 	if checkFlowCompleted(testFlow, allowedFlows) {
-		t.Errorf("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be false.", testFlow, allowedFlows)
 	}
 }
 
@@ -130,7 +130,7 @@ func TestFlowCheckingExtraneousUnordered(t *testing.T) {
 		authtypes.LoginType("stage1"),
 	}
 	if !checkFlowCompleted(testFlow, allowedFlows) {
-		t.Errorf("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be true.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be true.", testFlow, allowedFlows)
 	}
 }
 
@@ -140,7 +140,7 @@ func TestFlowCheckingShortIncorrectInput(t *testing.T) {
 		authtypes.LoginType("stage8"),
 	}
 	if checkFlowCompleted(testFlow, allowedFlows) {
-		t.Errorf("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be false.", testFlow, allowedFlows)
 	}
 }
 
@@ -153,7 +153,7 @@ func TestFlowCheckingExtraneousIncorrectInput(t *testing.T) {
 		authtypes.LoginType("stage11"),
 	}
 	if checkFlowCompleted(testFlow, allowedFlows) {
-		t.Errorf("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be false.", testFlow, allowedFlows)
 	}
 }
 
@@ -166,7 +166,7 @@ func TestEmptyCompletedFlows(t *testing.T) {
 
 	// check for []
 	if ret == nil || len(ret) != 0 {
-		t.Errorf("Empty Completed Flow Stages should be a empty slice: returned ", ret, ". Should be []")
+		t.Errorf("Empty Completed Flow Stages should be a empty slice: returned %v. Should be []", ret)
 	}
 }
 

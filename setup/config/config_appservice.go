@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"net"
 	"net/http"
 	"os"
@@ -26,6 +25,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"gopkg.in/yaml.v3"
 )

@@ -16,10 +16,11 @@ package routing
 
 import (
 	"encoding/json"
-	"github.com/pitabwire/frame"
 	"io"
 	"net"
 	"net/http"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -60,7 +61,7 @@ func GetDeviceByID(
 		UserID: device.UserID,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
+		frame.Log(req.Context()).WithError(err).Error("QueryDevices failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -100,7 +101,7 @@ func GetDevicesByLocalpart(
 		UserID: device.UserID,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("QueryDevices failed")
+		frame.Log(req.Context()).WithError(err).Error("QueryDevices failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -145,7 +146,7 @@ func UpdateDeviceByID(
 		DisplayName:      payload.DisplayName,
 	}, &performRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceUpdate failed")
+		frame.Log(req.Context()).WithError(err).Error("PerformDeviceUpdate failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

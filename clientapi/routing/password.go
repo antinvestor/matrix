@@ -1,8 +1,9 @@
 package routing
 
 import (
-	"github.com/pitabwire/frame"
 	"net/http"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -89,7 +90,7 @@ func Password(
 	// Get the local part.
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		frame.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -104,14 +105,14 @@ func Password(
 	}
 	passwordRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), passwordReq, passwordRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("PerformPasswordUpdate failed")
+		frame.Log(req.Context()).WithError(err).Error("PerformPasswordUpdate failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 	if !passwordRes.PasswordUpdated {
-		util.GetLogger(req.Context()).Error("Expected password to have been updated but wasn't")
+		frame.Log(req.Context()).Error("Expected password to have been updated but wasn't")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -128,7 +129,7 @@ func Password(
 		}
 		logoutRes := &api.PerformDeviceDeletionResponse{}
 		if err := userAPI.PerformDeviceDeletion(req.Context(), logoutReq, logoutRes); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
+			frame.Log(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -141,7 +142,7 @@ func Password(
 			SessionID:  device.SessionID,
 		}
 		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
+			frame.Log(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

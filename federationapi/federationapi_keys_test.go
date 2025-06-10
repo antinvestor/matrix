@@ -6,11 +6,12 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/queueutil"
 	"io"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/pitabwire/frame"
@@ -113,7 +114,6 @@ func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *confi
 		globalCfg.KeyValidityPeriod = s.validity
 		cfg.FederationAPI.KeyPerspectives = nil
 
-		globalCfg.JetStream.TopicPrefix = string(s.name[:1])
 		cfg.FederationAPI.Global = &globalCfg
 		cfg.KeyServer.Global = &globalCfg
 

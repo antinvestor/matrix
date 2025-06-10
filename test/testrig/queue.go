@@ -2,8 +2,9 @@ package testrig
 
 import (
 	"context"
-	"github.com/antinvestor/matrix/internal/queueutil"
 	"testing"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"

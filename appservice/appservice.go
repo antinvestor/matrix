@@ -16,9 +16,10 @@ package appservice
 
 import (
 	"context"
+	"sync"
+
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/pitabwire/frame"
-	"sync"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"

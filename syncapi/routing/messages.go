@@ -17,11 +17,12 @@ package routing
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"math"
 	"net/http"
 	"sort"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -82,7 +83,7 @@ func OnIncomingMessagesRequest(
 
 	deviceUserID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
+		frame.Log(req.Context()).WithError(err).Error("device.UserID invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -267,7 +268,7 @@ func OnIncomingMessagesRequest(
 
 	clientEvents, start, end, err := mReq.retrieveEvents(req.Context(), rsAPI)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
+		frame.Log(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -280,7 +281,7 @@ func OnIncomingMessagesRequest(
 		end = types.TopologyToken{}
 	}
 
-	util.GetLogger(req.Context()).
+	frame.Log(req.Context()).
 		WithField("request_from", from.String()).
 		WithField("request_to", to.String()).
 		WithField("limit", filter.Limit).
@@ -298,7 +299,7 @@ func OnIncomingMessagesRequest(
 	if filter.LazyLoadMembers {
 		membershipEvents, err := applyLazyLoadMembers(req.Context(), device, snapshot, roomID, clientEvents, lazyLoadCache)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("failed to apply lazy loading")
+			frame.Log(req.Context()).WithError(err).Error("failed to apply lazy loading")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -356,7 +357,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	end.Decrement()
 
 	var events []*rstypes.HeaderedEvent
-	util.GetLogger(r.ctx).
+	frame.Log(r.ctx).
 		WithField("start", r.from).
 		WithField("end", r.to).
 		WithField("backwards", r.backwardOrdering).
@@ -578,7 +579,7 @@ func (r *messagesReq) backfill(ctx context.Context, roomID string, backwardsExtr
 	if err != nil {
 		return nil, fmt.Errorf("PerformBackfill failed: %w", err)
 	}
-	util.GetLogger(r.ctx).WithField("new_events", len(res.Events)).Info("Storing new events from backfill")
+	frame.Log(r.ctx).WithField("new_events", len(res.Events)).Info("Storing new events from backfill")
 
 	// TODO: we should only be inserting events into the database from the roomserver's kafka output stream.
 	// Currently, this can race with live events for the room and cause problems. It's also just a bit unclear

@@ -15,11 +15,12 @@
 package httputil
 
 import (
-	"connectrpc.com/connect"
-	"connectrpc.com/validate"
 	"encoding/json"
 	"net/http"
 	"net/url"
+
+	"connectrpc.com/connect"
+	"connectrpc.com/validate"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/gorilla/mux"

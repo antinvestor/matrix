@@ -16,6 +16,7 @@ package producers
 
 import (
 	"context"
+
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
 )

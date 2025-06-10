@@ -16,6 +16,7 @@ package internal
 
 import (
 	"context"
+
 	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -101,16 +102,15 @@ func (r *RelayInternalAPI) QueryTransactions(
 	userID spec.UserID,
 	previousEntry fclient.RelayEntry,
 ) (api.QueryRelayTransactionsResponse, error) {
-	frame.Log(ctx).Info("QueryTransactions for %s", userID.String())
+	log := frame.Log(ctx).WithField("user_id", userID.String())
+	log.Info("Querying transactions")
 	if previousEntry.EntryID > 0 {
-		frame.Log(ctx).Info("Cleaning previous entry (%v) from db for %s",
-			previousEntry.EntryID,
-			userID.String(),
-		)
+		log = log.WithField("previous_entry_id", previousEntry.EntryID)
+		log.Info("Cleaning previous entry from database")
 		prevReceipt := receipt.NewReceipt(previousEntry.EntryID)
 		err := r.db.CleanTransactions(ctx, userID, []*receipt.Receipt{&prevReceipt})
 		if err != nil {
-			frame.Log(ctx).Error("db.CleanTransactions: %s", err.Error())
+			log.WithError(err).Error("Failed to clean transactions from database")
 			return api.QueryRelayTransactionsResponse{}, err
 		}
 	}
@@ -123,12 +123,13 @@ func (r *RelayInternalAPI) QueryTransactions(
 
 	response := api.QueryRelayTransactionsResponse{}
 	if transaction != nil && receiptTx != nil {
-		frame.Log(ctx).Info("Obtained transaction (%v) for %s", transaction.TransactionID, userID.String())
+		log = log.WithField("transaction_id", transaction.TransactionID)
+		log.Info("Obtained transaction")
 		response.Transaction = *transaction
 		response.EntryID = receiptTx.GetNID()
 		response.EntriesQueued = true
 	} else {
-		frame.Log(ctx).Info("No more entries in the queue for %s", userID.String())
+		log.Info("No more entries in the queue")
 		response.EntryID = 0
 		response.EntriesQueued = false
 	}

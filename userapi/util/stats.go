@@ -16,9 +16,10 @@ package util
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"syscall"
 	"time"
+
+	"github.com/pitabwire/frame"
 )
 
 func getMemoryStats(ctx context.Context, p *phoneHomeStats) error {

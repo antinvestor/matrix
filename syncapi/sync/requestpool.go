@@ -19,12 +19,13 @@ package sync
 import (
 	"context"
 	"errors"
-	"github.com/pitabwire/frame"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
@@ -599,7 +600,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("newSyncRequest failed")
+		frame.Log(req.Context()).WithError(err).Error("newSyncRequest failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -621,7 +622,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 		syncReq.Response, fromToken.DeviceListPosition, toToken.DeviceListPosition,
 	)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
+		frame.Log(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

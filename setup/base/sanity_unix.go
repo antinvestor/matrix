@@ -4,8 +4,9 @@ package base
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"syscall"
+
+	"github.com/pitabwire/frame"
 )
 
 func PlatformSanityChecks(ctx context.Context) {

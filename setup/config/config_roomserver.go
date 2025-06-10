@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/pitabwire/frame"
 

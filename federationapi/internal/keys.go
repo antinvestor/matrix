@@ -187,7 +187,8 @@ func (r *FederationInternalAPI) handleFetcherKeys(
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	frame.Log(ctx).WithField("fetcher_name", fetcher.FetcherName()).Info("Fetching %d key(s)", len(requests))
+	log := frame.Log(ctx).WithField("fetcher_name", fetcher.FetcherName())
+	log.WithField("key_count", len(requests)).Info("Fetching keys")
 
 	// Create a context that limits our requests to 30 seconds.
 	fetcherCtx, fetcherCancel := context.WithTimeout(ctx, time.Second*30)
@@ -231,15 +232,16 @@ func (r *FederationInternalAPI) handleFetcherKeys(
 
 	// Store the keys from our store map.
 	if err = r.keyRing.KeyDatabase.StoreKeys(ctx, storeResults); err != nil {
-		frame.Log(ctx).WithError(err).
-			WithField("fetcher_name", fetcher.FetcherName()).
-			WithField("database_name", r.keyRing.KeyDatabase.FetcherName()).Error("Failed to store keys in the database")
+		log.WithError(err).
+			WithField("database_name", r.keyRing.KeyDatabase.FetcherName()).
+			Error("Failed to store keys in the database")
 		return fmt.Errorf("server key API failed to store retrieved keys: %w", err)
 	}
 
 	if len(storeResults) > 0 {
-		frame.Log(ctx).
-			WithField("fetcher_name", fetcher.FetcherName()).Info("Updated %d of %d key(s) in database (%d keys remaining)", len(storeResults), len(results), len(requests))
+		log.WithField("keys_updated", len(storeResults)).
+			WithField("total_keys", len(results)).
+			WithField("keys_remaining", len(requests)).Info("Updated keys in database")
 	}
 
 	return nil

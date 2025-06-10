@@ -20,11 +20,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"

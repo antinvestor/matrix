@@ -19,12 +19,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"hash/fnv"
 	"net"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
@@ -35,7 +36,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -224,6 +224,8 @@ func (u *DeviceListUpdater) Start(ctx context.Context) error {
 
 // CleanUp removes stale device entries for users we don't share a room with anymore
 func (u *DeviceListUpdater) CleanUp(ctx context.Context) error {
+	logger := frame.Log(ctx).WithField("function", "DeviceListUpdater.CleanUp")
+
 	staleUsers, err := u.db.StaleDeviceLists(ctx, []spec.ServerName{})
 	if err != nil {
 		return err
@@ -237,7 +239,8 @@ func (u *DeviceListUpdater) CleanUp(ctx context.Context) error {
 	if len(res.LeftUsers) == 0 {
 		return nil
 	}
-	frame.Log(ctx).Debug("Deleting %d stale device list entries", len(res.LeftUsers))
+
+	logger.WithField("count", len(res.LeftUsers)).Debug("Deleting stale device list entries")
 	return u.db.DeleteStaleDeviceLists(ctx, res.LeftUsers)
 }
 
@@ -535,7 +538,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName sp
 	// immediately instead of just after **all** users have been processed.
 	defer u.clearChannel(userID)
 
-	logger := util.GetLogger(iCtx).WithField("server_name", serverName).WithField("user_id", userID)
+	logger := frame.Log(iCtx).WithField("server_name", serverName).WithField("user_id", userID)
 	res, err := u.fedClient.GetUserDevices(iCtx, u.thisServer, serverName, userID)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {

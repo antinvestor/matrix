@@ -24,6 +24,7 @@ import (
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/containerd/log"
 
 	"gopkg.in/h2non/bimg.v1"
 )

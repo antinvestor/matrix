@@ -18,12 +18,13 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"golang.org/x/oauth2"
 

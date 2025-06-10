@@ -17,9 +17,10 @@ package config
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"reflect"
 	"testing"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -35,7 +36,7 @@ func TestLoadConfigRelative(t *testing.T) {
 		}.readFile,
 	)
 	if err != nil {
-		t.Errorf("failed to load config:", err)
+		t.Errorf("failed to load config: %v", err)
 	}
 
 	configErrors := &ConfigErrors{}
@@ -221,7 +222,7 @@ func (m mockReadFile) readFile(path string) ([]byte, error) {
 func TestReadKey(t *testing.T) {
 	keyID, _, err := readKeyPEM("path/to/key", []byte(testKey), true)
 	if err != nil {
-		t.Errorf("failed to load private key:", err)
+		t.Errorf("failed to load private key: %v", err)
 	}
 	wantKeyID := testKeyID
 	if wantKeyID != string(keyID) {

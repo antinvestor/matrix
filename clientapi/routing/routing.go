@@ -15,11 +15,12 @@
 package routing
 
 import (
-	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"context"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"strings"
+
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
+	"github.com/pitabwire/frame"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 
@@ -120,9 +121,10 @@ func Setup(
 	sf := singleflight.Group{}
 
 	if cfg.Global.WellKnownClientName != "" {
-		frame.Log(ctx).Info("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Global.WellKnownClientName)
+		log := frame.Log(ctx)
+		log.WithField("base_url", cfg.Global.WellKnownClientName).Info("Setting m.homeserver base_url at /.well-known/matrix/client")
 		if cfg.Global.WellKnownSlidingSyncProxy != "" {
-			frame.Log(ctx).Info("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Global.WellKnownSlidingSyncProxy)
+			log.WithField("proxy_url", cfg.Global.WellKnownSlidingSyncProxy).Info("Setting org.matrix.msc3575.proxy url at /.well-known/matrix/client")
 		}
 		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
 			response := WellKnownClientResponse{

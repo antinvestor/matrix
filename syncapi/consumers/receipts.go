@@ -16,9 +16,10 @@ package consumers
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/pitabwire/frame"
-	"strconv"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"

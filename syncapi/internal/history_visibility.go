@@ -17,9 +17,10 @@ package internal
 import (
 	"context"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"math"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"

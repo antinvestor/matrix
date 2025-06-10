@@ -16,9 +16,10 @@ package notifier
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"sync"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"

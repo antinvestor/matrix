@@ -1,9 +1,10 @@
 package routing
 
 import (
-	"github.com/pitabwire/frame"
 	"io"
 	"net/http"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -36,7 +37,7 @@ func Deactivate(
 
 	localpart, serverName, err := gomatrixserverlib.SplitID('@', login.Username())
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		frame.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

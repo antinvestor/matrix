@@ -15,8 +15,9 @@
 package routing
 
 import (
-	"connectrpc.com/connect"
 	"net/http"
+
+	"connectrpc.com/connect"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/gorilla/mux"

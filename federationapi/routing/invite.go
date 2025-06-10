@@ -19,8 +19,9 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"net/http"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -214,7 +215,7 @@ func InviteV1(
 	var strippedState []gomatrixserverlib.InviteStrippedState
 	if jsonErr := json.Unmarshal(event.Unsigned(), &strippedState); jsonErr != nil {
 		// just warn, they may not have added any.
-		util.GetLogger(httpReq.Context()).Warn("failed to extract stripped state from invite event")
+		frame.Log(httpReq.Context()).Warn("failed to extract stripped state from invite event")
 	}
 
 	if event.StateKey() == nil {

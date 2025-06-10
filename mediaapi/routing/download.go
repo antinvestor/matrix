@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"io"
 	"io/fs"
 	"mime"
@@ -33,6 +32,8 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -214,7 +215,8 @@ func (r *downloadRequest) jsonErrorResponse(w http.ResponseWriter, res util.JSON
 
 	// Set status code and write the body
 	w.WriteHeader(res.Code)
-	r.Logger.WithField("code", res.Code).Debug("Responding (%d bytes)", len(resBytes))
+	r.Logger.WithField("code", res.Code).
+		WithField("response_len", len(resBytes)).Debug("Sending response")
 
 	// we don't really care that much if we fail to write the error response
 	w.Write(resBytes) // nolint: errcheck

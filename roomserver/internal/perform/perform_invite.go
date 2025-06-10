@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
+
 	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"

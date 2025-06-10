@@ -18,11 +18,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -108,7 +109,7 @@ func SendEvent(
 		})
 		if innerErr != nil {
 			// TODO: work out better logic for failure cases (e.g. sender ID not found)
-			util.GetLogger(req.Context()).WithError(innerErr).Error("synctypes.FromClientStateKey failed")
+			frame.Log(req.Context()).WithError(innerErr).Error("synctypes.FromClientStateKey failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),
@@ -232,14 +233,14 @@ func SendEvent(
 		txnAndSessionID,
 		false,
 	); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
+		frame.Log(req.Context()).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 	timeToSubmitEvent := time.Since(startedSubmittingEvent)
-	util.GetLogger(req.Context()).
+	frame.Log(req.Context()).
 		WithField("event_id", e.EventID()).
 		WithField("room_id", roomID).
 		WithField("room_version", roomVersion).
@@ -281,7 +282,7 @@ func updatePowerLevels(req *http.Request, r map[string]interface{}, roomID strin
 		if err != nil {
 			return err
 		} else if senderID == nil {
-			util.GetLogger(req.Context()).Warn("sender ID not found for %s in %s", uID, *validRoomID)
+			frame.Log(req.Context()).Warn("sender ID not found for %s in %s", uID, *validRoomID)
 			continue
 		}
 		userMap[string(*senderID)] = level

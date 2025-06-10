@@ -16,10 +16,11 @@ package routing
 
 import (
 	"context"
-	"github.com/pitabwire/frame"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -212,7 +213,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).WithField("senderID", event.SenderID()).Error("Failed converting to ClientEvent")
+			frame.Log(req.Context()).WithError(err).WithField("senderID", event.SenderID()).Error("Failed converting to ClientEvent")
 			continue
 		}
 

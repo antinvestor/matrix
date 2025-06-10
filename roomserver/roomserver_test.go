@@ -3,10 +3,11 @@ package roomserver_test
 import (
 	"context"
 	"crypto/ed25519"
-	"github.com/antinvestor/matrix/internal/queueutil"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/antinvestor/matrix/internal/queueutil"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/statistics"
@@ -239,7 +240,7 @@ func TestPurgeRoom(t *testing.T) {
 
 	roomID, err0 := spec.NewRoomID(room.ID)
 	if err0 != nil {
-		t.Fatalf(err0)
+		t.Fatal(err0)
 	}
 
 	// Invite Bob

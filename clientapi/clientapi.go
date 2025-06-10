@@ -15,8 +15,9 @@
 package clientapi
 
 import (
-	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"context"
+
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/pitabwire/frame"
 
