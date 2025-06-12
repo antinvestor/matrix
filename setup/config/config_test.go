@@ -20,10 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/pitabwire/util"
 
 	"gopkg.in/yaml.v3"
 )
@@ -43,7 +42,7 @@ func TestLoadConfigRelative(t *testing.T) {
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			frame.Log(context.TODO()).Error("Configuration error: %s", err)
+			util.Log(context.TODO()).Error("Configuration error: %s", err)
 		}
 		t.Errorf("configuration verification failed")
 	}

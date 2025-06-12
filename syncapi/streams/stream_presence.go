@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pitabwire/util"
 	"sync"
 
 	"github.com/tidwall/gjson"
@@ -65,16 +66,19 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
+
+	log := util.Log(ctx)
+
 	// We pull out a larger number than the filter asks for, since we're filtering out events later
 	presences, err := snapshot.PresenceAfter(ctx, from, synctypes.EventFilter{Limit: 1000})
 	if err != nil {
-		req.Log.WithError(err).Error("p.Cm.PresenceAfter failed")
+		log.WithError(err).Error("p.Cm.PresenceAfter failed")
 		return from
 	}
 
 	getPresenceForUsers, err := p.getNeededUsersFromRequest(ctx, req, presences)
 	if err != nil {
-		req.Log.WithError(err).Error("getNeededUsersFromRequest failed")
+		log.WithError(err).Error("getNeededUsersFromRequest failed")
 		return from
 	}
 
@@ -85,7 +89,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 
 	dbPresences, err := snapshot.GetPresences(ctx, getPresenceForUsers)
 	if err != nil {
-		req.Log.WithError(err).Error("unable to query presence for user")
+		log.WithError(err).Error("unable to query presence for user")
 		_ = snapshot.Rollback()
 		return from
 	}
@@ -111,7 +115,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 			skip := prevPresence.Equals(presence) && currentlyActive && req.Device.UserID != presence.UserID
 			_, membershipChange := req.MembershipChanges[presence.UserID]
 			if skip && !membershipChange {
-				req.Log.Debug("Skipping presence, no change (%s)", presence.UserID)
+				log.Debug("Skipping presence, no change (%s)", presence.UserID)
 				continue
 			}
 		}

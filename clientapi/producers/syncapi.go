@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"strconv"
 	"time"
@@ -48,7 +48,7 @@ func (p *SyncAPIProducer) SendReceipt(
 	userID, roomID, eventID, receiptType string, timestamp spec.Timestamp,
 ) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	h := map[string]string{
 		queueutil.UserID:  userID,
@@ -67,7 +67,7 @@ func (p *SyncAPIProducer) SendToDevice(
 	message json.RawMessage,
 ) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	devices := []string{}
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)

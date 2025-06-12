@@ -176,17 +176,6 @@ func (d DataSource) IsQueue() bool {
 func (d DataSource) ToURI() (*url.URL, error) {
 	return url.Parse(string(d))
 }
-func (d DataSource) PrefixPath(prefix string) DataSource {
-	nuUri, err := d.ToURI()
-	if err != nil {
-		return d
-	}
-
-	if nuUri.Path != "" {
-		nuUri.Path = fmt.Sprintf("%s%s", prefix, nuUri.Path)
-	}
-	return DataSource(nuUri.String())
-}
 
 func (d DataSource) ExtendPath(epath ...string) DataSource {
 	nuUri, err := d.ToURI()
@@ -198,6 +187,43 @@ func (d DataSource) ExtendPath(epath ...string) DataSource {
 	nuPathPieces = append(nuPathPieces, epath...)
 
 	nuUri.Path = path.Join(nuPathPieces...)
+
+	return DataSource(nuUri.String())
+}
+
+func (d DataSource) SuffixPath(suffix string) DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
+	}
+
+	if nuUri.Path != "" {
+
+		nuUri.Path = strings.Join([]string{nuUri.Path, suffix}, "")
+	}
+	return DataSource(nuUri.String())
+}
+
+func (d DataSource) PrefixPath(prefix string) DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
+	}
+
+	if nuUri.Path != "" {
+		nuUri.Path = strings.Join([]string{prefix, nuUri.Path}, "")
+	}
+
+	return DataSource(nuUri.String())
+}
+
+func (d DataSource) DelPath() DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
+	}
+
+	nuUri.Path = ""
 
 	return DataSource(nuUri.String())
 }
@@ -412,6 +438,30 @@ type DefaultOpts struct {
 	DSCacheConn    DataSource
 	DSQueueConn    DataSource
 	QueuePrefix    string
+}
+
+func (d *DefaultOpts) defaultQ(s string) QueueOptions {
+
+	ref := fmt.Sprintf("%s_Ref", s)
+
+	if d.DSQueueConn.IsNats() {
+
+		durable := strings.Replace(fmt.Sprintf("ConsumerDurable_%s", s), ".", "_", -1)
+
+		return QueueOptions{Prefix: d.QueuePrefix, QReference: ref, DS: d.DSQueueConn.
+			ExtendQuery("jetstream", "true").
+			ExtendQuery("subject", s).
+			ExtendQuery("stream_name", s).
+			ExtendQuery("stream_subjects", s).
+			ExtendQuery("stream_storage", "file").
+			ExtendQuery("stream_retention", "workqueue").
+			ExtendQuery("consumer_filter_subject", s).
+			ExtendQuery("consumer_durable_name", durable).
+			ExtendQuery("consumer_deliver_policy", "all").
+			ExtendQuery("consumer_ack_policy", "explicit"),
+		}
+	}
+	return QueueOptions{Prefix: d.QueuePrefix, QReference: ref, DS: d.DSQueueConn.SuffixPath(s)}
 }
 
 // Defaults sets default config values if they are not explicitly set.

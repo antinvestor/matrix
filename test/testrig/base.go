@@ -27,12 +27,12 @@ import (
 
 func newService(t *testing.T) (context.Context, *frame.Service) {
 	ctx := t.Context()
-	opts := []frame.Option{frame.NoopDriver()}
+	opts := []frame.Option{frame.WithNoopDriver()}
 	return frame.NewServiceWithContext(ctx, "Test Srv", opts...)
 }
 
 func newServiceWithoutT() (context.Context, *frame.Service) {
-	opts := []frame.Option{frame.NoopDriver()}
+	opts := []frame.Option{frame.WithNoopDriver()}
 	return frame.NewService("Test Srv", opts...)
 }
 
@@ -46,6 +46,8 @@ func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.
 	var cfg config.Matrix
 	cfg.Defaults(defaultOpts)
 	cfg.FederationAPI.KeyPerspectives = nil
+
+	cfg.Global.LogShowStackTrace = true
 
 	cfg.Global.Cache.MaxAge = time.Minute * 5
 	cfg.Global.Cache.EstimatedMaxSize = 8 * 1024 * 1024
@@ -85,9 +87,11 @@ func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *fr
 	}
 	srv.AddCleanupMethod(clearConfig)
 
-	srvOpts := []frame.Option{frame.Config(&cfg.Global), frame.Datastore(ctx), frame.WithPoolCapacity(5), frame.WithPoolConcurrency(4)}
+	srvOpts := []frame.Option{frame.WithConfig(&cfg.Global), frame.WithDatastore(), frame.WithPoolCapacity(5), frame.WithPoolConcurrency(4)}
 
-	srv.Init(srvOpts...)
+	srv.Init(ctx, srvOpts...)
+
+	createStreamForQueueConfig(ctx, t, srv, cfg)
 
 	return ctx, srv, cfg
 }
@@ -109,9 +113,9 @@ func InitWithoutT(testOpts ...test.DependancyOption) (context.Context, *frame.Se
 
 	scfg := cfg.Global
 
-	srvOpts := []frame.Option{frame.Config(&scfg), frame.Datastore(ctx)}
+	srvOpts := []frame.Option{frame.WithConfig(&scfg), frame.WithDatastore()}
 
-	srv.Init(srvOpts...)
+	srv.Init(ctx, srvOpts...)
 
 	return ctx, srv, cfg, nil
 }

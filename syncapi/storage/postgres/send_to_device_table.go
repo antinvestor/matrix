@@ -24,6 +24,7 @@ import (
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // Schema for send-to-device table
@@ -143,7 +144,7 @@ func (t *sendToDeviceTable) SelectSendToDeviceMessages(
 			DeviceID: deviceID,
 		}
 		if err = json.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
-			frame.Log(ctx).WithError(err).Error("Failed to unmarshal send-to-device message")
+			util.Log(ctx).WithError(err).Error("Failed to unmarshal send-to-device message")
 			continue
 		}
 		if id > lastPos {

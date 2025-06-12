@@ -17,14 +17,13 @@ package internal
 import (
 	"context"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/relayapi/api"
+	"github.com/pitabwire/util"
 )
 
 // SetRelayingEnabled implements api.RelayInternalAPI
@@ -52,7 +51,7 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	prevEntry := fclient.RelayEntry{}
 	asyncResponse, err := r.fedClient.P2PGetTransactionFromRelay(ctx, userID, prevEntry, relayServer)
 	if err != nil {
-		frame.Log(ctx).Error("P2PGetTransactionFromRelay: %s", err.Error())
+		util.Log(ctx).Error("P2PGetTransactionFromRelay: %s", err.Error())
 		return err
 	}
 	r.processTransaction(ctx, &asyncResponse.Transaction)
@@ -60,11 +59,11 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	prevEntry = fclient.RelayEntry{EntryID: asyncResponse.EntryID}
 	for asyncResponse.EntriesQueued {
 		// There are still more entries available for this node from the relay.
-		frame.Log(ctx).Info("Retrieving next entry from relay, previous: %v", prevEntry)
+		util.Log(ctx).Info("Retrieving next entry from relay, previous: %v", prevEntry)
 		asyncResponse, err = r.fedClient.P2PGetTransactionFromRelay(ctx, userID, prevEntry, relayServer)
 		prevEntry = fclient.RelayEntry{EntryID: asyncResponse.EntryID}
 		if err != nil {
-			frame.Log(ctx).Error("P2PGetTransactionFromRelay: %s", err.Error())
+			util.Log(ctx).Error("P2PGetTransactionFromRelay: %s", err.Error())
 			return err
 		}
 		r.processTransaction(ctx, &asyncResponse.Transaction)
@@ -79,10 +78,10 @@ func (r *RelayInternalAPI) PerformStoreTransaction(
 	transaction gomatrixserverlib.Transaction,
 	userID spec.UserID,
 ) error {
-	frame.Log(ctx).Warn("Storing transaction for %v", userID)
+	util.Log(ctx).Warn("Storing transaction for %v", userID)
 	receiptTx, err := r.db.StoreTransaction(ctx, transaction)
 	if err != nil {
-		frame.Log(ctx).Error("db.StoreTransaction: %s", err.Error())
+		util.Log(ctx).Error("db.StoreTransaction: %s", err.Error())
 		return err
 	}
 	err = r.db.AssociateTransactionWithDestinations(
@@ -102,7 +101,7 @@ func (r *RelayInternalAPI) QueryTransactions(
 	userID spec.UserID,
 	previousEntry fclient.RelayEntry,
 ) (api.QueryRelayTransactionsResponse, error) {
-	log := frame.Log(ctx).WithField("user_id", userID.String())
+	log := util.Log(ctx).WithField("user_id", userID.String())
 	log.Info("Querying transactions")
 	if previousEntry.EntryID > 0 {
 		log = log.WithField("previous_entry_id", previousEntry.EntryID)
@@ -117,7 +116,7 @@ func (r *RelayInternalAPI) QueryTransactions(
 
 	transaction, receiptTx, err := r.db.GetTransaction(ctx, userID)
 	if err != nil {
-		frame.Log(ctx).Error("db.GetTransaction: %s", err.Error())
+		util.Log(ctx).Error("db.GetTransaction: %s", err.Error())
 		return api.QueryRelayTransactionsResponse{}, err
 	}
 
@@ -138,7 +137,7 @@ func (r *RelayInternalAPI) QueryTransactions(
 }
 
 func (r *RelayInternalAPI) processTransaction(ctx context.Context, txn *gomatrixserverlib.Transaction) {
-	frame.Log(ctx).Warn("Processing transaction from relay server")
+	util.Log(ctx).Warn("Processing transaction from relay server")
 	mu := internal.NewMutexByRoom()
 	t := internal.NewTxnReq(
 		r.rsAPI,

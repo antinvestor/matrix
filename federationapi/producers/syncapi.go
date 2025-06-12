@@ -21,11 +21,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/pitabwire/util"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -57,7 +57,7 @@ func (p *SyncAPIProducer) SendReceipt(
 		"timestamp":       fmt.Sprintf("%d", timestamp),
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("component", "syncapi_producer").
 		WithField("topic", p.TopicReceiptEvent).
 		Debug("Producing to topic")
@@ -94,7 +94,7 @@ func (p *SyncAPIProducer) SendToDevice(
 		devices = append(devices, deviceID)
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("user_id", userID).
 		WithField("num_devices", len(devices)).
 		WithField("type", eventType).
@@ -118,12 +118,12 @@ func (p *SyncAPIProducer) SendToDevice(
 		err = p.Qm.Publish(ctx, p.TopicSendToDeviceEvent, ote, h)
 		if err != nil {
 			if i < len(devices)-1 {
-				frame.Log(ctx).WithError(err).
+				util.Log(ctx).WithError(err).
 					WithField("component", "syncapi_producer").
 					Warn("sendToDevice failed to PublishMsg, trying further devices")
 				continue
 			}
-			frame.Log(ctx).WithError(err).
+			util.Log(ctx).WithError(err).
 				WithField("component", "syncapi_producer").
 				Error("sendToDevice failed to PublishMsg for all devices")
 			return err
@@ -142,7 +142,7 @@ func (p *SyncAPIProducer) SendTyping(
 		"typing":         strconv.FormatBool(typing),
 		"timeout_ms":     strconv.Itoa(int(timeoutMS)),
 	}
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField(
 			"component", "syncapi_producer").
 		WithField("topic", p.TopicTypingEvent).
@@ -163,36 +163,36 @@ func (p *SyncAPIProducer) SendPresence(
 	lastActiveTS := spec.AsTimestamp(time.Now().Add(-(time.Duration(lastActiveAgo) * time.Millisecond)))
 
 	h["last_active_ts"] = strconv.Itoa(int(lastActiveTS))
-	frame.Log(ctx).WithField(
+	util.Log(ctx).WithField(
 		"component", "syncapi_producer").
 		WithField("presence", h).
 		Debug("Sending presence to syncAPI")
-	return p.Qm.Publish(ctx, p.TopicPresenceEvent, []byte(""), h)
+	return p.Qm.Publish(ctx, p.TopicPresenceEvent, "", h)
 }
 
 func (p *SyncAPIProducer) SendDeviceListUpdate(
-	ctx context.Context, deviceListUpdate spec.RawJSON, origin spec.ServerName,
+	ctx context.Context, deviceListUpdate json.RawMessage, origin spec.ServerName,
 ) (err error) {
 	h := map[string]string{
 		"origin": string(origin),
 	}
 
-	frame.Log(ctx).
-		WithField(
-			"component", "syncapi_producer").
-		WithField("device_list_update", h).Debug("Sending device list update")
+	util.Log(ctx).
+		WithField("component", "syncapi_producer").
+		WithField("device_list_update", h).
+		Debug("Sending device list update")
 	return p.Qm.Publish(ctx, p.TopicPresenceEvent, []byte(deviceListUpdate), h)
 }
 
 func (p *SyncAPIProducer) SendSigningKeyUpdate(
-	ctx context.Context, data spec.RawJSON, origin spec.ServerName,
+	ctx context.Context, data json.RawMessage, origin spec.ServerName,
 ) (err error) {
 	h := map[string]string{
 		"origin": string(origin),
 	}
 
-	frame.Log(ctx).WithField(
+	util.Log(ctx).WithField(
 		"component", "syncapi_producer").
 		Debug("Sending signing key update")
-	return p.Qm.Publish(ctx, p.TopicSigningKeyUpdate, []byte(data), h)
+	return p.Qm.Publish(ctx, p.TopicSigningKeyUpdate, data, h)
 }

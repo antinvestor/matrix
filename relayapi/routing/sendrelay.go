@@ -18,8 +18,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -36,7 +34,7 @@ func SendTransactionToRelay(
 	txnID gomatrixserverlib.TransactionID,
 	userID spec.UserID,
 ) util.JSONResponse {
-	log := frame.Log(httpReq.Context())
+	log := util.Log(httpReq.Context())
 	log.Info("Processing send_relay for %s", userID.String())
 
 	var txnEvents fclient.RelayEvents
@@ -64,7 +62,7 @@ func SendTransactionToRelay(
 	t.TransactionID = txnID
 	t.Destination = userID.Domain()
 
-	frame.Log(httpReq.Context()).Warn("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
+	util.Log(httpReq.Context()).Warn("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
 
 	err := relayAPI.PerformStoreTransaction(httpReq.Context(), t, userID)
 	if err != nil {

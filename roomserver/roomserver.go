@@ -17,11 +17,10 @@ package roomserver
 import (
 	"context"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal"
@@ -44,12 +43,12 @@ func NewInternalAPI(
 
 	roomserverCm, err := cm.FromOptions(ctx, &cfg.RoomServer.Database)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("could not obtain connection manager for roomserver")
+		util.Log(ctx).WithError(err).Panic("could not obtain connection manager for roomserver")
 	}
 
 	roomserverDB, err := storage.NewDatabase(ctx, roomserverCm, caches)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to connect to room server db")
+		util.Log(ctx).WithError(err).Panic("failed to connect to room server db")
 	}
 
 	return internal.NewRoomserverAPI(

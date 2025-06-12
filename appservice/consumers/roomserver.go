@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -91,7 +91,7 @@ func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 func (s *OutputRoomEventConsumer) Handle(
 	ctx context.Context, metadata map[string]string, message []byte,
 ) error {
-	logger := frame.Log(ctx)
+	logger := util.Log(ctx)
 
 	state, ok := s.appServiceMap[metadata[queueutil.AppServiceIDToken]]
 	if !ok {
@@ -218,7 +218,7 @@ func (s *OutputRoomEventConsumer) sendEvents(
 
 // backoff pauses the calling goroutine for a 2^some backoff exponent seconds
 func (s *appserviceState) backoffAndPause(ctx context.Context, err error) error {
-	logger := frame.Log(ctx)
+	logger := util.Log(ctx)
 
 	// work out how much to back off by
 	backoffDuration := time.Second * time.Duration(math.Pow(2, float64(s.backoff)))
@@ -237,7 +237,7 @@ func (s *appserviceState) backoffAndPause(ctx context.Context, err error) error 
 //
 // TODO: This should be cached, see https://github.com/antinvestor/matrix/issues/1682
 func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
-	logger := frame.Log(ctx)
+	logger := util.Log(ctx)
 	user := ""
 	userID, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err == nil {
@@ -279,7 +279,7 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 // appserviceJoinedAtEvent returns a boolean depending on whether a given
 // appservice has membership at the time a given event was created.
 func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *types.HeaderedEvent, appservice *config.ApplicationService) bool {
-	logger := frame.Log(ctx)
+	logger := util.Log(ctx)
 	// TODO: This is only checking the current room state, not the state at
 	// the event in question. Pretty sure this is what Synapse does too, but
 	// until we have a lighter way of checking the state before the event that

@@ -21,10 +21,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/containerd/log"
+	"github.com/pitabwire/util"
+
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/containerd/log"
 
 	"gopkg.in/h2non/bimg.v1"
 )
@@ -38,7 +40,7 @@ func GenerateThumbnails(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *log.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
 	if err != nil {

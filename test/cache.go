@@ -50,7 +50,7 @@ import (
 //	return config.DataSource(connStr), func() {
 //		err = testcontainers.TerminateContainer(container)
 //		if err != nil {
-//			frame.Log(ctx).WithError(err).Error("failed to terminate container")
+//			util.Log(ctx).WithError(err).Error("failed to terminate container")
 //		}
 //	}, nil
 //}

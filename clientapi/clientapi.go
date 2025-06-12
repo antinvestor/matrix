@@ -19,7 +19,7 @@ import (
 
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -55,7 +55,7 @@ func AddPublicRoutes(
 	enableMetrics bool,
 ) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	syncApiCfg := cfg.SyncAPI.Queues
 
 	err := qm.RegisterPublisher(ctx, &syncApiCfg.OutputReceiptEvent)

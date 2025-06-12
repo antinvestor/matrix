@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
+	"github.com/pitabwire/util"
 	"math"
 	"strconv"
 	"time"
@@ -50,6 +52,8 @@ func (p *InviteStreamProvider) IncrementalSync(
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
+
+	log := util.Log(ctx)
 	r := types.Range{
 		From: from,
 		To:   to,
@@ -59,7 +63,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		ctx, req.Device.UserID, r,
 	)
 	if err != nil {
-		req.Log.WithError(err).Error("p.Cm.InviteEventsInRange failed")
+		log.WithError(err).Error("p.Cm.InviteEventsInRange failed")
 		return from
 	}
 
@@ -81,7 +85,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		}
 		ir, err := types.NewInviteResponse(ctx, p.rsAPI, inviteEvent, eventFormat)
 		if err != nil {
-			req.Log.WithError(err).Error("failed creating invite response")
+			log.WithError(err).Error("failed creating invite response")
 			continue
 		}
 		req.Response.Rooms.Invite[roomID] = ir
@@ -111,7 +115,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 			Sender:         req.Device.UserID,
 			StateKey:       &req.Device.UserID,
 			Type:           "m.room.member",
-			Content:        spec.RawJSON(`{"membership":"leave"}`),
+			Content:        json.RawMessage(`{"membership":"leave"}`),
 		})
 		req.Response.Rooms.Leave[roomID] = lr
 	}

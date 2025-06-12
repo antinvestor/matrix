@@ -22,13 +22,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/pitabwire/util"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
@@ -454,7 +453,7 @@ func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID spec.RoomID
 
 func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	roomInfo, err := rq.Roomserver.QueryRoomInfo(ctx, roomID)
 	if err != nil || roomInfo == nil || roomInfo.IsStub() {

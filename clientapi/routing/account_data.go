@@ -20,8 +20,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"
@@ -51,7 +49,7 @@ func GetAccountData(
 	}
 	dataRes := api.QueryAccountDataResponse{}
 	if err := userAPI.QueryAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-		frame.Log(req.Context()).WithError(err).Error("userAPI.QueryAccountData failed")
+		util.Log(req.Context()).WithError(err).Error("userAPI.QueryAccountData failed")
 		return util.ErrorResponse(fmt.Errorf("userAPI.QueryAccountData: %w", err))
 	}
 
@@ -105,7 +103,7 @@ func SaveAccountData(
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("io.ReadAll failed")
+		util.Log(req.Context()).WithError(err).Error("io.ReadAll failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -127,7 +125,7 @@ func SaveAccountData(
 	}
 	dataRes := api.InputAccountDataResponse{}
 	if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-		frame.Log(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
+		util.Log(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
 		return util.ErrorResponse(err)
 	}
 
@@ -184,7 +182,7 @@ func SaveReadMarker(
 		}
 		dataRes := api.InputAccountDataResponse{}
 		if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-			frame.Log(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
+			util.Log(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
 			return util.ErrorResponse(err)
 		}
 	}

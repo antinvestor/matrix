@@ -25,11 +25,10 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI
@@ -49,7 +48,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 	trace, ctx := internal.StartRegion(ctx, "ApplicationServiceRoomAlias")
 	defer trace.EndRegion()
 
-	log := frame.Log(ctx).WithField("room_alias", request.Alias)
+	log := util.Log(ctx).WithField("room_alias", request.Alias)
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
 		if appservice.URL != "" && appservice.IsInterestedInRoomAlias(request.Alias) {
@@ -127,7 +126,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 	trace, ctx := internal.StartRegion(ctx, "ApplicationServiceUserID")
 	defer trace.EndRegion()
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
 		if appservice.URL != "" && appservice.IsInterestedInUserID(request.UserID) {
@@ -219,7 +218,7 @@ func (a *AppServiceQueryAPI) Locations(
 	resp *api.LocationResponse,
 ) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	params, err := url.ParseQuery(req.Params)
 	if err != nil {
 		return err
@@ -262,7 +261,7 @@ func (a *AppServiceQueryAPI) User(
 	resp *api.UserResponse,
 ) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	params, err := url.ParseQuery(req.Params)
 	if err != nil {
@@ -305,7 +304,7 @@ func (a *AppServiceQueryAPI) Protocols(
 	req *api.ProtocolRequest,
 	resp *api.ProtocolResponse,
 ) error {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	protocolPath := api.ASProtocolPath
 	if a.Cfg.LegacyPaths {

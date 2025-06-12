@@ -1,15 +1,13 @@
 package routing
 
 import (
+	"context"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/matrix/test"
 
@@ -25,7 +23,7 @@ import (
 func Test_uploadRequest_doUpload(t *testing.T) {
 	type fields struct {
 		MediaMetadata *types.MediaMetadata
-		Logger        *frame.Entry
+		Logger        *util.LogEntry
 	}
 	type args struct {
 		reqReader                 io.Reader
@@ -39,7 +37,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	}
 
 	maxSize := config.FileSizeBytes(8)
-	logger := frame.NewLogger(slog.LevelInfo).WithField("mediaapi", "test")
+	logger := util.NewLogger(context.TODO(), util.DefaultLogOptions()).WithField("mediaapi", "test")
 	testdataPath := filepath.Join(wd, "./testdata")
 
 	cfg := &config.MediaAPI{

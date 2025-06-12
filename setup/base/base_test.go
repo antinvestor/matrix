@@ -45,7 +45,7 @@ func TestLandingPage_Tcp(t *testing.T) {
 	cfg.Global.HttpServerPort = fmt.Sprintf(":%s", httpUrl.Port())
 
 	ctx, service := frame.NewServiceWithContext(ctx, "matrix tests",
-		frame.Config(&cfg.Global))
+		frame.WithConfig(&cfg.Global))
 	defer service.Stop(ctx)
 
 	routers := httputil.NewRouters()
@@ -56,7 +56,7 @@ func TestLandingPage_Tcp(t *testing.T) {
 	assert.NoError(t, err)
 
 	go func(ctx context.Context, service *frame.Service, opt frame.Option) {
-		service.Init(opt)
+		service.Init(ctx, opt)
 		err = service.Run(ctx, "")
 	}(ctx, service, opt)
 	time.Sleep(time.Millisecond * 10)

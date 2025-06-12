@@ -154,7 +154,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 
 		assert.DeepEqual(t, jsonResp, util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: spec.RawJSON(`{"foo":"bar"}`),
+			JSON: json.RawMessage(`{"foo":"bar"}`),
 		})
 	})
 
@@ -192,7 +192,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 
 		assert.DeepEqual(t, jsonResp, util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: spec.RawJSON(`{"foo":"bar"}`),
+			JSON: json.RawMessage(`{"foo":"bar"}`),
 		})
 	})
 
@@ -230,7 +230,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 
 		assert.DeepEqual(t, jsonResp, util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: spec.RawJSON(`{"foo":"bar"}`),
+			JSON: json.RawMessage(`{"foo":"bar"}`),
 		})
 	})
 }

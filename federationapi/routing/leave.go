@@ -20,7 +20,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/eventutil"
@@ -39,7 +38,7 @@ func MakeLeave(
 ) util.JSONResponse {
 	roomVersion, err := rsAPI.QueryRoomVersionForRoom(httpReq.Context(), roomID.String())
 	if err != nil {
-		frame.Log(httpReq.Context()).WithError(err).Error("failed obtaining room version")
+		util.Log(httpReq.Context()).WithError(err).Error("failed obtaining room version")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -52,7 +51,7 @@ func MakeLeave(
 	}
 	res := api.QueryServerJoinedToRoomResponse{}
 	if err = rsAPI.QueryServerJoinedToRoom(httpReq.Context(), &req, &res); err != nil {
-		frame.Log(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+		util.Log(httpReq.Context()).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -63,7 +62,7 @@ func MakeLeave(
 		destination := request.Destination()
 		identity, signErr := cfg.Global.SigningIdentityFor(destination)
 		if signErr != nil {
-			frame.Log(httpReq.Context()).WithError(signErr).WithField("destination", destination).Error("Failed to obtain signing identity for destination")
+			util.Log(httpReq.Context()).WithError(signErr).WithField("destination", destination).Error("Failed to obtain signing identity for destination")
 			return nil, nil, spec.NotFound(fmt.Sprintf("Server name %q does not exist", destination))
 		}
 
@@ -72,13 +71,13 @@ func MakeLeave(
 		switch e := buildErr.(type) {
 		case nil:
 		case eventutil.ErrRoomNoExists:
-			frame.Log(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
+			util.Log(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.NotFound("Room does not exist")
 		case gomatrixserverlib.BadJSONError:
-			frame.Log(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
+			util.Log(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.BadJSON(e.Error())
 		default:
-			frame.Log(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
+			util.Log(httpReq.Context()).WithError(buildErr).Error("eventutil.BuildEvent failed")
 			return nil, nil, spec.InternalServerError{}
 		}
 
@@ -91,13 +90,13 @@ func MakeLeave(
 
 	senderID, err := rsAPI.QuerySenderIDForUser(httpReq.Context(), roomID, userID)
 	if err != nil {
-		frame.Log(httpReq.Context()).WithError(err).Error("rsAPI.QuerySenderIDForUser failed")
+		util.Log(httpReq.Context()).WithError(err).Error("rsAPI.QuerySenderIDForUser failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	} else if senderID == nil {
-		frame.Log(httpReq.Context()).WithField("roomID", roomID).WithField("userID", userID).Error("rsAPI.QuerySenderIDForUser returned nil sender ID")
+		util.Log(httpReq.Context()).WithField("roomID", roomID).WithField("userID", userID).Error("rsAPI.QuerySenderIDForUser returned nil sender ID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -122,13 +121,13 @@ func MakeLeave(
 	switch e := internalErr.(type) {
 	case nil:
 	case spec.InternalServerError:
-		frame.Log(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
+		util.Log(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	case spec.MatrixError:
-		frame.Log(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
+		util.Log(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
 		code := http.StatusInternalServerError
 		switch e.ErrCode {
 		case spec.ErrorForbidden:
@@ -144,7 +143,7 @@ func MakeLeave(
 			JSON: e,
 		}
 	default:
-		frame.Log(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
+		util.Log(httpReq.Context()).WithError(internalErr).Error("failed to handle make_leave request")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("unknown error"),
@@ -152,7 +151,7 @@ func MakeLeave(
 	}
 
 	if response == nil {
-		frame.Log(httpReq.Context()).Error("gmsl.HandleMakeLeave returned invalid response")
+		util.Log(httpReq.Context()).Error("gmsl.HandleMakeLeave returned invalid response")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -270,7 +269,7 @@ func SendLeave(
 	queryRes := &api.QueryLatestEventsAndStateResponse{}
 	err = rsAPI.QueryLatestEventsAndState(httpReq.Context(), queryReq, queryRes)
 	if err != nil {
-		frame.Log(httpReq.Context()).WithError(err).Error("rsAPI.QueryLatestEventsAndState failed")
+		util.Log(httpReq.Context()).WithError(err).Error("rsAPI.QueryLatestEventsAndState failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -305,7 +304,7 @@ func SendLeave(
 	// Check that the event is signed by the server sending the request.
 	redacted, err := verImpl.RedactEventJSON(event.JSON())
 	if err != nil {
-		frame.Log(httpReq.Context()).WithError(err).Error("XXX: leave.go")
+		util.Log(httpReq.Context()).WithError(err).Error("XXX: leave.go")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("The event JSON could not be redacted"),
@@ -319,7 +318,7 @@ func SendLeave(
 	}}
 	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
 	if err != nil {
-		frame.Log(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
+		util.Log(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -335,7 +334,7 @@ func SendLeave(
 	// check membership is set to leave
 	mem, err := event.Membership()
 	if err != nil {
-		frame.Log(httpReq.Context()).WithError(err).Error("event.Membership failed")
+		util.Log(httpReq.Context()).WithError(err).Error("event.Membership failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("missing content.membership key"),
@@ -364,7 +363,7 @@ func SendLeave(
 	}, &response)
 
 	if response.ErrMsg != "" {
-		frame.Log(httpReq.Context()).WithField("error", response.ErrMsg).WithField("not_allowed", response.NotAllowed).Error("producer.SendEvents failed")
+		util.Log(httpReq.Context()).WithField("error", response.ErrMsg).WithField("not_allowed", response.NotAllowed).Error("producer.SendEvents failed")
 		if response.NotAllowed {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,

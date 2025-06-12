@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -42,7 +40,7 @@ func GetAliases(
 	}
 	stateRes := &api.QueryCurrentStateResponse{}
 	if err := rsAPI.QueryCurrentState(req.Context(), stateReq, stateRes); err != nil {
-		frame.Log(req.Context()).WithError(err).Error("rsAPI.QueryCurrentState failed")
+		util.Log(req.Context()).WithError(err).Error("rsAPI.QueryCurrentState failed")
 		return util.ErrorResponse(fmt.Errorf("rsAPI.QueryCurrentState: %w", err))
 	}
 
@@ -51,7 +49,7 @@ func GetAliases(
 		var err error
 		var content gomatrixserverlib.HistoryVisibilityContent
 		if err = json.Unmarshal(historyVisEvent.Content(), &content); err != nil {
-			frame.Log(req.Context()).WithError(err).Error("historyVisEvent.HistoryVisibility failed")
+			util.Log(req.Context()).WithError(err).Error("historyVisEvent.HistoryVisibility failed")
 			return util.ErrorResponse(fmt.Errorf("historyVisEvent.HistoryVisibility: %w", err))
 		}
 		visibility = content.HistoryVisibility
@@ -71,7 +69,7 @@ func GetAliases(
 		var queryRes api.QueryMembershipForUserResponse
 		err = rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes)
 		if err != nil {
-			frame.Log(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
+			util.Log(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -90,7 +88,7 @@ func GetAliases(
 	}
 	aliasesRes := api.GetAliasesForRoomIDResponse{}
 	if err := rsAPI.GetAliasesForRoomID(req.Context(), &aliasesReq, &aliasesRes); err != nil {
-		frame.Log(req.Context()).WithError(err).Error("rsAPI.GetAliasesForRoomID failed")
+		util.Log(req.Context()).WithError(err).Error("rsAPI.GetAliasesForRoomID failed")
 		return util.ErrorResponse(fmt.Errorf("rsAPI.GetAliasesForRoomID: %w", err))
 	}
 

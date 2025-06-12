@@ -17,12 +17,11 @@ package api
 import (
 	"context"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/util"
 )
 
 // SendEvents to the roomserver The events are written with KindNew.
@@ -74,7 +73,7 @@ func SendEventWithState(
 		stateEventIDs[i] = stateEvents[i].EventID()
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("room_id", event.RoomID().String()).
 		WithField("event_id", event.EventID()).
 		WithField("outliers", len(ires)).
@@ -116,7 +115,7 @@ func GetEvent(ctx context.Context, rsAPI QueryEventsAPI, roomID, eventID string)
 		EventIDs: []string{eventID},
 	}, &res)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("Failed to QueryEventsByID")
+		util.Log(ctx).WithError(err).Error("Failed to QueryEventsByID")
 		return nil
 	}
 	if len(res.Events) != 1 {
@@ -133,7 +132,7 @@ func GetStateEvent(ctx context.Context, rsAPI QueryEventsAPI, roomID string, tup
 		StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
 	}, &res)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("Failed to QueryCurrentState")
+		util.Log(ctx).WithError(err).Error("Failed to QueryCurrentState")
 		return nil
 	}
 	ev, ok := res.StateEvents[tuple]
@@ -151,7 +150,7 @@ func IsServerBannedFromRoom(ctx context.Context, rsAPI FederationRoomserverAPI, 
 	}
 	res := &QueryServerBannedFromRoomResponse{}
 	if err := rsAPI.QueryServerBannedFromRoom(ctx, req, res); err != nil {
-		frame.Log(ctx).WithError(err).Error("Failed to QueryServerBannedFromRoom")
+		util.Log(ctx).WithError(err).Error("Failed to QueryServerBannedFromRoom")
 		return true
 	}
 	return res.Banned
@@ -179,7 +178,7 @@ func PopulatePublicRooms(ctx context.Context, roomIDs []string, rsAPI QueryBulkS
 		},
 	}, &stateRes)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("QueryBulkStateContent failed")
+		util.Log(ctx).WithError(err).Error("QueryBulkStateContent failed")
 		return nil, err
 	}
 	chunk := make([]fclient.PublicRoom, len(roomIDs))

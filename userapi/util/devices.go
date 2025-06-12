@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
+	"github.com/pitabwire/util"
 )
 
 type PusherDevice struct {
@@ -22,7 +21,7 @@ type PusherDevice struct {
 // GetPushDevices pushes to the configured devices of a local user.
 func GetPushDevices(ctx context.Context, localpart string, serverName spec.ServerName, tweaks map[string]interface{}, db storage.UserDatabase) ([]*PusherDevice, error) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	pushers, err := db.GetPushers(ctx, localpart, serverName)
 	if err != nil {

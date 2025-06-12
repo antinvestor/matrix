@@ -20,7 +20,6 @@ import (
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/roomserver/version"
-	"github.com/pitabwire/frame"
 )
 
 // PerformDirectoryLookup implements api.FederationInternalAPI
@@ -101,7 +100,7 @@ func (r *FederationInternalAPI) PerformJoin(
 			serverName,
 			request.Unsigned,
 		); err != nil {
-			frame.Log(ctx).WithError(err).
+			util.Log(ctx).WithError(err).
 				WithField("server_name", serverName).
 				WithField("room_id", request.RoomID).
 				Warn("Failed to join room through server")
@@ -130,7 +129,7 @@ func (r *FederationInternalAPI) PerformJoin(
 		}
 	}
 
-	frame.Log(ctx).WithError(lastErr).
+	util.Log(ctx).WithError(lastErr).
 		WithField("user_id", request.UserID).
 		WithField("room_id", request.RoomID).
 		WithField("server_count", len(request.ServerNames)).
@@ -218,7 +217,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return fmt.Errorf("joinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("room", roomID).
 		WithField("host_count", len(joinedHosts)).
 		Info("Joined federated room")
@@ -289,7 +288,7 @@ func (r *FederationInternalAPI) PerformOutboundPeek(
 			serverName,
 			supportedVersions,
 		); err != nil {
-			frame.Log(ctx).WithError(err).
+			util.Log(ctx).WithError(err).
 				WithField("server_name", serverName).
 				WithField("room_id", request.RoomID).
 				Warn("Failed to peek room through server")
@@ -314,7 +313,7 @@ func (r *FederationInternalAPI) PerformOutboundPeek(
 		}
 	}
 
-	frame.Log(ctx).WithError(lastErr).
+	util.Log(ctx).WithError(lastErr).
 		WithField("room_id", request.RoomID).
 		WithField("server_count", len(request.ServerNames)).
 		Error("failed to peek room through servers")
@@ -348,13 +347,13 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	if outboundPeek != nil {
 		nowMilli := time.Now().UnixNano() / int64(time.Millisecond)
 		if nowMilli > outboundPeek.RenewedTimestamp+outboundPeek.RenewalInterval {
-			frame.Log(ctx).
+			util.Log(ctx).
 				WithField("server_name", serverName).
 				WithField("room_id", roomID).
 				Info("stale outbound peek to server already exists; renewing")
 			renewing = true
 		} else {
-			frame.Log(ctx).
+			util.Log(ctx).
 				WithField("server_name", serverName).
 				WithField("room_id", roomID).
 				Info("live outbound peek to server already exists")
@@ -416,7 +415,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 		}
 	}
 
-	// frame.Log(ctx).Warn("got respPeek %#v", respPeek)
+	// util.Log(ctx).Warn("got respPeek %#v", respPeek)
 	// Send the newly returned state to the roomserver to update our local view.
 	if err = roomserverAPI.SendEventWithState(
 		ctx, r.rsAPI, r.cfg.Global.ServerName,
@@ -469,7 +468,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		)
 		if err != nil {
 			// TODO: Check if the user was not allowed to leave the room.
-			frame.Log(ctx).WithError(err).Warn("r.federation.MakeLeave failed")
+			util.Log(ctx).WithError(err).Warn("r.federation.MakeLeave failed")
 			r.statistics.ForServer(ctx, serverName).Failure(ctx)
 			continue
 		}
@@ -506,12 +505,12 @@ func (r *FederationInternalAPI) PerformLeave(
 				"membership": "leave",
 			}
 			if err = leaveEB.SetContent(content); err != nil {
-				frame.Log(ctx).WithError(err).Warn("respMakeLeave.LeaveEvent.SetContent failed")
+				util.Log(ctx).WithError(err).Warn("respMakeLeave.LeaveEvent.SetContent failed")
 				continue
 			}
 		}
 		if err = leaveEB.SetUnsigned(struct{}{}); err != nil {
-			frame.Log(ctx).WithError(err).Warn("respMakeLeave.LeaveEvent.SetUnsigned failed")
+			util.Log(ctx).WithError(err).Warn("respMakeLeave.LeaveEvent.SetUnsigned failed")
 			continue
 		}
 
@@ -523,7 +522,7 @@ func (r *FederationInternalAPI) PerformLeave(
 			r.cfg.Global.PrivateKey,
 		)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Warn("respMakeLeave.LeaveEvent.Build failed")
+			util.Log(ctx).WithError(err).Warn("respMakeLeave.LeaveEvent.Build failed")
 			continue
 		}
 
@@ -535,7 +534,7 @@ func (r *FederationInternalAPI) PerformLeave(
 			event,
 		)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Warn("r.federation.SendLeave failed")
+			util.Log(ctx).WithError(err).Warn("r.federation.SendLeave failed")
 			r.statistics.ForServer(ctx, serverName).Failure(ctx)
 			continue
 		}
@@ -577,7 +576,7 @@ func (r *FederationInternalAPI) SendInvite(
 		return nil, fmt.Errorf("relay servers have no meaningful response for invite")
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("event_id", event.EventID()).
 		WithField("user_id", *event.StateKey()).
 		WithField("room_id", event.RoomID().String()).
@@ -634,7 +633,7 @@ func (r *FederationInternalAPI) SendInviteV3(
 		return nil, fmt.Errorf("relay servers have no meaningful response for invite")
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("user_id", invitee.String()).
 		WithField("room_id", event.RoomID).
 		WithField("room_version", version).
@@ -672,7 +671,7 @@ func (r *FederationInternalAPI) PerformBroadcastEDU(
 		return nil
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("destination_count", len(destinations)).
 		Info("Sending wake-up EDU to destinations")
 	edu := &gomatrixserverlib.EDU{
@@ -805,7 +804,7 @@ func (r *FederationInternalAPI) P2PQueryRelayServers(
 	request *api.P2PQueryRelayServersRequest,
 	response *api.P2PQueryRelayServersResponse,
 ) error {
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("server", request.Server).
 		Info("Getting relay servers")
 	relayServers, err := r.db.P2PGetRelayServersForServer(ctx, request.Server)
@@ -823,7 +822,7 @@ func (r *FederationInternalAPI) P2PAddRelayServers(
 	request *api.P2PAddRelayServersRequest,
 	response *api.P2PAddRelayServersResponse,
 ) error {
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("server", request.Server).
 		WithField("relay_servers_count", len(request.RelayServers)).
 		Info("Adding relay servers")
@@ -841,7 +840,7 @@ func (r *FederationInternalAPI) P2PRemoveRelayServers(
 	request *api.P2PRemoveRelayServersRequest,
 	response *api.P2PRemoveRelayServersResponse,
 ) error {
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("server", request.Server).
 		WithField("relay_servers_count", len(request.RelayServers)).
 		Info("Removing relay servers")

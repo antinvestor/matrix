@@ -20,8 +20,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/producers"
 
@@ -32,7 +30,7 @@ import (
 func SetReceipt(req *http.Request, userAPI userapi.ClientUserAPI, syncProducer *producers.SyncAPIProducer, device *userapi.Device, roomID, receiptType, eventID string) util.JSONResponse {
 	ctx := req.Context()
 	timestamp := spec.AsTimestamp(time.Now())
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("roomID", roomID).
 		WithField("receiptType", receiptType).
 		WithField("eventID", eventID).
@@ -63,7 +61,7 @@ func SetReceipt(req *http.Request, userAPI userapi.ClientUserAPI, syncProducer *
 		}
 		dataRes := userapi.InputAccountDataResponse{}
 		if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-			frame.Log(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
+			util.Log(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
 			return util.ErrorResponse(err)
 		}
 

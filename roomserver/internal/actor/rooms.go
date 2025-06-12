@@ -4,18 +4,18 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
-	"time"
+
+	"github.com/antinvestor/gomatrixserverlib/spec"
 
 	actorV1 "github.com/antinvestor/matrix/apis/actor/v1"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/asynkron/protoactor-go/cluster"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/asynkron/protoactor-go/actor"
 )
-
-const messageQPullDelay = 500 * time.Millisecond
 
 // RoomActor is an actor that processes messages for a specific room
 type RoomActor struct {
@@ -23,7 +23,8 @@ type RoomActor struct {
 	cancelFunc context.CancelFunc
 	roomID     string
 
-	qm queueutil.QueueManager
+	qOpts *config.QueueOptions
+	qm    queueutil.QueueManager
 
 	handlerFunc  HandlerFunc
 	subscription frame.Subscriber
@@ -39,57 +40,40 @@ type RoomActor struct {
 
 	// Flag to track if setup is in progress
 	setupInProgress atomic.Bool
+
+	log *util.LogEntry
 }
 
 // NewRoomActor creates a new room actor
-func NewRoomActor(ctx context.Context, cluster *cluster.Cluster, svc *frame.Service, qm queueutil.QueueManager, handlerFunc HandlerFunc) *RoomActor {
+func NewRoomActor(ctx context.Context, cluster *cluster.Cluster, svc *frame.Service, opts *config.QueueOptions, qm queueutil.QueueManager, handlerFunc HandlerFunc) *RoomActor {
 
 	ictx, cancel := context.WithCancel(ctx)
 
 	return &RoomActor{
-		ctx:         ictx,
-		cancelFunc:  cancel,
-		cluster:     cluster,
-		qm:          qm,
+		ctx:        ictx,
+		cancelFunc: cancel,
+		cluster:    cluster,
+
+		qOpts: opts,
+		qm:    qm,
+
 		handlerFunc: handlerFunc,
 		svc:         svc,
+		log:         util.Log(ictx),
 	}
 }
 
-func (ra *RoomActor) ActorName() string {
-	return ra.roomID
-}
+func (ra *RoomActor) setupSubscriber(actx actor.Context, roomID *spec.RoomID) error {
 
-func (ra *RoomActor) onSetupActor(gctx actor.Context, req *actorV1.SetupRequest) error {
-
-	if ra.roomID == "" {
-		ra.roomID = req.GetRoomId()
-	}
-	if ra.roomID != req.GetRoomId() {
-		return fmt.Errorf("room ID mismatch: %s != %s", ra.roomID, req.GetRoomId())
-	}
-
-	ra.cli = actorV1.GetRoomEventProcessorGrainClient(ra.cluster, ra.roomID)
-
-	err := ra.setupSubscriber(gctx, req)
+	opts, err := RoomifyQOpts(ra.ctx, ra.qOpts, roomID, true)
 	if err != nil {
 		return err
 	}
 
-	return ra.setupPublisher(gctx, req)
-}
-
-func (ra *RoomActor) setupSubscriber(_ actor.Context, req *actorV1.SetupRequest) error {
-
-	opts := &config.QueueOptions{
-		QReference: req.GetQRef(),
-		Prefix:     req.GetQPrefix(),
-		DS:         config.DataSource(req.GetQSubsUri()),
-	}
-
 	// Register subscriber for this room
-	err := ra.qm.RegisterSubscriber(ra.ctx, opts)
+	err = ra.qm.RegisterSubscriber(ra.ctx, opts)
 	if err != nil {
+
 		return err
 	}
 
@@ -103,15 +87,14 @@ func (ra *RoomActor) setupSubscriber(_ actor.Context, req *actorV1.SetupRequest)
 
 }
 
-func (ra *RoomActor) setupPublisher(_ actor.Context, req *actorV1.SetupRequest) error {
+func (ra *RoomActor) setupPublisher(actx actor.Context, roomID *spec.RoomID) error {
 
-	opts := &config.QueueOptions{
-		QReference: req.GetQRef(),
-		Prefix:     req.GetQPrefix(),
-		DS:         config.DataSource(req.GetQPubUri()),
+	opts, err := RoomifyQOpts(ra.ctx, ra.qOpts, roomID, false)
+	if err != nil {
+		return err
 	}
 	// Register subscriber for this room
-	err := ra.qm.RegisterPublisher(ra.ctx, opts)
+	err = ra.qm.RegisterPublisher(ra.ctx, opts)
 	if err != nil {
 		return err
 	}
@@ -126,20 +109,54 @@ func (ra *RoomActor) setupPublisher(_ actor.Context, req *actorV1.SetupRequest) 
 
 }
 
-func (ra *RoomActor) Init(ctx cluster.GrainContext) {
+func (ra *RoomActor) Init(gctx cluster.GrainContext) {
 
-	ctx.Logger().With("room", ra.roomID).Info("--------------- Room actor running             ")
+	roomID, err := spec.NewRoomID(gctx.Identity())
+	if err != nil {
+		ra.log.With("roomID", roomID).With("error", err).Error("--------------- Invalid room ID     ")
+		return
+	}
+
+	ra.roomID = roomID.String()
+	ra.cli = actorV1.GetRoomEventProcessorGrainClient(ra.cluster, roomID.String())
+	ra.log = ra.log.With("roomID", roomID.String())
+	log := ra.log
+
+	err = ra.setupPublisher(gctx, roomID)
+	if err != nil {
+		log.With("roomID", roomID).With("error", err).Error(" Failed to setup publisher     ")
+		return
+	}
+
+	err = ra.setupSubscriber(gctx, roomID)
+	if err != nil {
+		log.With("roomID", roomID).With("error", err).Error(" Failed to setup subscriber     ")
+		return
+	}
+
+	gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: ra.roomID})
+
+	log.With("roomID", roomID).Info("--------------- Successfully Setup Room    ")
 
 }
 func (ra *RoomActor) Terminate(gctx cluster.GrainContext) {
+	var err error
 	// First cancel any ongoing operations
 	ra.cancelFunc()
 
+	if ra.publisher != nil {
+		err = ra.qm.DiscardPublisher(ra.ctx, ra.publisher.Ref())
+		if err != nil {
+			gctx.Logger().With("error", err).Error("failed to discard publisher")
+		}
+	}
+
 	// Then properly close the subscription with timeout
 	if ra.subscription != nil {
-		closeCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		defer cancel()
-		_ = ra.subscription.Stop(closeCtx)
+		err = ra.qm.DiscardSubscriber(ra.ctx, ra.subscription.Ref())
+		if err != nil {
+			gctx.Logger().With("error", err).Error("failed to discard publisher")
+		}
 	}
 }
 
@@ -148,7 +165,7 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 	msg := gctx.Message()
 
 	switch msgT := msg.(type) {
-	case *actor.ReceiveTimeout:
+	case *actorV1.StopRoomActor:
 
 		gctx.Poison(gctx.Self())
 
@@ -159,46 +176,12 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 		}
 
 		// Process the next message and determine whether there are more to process
-		err := ra.nextEvent(gctx, msgT)
-		if err != nil {
-			// Reset processing flag on error
-			ra.jobProcessing.Swap(false)
-			gctx.Logger().With("error", err).Error("----------------------- could not submit message for processing")
-			return
-		}
+		ra.nextEvent(gctx, msgT)
 
 	default:
 
-		gctx.Logger().With("room", ra.roomID).With("message", msg).Info("--------------- Unknown            ")
+		ra.log.With("message", msg).Debug("--------------- Unknown            ")
 	}
-}
-func (ra *RoomActor) Setup(req *actorV1.SetupRequest, gctx cluster.GrainContext) (*actorV1.SetupResponse, error) {
-
-	// Ensure only one setup can run at a time
-	if !ra.setupInProgress.CompareAndSwap(false, true) {
-
-		return &actorV1.SetupResponse{Success: false, Message: "setup already in progress"}, nil
-	}
-
-	// Use defer to ensure the flag is reset even if an error occurs
-	defer ra.setupInProgress.Store(false)
-
-	if ra.publisher != nil {
-		return &actorV1.SetupResponse{Success: true, Message: "ok"}, nil
-	}
-
-	err := ra.onSetupActor(gctx, req)
-	if err != nil {
-		return &actorV1.SetupResponse{Success: false, Message: err.Error()}, nil
-	}
-
-	gctx.SetReceiveTimeout(actorIdlingTime)
-
-	gctx.Logger().With("room", ra.roomID).With("message", req).Debug("--------------- SetupRoom              ")
-
-	gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: ra.roomID})
-
-	return &actorV1.SetupResponse{Success: true, Message: "ok"}, nil
 }
 
 func (ra *RoomActor) Publish(req *actorV1.PublishRequest, gctx cluster.GrainContext) (*actorV1.PublishResponse, error) {
@@ -218,7 +201,9 @@ func (ra *RoomActor) Publish(req *actorV1.PublishRequest, gctx cluster.GrainCont
 
 // nextEvent pulls a message from the queue and processes it
 // returns message ID if a message was processed, empty string if no message was available
-func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkRequest) error {
+func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkRequest) {
+
+	log := ra.log
 
 	work := frame.NewJob(func(ctx context.Context, result frame.JobResultPipe[any]) error {
 		defer func() {
@@ -226,18 +211,24 @@ func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkReque
 			ra.jobProcessing.Swap(false)
 		}()
 
-		l := ra.svc.L(ctx)
+		log = ra.log.WithContext(ctx)
 
 		// Check if subscription is active
 		if ra.subscription == nil {
-			l.Error(" err ----------------------------  no subscription initialized for room")
+			log.Error(" no subscription initialized for room")
 			return fmt.Errorf("subscription not initialized for room %s", req.GetRoomId())
 		}
 
-		requestCtx, cancelFn := context.WithTimeout(ctx, messageQPullDelay)
+		requestCtx, cancelFn := context.WithTimeout(ctx, maximumIdlingTime)
 		msg, err := ra.subscription.Receive(requestCtx)
 		cancelFn()
 		if err != nil {
+
+			if ra.subscription.Idle() {
+				gctx.Request(gctx.Self(), &actorV1.StopRoomActor{RoomId: ra.roomID})
+				return err
+			}
+
 			gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: ra.roomID})
 			return err
 		}
@@ -245,7 +236,7 @@ func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkReque
 		// Process the message
 		err = ra.handlerFunc(ctx, msg.Metadata, msg.Body)
 		if err != nil {
-			l.WithError(err).Error(" 2. err ----------------------------  failed to process event")
+			log.WithError(err).Error(" failed to process event")
 			msg.Nack()
 
 			return err
@@ -254,10 +245,16 @@ func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkReque
 
 		// Process next message immediately without delay
 		gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: ra.roomID})
-		gctx.SetReceiveTimeout(actorIdlingTime)
 
 		return nil
 	})
 
-	return frame.SubmitJob(ra.ctx, ra.svc, work)
+	err := frame.SubmitJob(ra.ctx, ra.svc, work)
+	if err != nil {
+
+		log.With("error", err).Error("could not submit message for processing")
+		// Reset processing flag on error
+		ra.jobProcessing.Swap(false)
+
+	}
 }

@@ -18,8 +18,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -56,7 +54,7 @@ func Relations(
 
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("device.UserID invalid")
+		util.Log(req.Context()).WithError(err).Error("device.UserID invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -96,7 +94,7 @@ func Relations(
 
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("Failed to get snapshot for relations")
+		util.Log(req.Context()).WithError(err).Error("Failed to get snapshot for relations")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -135,7 +133,7 @@ func Relations(
 			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 		})
 		if err != nil {
-			frame.Log(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
+			util.Log(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
 			continue
 		}
 		res.Chunk = append(

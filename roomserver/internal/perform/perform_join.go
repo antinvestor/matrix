@@ -21,9 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -56,7 +55,7 @@ func (r *Joiner) PerformJoin(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
 ) (roomID string, joinedVia spec.ServerName, err error) {
-	logger := frame.Log(ctx).WithContext(ctx).
+	logger := util.Log(ctx).WithContext(ctx).
 		WithField("room_id", req.RoomIDOrAlias).
 		WithField("user_id", req.UserID).
 		WithField("servers", req.ServerNames)
@@ -116,7 +115,7 @@ func (r *Joiner) performJoinRoomByAlias(
 		dirRes := fsAPI.PerformDirectoryLookupResponse{}
 		err = r.FSAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
 		if err != nil {
-			frame.Log(ctx).WithError(err).WithField("room_alias", req.RoomIDOrAlias).Error("error looking up alias")
+			util.Log(ctx).WithError(err).WithField("room_alias", req.RoomIDOrAlias).Error("error looking up alias")
 			return "", "", fmt.Errorf("looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
 		}
 		roomID = dirRes.RoomID
@@ -206,7 +205,7 @@ func (r *Joiner) performJoinRoomByID(
 				// create user room key if needed
 				key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
 				if keyErr != nil {
-					frame.Log(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
+					util.Log(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
 					return "", "", fmt.Errorf("GetOrCreateUserRoomPrivateKey failed: %w", keyErr)
 				}
 				senderID = spec.SenderIDFromPseudoIDKey(key)
@@ -257,7 +256,7 @@ func (r *Joiner) performJoinRoomByID(
 		guestAccess := "forbidden"
 		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, spec.MRoomGuestAccess, "")
 		if (err != nil && !sqlutil.ErrorIsNoRows(err)) || guestAccessEvent == nil {
-			frame.Log(ctx).WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
+			util.Log(ctx).WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
 		}
 		if guestAccessEvent != nil {
 			guestAccess = gjson.GetBytes(guestAccessEvent.Content(), "guest_access").String()
@@ -291,7 +290,7 @@ func (r *Joiner) performJoinRoomByID(
 		var pseudoIDKey ed25519.PrivateKey
 		pseudoIDKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
+			util.Log(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
 			return "", "", err
 		}
 

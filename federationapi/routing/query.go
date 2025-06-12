@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -64,7 +62,7 @@ func RoomAliasToID(
 		}
 		queryRes := &roomserverAPI.GetRoomIDForAliasResponse{}
 		if err = rsAPI.GetRoomIDForAlias(httpReq.Context(), queryReq, queryRes); err != nil {
-			frame.Log(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
+			util.Log(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -75,7 +73,7 @@ func RoomAliasToID(
 			serverQueryReq := federationAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: queryRes.RoomID}
 			var serverQueryRes federationAPI.QueryJoinedHostServerNamesInRoomResponse
 			if err = senderAPI.QueryJoinedHostServerNamesInRoom(httpReq.Context(), &serverQueryReq, &serverQueryRes); err != nil {
-				frame.Log(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
+				util.Log(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -108,7 +106,7 @@ func RoomAliasToID(
 			}
 			// TODO: Return 502 if the remote server errored.
 			// TODO: Return 504 if the remote server timed out.
-			frame.Log(httpReq.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
+			util.Log(httpReq.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -158,13 +156,13 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 		var errRoomUnknownOrNotAllowed roomserverAPI.ErrRoomUnknownOrNotAllowed
 		switch {
 		case errors.As(err, &errRoomUnknownOrNotAllowed):
-			frame.Log(ctx).WithError(err).Debug("room unknown/forbidden when handling SS room hierarchy request")
+			util.Log(ctx).WithError(err).Debug("room unknown/forbidden when handling SS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound("room is unknown/forbidden"),
 			}
 		default:
-			frame.Log(ctx).WithError(err).Error("failed to fetch next page of room hierarchy (SS API)")
+			util.Log(ctx).WithError(err).Error("failed to fetch next page of room hierarchy (SS API)")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),
@@ -173,7 +171,7 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 	}
 
 	if len(discoveredRooms) == 0 {
-		frame.Log(httpReq.Context()).Debug("no rooms found when handling SS room hierarchy request")
+		util.Log(httpReq.Context()).Debug("no rooms found when handling SS room hierarchy request")
 		return util.JSONResponse{
 			Code: 404,
 			JSON: spec.NotFound("room is unknown/forbidden"),

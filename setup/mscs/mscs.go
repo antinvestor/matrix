@@ -18,20 +18,19 @@ package mscs
 import (
 	"context"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/mscs/msc2836"
+	"github.com/pitabwire/util"
 )
 
 // Enable MSCs - returns an error on unknown MSCs
 func Enable(ctx context.Context, cfg *config.Matrix, cm sqlutil.ConnectionManager, routers httputil.Routers, monolith *setup.Monolith, caches *cacheutil.Caches) error {
 	for _, msc := range cfg.MSCs.MSCs {
-		frame.Log(ctx).WithField("msc", msc).Info("Enabling MSC")
+		util.Log(ctx).WithField("msc", msc).Info("Enabling MSC")
 		if err := EnableMSC(ctx, cfg, cm, routers, monolith, msc, caches); err != nil {
 			return err
 		}
@@ -46,7 +45,7 @@ func EnableMSC(ctx context.Context, cfg *config.Matrix, cm sqlutil.ConnectionMan
 	case "msc2444": // enabled inside federationapi
 	case "msc2753": // enabled inside clientapi
 	default:
-		frame.Log(ctx).WithField("msc", msc).Warn("EnableMSC: unknown MSC, this MSC is either not supported or is natively supported by Matrix")
+		util.Log(ctx).WithField("msc", msc).Warn("EnableMSC: unknown MSC, this MSC is either not supported or is natively supported by Matrix")
 	}
 	return nil
 }

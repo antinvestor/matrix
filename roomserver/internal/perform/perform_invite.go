@@ -19,8 +19,6 @@ import (
 	"crypto/ed25519"
 	"fmt"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
@@ -32,6 +30,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
 type QueryState struct {
@@ -251,7 +250,7 @@ func (r *Inviter) PerformInvite(
 	inputRes := &api.InputRoomEventsResponse{}
 	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
 	if err := inputRes.Err(); err != nil {
-		frame.Log(ctx).WithField("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
+		util.Log(ctx).WithField("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
 		return api.ErrNotAllowed{Err: err}
 	}
 

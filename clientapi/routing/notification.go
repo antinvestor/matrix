@@ -21,7 +21,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
@@ -35,7 +34,7 @@ func GetNotifications(
 		var err error
 		limit, err = strconv.ParseInt(limitStr, 10, 64)
 		if err != nil {
-			frame.Log(req.Context()).WithError(err).Error("ParseInt(limit) failed")
+			util.Log(req.Context()).WithError(err).Error("ParseInt(limit) failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -46,7 +45,7 @@ func GetNotifications(
 	var queryRes userapi.QueryNotificationsResponse
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -60,13 +59,13 @@ func GetNotifications(
 		Only:       req.URL.Query().Get("only"),
 	}, &queryRes)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("QueryNotifications failed")
+		util.Log(req.Context()).WithError(err).Error("QueryNotifications failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	frame.Log(req.Context()).WithField("from", req.URL.Query().Get("from")).WithField("limit", limit).WithField("only", req.URL.Query().Get("only")).WithField("next", queryRes.NextToken).Info("QueryNotifications: len %d", len(queryRes.Notifications))
+	util.Log(req.Context()).WithField("from", req.URL.Query().Get("from")).WithField("limit", limit).WithField("only", req.URL.Query().Get("only")).WithField("next", queryRes.NextToken).Info("QueryNotifications: len %d", len(queryRes.Notifications))
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: queryRes,

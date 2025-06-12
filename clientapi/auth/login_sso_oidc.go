@@ -27,12 +27,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
 // oidcDiscoveryMaxStaleness indicates how stale the Discovery
@@ -100,7 +99,7 @@ func (p *oidcIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL
 
 func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error) {
 
-	logger := frame.Log(ctx)
+	logger := util.Log(ctx)
 
 	disc, err := p.reload(ctx)
 	if err != nil {
@@ -273,13 +272,13 @@ func httpDo(ctx context.Context, hc *http.Client, req *http.Request) (*http.Resp
 				if len(bs) > 80 {
 					bs = bs[:80]
 				}
-				frame.Log(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).WithField("response", string(bs)).Warn("OAuth2 HTTP request failed")
+				util.Log(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).WithField("response", string(bs)).Warn("OAuth2 HTTP request failed")
 			}
 		case strings.HasPrefix(contentType, "application/json"):
 			// https://openid.net/specs/openid-connect-core-1_0.html#TokenErrorResponse
 			var body oauth2Error
 			if err := json.NewDecoder(resp.Body).Decode(&body); err == nil {
-				frame.Log(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).WithField("error", body.Error).WithField("error_description", body.ErrorDescription).WithField("error_uri", body.ErrorURI).Warn("OAuth2 HTTP request failed")
+				util.Log(ctx).WithField("url", req.URL.String()).WithField("status", resp.StatusCode).WithField("error", body.Error).WithField("error_description", body.ErrorDescription).WithField("error_uri", body.ErrorURI).Warn("OAuth2 HTTP request failed")
 			}
 			if body.Error != "" {
 				return nil, fmt.Errorf("OAuth2 request %q failed: %s (%s)", req.URL.String(), resp.Status, body.Error)

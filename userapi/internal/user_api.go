@@ -23,8 +23,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
@@ -111,7 +109,7 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 		return fmt.Errorf("data type must not be empty")
 	}
 	if err := a.DB.SaveAccountData(ctx, local, domain, req.RoomID, req.DataType, req.AccountData); err != nil {
-		frame.Log(ctx).WithError(err).Error("a.Cm.SaveAccountData failed")
+		util.Log(ctx).WithError(err).Error("a.Cm.SaveAccountData failed")
 		return fmt.Errorf("failed to save account data: %w", err)
 	}
 	var ignoredUsers *synctypes.IgnoredUsers
@@ -129,7 +127,7 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 		Type:         req.DataType,
 		IgnoredUsers: ignoredUsers,
 	}); err != nil {
-		frame.Log(ctx).WithError(err).Error("a.SyncProducer.SendAccountData failed")
+		util.Log(ctx).WithError(err).Error("a.SyncProducer.SendAccountData failed")
 		return fmt.Errorf("failed to send account data to output: %w", err)
 	}
 	return nil
@@ -143,7 +141,7 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 	}
 	localpart, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: SplitID failure")
+		util.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: SplitID failure")
 		return nil
 	}
 	if !a.Config.Global.IsLocalServerName(domain) {
@@ -152,12 +150,12 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 
 	deleted, err := a.DB.DeleteNotificationsUpTo(ctx, localpart, domain, req.RoomID, uint64(spec.AsTimestamp(time.Now())))
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: DeleteNotificationsUpTo failed")
+		util.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: DeleteNotificationsUpTo failed")
 		return err
 	}
 
 	if err = a.SyncProducer.GetAndSendNotificationData(ctx, req.UserID, req.RoomID); err != nil {
-		frame.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: GetAndSendNotificationData failed")
+		util.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: GetAndSendNotificationData failed")
 		return err
 	}
 
@@ -167,7 +165,7 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 	}
 
 	if err = userapiUtil.NotifyUserCountsAsync(ctx, a.PgClient, localpart, domain, a.DB); err != nil {
-		frame.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: NotifyUserCounts failed")
+		util.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: NotifyUserCounts failed")
 		return err
 	}
 	return nil
@@ -181,7 +179,7 @@ func postRegisterJoinRooms(ctx context.Context, cfg *config.UserAPI, acc *api.Ac
 			userID := userutil.MakeUserID(acc.Localpart, cfg.Global.ServerName)
 			err := addUserToRoom(ctx, rsAPI, cfg.AutoJoinRooms[room], acc.Localpart, userID)
 			if err != nil {
-				frame.Log(ctx).WithField("user_id", userID).WithField("room", cfg.AutoJoinRooms[room]).WithError(err).Error("user failed to auto-join room")
+				util.Log(ctx).WithField("user_id", userID).WithField("room", cfg.AutoJoinRooms[room]).WithError(err).Error("user failed to auto-join room")
 			}
 		}
 	}
@@ -245,7 +243,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	if err = a.SyncProducer.SendAccountData(ctx, acc.UserID, eventutil.AccountData{
 		Type: "m.push_rules",
 	}); err != nil {
-		frame.Log(ctx).WithError(err).WithField("account_type", req.AccountType).WithField("localpart", req.Localpart).WithField("user_id", acc.UserID).Warn("failed to send account data to the SyncAPI")
+		util.Log(ctx).WithError(err).WithField("account_type", req.AccountType).WithField("localpart", req.Localpart).WithField("user_id", acc.UserID).Warn("failed to send account data to the SyncAPI")
 	}
 
 	if req.AccountType == api.AccountTypeGuest {
@@ -300,7 +298,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 		}
 		isExisting = existingDev.ID == *req.DeviceID
 	}
-	frame.Log(ctx).WithField("localpart", req.Localpart).WithField("device_id", req.DeviceID).WithField("display_name", req.DeviceDisplayName).Info("PerformDeviceCreation")
+	util.Log(ctx).WithField("localpart", req.Localpart).WithField("device_id", req.DeviceID).WithField("display_name", req.DeviceDisplayName).Info("PerformDeviceCreation")
 	dev, err := a.DB.CreateDevice(ctx, req.Localpart, serverName, req.DeviceID, req.AccessToken, req.ExtraData, req.DeviceDisplayName, req.IPAddr, req.UserAgent)
 	if err != nil {
 		return err
@@ -315,7 +313,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 }
 
 func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.PerformDeviceDeletionRequest, res *api.PerformDeviceDeletionResponse) error {
-	frame.Log(ctx).WithField("user_id", req.UserID).WithField("devices", req.DeviceIDs).Info("PerformDeviceDeletion")
+	util.Log(ctx).WithField("user_id", req.UserID).WithField("devices", req.DeviceIDs).Info("PerformDeviceDeletion")
 	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
 		return err
@@ -402,7 +400,7 @@ func (a *UserInternalAPI) PerformLastSeenUpdate(
 func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.PerformDeviceUpdateRequest, res *api.PerformDeviceUpdateResponse) error {
 	localpart, domain, err := gomatrixserverlib.SplitID('@', req.RequestingUserID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return err
 	}
 	if !a.Config.Global.IsLocalServerName(domain) {
@@ -413,14 +411,14 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 		res.DeviceExists = false
 		return nil
 	} else if err != nil {
-		frame.Log(ctx).WithError(err).Error("deviceDB.GetDeviceByID failed")
+		util.Log(ctx).WithError(err).Error("deviceDB.GetDeviceByID failed")
 		return err
 	}
 	res.DeviceExists = true
 
 	err = a.DB.UpdateDevice(ctx, localpart, domain, req.DeviceID, req.DisplayName)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("deviceDB.UpdateDevice failed")
+		util.Log(ctx).WithError(err).Error("deviceDB.UpdateDevice failed")
 		return err
 	}
 	if req.DisplayName != nil && dev.DisplayName != *req.DisplayName {
@@ -658,7 +656,7 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 	userID := fmt.Sprintf("@%s:%s", req.Localpart, serverName)
 	_, err := a.RSAPI.PerformAdminEvacuateUser(ctx, userID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("userID", userID).Error("Failed to evacuate user after account deactivation")
+		util.Log(ctx).WithError(err).WithField("userID", userID).Error("Failed to evacuate user after account deactivation")
 	}
 
 	deviceReq := &api.PerformDeviceDeletionRequest{
@@ -837,7 +835,7 @@ func (a *UserInternalAPI) QueryNotifications(ctx context.Context, req *api.Query
 }
 
 func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.PerformPusherSetRequest, res *struct{}) error {
-	frame.Log(ctx).WithField("localpart", req.Localpart).WithField("pushkey", req.Pusher.PushKey).WithField("display_name", req.Pusher.AppDisplayName).Info("PerformPusherCreation")
+	util.Log(ctx).WithField("localpart", req.Localpart).WithField("pushkey", req.Pusher.PushKey).WithField("display_name", req.Pusher.AppDisplayName).Info("PerformPusherCreation")
 	if !req.Append {
 		err := a.DB.RemovePushers(ctx, req.AppID, req.PushKey)
 		if err != nil {
@@ -854,7 +852,7 @@ func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.Perform
 }
 
 func (a *UserInternalAPI) PerformPusherDeletion(ctx context.Context, req *api.PerformPusherDeletionRequest, res *struct{}) error {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	pushers, err := a.DB.GetPushers(ctx, req.Localpart, req.ServerName)
 	if err != nil {
 		return err

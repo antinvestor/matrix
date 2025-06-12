@@ -21,7 +21,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
@@ -76,7 +75,7 @@ func GetJoinedMembers(
 
 	var queryRes api.QueryMembershipForUserResponse
 	if queryErr := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); queryErr != nil {
-		frame.Log(req.Context()).WithError(queryErr).Error("rsAPI.QueryMembershipsForRoom failed")
+		util.Log(req.Context()).WithError(queryErr).Error("rsAPI.QueryMembershipsForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -103,7 +102,7 @@ func GetJoinedMembers(
 		JoinedOnly: true,
 		RoomID:     validRoomID.String(),
 	}, &membershipsForRoomResp); err != nil {
-		frame.Log(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
+		util.Log(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -115,7 +114,7 @@ func GetJoinedMembers(
 	for _, ev := range membershipsForRoomResp.JoinEvents {
 		var content databaseJoinedMember
 		if err := json.Unmarshal(ev.Content, &content); err != nil {
-			frame.Log(req.Context()).WithError(err).Error("failed to unmarshal event content")
+			util.Log(req.Context()).WithError(err).Error("failed to unmarshal event content")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -124,7 +123,7 @@ func GetJoinedMembers(
 
 		userID, err := rsAPI.QueryUserIDForSender(req.Context(), *validRoomID, spec.SenderID(ev.Sender))
 		if err != nil || userID == nil {
-			frame.Log(req.Context()).WithError(err).Error("rsAPI.QueryUserIDForSender failed")
+			util.Log(req.Context()).WithError(err).Error("rsAPI.QueryUserIDForSender failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

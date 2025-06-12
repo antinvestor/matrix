@@ -17,8 +17,6 @@ package routing
 import (
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/userapi/api"
 
@@ -62,7 +60,7 @@ func GetAdminWhois(
 		UserID: userID,
 	}, &queryRes)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("GetAdminWhois failed to query user devices")
+		util.Log(req.Context()).WithError(err).Error("GetAdminWhois failed to query user devices")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

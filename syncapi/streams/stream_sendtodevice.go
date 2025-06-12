@@ -2,6 +2,7 @@ package streams
 
 import (
 	"context"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -43,7 +44,7 @@ func (p *SendToDeviceStreamProvider) IncrementalSync(
 	// See if we have any new tasks to do for the send-to-device messaging.
 	lastPos, events, err := snapshot.SendToDeviceUpdatesForSync(req.Context, req.Device.UserID, req.Device.ID, from, to)
 	if err != nil {
-		req.Log.WithError(err).Error("p.Cm.SendToDeviceUpdatesForSync failed")
+		util.Log(ctx).WithError(err).Error("p.Cm.SendToDeviceUpdatesForSync failed")
 		return from
 	}
 

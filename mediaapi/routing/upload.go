@@ -26,8 +26,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/mediaapi/fileutils"
@@ -44,7 +42,7 @@ import (
 // NOTE: The members come from HTTP request metadata such as headers, query parameters or can be derived from such
 type uploadRequest struct {
 	MediaMetadata *types.MediaMetadata
-	Logger        *frame.Entry
+	Logger        *util.LogEntry
 }
 
 // uploadResponse defines the format of the JSON response
@@ -88,7 +86,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI, dev *usera
 			UploadName:    types.Filename(url.PathEscape(req.FormValue("filename"))),
 			UserID:        types.MatrixUserID(dev.UserID),
 		},
-		Logger: frame.Log(req.Context()).WithField("Origin", cfg.Global.ServerName),
+		Logger: util.Log(req.Context()).WithField("Origin", cfg.Global.ServerName),
 	}
 
 	if resErr := r.Validate(cfg.MaxFileSizeBytes); resErr != nil {

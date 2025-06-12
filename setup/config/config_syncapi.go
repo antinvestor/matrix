@@ -74,15 +74,18 @@ type SyncQueues struct {
 
 func (q *SyncQueues) Defaults(opts DefaultOpts) {
 
-	q.OutputRoomEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIRoomServerConsumer", DS: opts.DSQueueConn.ExtendPath(OutputRoomEvent).ExtendQuery("stream_name", OutputRoomEvent)}
-	q.OutputClientData = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIAccountDataConsumer", DS: opts.DSQueueConn.ExtendPath(OutputClientData).ExtendQuery("stream_name", OutputClientData)}
-	q.OutputKeyChangeEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIKeyChangeConsumer", DS: opts.DSQueueConn.ExtendPath(OutputKeyChangeEvent).ExtendQuery("stream_name", OutputKeyChangeEvent)}
-	q.OutputSendToDeviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPISendToDeviceConsumer", DS: opts.DSQueueConn.ExtendPath(OutputSendToDeviceEvent).ExtendQuery("stream_name", OutputSendToDeviceEvent)}
-	q.OutputTypingEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPITypingConsumer", DS: opts.DSQueueConn.ExtendPath(OutputTypingEvent).ExtendQuery("stream_name", OutputTypingEvent)}
-	q.OutputReceiptEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIReceiptConsumer", DS: opts.DSQueueConn.ExtendPath(OutputReceiptEvent).ExtendQuery("stream_name", OutputReceiptEvent)}
-	q.OutputStreamEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIRoomServerConsumer", DS: opts.DSQueueConn.ExtendPath(OutputStreamEvent).ExtendQuery("stream_name", OutputStreamEvent)}
-	q.OutputNotificationData = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPINotificationDataConsumer", DS: opts.DSQueueConn.ExtendPath(OutputNotificationData).ExtendQuery("stream_name", OutputNotificationData)}
-	q.OutputPresenceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "SyncAPIPresenceConsumer", DS: opts.DSQueueConn.ExtendPath(OutputPresenceEvent).ExtendQuery("stream_name", OutputPresenceEvent)}
+	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent)
+	q.OutputClientData = opts.defaultQ(OutputClientData)
+	q.OutputKeyChangeEvent = opts.defaultQ(OutputKeyChangeEvent)
+	q.OutputSendToDeviceEvent = opts.defaultQ(OutputSendToDeviceEvent)
+
+	q.OutputTypingEvent = opts.defaultQ(OutputTypingEvent)
+	q.OutputTypingEvent.DS = q.OutputTypingEvent.DS.ExtendQuery("stream_storage", "memory")
+
+	q.OutputReceiptEvent = opts.defaultQ(OutputReceiptEvent)
+	q.OutputStreamEvent = opts.defaultQ(OutputStreamEvent)
+	q.OutputNotificationData = opts.defaultQ(OutputNotificationData)
+	q.OutputPresenceEvent = opts.defaultQ(OutputPresenceEvent)
 }
 
 func (q *SyncQueues) Verify(configErrs *ConfigErrors) {

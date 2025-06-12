@@ -541,7 +541,7 @@ func Test_Notification(t *testing.T) {
 					{},
 				},
 				Event: synctypes.ClientEvent{
-					Content: spec.RawJSON("{}"),
+					Content: json.RawMessage("{}"),
 				},
 				Read:   false,
 				RoomID: roomID,

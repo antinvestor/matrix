@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -283,7 +281,7 @@ func (u *latestEventsUpdater) latestState() error {
 	}
 
 	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
-		frame.Log(ctx).
+		util.Log(ctx).
 			WithField("event_id", u.event.EventID()).
 			WithField("room_id", u.event.RoomID().String()).
 			WithField("old_state_nid", u.oldStateNID).

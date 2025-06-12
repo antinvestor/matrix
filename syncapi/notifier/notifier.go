@@ -19,14 +19,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/util"
 )
 
 // NOTE: ALL FUNCTIONS IN THIS FILE PREFIXED WITH _ ARE NOT THREAD-SAFE
@@ -99,7 +98,7 @@ func (n *Notifier) OnNewEvent(
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	n.currPos.ApplyUpdates(posUpdate)
 	n._removeEmptyUserStreams()

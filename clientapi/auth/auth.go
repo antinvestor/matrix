@@ -23,8 +23,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
@@ -70,7 +68,7 @@ func VerifyUserFromRequest(
 	}, &res)
 	if err != nil {
 		ctx := req.Context()
-		log := frame.Log(ctx)
+		log := util.Log(ctx)
 		log.WithError(err).Error("userAPI.QueryAccessToken failed")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,

@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/api"
+	"github.com/pitabwire/util"
 )
 
 // QueryJoinedHostServerNamesInRoom implements api.FederationInternalAPI
@@ -60,7 +59,7 @@ func (r *FederationInternalAPI) fetchServerKeysFromCache(
 		}
 		// we should only get 1 result as we only gave 1 key ID
 		sk := serverKeysResponses[0]
-		frame.Log(ctx).WithField("key_id", keyID).WithField("minimum_valid_until_ts", criteria.MinimumValidUntilTS).WithField("server_keys_valid_until_ts", sk.ValidUntilTS).Info("fetched server keys from cache")
+		util.Log(ctx).WithField("key_id", keyID).WithField("minimum_valid_until_ts", criteria.MinimumValidUntilTS).WithField("server_keys_valid_until_ts", sk.ValidUntilTS).Info("fetched server keys from cache")
 		if criteria.MinimumValidUntilTS != 0 {
 			// check if it's still valid. if they have the same value that's also valid
 			if sk.ValidUntilTS < criteria.MinimumValidUntilTS {
@@ -85,12 +84,12 @@ func (r *FederationInternalAPI) QueryServerKeys(
 		res.ServerKeys = results
 		return nil
 	}
-	frame.Log(ctx).WithField("server", req.ServerName).WithError(err).Warn("notary: failed to satisfy keys request entirely from cache, hitting direct")
+	util.Log(ctx).WithField("server", req.ServerName).WithError(err).Warn("notary: failed to satisfy keys request entirely from cache, hitting direct")
 
 	serverKeys, err := r.fetchServerKeysDirectly(ctx, req.ServerName)
 	if err != nil {
 		// try to load as much as we can from the cache in a best effort basis
-		frame.Log(ctx).WithField("server", req.ServerName).WithError(err).Warn("notary: failed to ask server for keys, returning best effort keys")
+		util.Log(ctx).WithField("server", req.ServerName).WithError(err).Warn("notary: failed to ask server for keys, returning best effort keys")
 		serverKeysResponses, dbErr := r.db.GetNotaryKeys(ctx, req.ServerName, req.KeyIDs())
 		if dbErr != nil {
 			return fmt.Errorf("notary: server returned %s, and db returned %s", err, dbErr)
@@ -101,7 +100,7 @@ func (r *FederationInternalAPI) QueryServerKeys(
 	// cache it!
 	if err = r.db.UpdateNotaryKeys(ctx, req.ServerName, *serverKeys); err != nil {
 		// non-fatal, still return the response
-		frame.Log(ctx).WithError(err).Warn("failed to UpdateNotaryKeys")
+		util.Log(ctx).WithError(err).Warn("failed to UpdateNotaryKeys")
 	}
 	res.ServerKeys = []gomatrixserverlib.ServerKeys{*serverKeys}
 	return nil

@@ -21,8 +21,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -106,7 +104,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("buildMembershipEvent failed")
+		util.Log(ctx).WithError(err).Error("buildMembershipEvent failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -124,7 +122,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		nil,
 		false,
 	); err != nil {
-		frame.Log(ctx).WithError(err).Error("SendEvents failed")
+		util.Log(ctx).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -393,7 +391,7 @@ func sendInvite(
 		}, e
 	case nil:
 	default:
-		frame.Log(ctx).WithError(err).Error("PerformInvite failed")
+		util.Log(ctx).WithError(err).Error("PerformInvite failed")
 
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -553,31 +551,31 @@ func checkAndProcessThreepid(
 	switch e := err.(type) {
 	case nil:
 	case threepid.ErrMissingParameter:
-		frame.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		util.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(err.Error()),
 		}
 	case threepid.ErrNotTrusted:
-		frame.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		util.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotTrusted(body.IDServer),
 		}
 	case eventutil.ErrRoomNoExists:
-		frame.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		util.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound(err.Error()),
 		}
 	case gomatrixserverlib.BadJSONError:
-		frame.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		util.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(e.Error()),
 		}
 	default:
-		frame.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		util.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -593,7 +591,7 @@ func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.ClientRoomserver
 		UserID: userID,
 	}, &membershipRes)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("QueryMembershipForUser: could not query membership for user")
+		util.Log(ctx).WithError(err).Error("QueryMembershipForUser: could not query membership for user")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -613,7 +611,7 @@ func SendForget(
 	roomID string, rsAPI roomserverAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
 	ctx := req.Context()
-	logger := frame.Log(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)
+	logger := util.Log(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)
 
 	deviceUserID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {

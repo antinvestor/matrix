@@ -20,10 +20,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/tidwall/gjson"
@@ -213,7 +212,7 @@ func visibilityForEvents(
 	if senderID != nil {
 		membershipEvents, err = rsAPI.QueryMembershipAtEvent(ctx, roomID, eventIDs, *senderID)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("visibilityForEvents: failed to fetch membership at event, defaulting to 'leave'")
+			util.Log(ctx).WithError(err).Error("visibilityForEvents: failed to fetch membership at event, defaulting to 'leave'")
 		}
 	}
 

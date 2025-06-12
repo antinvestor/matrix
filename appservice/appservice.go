@@ -19,7 +19,7 @@ import (
 	"sync"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
@@ -58,7 +58,7 @@ func NewInternalAPI(
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		// Create bot account for this AS if it doesn't already exist
 		if err := generateAppServiceAccount(ctx, userAPI, appservice, cfg.Global.ServerName); err != nil {
-			frame.Log(ctx).
+			util.Log(ctx).
 				WithField("appservice", appservice.ID).
 				WithError(err).Panic("failed to generate bot account for appservice")
 		}
@@ -71,7 +71,7 @@ func NewInternalAPI(
 		qm, rsAPI,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start appservice roomserver consumer")
+		util.Log(ctx).WithError(err).Panic("failed to start appservice roomserver consumer")
 	}
 
 	return appserviceQueryAPI

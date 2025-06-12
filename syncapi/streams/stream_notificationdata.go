@@ -2,6 +2,7 @@ package streams
 
 import (
 	"context"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -46,7 +47,7 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 	// and can display the correct numbers.
 	countsByRoom, err := snapshot.GetUserUnreadNotificationCountsForRooms(ctx, req.Device.UserID, req.Rooms)
 	if err != nil {
-		req.Log.WithError(err).Error("GetUserUnreadNotificationCountsForRooms failed")
+		util.Log(ctx).WithError(err).Error("GetUserUnreadNotificationCountsForRooms failed")
 		return from
 	}
 

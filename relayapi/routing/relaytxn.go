@@ -18,8 +18,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/relayapi/api"
@@ -34,7 +32,7 @@ func GetTransactionFromRelay(
 	relayAPI api.RelayInternalAPI,
 	userID spec.UserID,
 ) util.JSONResponse {
-	log := frame.Log(httpReq.Context())
+	log := util.Log(httpReq.Context())
 	log.Info("Processing relay_txn for %s", userID.String())
 
 	var previousEntry fclient.RelayEntry

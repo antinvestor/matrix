@@ -21,7 +21,7 @@ import (
 
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal/cacheutil"
@@ -62,27 +62,27 @@ func AddPublicRoutes(
 
 	err := qm.RegisterPublisher(ctx, &cfg.Queues.OutputReceiptEvent)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register receipt event publisher")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register receipt event publisher")
 	}
 	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputSendToDeviceEvent)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register send to device event publisher")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register send to device event publisher")
 	}
 	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputTypingEvent)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register typing event publisher")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register typing event publisher")
 	}
 	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputPresenceEvent)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register presence event publisher")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register presence event publisher")
 	}
 	err = qm.RegisterPublisher(ctx, &cfgUserApi.Queues.InputDeviceListUpdate)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register input device list update event publisher")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register input device list update event publisher")
 	}
 	err = qm.RegisterPublisher(ctx, &cfgUserApi.Queues.InputSigningKeyUpdate)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register input signing key event publisher")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register input signing key event publisher")
 	}
 
 	producer := &producers.SyncAPIProducer{
@@ -104,7 +104,7 @@ func AddPublicRoutes(
 	// be the same thing now.
 	f, ok := fedAPI.(*internal.FederationInternalAPI)
 	if !ok {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("federationapi.AddPublicRoutes called with a FederationInternalAPI impl which was not " +
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("federationapi.AddPublicRoutes called with a FederationInternalAPI impl which was not " +
 			"FederationInternalAPI. This is a programming error.")
 	}
 
@@ -136,11 +136,11 @@ func NewInternalAPI(
 
 	federationCm, err := cm.FromOptions(ctx, &cfg.Database)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to obtain federation sender db connection manager")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to obtain federation sender db connection manager")
 	}
 	federationDB, err := storage.NewDatabase(ctx, federationCm, caches, cfg.Global.IsLocalServerName)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to connect to federation sender db")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to connect to federation sender db")
 	}
 
 	if presenceCli == nil {
@@ -168,39 +168,39 @@ func NewInternalAPI(
 		ctx, cfg, qm, queues, federationDB, rsAPI, presenceCli,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start room server consumer")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start room server consumer")
 	}
 
 	err = consumers.NewOutputSendToDeviceConsumer(
 		ctx, cfg, qm, queues, federationDB,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start send-to-device consumer")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start send-to-device consumer")
 	}
 	err = consumers.NewOutputReceiptConsumer(
 		ctx, cfg, qm, queues, federationDB,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start receipt consumer")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start receipt consumer")
 	}
 	err = consumers.NewOutputTypingConsumer(
 		ctx, cfg, qm, queues, federationDB,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start typing consumer")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start typing consumer")
 	}
 	err = consumers.NewKeyChangeConsumer(
 		ctx, &mcfg.KeyServer, qm, queues, federationDB, rsAPI,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start key server consumer")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start key server consumer")
 	}
 
 	err = consumers.NewOutputPresenceConsumer(
 		ctx, cfg, qm, queues, federationDB, rsAPI,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start presence consumer")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start presence consumer")
 	}
 
 	var cleanExpiredEDUs func()
@@ -211,12 +211,12 @@ func NewInternalAPI(
 			return
 		default:
 
-			frame.Log(ctx).
+			util.Log(ctx).
 				WithField("component", "federationapi").
 				Info("Cleaning expired EDUs")
 
 			if err = federationDB.DeleteExpiredEDUs(ctx); err != nil {
-				frame.Log(ctx).WithError(err).
+				util.Log(ctx).WithError(err).
 					WithField("component", "federationapi").
 					Error("Failed to clean expired EDUs")
 			}

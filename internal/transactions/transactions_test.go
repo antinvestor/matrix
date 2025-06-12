@@ -70,9 +70,9 @@ func TestCache(t *testing.T) {
 
 	testResponse, ok := fakeTxnCache.FetchTransaction(fakeAccessToken, fakeTxnID, u)
 	if !ok {
-		t.Errorf("Failed to retrieve entry for txnID: ", fakeTxnID)
+		t.Errorf("Failed to retrieve entry for txnID: %s", fakeTxnID)
 	} else if testResponse.JSON != fakeResponse.JSON {
-		t.Errorf("Fetched response incorrect. Expected: ", fakeResponse.JSON, " got: ", testResponse.JSON)
+		t.Errorf("Fetched response incorrect. Expected: %s got: %s", fakeResponse.JSON, testResponse.JSON)
 	}
 }
 

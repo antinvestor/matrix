@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -60,7 +60,7 @@ func NewOutputTypingEventConsumer(
 
 func (s *OutputTypingEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	roomID := metadata[queueutil.RoomID]
 	userID := metadata[queueutil.UserID]

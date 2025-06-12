@@ -26,8 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pitabwire/frame"
-
+	"github.com/pitabwire/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -329,7 +328,7 @@ func compileNamespaceRegexes(namespaces []ApplicationServiceNamespace) (err erro
 // application services according to the application service spec.
 func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
 
-	log := frame.Log(context.TODO())
+	log := util.Log(context.TODO())
 
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
@@ -416,7 +415,7 @@ func validateNamespace(
 	// Check if GroupID for the users namespace is in the correct format
 	if key == "users" && namespace.GroupID != "" {
 		// TODO: Remove once group_id is implemented
-		frame.Log(context.TODO()).Warn("WARNING: Application service option group_id is currently unimplemented")
+		util.Log(context.TODO()).Warn("WARNING: Application service option group_id is currently unimplemented")
 
 		correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
 		if !correctFormat {
@@ -445,7 +444,7 @@ type AppServiceQueues struct {
 }
 
 func (q *AppServiceQueues) Defaults(opts DefaultOpts) {
-	q.OutputAppserviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "AppServiceOutputAppserviceEvent", DS: opts.DSQueueConn.ExtendPath(OutputAppserviceEvent).ExtendQuery("stream_name", OutputAppserviceEvent)}
+	q.OutputAppserviceEvent = opts.defaultQ(OutputAppserviceEvent)
 }
 
 func (q *AppServiceQueues) Verify(configErrs *ConfigErrors) {

@@ -23,8 +23,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
@@ -82,7 +80,7 @@ func GetPostPublicRooms(
 			"",
 		)
 		if err != nil {
-			frame.Log(req.Context()).WithError(err).Error("failed to get public rooms")
+			util.Log(req.Context()).WithError(err).Error("failed to get public rooms")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -96,7 +94,7 @@ func GetPostPublicRooms(
 
 	response, err := publicRooms(req.Context(), request, rsAPI, extRoomsProvider)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("failed to work out public rooms")
+		util.Log(req.Context()).WithError(err).Error("failed to work out public rooms")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -125,7 +123,7 @@ func publicRooms(
 	// ParseInt returns 0 and an error when trying to parse an empty string
 	// In that case, we want to assign 0 so we ignore the error
 	if err != nil && len(request.Since) > 0 {
-		frame.Log(ctx).WithError(err).Error("strconv.ParseInt failed")
+		util.Log(ctx).WithError(err).Error("strconv.ParseInt failed")
 		return nil, err
 	}
 	err = nil
@@ -188,7 +186,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 		// Atoi returns 0 and an error when trying to parse an empty string
 		// In that case, we want to assign 0 so we ignore the error
 		if err != nil && len(httpReq.FormValue("limit")) > 0 {
-			frame.Log(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
+			util.Log(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 			return &util.JSONResponse{
 				Code: 400,
 				JSON: spec.BadJSON("limit param is not a number"),
@@ -269,12 +267,12 @@ func refreshPublicRoomCache(
 		IncludeAllNetworks: request.IncludeAllNetworks,
 	}, &queryRes)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("QueryPublishedRooms failed")
+		util.Log(ctx).WithError(err).Error("QueryPublishedRooms failed")
 		return publicRoomsCache
 	}
 	pubRooms, err := roomserverAPI.PopulatePublicRooms(ctx, queryRes.RoomIDs, rsAPI)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("PopulatePublicRooms failed")
+		util.Log(ctx).WithError(err).Error("PopulatePublicRooms failed")
 		return publicRoomsCache
 	}
 	publicRoomsCache = []fclient.PublicRoom{}

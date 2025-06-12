@@ -26,6 +26,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // accountsSchema defines the schema for the accounts table.
@@ -191,7 +192,7 @@ func (s *accountsTable) SelectAccountByLocalpart(
 	var appserviceIDPtr sql.NullString
 	var acc api.Account
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	db := s.cm.Connection(ctx, true)
 	row := db.Raw(s.selectAccountByLocalpart, localpart, serverName).Row()

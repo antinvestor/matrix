@@ -33,8 +33,6 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/mediaapi/fileutils"
@@ -62,7 +60,7 @@ type downloadRequest struct {
 	MediaMetadata      *types.MediaMetadata
 	IsThumbnailRequest bool
 	ThumbnailSize      types.ThumbnailSize
-	Logger             *frame.Entry
+	Logger             *util.LogEntry
 	DownloadFilename   string
 	multipartResponse  bool // whether we need to return a multipart/mixed response (for requests coming in over federation)
 	fedClient          fclient.FederationClient
@@ -134,7 +132,7 @@ func Download(
 			Origin:  origin,
 		},
 		IsThumbnailRequest: isThumbnailRequest,
-		Logger: frame.Log(req.Context()).
+		Logger: util.Log(req.Context()).
 			WithField("Origin", origin).
 			WithField("MediaID", mediaID),
 		DownloadFilename:  customFilename,

@@ -25,6 +25,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // notificationSchema defines the schema for notifications storage
@@ -159,7 +160,7 @@ func (s *notificationsTable) DeleteUpTo(ctx context.Context, localpart string, s
 		return false, result.Error
 	}
 
-	frame.Log(ctx).WithField("localpart", localpart).
+	util.Log(ctx).WithField("localpart", localpart).
 		WithField("room_id", roomID).
 		WithField("stream_pos", pos).
 		Debug("DeleteUpTo: %d rows affected", result.RowsAffected)
@@ -174,7 +175,7 @@ func (s *notificationsTable) UpdateRead(ctx context.Context, localpart string, s
 		return false, res.Error
 	}
 
-	frame.Log(ctx).WithField("localpart", localpart).
+	util.Log(ctx).WithField("localpart", localpart).
 		WithField("room_id", roomID).
 		WithField("stream_pos", pos).
 		Debug("UpdateRead: %d rows affected", res.RowsAffected)

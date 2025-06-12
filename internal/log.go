@@ -24,7 +24,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // callerPrettyfier is a function that given a runtime.Frame object, will
@@ -49,9 +49,9 @@ func callerPrettyfier(f *runtime.Frame) (string, string) {
 // simplest, and it gives us the freedom to run pprof on a separate port.
 func SetupPprof(ctx context.Context) {
 	if hostPort := os.Getenv("PPROFLISTEN"); hostPort != "" {
-		frame.Log(ctx).Warn("Starting pprof on ", hostPort)
+		util.Log(ctx).Warn("Starting pprof on ", hostPort)
 		go func() {
-			frame.Log(ctx).WithError(http.ListenAndServe(hostPort, nil)).Error("Failed to setup pprof listener")
+			util.Log(ctx).WithError(http.ListenAndServe(hostPort, nil)).Error("Failed to setup pprof listener")
 		}()
 	}
 }
@@ -66,6 +66,6 @@ func CloseAndLogIfError(ctx context.Context, closer io.Closer, message string) {
 		ctx = context.TODO()
 	}
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error(message)
+		util.Log(ctx).WithError(err).Error(message)
 	}
 }

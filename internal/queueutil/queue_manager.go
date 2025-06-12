@@ -35,14 +35,9 @@ func (q *queues) EnsurePublisherOk(ctx context.Context, opts *config.QueueOption
 }
 
 func (q *queues) Publish(ctx context.Context, reference string, payload any, headers ...map[string]string) error {
+
 	err := q.service.Publish(ctx, reference, payload, headers...)
 	if err != nil {
-
-		frame.Log(ctx).
-			WithField("prefix", reference).
-			WithError(err).
-			Error("Failed to publish")
-
 		return err
 	}
 	return nil

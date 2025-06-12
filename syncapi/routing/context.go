@@ -22,8 +22,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/cacheutil"
@@ -96,7 +94,7 @@ func Context(
 	membershipRes := roomserver.QueryMembershipForUserResponse{}
 	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: *userID, RoomID: roomID}
 	if err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
-		frame.Log(ctx).WithError(err).Error("unable to query membership")
+		util.Log(ctx).WithError(err).Error("unable to query membership")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -130,7 +128,7 @@ func Context(
 				JSON: spec.NotFound(fmt.Sprintf("Event %s not found", eventID)),
 			}
 		}
-		frame.Log(ctx).WithError(err).WithField("eventID", eventID).Error("unable to find requested event")
+		util.Log(ctx).WithError(err).WithField("eventID", eventID).Error("unable to find requested event")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -141,13 +139,13 @@ func Context(
 	startTime := time.Now()
 	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, []*rstypes.HeaderedEvent{&requestedEvent}, nil, *userID, "context")
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("unable to apply history visibility filter")
+		util.Log(ctx).WithError(err).Error("unable to apply history visibility filter")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	frame.Log(ctx).WithField("duration", time.Since(startTime)).
+	util.Log(ctx).WithField("duration", time.Since(startTime)).
 		WithField("room_id", roomID).
 		Debug("applied history visibility (context)")
 	if len(filteredEvents) == 0 {
@@ -164,7 +162,7 @@ func Context(
 
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, roomID, filter)
 	if err != nil && !sqlutil.ErrorIsNoRows(err) {
-		frame.Log(ctx).WithError(err).Error("unable to fetch before events")
+		util.Log(ctx).WithError(err).Error("unable to fetch before events")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -173,7 +171,7 @@ func Context(
 
 	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, roomID, filter)
 	if err != nil && !sqlutil.ErrorIsNoRows(err) {
-		frame.Log(ctx).WithError(err).Error("unable to fetch after events")
+		util.Log(ctx).WithError(err).Error("unable to fetch after events")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -183,21 +181,21 @@ func Context(
 	startTime = time.Now()
 	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, snapshot, rsAPI, eventsBefore, eventsAfter, *userID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("unable to apply history visibility filter")
+		util.Log(ctx).WithError(err).Error("unable to apply history visibility filter")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 
-	frame.Log(ctx).WithField("duration", time.Since(startTime)).
+	util.Log(ctx).WithField("duration", time.Since(startTime)).
 		WithField("room_id", roomID).
 		Debug("applied history visibility (context eventsBefore/eventsAfter)")
 
 	// TODO: Get the actual state at the last event returned by SelectContextAfterEvent
 	state, err := snapshot.CurrentState(ctx, roomID, &stateFilter, nil)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("unable to fetch current room state")
+		util.Log(ctx).WithError(err).Error("unable to fetch current room state")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -220,7 +218,7 @@ func Context(
 		})
 		newState, err = applyLazyLoadMembers(ctx, device, snapshot, roomID, evs, lazyLoadCache)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("unable to load membership events")
+			util.Log(ctx).WithError(err).Error("unable to load membership events")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

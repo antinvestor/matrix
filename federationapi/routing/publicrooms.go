@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -64,7 +62,7 @@ func publicRooms(
 	// ParseInt returns 0 and an error when trying to parse an empty string
 	// In that case, we want to assign 0 so we ignore the error
 	if err != nil && len(request.Since) > 0 {
-		frame.Log(ctx).WithError(err).Error("strconv.ParseInt failed")
+		util.Log(ctx).WithError(err).Error("strconv.ParseInt failed")
 		return nil, err
 	}
 
@@ -77,7 +75,7 @@ func publicRooms(
 		NetworkID: request.NetworkID,
 	}, &queryRes)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("QueryPublishedRooms failed")
+		util.Log(ctx).WithError(err).Error("QueryPublishedRooms failed")
 		return nil, err
 	}
 	response.TotalRoomCountEstimate = len(queryRes.RoomIDs)
@@ -111,7 +109,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 		// Atoi returns 0 and an error when trying to parse an empty string
 		// In that case, we want to assign 0 so we ignore the error
 		if err != nil && len(httpReq.FormValue("limit")) > 0 {
-			frame.Log(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
+			util.Log(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 			return &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -150,7 +148,7 @@ func fillInRooms(ctx context.Context, roomIDs []string, rsAPI roomserverAPI.Fede
 		},
 	}, &stateRes)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("QueryBulkStateContent failed")
+		util.Log(ctx).WithError(err).Error("QueryBulkStateContent failed")
 		return nil, err
 	}
 	chunk := make([]fclient.PublicRoom, len(roomIDs))

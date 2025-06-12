@@ -5,7 +5,7 @@ import (
 
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 
@@ -50,7 +50,7 @@ func NewSyncAPI(ctx context.Context, cfg *config.SyncAPI, db storage.UserDatabas
 // SendAccountData sends account data to the Sync API server.
 func (p *SyncAPI) SendAccountData(ctx context.Context, userID string, data eventutil.AccountData) error {
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("user_id", userID).
 		WithField("room_id", data.RoomID).
 		WithField("data_type", data.Type).
@@ -90,7 +90,7 @@ func (p *SyncAPI) GetAndSendNotificationData(ctx context.Context, userID, roomID
 // sendNotificationData sends data about unread notifications to the Sync API server.
 func (p *SyncAPI) sendNotificationData(ctx context.Context, userID string, data *eventutil.NotificationData) error {
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("user_id", userID).
 		WithField("room_id", data.RoomID).
 		Debug("Producing to topic '%s'", p.notificationDataTopic)

@@ -20,7 +20,7 @@ import (
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // FederationInternalAPI is an implementation of api.FederationInternalAPI
@@ -47,7 +47,7 @@ func NewFederationInternalAPI(
 ) *FederationInternalAPI {
 	serverKeyDB, err := cache.NewKeyDatabase(db, caches)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to set up caching wrapper for server key database")
+		util.Log(ctx).WithError(err).Panic("failed to set up caching wrapper for server key database")
 	}
 
 	if keyRing == nil {
@@ -85,7 +85,7 @@ func NewFederationInternalAPI(
 			for _, key := range ps.Keys {
 				rawkey, err := b64e.DecodeString(key.PublicKey)
 				if err != nil {
-					frame.Log(ctx).WithError(err).
+					util.Log(ctx).WithError(err).
 						WithField("server_name", ps.ServerName).
 						WithField("public_key", key.PublicKey).
 						Warn("Couldn't parse perspective key")
@@ -96,7 +96,7 @@ func NewFederationInternalAPI(
 
 			keyRing.KeyFetchers = append(keyRing.KeyFetchers, perspective)
 
-			frame.Log(ctx).
+			util.Log(ctx).
 				WithField("server_name", ps.ServerName).
 				WithField("num_public_keys", len(ps.Keys)).
 				Info("Enabled perspective key fetcher")

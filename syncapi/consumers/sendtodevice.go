@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -69,7 +69,7 @@ func NewOutputSendToDeviceEventConsumer(
 
 func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	userID := metadata[queueutil.UserID]
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)

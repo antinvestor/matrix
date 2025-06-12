@@ -20,8 +20,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -54,7 +52,7 @@ func GetProfile(
 			}
 		}
 
-		frame.Log(req.Context()).WithError(err).Error("getProfile failed")
+		util.Log(req.Context()).WithError(err).Error("getProfile failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -110,7 +108,7 @@ func SetAvatarURL(
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -134,7 +132,7 @@ func SetAvatarURL(
 
 	profile, changed, err := profileAPI.SetAvatarURL(req.Context(), localpart, domain, r.AvatarURL)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
+		util.Log(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -199,7 +197,7 @@ func SetDisplayName(
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -223,7 +221,7 @@ func SetDisplayName(
 
 	profile, changed, err := profileAPI.SetDisplayName(req.Context(), localpart, domain, r.DisplayName)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
+		util.Log(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -263,7 +261,7 @@ func updateProfile(
 
 	rooms, err := rsAPI.QueryRoomsForUser(ctx, *deviceUserID, "join")
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("QueryRoomsForUser failed")
+		util.Log(ctx).WithError(err).Error("QueryRoomsForUser failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -277,7 +275,7 @@ func updateProfile(
 
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -295,7 +293,7 @@ func updateProfile(
 			JSON: spec.BadJSON(e.Error()),
 		}, e
 	default:
-		frame.Log(ctx).WithError(err).Error("buildMembershipEvents failed")
+		util.Log(ctx).WithError(err).Error("buildMembershipEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -303,7 +301,7 @@ func updateProfile(
 	}
 
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, device.UserDomain(), domain, domain, nil, false); err != nil {
-		frame.Log(ctx).WithError(err).Error("SendEvents failed")
+		util.Log(ctx).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

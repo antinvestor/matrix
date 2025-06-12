@@ -21,11 +21,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/util"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -85,7 +84,7 @@ func (c *RedisCachePartition[K, V]) Get(ctx context.Context, key K) (V, bool) {
 	if err != nil {
 
 		if !errors.Is(err, redis.Nil) {
-			frame.Log(ctx).WithError(err).Error("Failed to get value")
+			util.Log(ctx).WithError(err).Error("Failed to get value")
 		}
 
 		var empty V

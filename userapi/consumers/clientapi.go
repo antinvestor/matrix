@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -29,7 +28,9 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/matrix/userapi/producers"
-	"github.com/antinvestor/matrix/userapi/util"
+	userapiutil "github.com/antinvestor/matrix/userapi/util"
+
+	"github.com/pitabwire/util"
 )
 
 // OutputReceiptEventConsumer consumes events that originated in the clientAPI.
@@ -75,7 +76,7 @@ func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[st
 		return nil
 	}
 
-	log := frame.Log(ctx).
+	log := util.Log(ctx).
 		WithField("room_id", roomID).
 		WithField("user_id", userID)
 
@@ -105,7 +106,7 @@ func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[st
 	if !updated {
 		return nil
 	}
-	if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, domain, s.db); err != nil {
+	if err = userapiutil.NotifyUserCountsAsync(ctx, s.pgClient, localpart, domain, s.db); err != nil {
 		log.WithError(err).Error("userapi EDU consumer: NotifyUserCounts failed")
 		return err
 	}

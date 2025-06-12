@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -64,7 +64,7 @@ func NewOutputNotificationDataConsumer(
 // be incorrectly calculated.
 func (s *OutputNotificationDataConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	userID := metadata[queueutil.UserID]
 

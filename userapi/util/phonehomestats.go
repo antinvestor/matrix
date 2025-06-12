@@ -24,12 +24,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/storage"
+	"github.com/pitabwire/util"
 )
 
 type phoneHomeStats struct {
@@ -94,7 +93,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 	// cpu and memory usage information
 	err := getMemoryStats(ctx, p)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Warn("unable to get memory/cpu stats, using defaults")
+		util.Log(ctx).WithError(err).Warn("unable to get memory/cpu stats, using defaults")
 	}
 
 	// configuration information
@@ -107,7 +106,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 
 	messageStats, activeRooms, activeE2EERooms, err := p.db.DailyRoomsMessages(iCtx, p.serverName)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Warn("unable to query message stats, using default values")
+		util.Log(ctx).WithError(err).Warn("unable to query message stats, using default values")
 	}
 	p.stats["daily_messages"] = messageStats.Messages
 	p.stats["daily_sent_messages"] = messageStats.SentMessages
@@ -119,7 +118,7 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 	// user stats and Cm engine
 	userStats, db, err := p.db.UserStatistics(iCtx)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Warn("unable to query userstats, using default values")
+		util.Log(ctx).WithError(err).Warn("unable to query userstats, using default values")
 	}
 	p.stats["database_engine"] = db.Engine
 	p.stats["database_server_version"] = db.Version
@@ -139,24 +138,24 @@ func (p *phoneHomeStats) collect(ctx context.Context) {
 
 	output := bytes.Buffer{}
 	if err = json.NewEncoder(&output).Encode(p.stats); err != nil {
-		frame.Log(ctx).WithError(err).Error("Unable to encode phone-home statistics")
+		util.Log(ctx).WithError(err).Error("Unable to encode phone-home statistics")
 		return
 	}
 
-	frame.Log(ctx).WithField("endpoint", p.cfg.Global.ReportStats.Endpoint).
+	util.Log(ctx).WithField("endpoint", p.cfg.Global.ReportStats.Endpoint).
 		WithField("output", output.String()).
 		Info("Reporting stats")
 
 	request, err := http.NewRequestWithContext(iCtx, http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("Unable to create phone-home statistics request")
+		util.Log(ctx).WithError(err).Error("Unable to create phone-home statistics request")
 		return
 	}
 	request.Header.Set("User-Agent", "Matrix/"+internal.VersionString())
 
 	_, err = p.client.Do(request)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("Unable to send phone-home statistics")
+		util.Log(ctx).WithError(err).Error("Unable to send phone-home statistics")
 		return
 	}
 }

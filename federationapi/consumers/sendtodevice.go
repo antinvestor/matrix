@@ -21,7 +21,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/federationapi/queue"
@@ -60,7 +59,7 @@ func NewOutputSendToDeviceConsumer(
 // send-to-device events topic from the client api.
 func (t *OutputSendToDeviceConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	// only send send-to-device events which originated from us
 	sender := metadata["sender"]
 	_, originServerName, err := gomatrixserverlib.SplitID('@', sender)

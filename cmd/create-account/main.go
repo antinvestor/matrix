@@ -29,9 +29,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal"
+	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
 
 	"golang.org/x/term"
@@ -83,7 +82,7 @@ func main() {
 	}
 	cfg := setup.ParseFlags(true)
 
-	log := frame.Log(context.Background()).WithField("cmd", "create-account")
+	log := util.Log(context.Background()).WithField("cmd", "create-account")
 
 	if *resetPassword {
 		log.Fatal("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")

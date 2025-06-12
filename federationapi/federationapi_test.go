@@ -134,7 +134,7 @@ func (f *fedClient) MakeJoin(ctx context.Context, origin, s spec.ServerName, roo
 				RoomID:     roomID,
 				Type:       "m.room.member",
 				StateKey:   &senderIDString,
-				Content:    spec.RawJSON([]byte(`{"membership":"join"}`)),
+				Content:    json.RawMessage([]byte(`{"membership":"join"}`)),
 				PrevEvents: r.ForwardExtremities(),
 			}
 			var needed gomatrixserverlib.StateNeeded

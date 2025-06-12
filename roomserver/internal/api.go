@@ -5,7 +5,6 @@ import (
 	"crypto/ed25519"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -71,7 +70,7 @@ func NewRoomserverAPI(
 
 	err := qm.RegisterPublisher(ctx, &cfg.SyncAPI.Queues.OutputRoomEvent)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to register publisher for output room event")
+		util.Log(ctx).WithError(err).Panic("failed to register publisher for output room event")
 	}
 
 	producer := &producers.RoomEventProducer{
@@ -119,7 +118,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAP
 		keyRing, r.ServerACLs, r.OutputProducer,
 		r.Queryer, nil, r.enableMetrics)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start roomserver input API")
+		util.Log(ctx).WithError(err).Panic("failed to start roomserver input API")
 	}
 
 	r.Inputer = inputer

@@ -20,7 +20,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
@@ -55,7 +54,7 @@ func CreateOpenIDToken(
 
 	err := userAPI.PerformOpenIDTokenCreation(req.Context(), &request, &response)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("userAPI.CreateOpenIDToken failed")
+		util.Log(req.Context()).WithError(err).Error("userAPI.CreateOpenIDToken failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

@@ -163,7 +163,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 		mod.origin = creator.srvName
 	}
 
-	var unsigned spec.RawJSON
+	var unsigned json.RawMessage
 	var err error
 	if mod.unsigned != nil {
 		unsigned, err = json.Marshal(mod.unsigned)

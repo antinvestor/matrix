@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 
 	"github.com/tidwall/gjson"
 
@@ -29,7 +28,8 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	userAPITypes "github.com/antinvestor/matrix/userapi/types"
-	"github.com/antinvestor/matrix/userapi/util"
+	userapiutil "github.com/antinvestor/matrix/userapi/util"
+	"github.com/pitabwire/util"
 )
 
 type OutputRoomEventConsumer struct {
@@ -74,7 +74,7 @@ func NewOutputRoomEventConsumer(
 func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	// Only handle events we care about
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	var event *rstypes.HeaderedEvent
 	var isNewRoomEvent bool
@@ -175,7 +175,7 @@ func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context, eventTy
 		}
 		err = s.db.UpsertDailyRoomsMessages(ctx, serverName, stats, normalRooms, encryptedRooms)
 		if err != nil {
-			log := frame.Log(ctx)
+			log := util.Log(ctx)
 			log.WithError(err).Error("failed to upsert daily messages")
 		}
 		// Clear stats if we successfully stored it
@@ -291,7 +291,7 @@ func (s *OutputRoomEventConsumer) copyTags(ctx context.Context, oldRoomID, newRo
 
 func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rstypes.HeaderedEvent, streamPos uint64) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID().String())
 	if err != nil {
@@ -391,7 +391,7 @@ func newLocalMembership(event *synctypes.ClientEvent) (*localMembership, error) 
 // the total number of members.
 func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID string) ([]*localMembership, int, error) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	// Get only locally joined users to avoid unmarshalling and caching
 	// membership events we only use to calculate the room size.
@@ -522,7 +522,7 @@ func unmarshalCanonicalAlias(event *rstypes.HeaderedEvent) (string, error) {
 // notifyLocal finds the right push actions for a local user, given an event.
 func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int, roomName string, streamPos uint64) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	actions, err := s.evaluatePushRules(ctx, event, mem, roomSize)
 	if err != nil {
@@ -691,7 +691,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		return nil, nil
 	}
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	log.
 		WithField("event_id", event.EventID()).
 		WithField("room_id", event.RoomID().String()).
@@ -742,7 +742,7 @@ func (rse *ruleSetEvalContext) HasPowerLevel(senderID spec.SenderID, levelKey st
 // localPushDevices pushes to the configured devices of a local
 // user. The map keys are [url][format].
 func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpart string, serverName spec.ServerName, tweaks map[string]interface{}) (map[string]map[string][]*pushgateway.Device, string, error) {
-	pusherDevices, err := util.GetPushDevices(ctx, localpart, serverName, tweaks, s.db)
+	pusherDevices, err := userapiutil.GetPushDevices(ctx, localpart, serverName, tweaks, s.db)
 	if err != nil {
 		return nil, "", fmt.Errorf("util.GetPushDevices: %w", err)
 	}
@@ -766,7 +766,7 @@ func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpar
 
 // notifyHTTP performs a notificatation to a Push Gateway.
 func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes.HeaderedEvent, url, format string, devices []*pushgateway.Device, localpart, roomName string, userNumUnreadNotifs int) ([]*pushgateway.Device, error) {
-	logger := frame.Log(ctx).
+	logger := util.Log(ctx).
 		WithField("event_id", event.EventID()).
 		WithField("url", url).
 		WithField("localpart", localpart).
@@ -857,7 +857,7 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 
 // deleteRejectedPushers deletes the pushers associated with the given devices.
 func (s *OutputRoomEventConsumer) deleteRejectedPushers(ctx context.Context, devices []*pushgateway.Device, localpart string, serverName spec.ServerName) {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	log.
 		WithField("localpart", localpart).
 		WithField("app_id0", devices[0].AppID).

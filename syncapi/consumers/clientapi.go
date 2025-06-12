@@ -22,7 +22,7 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -70,7 +70,7 @@ func NewOutputClientDataConsumer(
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputClientDataConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	// Parse out the event JSON
 	userID := metadata[queueutil.UserID]
 	var output eventutil.AccountData

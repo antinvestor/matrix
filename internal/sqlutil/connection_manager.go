@@ -20,6 +20,8 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/pitabwire/util"
+
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/frame" // assumed path; adjust if needed
 	"gorm.io/gorm"
@@ -96,10 +98,13 @@ func (c *Connections) BeginTx(ctx context.Context, opts ...*WriterOption) (conte
 }
 
 func (c *Connections) FromOptions(ctx context.Context, opts *config.DatabaseOptions) (ConnectionManager, error) {
+
+	log := util.Log(ctx)
+
 	conn, err := NewConnectionManagerWithOptions(ctx, c.service, opts)
 
 	if err != nil {
-		c.service.L(ctx).WithError(err).Error("Failed to create connection manager, reusing current connection manager")
+		log.WithError(err).Error("Failed to create connection manager, reusing current connection manager")
 		return c, nil
 	}
 
@@ -107,7 +112,7 @@ func (c *Connections) FromOptions(ctx context.Context, opts *config.DatabaseOpti
 		return conn, nil
 	}
 
-	c.service.L(ctx).Info("Reusing active connection manager")
+	log.Debug("Reusing active connection manager")
 	return c, nil
 
 }
@@ -208,10 +213,10 @@ func NewConnectionManagerWithOptions(ctx context.Context, service *frame.Service
 		var dbOpts []frame.Option
 		for _, conn := range connSlice {
 			if conn.IsPostgres() {
-				dbOpts = append(dbOpts, frame.DatastoreConnectionWithName(ctx, primaryConnStr, string(conn), false))
+				dbOpts = append(dbOpts, frame.WithDatastoreConnectionWithName(primaryConnStr, string(conn), false))
 			}
 		}
-		service.Init(dbOpts...)
+		service.Init(ctx, dbOpts...)
 		pool = service.DBPool(primaryConnStr)
 	}
 

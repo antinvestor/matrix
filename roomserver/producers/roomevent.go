@@ -19,7 +19,7 @@ import (
 
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 
@@ -44,7 +44,7 @@ type RoomEventProducer struct {
 func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string, updates []api.OutputEvent) error {
 	var err error
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	for _, update := range updates {
 
@@ -87,10 +87,9 @@ func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string
 			queueutil.RoomID:        roomID,
 		}
 
-		logger.Debug("Producing to topic '%s'", r.Topic)
 		err = r.Qm.Publish(ctx, r.Topic.Ref(), update, h)
 		if err != nil {
-			logger.WithError(err).Error("Failed to produce to topic '%s': %s", r.Topic, err)
+			logger.WithError(err).WithField("topic", r.Topic).Error("Failed to produce to topic ")
 			return err
 		}
 	}

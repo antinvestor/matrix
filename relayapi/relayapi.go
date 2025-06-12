@@ -17,8 +17,6 @@ package relayapi
 import (
 	"context"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/federationapi/producers"
@@ -31,6 +29,7 @@ import (
 	"github.com/antinvestor/matrix/relayapi/storage"
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
@@ -70,11 +69,11 @@ func NewRelayInternalAPI(
 
 	relayCm, err := cm.FromOptions(ctx, &cfg.RelayAPI.Database)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to obtain relay db connection manager :%v", err)
+		util.Log(ctx).WithError(err).Panic("failed to obtain relay db connection manager :%v", err)
 	}
 	relayDB, err := storage.NewDatabase(ctx, relayCm, caches, cfg.Global.IsLocalServerName)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to connect to relay db")
+		util.Log(ctx).WithError(err).Panic("failed to connect to relay db")
 	}
 
 	return internal.NewRelayInternalAPI(

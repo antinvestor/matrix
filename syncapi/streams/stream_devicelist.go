@@ -2,6 +2,7 @@ package streams
 
 import (
 	"context"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/internal"
@@ -31,14 +32,15 @@ func (p *DeviceListStreamProvider) IncrementalSync(
 	from, to types.StreamPosition,
 ) types.StreamPosition {
 	var err error
+	log := util.Log(ctx)
 	to, _, err = internal.DeviceListCatchup(ctx, snapshot, p.userAPI, p.rsAPI, req.Device.UserID, req.Response, from, to)
 	if err != nil {
-		req.Log.WithError(err).Error("internal.DeviceListCatchup failed")
+		log.WithError(err).Error("internal.DeviceListCatchup failed")
 		return from
 	}
 	err = internal.DeviceOTKCounts(req.Context, p.userAPI, req.Device.UserID, req.Device.ID, req.Response)
 	if err != nil {
-		req.Log.WithError(err).Error("internal.DeviceListCatchup failed")
+		log.WithError(err).Error("internal.DeviceListCatchup failed")
 		return from
 	}
 

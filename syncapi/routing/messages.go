@@ -22,8 +22,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
@@ -83,7 +81,7 @@ func OnIncomingMessagesRequest(
 
 	deviceUserID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("device.UserID invalid")
+		util.Log(req.Context()).WithError(err).Error("device.UserID invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -180,7 +178,7 @@ func OnIncomingMessagesRequest(
 			fromStream = &streamToken
 			from, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
 			if err != nil {
-				frame.Log(ctx).WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
+				util.Log(ctx).WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -205,7 +203,7 @@ func OnIncomingMessagesRequest(
 			} else {
 				to, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
 				if err != nil {
-					frame.Log(ctx).WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
+					util.Log(ctx).WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
 					return util.JSONResponse{
 						Code: http.StatusInternalServerError,
 						JSON: spec.InternalServerError{},
@@ -268,7 +266,7 @@ func OnIncomingMessagesRequest(
 
 	clientEvents, start, end, err := mReq.retrieveEvents(req.Context(), rsAPI)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
+		util.Log(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -281,7 +279,7 @@ func OnIncomingMessagesRequest(
 		end = types.TopologyToken{}
 	}
 
-	frame.Log(req.Context()).
+	util.Log(req.Context()).
 		WithField("request_from", from.String()).
 		WithField("request_to", to.String()).
 		WithField("limit", filter.Limit).
@@ -299,7 +297,7 @@ func OnIncomingMessagesRequest(
 	if filter.LazyLoadMembers {
 		membershipEvents, err := applyLazyLoadMembers(req.Context(), device, snapshot, roomID, clientEvents, lazyLoadCache)
 		if err != nil {
-			frame.Log(req.Context()).WithError(err).Error("failed to apply lazy loading")
+			util.Log(req.Context()).WithError(err).Error("failed to apply lazy loading")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -357,7 +355,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	end.Decrement()
 
 	var events []*rstypes.HeaderedEvent
-	frame.Log(r.ctx).
+	util.Log(r.ctx).
 		WithField("start", r.from).
 		WithField("end", r.to).
 		WithField("backwards", r.backwardOrdering).
@@ -387,7 +385,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	if err != nil {
 		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
 	}
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("duration", time.Since(startTime)).
 		WithField("room_id", r.roomID).
 		WithField("events_before", len(events)).
@@ -579,7 +577,7 @@ func (r *messagesReq) backfill(ctx context.Context, roomID string, backwardsExtr
 	if err != nil {
 		return nil, fmt.Errorf("PerformBackfill failed: %w", err)
 	}
-	frame.Log(r.ctx).WithField("new_events", len(res.Events)).Info("Storing new events from backfill")
+	util.Log(r.ctx).WithField("new_events", len(res.Events)).Info("Storing new events from backfill")
 
 	// TODO: we should only be inserting events into the database from the roomserver's kafka output stream.
 	// Currently, this can race with live events for the room and cause problems. It's also just a bit unclear

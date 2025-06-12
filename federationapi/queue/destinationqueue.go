@@ -22,8 +22,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -32,6 +30,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/storage/shared/receipt"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/util"
 )
 
 const (
@@ -70,7 +69,7 @@ type destinationQueue struct {
 // start sending events to that destination.
 func (oq *destinationQueue) sendEvent(ctx context.Context, event *types.HeaderedEvent, dbReceipt *receipt.Receipt) {
 	if event == nil {
-		frame.Log(ctx).Error("attempt to send nil PDU with destination %q", oq.destination)
+		util.Log(ctx).Error("attempt to send nil PDU with destination %q", oq.destination)
 		return
 	}
 
@@ -101,7 +100,7 @@ func (oq *destinationQueue) sendEvent(ctx context.Context, event *types.Headered
 // start sending events to that destination.
 func (oq *destinationQueue) sendEDU(ctx context.Context, event *gomatrixserverlib.EDU, dbReceipt *receipt.Receipt) {
 	if event == nil {
-		frame.Log(ctx).Error("attempt to send nil EDU with destination %q", oq.destination)
+		util.Log(ctx).Error("attempt to send nil EDU with destination %q", oq.destination)
 		return
 	}
 
@@ -153,7 +152,7 @@ func (oq *destinationQueue) wakeQueueIfEventsPending(ctx context.Context, forceW
 	// or if forceWakeup is true. Otherwise there is no reason to start the
 	// queue goroutine and waste resources.
 	if forceWakeup || eventsPending() {
-		frame.Log(ctx).Info("Starting queue due to pending events or forceWakeup")
+		util.Log(ctx).Info("Starting queue due to pending events or forceWakeup")
 		oq.wakeQueueAndNotify(ctx)
 	}
 }
@@ -231,7 +230,7 @@ func (oq *destinationQueue) getPendingFromDatabase(ctx context.Context) {
 				}
 			}
 		} else {
-			frame.Log(ctx).WithError(err).Error("Failed to get pending PDUs for %q", oq.destination)
+			util.Log(ctx).WithError(err).Error("Failed to get pending PDUs for %q", oq.destination)
 		}
 	}
 
@@ -252,7 +251,7 @@ func (oq *destinationQueue) getPendingFromDatabase(ctx context.Context) {
 				}
 			}
 		} else {
-			frame.Log(ctx).WithError(err).Error("Failed to get pending EDUs for %q", oq.destination)
+			util.Log(ctx).WithError(err).Error("Failed to get pending EDUs for %q", oq.destination)
 		}
 	}
 
@@ -396,7 +395,7 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 ) (sendMethod statistics.SendMethod, err error) {
 	// Create the transaction.
 	t, pduReceipts, eduReceipts := oq.createTransaction(pdus, edus)
-	frame.Log(ctx).WithField("server_name", oq.destination).Debug("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
+	util.Log(ctx).WithField("server_name", oq.destination).Debug("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
 
 	// Try to send the transaction to the destination server.
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
@@ -416,7 +415,7 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 			// The destination is still offline, try sending to relays.
 			sendMethod = statistics.SendViaRelay
 			relaySuccess := false
-			frame.Log(ctx).Info("Sending %q to relay servers: %v", t.TransactionID, relayServers)
+			util.Log(ctx).Info("Sending %q to relay servers: %v", t.TransactionID, relayServers)
 			// TODO : how to pass through actual userID here?!?!?!?!
 			userID, userErr := spec.NewUserID("@user:"+string(oq.destination), false)
 			if userErr != nil {
@@ -451,15 +450,15 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 	case nil:
 		// Clean up the transaction in the database.
 		if pduReceipts != nil {
-			//frame.Log(ctx).Info("Cleaning PDUs %q", pduReceipt.String())
+			//util.Log(ctx).Info("Cleaning PDUs %q", pduReceipt.String())
 			if err = oq.db.CleanPDUs(ctx, oq.destination, pduReceipts); err != nil {
-				frame.Log(ctx).WithError(err).Error("Failed to clean PDUs for server %q", t.Destination)
+				util.Log(ctx).WithError(err).Error("Failed to clean PDUs for server %q", t.Destination)
 			}
 		}
 		if eduReceipts != nil {
-			//frame.Log(ctx).Info("Cleaning EDUs %q", eduReceipt.String())
+			//util.Log(ctx).Info("Cleaning EDUs %q", eduReceipt.String())
 			if err = oq.db.CleanEDUs(ctx, oq.destination, eduReceipts); err != nil {
-				frame.Log(ctx).WithError(err).Error("Failed to clean EDUs for server %q", t.Destination)
+				util.Log(ctx).WithError(err).Error("Failed to clean EDUs for server %q", t.Destination)
 			}
 		}
 		// Reset the transaction ID.
@@ -475,10 +474,10 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 		// since we shouldn't queue things indefinitely in response
 		// to a 400-ish error
 		code := errResponse.Code
-		frame.Log(ctx).Debug("Transaction failed with HTTP", code)
+		util.Log(ctx).Debug("Transaction failed with HTTP", code)
 		return sendMethod, err
 	default:
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("destination", oq.destination).
 			Debug("Failed to send transaction %q", t.TransactionID)
 		return sendMethod, err
@@ -547,7 +546,7 @@ func (oq *destinationQueue) blacklistDestination(ctx context.Context) {
 	// It's been suggested that we should give up because the backoff
 	// has exceeded a maximum allowable value. Clean up the in-memory
 	// buffers at this point. The PDU clean-up is already on a defer.
-	frame.Log(ctx).Warn("Blacklisting %q due to exceeding backoff threshold", oq.destination)
+	util.Log(ctx).Warn("Blacklisting %q due to exceeding backoff threshold", oq.destination)
 
 	oq.pendingMutex.Lock()
 	for i := range oq.pendingPDUs {

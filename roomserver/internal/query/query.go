@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
 	//"github.com/antinvestor/matrix/roomserver/internal"
@@ -65,19 +63,19 @@ func (r *Queryer) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID
 	}
 	res := api.QueryServerJoinedToRoomResponse{}
 	if err = r.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
-		frame.Log(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+		util.Log(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return nil, fmt.Errorf("InternalServerError: Failed to query room: %w", err)
 	}
 
 	userJoinedToRoom, err := r.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), senderID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
+		util.Log(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
 		return nil, fmt.Errorf("InternalServerError: %w", err)
 	}
 
 	locallyJoinedUsers, err := r.LocallyJoinedUsers(ctx, roomInfo.RoomVersion, types.RoomNID(roomInfo.RoomNID))
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
+		util.Log(ctx).WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
 		return nil, fmt.Errorf("InternalServerError: %w", err)
 	}
 
@@ -475,7 +473,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	} else {
 		stateEntries, err = helpers.StateBeforeEvent(ctx, r.DB, info, membershipEventNID, r)
 		if err != nil {
-			frame.Log(ctx).WithField("membership_event_nid", membershipEventNID).WithError(err).Error("failed to load state before event")
+			util.Log(ctx).WithField("membership_event_nid", membershipEventNID).WithError(err).Error("failed to load state before event")
 			return err
 		}
 		events, err = helpers.GetMembershipsAtState(ctx, r.DB, info, stateEntries, request.JoinedOnly)

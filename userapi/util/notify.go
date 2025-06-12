@@ -5,12 +5,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/pitabwire/util"
 )
 
 // NotifyUserCountsAsync sends notifications to a local user's
@@ -19,7 +18,7 @@ import (
 // gateways. There is no way to know when the background goroutine has
 // finished.
 func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, localpart string, serverName spec.ServerName, db storage.UserDatabase) error {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	pusherDevices, err := GetPushDevices(ctx, localpart, serverName, nil, db)
 	if err != nil {

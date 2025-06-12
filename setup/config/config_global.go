@@ -13,6 +13,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -346,7 +347,7 @@ func (c *CacheOptions) LoadEnv() error {
 	}
 
 	if !c.ConnectionString.IsRedis() {
-		frame.Log(context.TODO()).WithField("cache_uri", c.ConnectionString).Warn("Invalid cache uri in the config")
+		util.Log(context.TODO()).WithField("cache_uri", c.ConnectionString).Warn("Invalid cache uri in the config")
 	}
 	return nil
 }
@@ -382,7 +383,7 @@ func (q *QueueOptions) Ref() string {
 func (q *QueueOptions) DSrc() DataSource {
 	pp := q.DS.PrefixPath(q.Prefix)
 	if !pp.IsNats() {
-		return q.DS
+		return pp
 	}
 
 	uri, _ := pp.ToURI()
@@ -420,7 +421,7 @@ func (q *QueueOptions) LoadEnv() error {
 	}
 
 	if !q.DS.IsQueue() {
-		frame.Log(context.TODO()).WithField("queue_uri", q.DS).Warn("Invalid queue uri in the config")
+		util.Log(context.TODO()).WithField("queue_uri", q.DS).Warn("Invalid queue uri in the config")
 	}
 	return nil
 }
@@ -503,7 +504,7 @@ func (c *DatabaseOptions) LoadEnv() error {
 	}
 
 	if !c.ConnectionString.IsPostgres() {
-		frame.Log(context.TODO()).WithField("db_uri", c.ConnectionString).Warn("Invalid database uri in the config")
+		util.Log(context.TODO()).WithField("db_uri", c.ConnectionString).Warn("Invalid database uri in the config")
 	}
 	return nil
 }

@@ -18,8 +18,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	keytypes "github.com/antinvestor/matrix/userapi/types"
@@ -84,7 +82,7 @@ func DeviceListCatchup(
 	}, &queryRes)
 	if queryRes.Error != nil {
 		// don't fail the catchup because we may have got useful information by tracking membership
-		frame.Log(ctx).
+		util.Log(ctx).
 			WithField("user_id", userID).
 			WithField("from", offset).
 			WithField("to", toOffset).
@@ -130,7 +128,7 @@ func DeviceListCatchup(
 		}
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("user_id", userID).
 		WithField("from", offset).
 		WithField("to", toOffset).
@@ -264,7 +262,7 @@ func filterSharedUsers(
 	}
 	sharedUsers, err := db.SharedUsers(ctx, userID, usersWithChangedKeys)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("db.SharedUsers failed: %s", err)
+		util.Log(ctx).WithError(err).Error("db.SharedUsers failed: %s", err)
 		// default to all users so we do needless queries rather than miss some important device update
 		return sharedUsersMap
 	}

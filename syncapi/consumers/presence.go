@@ -19,7 +19,7 @@ import (
 	"strconv"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
@@ -62,7 +62,7 @@ func NewPresenceConsumer(
 	}
 
 	if err := consumer.register(ctx); err != nil {
-		frame.Log(ctx).WithError(err).Error("Failed to register presence consumer")
+		util.Log(ctx).WithError(err).Error("Failed to register presence consumer")
 		return nil, err
 	}
 
@@ -83,7 +83,7 @@ func (s *PresenceConsumer) Handle(ctx context.Context, metadata map[string]strin
 	presence := metadata["presence"]
 	timestamp := metadata["last_active_ts"]
 	fromSync, _ := strconv.ParseBool(metadata["from_sync"])
-	frame.Log(ctx).Debug("syncAPI received presence event: %+v", metadata)
+	util.Log(ctx).Debug("syncAPI received presence event: %+v", metadata)
 
 	if fromSync { // do not process local presence changes; we already did this synchronously.
 		return nil
@@ -109,7 +109,7 @@ func (s *PresenceConsumer) Handle(ctx context.Context, metadata map[string]strin
 func (s *PresenceConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts spec.Timestamp, fromSync bool) {
 	pos, err := s.db.UpdatePresence(ctx, userID, presence, statusMsg, ts, fromSync)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("user", userID).WithField("presence", presence).Warn("failed to updated presence for user")
+		util.Log(ctx).WithError(err).WithField("user", userID).WithField("presence", presence).Warn("failed to updated presence for user")
 		return
 	}
 	s.stream.Advance(pos)

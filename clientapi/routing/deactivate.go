@@ -4,8 +4,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth"
@@ -37,7 +35,7 @@ func Deactivate(
 
 	localpart, serverName, err := gomatrixserverlib.SplitID('@', login.Username())
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -50,7 +48,7 @@ func Deactivate(
 		ServerName: serverName,
 	}, &res)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("userAPI.PerformAccountDeactivation failed")
+		util.Log(ctx).WithError(err).Error("userAPI.PerformAccountDeactivation failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

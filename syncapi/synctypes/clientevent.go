@@ -20,10 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/pitabwire/util"
 
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -52,25 +51,25 @@ const (
 // ClientFederationFields extends a ClientEvent to contain the additional fields present in a
 // federation event. Used when the client requests `event_format` of type `federation`.
 type ClientFederationFields struct {
-	Depth      int64        `json:"depth,omitempty"`
-	PrevEvents []string     `json:"prev_events,omitempty"`
-	AuthEvents []string     `json:"auth_events,omitempty"`
-	Signatures spec.RawJSON `json:"signatures,omitempty"`
-	Hashes     spec.RawJSON `json:"hashes,omitempty"`
+	Depth      int64           `json:"depth,omitempty"`
+	PrevEvents []string        `json:"prev_events,omitempty"`
+	AuthEvents []string        `json:"auth_events,omitempty"`
+	Signatures json.RawMessage `json:"signatures,omitempty"`
+	Hashes     json.RawMessage `json:"hashes,omitempty"`
 }
 
 // ClientEvent is an event which is fit for consumption by clients, in accordance with the specification.
 type ClientEvent struct {
-	Content        spec.RawJSON   `json:"content"`
-	EventID        string         `json:"event_id,omitempty"`         // EventID is omitted on receipt events
-	OriginServerTS spec.Timestamp `json:"origin_server_ts,omitempty"` // OriginServerTS is omitted on receipt events
-	RoomID         string         `json:"room_id,omitempty"`          // RoomID is omitted on /sync responses
-	Sender         string         `json:"sender,omitempty"`           // Sender is omitted on receipt events
-	SenderKey      spec.SenderID  `json:"sender_key,omitempty"`       // The SenderKey for events in pseudo ID rooms
-	StateKey       *string        `json:"state_key,omitempty"`
-	Type           string         `json:"type"`
-	Unsigned       spec.RawJSON   `json:"unsigned,omitempty"`
-	Redacts        string         `json:"redacts,omitempty"`
+	Content        json.RawMessage `json:"content"`
+	EventID        string          `json:"event_id,omitempty"`         // EventID is omitted on receipt events
+	OriginServerTS spec.Timestamp  `json:"origin_server_ts,omitempty"` // OriginServerTS is omitted on receipt events
+	RoomID         string          `json:"room_id,omitempty"`          // RoomID is omitted on /sync responses
+	Sender         string          `json:"sender,omitempty"`           // Sender is omitted on receipt events
+	SenderKey      spec.SenderID   `json:"sender_key,omitempty"`       // The SenderKey for events in pseudo ID rooms
+	StateKey       *string         `json:"state_key,omitempty"`
+	Type           string          `json:"type"`
+	Unsigned       json.RawMessage `json:"unsigned,omitempty"`
+	Redacts        string          `json:"redacts,omitempty"`
 
 	// Only sent to clients when `event_format` == `federation`.
 	ClientFederationFields
@@ -85,7 +84,7 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 		}
 		ev, err := ToClientEvent(se, format, userIDForSender)
 		if err != nil {
-			frame.Log(context.TODO()).WithError(err).Warn("Failed converting event to ClientEvent")
+			util.Log(context.TODO()).WithError(err).Warn("Failed converting event to ClientEvent")
 			continue
 		}
 		evs = append(evs, *ev)
@@ -193,7 +192,7 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 			if err != nil {
 				errString = err.Error()
 			}
-			frame.Log(context.TODO()).Warn("Failed to find userID for prev_sender in ClientEvent: %s", errString)
+			util.Log(context.TODO()).Warn("Failed to find userID for prev_sender in ClientEvent: %s", errString)
 			// NOTE: Not much can be done here, so leave the previous value in place.
 		}
 		ce.Unsigned, err = json.Marshal(prev)
@@ -235,7 +234,7 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 	return nil
 }
 
-func updateCreateEvent(content spec.RawJSON, userIDForSender spec.UserIDForSender, roomID spec.RoomID) (spec.RawJSON, error) {
+func updateCreateEvent(content json.RawMessage, userIDForSender spec.UserIDForSender, roomID spec.RoomID) (json.RawMessage, error) {
 	if creator := gjson.GetBytes(content, "creator"); creator.Exists() {
 		oldCreator := creator.Str
 		userID, err := userIDForSender(roomID, spec.SenderID(oldCreator))
@@ -293,14 +292,14 @@ func updateInviteEvent(userIDForSender spec.UserIDForSender, ev gomatrixserverli
 }
 
 type InviteRoomStateEvent struct {
-	Content  spec.RawJSON `json:"content"`
-	SenderID string       `json:"sender"`
-	StateKey *string      `json:"state_key"`
-	Type     string       `json:"type"`
+	Content  json.RawMessage `json:"content"`
+	SenderID string          `json:"sender"`
+	StateKey *string         `json:"state_key"`
+	Type     string          `json:"type"`
 }
 
-func GetUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomState gjson.Result, event gomatrixserverlib.PDU, roomID spec.RoomID, eventFormat ClientEventFormat) (spec.RawJSON, error) {
-	var res spec.RawJSON
+func GetUpdatedInviteRoomState(userIDForSender spec.UserIDForSender, inviteRoomState gjson.Result, event gomatrixserverlib.PDU, roomID spec.RoomID, eventFormat ClientEventFormat) (json.RawMessage, error) {
+	var res json.RawMessage
 	inviteStateEvents := []InviteRoomStateEvent{}
 	err := json.Unmarshal([]byte(inviteRoomState.Raw), &inviteStateEvents)
 	if err != nil {

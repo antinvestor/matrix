@@ -19,7 +19,7 @@ import (
 
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
@@ -54,7 +54,7 @@ func (p *KeyChange) ProduceKeyChanges(ctx context.Context, keys []api.DeviceMess
 		userToDeviceCount[key.UserID]++
 	}
 	for userID, count := range userToDeviceCount {
-		frame.Log(ctx).
+		util.Log(ctx).
 			WithField("user_id", userID).
 			WithField("num_key_changes", count).
 			Debug("Produced to key change topic '%s'", p.Topic.Ref())
@@ -85,7 +85,7 @@ func (p *KeyChange) ProduceSigningKeyUpdate(ctx context.Context, key api.CrossSi
 		return err
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("user_id", key.UserID).
 		Debug("Produced to cross-signing update topic '%s'", p.Topic)
 	return nil

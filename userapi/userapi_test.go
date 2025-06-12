@@ -86,7 +86,7 @@ func MustMakeInternalAPI(ctx context.Context, svc *frame.Service, cfg *config.Ma
 	cfgKeySrv := cfg.KeyServer
 	err = qm.RegisterPublisher(ctx, &cfgKeySrv.Queues.OutputKeyChangeEvent)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to register publisher for key change events")
+		util.Log(ctx).WithError(err).Panic("failed to register publisher for key change events")
 	}
 
 	keyChangeProducer := &producers.KeyChange{DB: keyDB, Qm: qm, Topic: &cfgKeySrv.Queues.OutputKeyChangeEvent}

@@ -283,7 +283,7 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.typing"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
 	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)
@@ -351,7 +351,7 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.direct_to_device"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
 	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)
@@ -428,7 +428,7 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.device_list_update"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
 	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)
@@ -491,7 +491,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.receipt"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	badUser := gomatrixserverlib.EDU{Type: "m.receipt"}
 	if badUser.Content, err = json.Marshal(map[string]interface{}{
 		roomID: map[string]interface{}{
@@ -569,7 +569,7 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.signing_key_update"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
 	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)
@@ -581,7 +581,7 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 		var output keyAPI.CrossSigningKeyUpdate
 		if err = json.Unmarshal(message, &output); err != nil {
 			// If the message was invalid, log it and move on to the next message in the stream
-			println(err.Error())
+			println(" CrsSgn Key ", string(message), " error : ", err.Error())
 			return nil
 		}
 
@@ -626,7 +626,7 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.presence"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
 	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)

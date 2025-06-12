@@ -26,7 +26,7 @@ type KeyServerQueues struct {
 }
 
 func (q *KeyServerQueues) Defaults(opts DefaultOpts) {
-	q.OutputKeyChangeEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "KeyServerKeyChangeConsumer", DS: opts.DSQueueConn.ExtendPath(OutputKeyChangeEvent).ExtendQuery("stream_name", OutputKeyChangeEvent)}
+	q.OutputKeyChangeEvent = opts.defaultQ(OutputKeyChangeEvent)
 }
 
 func (q *KeyServerQueues) Verify(configErrs *ConfigErrors) {

@@ -19,8 +19,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
@@ -70,7 +68,7 @@ func (c *RoomHierarchyPaginationCache) AddLine(line roomserverAPI.RoomHierarchyW
 func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr string, rsAPI roomserverAPI.ClientRoomserverAPI, paginationCache *RoomHierarchyPaginationCache) util.JSONResponse {
 
 	ctx := req.Context()
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	parsedRoomID, err := spec.NewRoomID(roomIDStr)
 	if err != nil {
@@ -148,7 +146,7 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 	if err != nil {
 		switch err.(type) {
 		case roomserverAPI.ErrRoomUnknownOrNotAllowed:
-			frame.Log(req.Context()).WithError(err).Debug("room unknown/forbidden when handling CS room hierarchy request")
+			util.Log(req.Context()).WithError(err).Debug("room unknown/forbidden when handling CS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden("room is unknown/forbidden"),

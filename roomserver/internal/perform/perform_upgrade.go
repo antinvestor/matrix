@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/eventutil"
@@ -61,10 +59,10 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 	senderID, err := r.URSAPI.QuerySenderIDForUser(ctx, *fullRoomID, userID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("Failed getting senderID for user")
+		util.Log(ctx).WithError(err).Error("Failed getting senderID for user")
 		return "", err
 	} else if senderID == nil {
-		frame.Log(ctx).WithField("userID", userID).WithField("roomID", *fullRoomID).Error("No senderID for user")
+		util.Log(ctx).WithField("userID", userID).WithField("roomID", *fullRoomID).Error("No senderID for user")
 		return "", fmt.Errorf("no sender ID for %s in %s", userID, *fullRoomID)
 	}
 
@@ -165,7 +163,7 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 
 	switch resErr.(type) {
 	case api.ErrNotAllowed:
-		frame.Log(ctx).WithError(resErr).Warn("UpgradeRoom: Could not restrict power levels in old room")
+		util.Log(ctx).WithError(resErr).Warn("UpgradeRoom: Could not restrict power levels in old room")
 	case nil:
 		return r.sendHeaderedEvent(ctx, userDomain, restrictedPowerLevelsHeadered, api.DoNotSendToOtherServers)
 	default:
@@ -235,7 +233,7 @@ func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api
 	})
 	switch resErr.(type) {
 	case api.ErrNotAllowed:
-		frame.Log(ctx).WithError(resErr).Warn("UpgradeRoom: Could not set empty canonical alias event in old room")
+		util.Log(ctx).WithError(resErr).Warn("UpgradeRoom: Could not set empty canonical alias event in old room")
 	case nil:
 		return r.sendHeaderedEvent(ctx, userDomain, emptyCanonicalAliasEvent, api.DoNotSendToOtherServers)
 	default:
@@ -272,7 +270,7 @@ func publishNewRoomAndUnpublishOldRoom(
 		Visibility: spec.Public,
 	}); err != nil {
 		// treat as non-fatal since the room is already made by this point
-		frame.Log(ctx).WithError(err).Error("failed to publish room")
+		util.Log(ctx).WithError(err).Error("failed to publish room")
 	}
 
 	// remove the old room from the published room list
@@ -281,7 +279,7 @@ func publishNewRoomAndUnpublishOldRoom(
 		Visibility: "private",
 	}); err != nil {
 		// treat as non-fatal since the room is already made by this point
-		frame.Log(ctx).WithError(err).Error("failed to un-publish room")
+		util.Log(ctx).WithError(err).Error("failed to un-publish room")
 	}
 }
 
@@ -410,7 +408,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// need to send the original power levels again later on.
 	powerLevelContent, err := oldPowerLevelsEvent.PowerLevels()
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("could not get power level")
+		util.Log(ctx).WithError(err).Error("could not get power level")
 		return nil, fmt.Errorf("power level event content was invalid")
 	}
 
@@ -459,7 +457,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 			StateKey: tuple.StateKey,
 		}
 		if err = json.Unmarshal(event.Content(), &newEvent.Content); err != nil {
-			frame.Log(ctx).WithError(err).Error("Failed to unmarshal old event")
+			util.Log(ctx).WithError(err).Error("Failed to unmarshal old event")
 			continue
 		}
 		eventsToMake = append(eventsToMake, newEvent)

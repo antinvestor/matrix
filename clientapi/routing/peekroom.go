@@ -18,8 +18,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
@@ -75,7 +73,7 @@ func PeekRoomByIDOrAlias(
 		}
 	case nil:
 	default:
-		frame.Log(req.Context()).WithError(err).WithField("roomID", roomIDOrAlias).Error("Failed to peek room")
+		util.Log(req.Context()).WithError(err).WithField("roomID", roomIDOrAlias).Error("Failed to peek room")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -114,7 +112,7 @@ func UnpeekRoomByID(
 		}
 	case nil:
 	default:
-		frame.Log(req.Context()).WithError(err).WithField("roomID", roomID).Error("Failed to un-peek room")
+		util.Log(req.Context()).WithError(err).WithField("roomID", roomID).Error("Failed to un-peek room")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

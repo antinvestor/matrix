@@ -140,11 +140,11 @@ type FederationAPIQueues struct {
 }
 
 func (q *FederationAPIQueues) Defaults(opts DefaultOpts) {
-	q.OutputPresenceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIPresenceConsumer", DS: opts.DSQueueConn.ExtendPath(OutputPresenceEvent).ExtendQuery("stream_name", OutputPresenceEvent)}
-	q.OutputReceiptEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIReceiptConsumer", DS: opts.DSQueueConn.ExtendPath(OutputReceiptEvent).ExtendQuery("stream_name", OutputReceiptEvent)}
-	q.OutputRoomEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIRoomServerConsumer", DS: opts.DSQueueConn.ExtendPath(OutputRoomEvent).ExtendQuery("stream_name", OutputRoomEvent)}
-	q.OutputSendToDeviceEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPIESendToDeviceConsumer", DS: opts.DSQueueConn.ExtendPath(OutputSendToDeviceEvent).ExtendQuery("stream_name", OutputSendToDeviceEvent)}
-	q.OutputTypingEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "FederationAPITypingConsumer", DS: opts.DSQueueConn.ExtendPath(OutputTypingEvent).ExtendQuery("stream_name", OutputTypingEvent)}
+	q.OutputPresenceEvent = opts.defaultQ(OutputPresenceEvent)
+	q.OutputReceiptEvent = opts.defaultQ(OutputReceiptEvent)
+	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent)
+	q.OutputSendToDeviceEvent = opts.defaultQ(OutputSendToDeviceEvent)
+	q.OutputTypingEvent = opts.defaultQ(OutputTypingEvent)
 }
 
 func (q *FederationAPIQueues) Verify(configErrs *ConfigErrors) {

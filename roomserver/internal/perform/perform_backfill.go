@@ -18,8 +18,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
@@ -29,6 +27,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/util"
 )
 
 // the max number of servers to backfill from per request. If this is too low we may fail to backfill when
@@ -53,7 +52,7 @@ func (r *Backfiller) PerformBackfill(
 	request *api.PerformBackfillRequest,
 	response *api.PerformBackfillResponse,
 ) error {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	// if we are requesting the backfill then we need to do a federation hit
 	// TODO: we could be more sensible and fetch as many events we already have then request the rest
 	//       which is what the syncapi does already.
@@ -108,7 +107,7 @@ func (r *Backfiller) PerformBackfill(
 }
 
 func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.PerformBackfillRequest, res *api.PerformBackfillResponse) error {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	info, err := r.DB.RoomInfo(ctx, req.RoomID)
 	if err != nil {
 		return err
@@ -187,7 +186,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
 	backfillRequester *backfillRequester, stateIDs []string, virtualHost spec.ServerName) {
 
-	baseLog := frame.Log(ctx)
+	baseLog := util.Log(ctx)
 	servers := backfillRequester.servers
 
 	// work out which are missing
@@ -300,7 +299,7 @@ func newBackfillRequester(
 }
 
 func (b *backfillRequester) StateIDsBeforeEvent(ctx context.Context, targetEvent gomatrixserverlib.PDU) ([]string, error) {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	b.eventIDMap[targetEvent.EventID()] = targetEvent
 	if ids, ok := b.eventIDToBeforeStateIDs[targetEvent.EventID()]; ok {
 		return ids, nil
@@ -392,7 +391,7 @@ func (b *backfillRequester) calculateNewStateIDs(targetEvent, prevEvent gomatrix
 func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
 	event gomatrixserverlib.PDU, eventIDs []string) (map[string]gomatrixserverlib.PDU, error) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	// try to fetch the events from the database first
 	events, err := b.ProvideEvents(ctx, roomVer, eventIDs)
 	if err != nil {
@@ -436,7 +435,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 // will be servers that are in the room already. The entries at the beginning are preferred servers
 // and will be tried first. An empty list will fail the request.
 func (b *backfillRequester) ServersAtEvent(ctx context.Context, roomID, eventID string) []spec.ServerName {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	// eventID will be a prev_event ID of a backwards extremity, meaning we will not have a database entry for it. Instead, use
 	// its successor, so look it up.
 	successor := ""
@@ -534,7 +533,7 @@ func (b *backfillRequester) Backfill(ctx context.Context, origin, server spec.Se
 }
 
 func (b *backfillRequester) ProvideEvents(ctx context.Context, roomVer gomatrixserverlib.RoomVersion, eventIDs []string) ([]gomatrixserverlib.PDU, error) {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	nidMap, err := b.db.EventNIDs(ctx, eventIDs)
 	if err != nil {
 		log.WithError(err).WithField("event_ids_count", len(eventIDs)).Error("Failed to find event NIDs")
@@ -566,7 +565,7 @@ func joinEventsFromHistoryVisibility(
 	ctx context.Context, db storage.RoomDatabase, querier api.QuerySenderIDAPI, roomInfo *types.RoomInfo, stateEntries []types.StateEntry,
 	thisServer spec.ServerName) ([]types.Event, gomatrixserverlib.HistoryVisibility, error) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	var eventNIDs []types.EventNID
 	for _, entry := range stateEntries {
 		// Filter the events to retrieve to only keep the membership events
@@ -608,7 +607,7 @@ func joinEventsFromHistoryVisibility(
 }
 
 func persistEvents(ctx context.Context, db storage.Database, querier api.QuerySenderIDAPI, events []gomatrixserverlib.PDU) (types.RoomNID, map[string]types.Event) {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	var roomNID types.RoomNID
 	var eventNID types.EventNID
 	backfilledEventMap := make(map[string]types.Event)

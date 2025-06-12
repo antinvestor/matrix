@@ -17,8 +17,6 @@ package routing
 import (
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
@@ -45,7 +43,7 @@ func GetEvent(
 ) util.JSONResponse {
 	ctx := req.Context()
 	db, err := syncDB.NewDatabaseSnapshot(ctx)
-	logger := frame.Log(ctx).
+	logger := util.Log(ctx).
 		WithField("event_id", eventID).
 		WithField("room_id", rawRoomID)
 	if err != nil {
@@ -91,7 +89,7 @@ func GetEvent(
 
 	userID, err := spec.NewUserID(rawUserID, true)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("invalid device.UserID")
+		util.Log(req.Context()).WithError(err).Error("invalid device.UserID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -122,7 +120,7 @@ func GetEvent(
 		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
+		util.Log(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),

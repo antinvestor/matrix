@@ -19,8 +19,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/pitabwire/util"
 	"golang.org/x/crypto/ed25519"
 
@@ -68,7 +66,7 @@ func QueryDeviceKeys(
 		UserToDevices: qkr.DeviceKeys,
 	}, &queryRes)
 	if queryRes.Error != nil {
-		frame.Log(httpReq.Context()).WithError(queryRes.Error).Error("Failed to QueryKeys")
+		util.Log(httpReq.Context()).WithError(queryRes.Error).Error("Failed to QueryKeys")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -123,7 +121,7 @@ func ClaimOneTimeKeys(
 		OneTimeKeys: cor.OneTimeKeys,
 	}, &claimRes)
 	if claimRes.Error != nil {
-		frame.Log(httpReq.Context()).WithError(claimRes.Error).Error("Failed to PerformClaimKeys")
+		util.Log(httpReq.Context()).WithError(claimRes.Error).Error("Failed to PerformClaimKeys")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -256,7 +254,7 @@ func NotaryKeys(
 		for _, keys := range keyList {
 			j, err := json.Marshal(keys)
 			if err != nil {
-				frame.Log(ctx).WithError(err).Error("Failed to marshal %q response", serverName)
+				util.Log(ctx).WithError(err).Error("Failed to marshal %q response", serverName)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -267,7 +265,7 @@ func NotaryKeys(
 				string(cfg.Global.ServerName), cfg.Global.KeyID, cfg.Global.PrivateKey, j,
 			)
 			if err != nil {
-				frame.Log(ctx).WithError(err).Error("Failed to sign %q response", serverName)
+				util.Log(ctx).WithError(err).Error("Failed to sign %q response", serverName)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},

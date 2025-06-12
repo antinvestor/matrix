@@ -23,7 +23,7 @@ import (
 
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -87,7 +87,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 	var err error
 	var output api.OutputEvent
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	if err = json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
@@ -153,7 +153,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 func (s *OutputRoomEventConsumer) onRedactEvent(
 	ctx context.Context, msg api.OutputRedactedEvent,
 ) error {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	err := s.db.RedactEvent(ctx, msg.RedactedEventID, msg.RedactedBecause, s.rsAPI)
 	if err != nil {
@@ -181,7 +181,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	ev := msg.Event
 	addsStateEvents, missingEventIDs := msg.NeededStateEventIDs()
@@ -307,7 +307,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	ctx context.Context, msg api.OutputOldRoomEvent,
 ) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	ev := msg.Event
 
@@ -400,7 +400,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	if msg.Event.StateKey() == nil {
 		return
@@ -435,7 +435,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 	ctx context.Context, msg api.OutputRetireInviteEvent,
 ) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	pduPos, err := s.db.RetireInviteEvent(ctx, msg.EventID)
 	// It's possible we just haven't heard of this invite yet, so
@@ -479,7 +479,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 	ctx context.Context, msg api.OutputNewPeek,
 ) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	sp, err := s.db.AddPeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
 	if err != nil {
@@ -499,7 +499,7 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 	ctx context.Context, msg api.OutputRetirePeek,
 ) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	sp, err := s.db.DeletePeek(ctx, msg.RoomID, msg.UserID, msg.DeviceID)
 	if err != nil {
@@ -519,7 +519,7 @@ func (s *OutputRoomEventConsumer) onPurgeRoom(
 	ctx context.Context, req api.OutputPurgeRoom,
 ) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	log.WithField("room_id", req.RoomID).Warn("Purging room from sync API")
 
 	if err := s.db.PurgeRoom(ctx, req.RoomID); err != nil {
@@ -588,7 +588,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 
 func (s *OutputRoomEventConsumer) checkIndexExclusion(ctx context.Context, ev *rstypes.HeaderedEvent) error {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	var relatesTo gjson.Result
 	switch ev.Type() {

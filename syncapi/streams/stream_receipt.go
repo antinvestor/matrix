@@ -3,6 +3,7 @@ package streams
 import (
 	"context"
 	"encoding/json"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 
@@ -53,7 +54,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 
 	lastPos, receipts, err := snapshot.RoomReceiptsAfter(ctx, joinedRooms, from)
 	if err != nil {
-		req.Log.WithError(err).Error("p.Cm.RoomReceiptsAfter failed")
+		util.Log(ctx).WithError(err).Error("p.Cm.RoomReceiptsAfter failed")
 		return from
 	}
 
@@ -103,7 +104,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		}
 		ev.Content, err = json.Marshal(content)
 		if err != nil {
-			req.Log.WithError(err).Error("json.Marshal failed")
+			util.Log(ctx).WithError(err).Error("json.Marshal failed")
 			return from
 		}
 

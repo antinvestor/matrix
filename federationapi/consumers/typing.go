@@ -20,7 +20,7 @@ import (
 	"strconv"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -63,14 +63,14 @@ func (t *OutputTypingConsumer) Handle(ctx context.Context, metadata map[string]s
 	userID := metadata[queueutil.UserID]
 	typing, err := strconv.ParseBool(metadata["typing"])
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("EDU output log: typing parse failure")
+		util.Log(ctx).WithError(err).Error("EDU output log: typing parse failure")
 		return nil
 	}
 
 	// only send typing events which originated from us
 	_, typingServerName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("user_id", userID).Error("Failed to extract domain from typing sender")
+		util.Log(ctx).WithError(err).WithField("user_id", userID).Error("Failed to extract domain from typing sender")
 		return nil
 	}
 	if !t.isLocalServerName(typingServerName) {
@@ -79,7 +79,7 @@ func (t *OutputTypingConsumer) Handle(ctx context.Context, metadata map[string]s
 
 	joined, err := t.db.GetJoinedHosts(ctx, roomID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("room_id", roomID).Error("failed to get joined hosts for room")
+		util.Log(ctx).WithError(err).WithField("room_id", roomID).Error("failed to get joined hosts for room")
 		return err
 	}
 
@@ -94,12 +94,12 @@ func (t *OutputTypingConsumer) Handle(ctx context.Context, metadata map[string]s
 		"user_id": userID,
 		"typing":  typing,
 	}); err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to marshal EDU JSON")
+		util.Log(ctx).WithError(err).Error("failed to marshal EDU JSON")
 		return nil
 	}
 	err = t.queues.SendEDU(ctx, edu, typingServerName, names)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to send EDU")
+		util.Log(ctx).WithError(err).Error("failed to send EDU")
 		return err
 	}
 

@@ -20,8 +20,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -49,9 +47,9 @@ func Setup(
 	v1fedmux.Handle("/send_relay/{txnID}/{userID}", MakeRelayAPI(
 		"send_relay_transaction", "", cfg.Global.IsLocalServerName, keys,
 		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
-			frame.Log(ctx).Info("Handling send_relay from: %s", request.Origin())
+			util.Log(ctx).Info("Handling send_relay from: %s", request.Origin())
 			if !relayAPI.RelayingEnabled() {
-				frame.Log(ctx).Warn("Dropping send_relay from: %s", request.Origin())
+				util.Log(ctx).Warn("Dropping send_relay from: %s", request.Origin())
 				return util.JSONResponse{
 					Code: http.StatusNotFound,
 				}
@@ -74,9 +72,9 @@ func Setup(
 	v1fedmux.Handle("/relay_txn/{userID}", MakeRelayAPI(
 		"get_relay_transaction", "", cfg.Global.IsLocalServerName, keys,
 		func(httpReq *http.Request, request *fclient.FederationRequest, vars map[string]string) util.JSONResponse {
-			frame.Log(ctx).Info("Handling relay_txn from: %s", request.Origin())
+			util.Log(ctx).Info("Handling relay_txn from: %s", request.Origin())
 			if !relayAPI.RelayingEnabled() {
-				frame.Log(ctx).Warn("Dropping relay_txn from: %s", request.Origin())
+				util.Log(ctx).Warn("Dropping relay_txn from: %s", request.Origin())
 				return util.JSONResponse{
 					Code: http.StatusNotFound,
 				}

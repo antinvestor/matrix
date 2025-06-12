@@ -25,8 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -222,7 +220,7 @@ func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Pr
 
 	err = rp.producer.SendPresence(ctx, userID, presenceToSet, newPresence.ClientFields.StatusMsg)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("Unable to publish presence message from sync")
+		util.Log(ctx).WithError(err).Error("Unable to publish presence message from sync")
 		return
 	}
 
@@ -289,6 +287,7 @@ var waitingSyncRequests = prometheus.NewGauge(
 func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.Device) util.JSONResponse {
 
 	ctx := req.Context()
+	log := util.Log(ctx)
 
 	// Extract values from request
 	syncReq, err := newSyncRequest(req, *device, rp.db)
@@ -317,7 +316,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	// Clean up old send-to-device messages from before this stream position.
 	// This is needed to avoid sending the same message multiple times
 	if err = rp.db.CleanSendToDeviceUpdates(ctx, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
-		syncReq.Log.WithError(err).Error("p.Cm.CleanSendToDeviceUpdates failed")
+		log.WithError(err).Error("p.Cm.CleanSendToDeviceUpdates failed")
 	}
 
 	// loop until we get some data
@@ -333,8 +332,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			userStreamListener := rp.Notifier.GetListener(*syncReq)
 			defer userStreamListener.Close()
 
-			giveup := func() util.JSONResponse {
-				syncReq.Log.Debug("Responding to sync since client gave up or timeout was reached")
+			giveup := func(ctx context.Context) util.JSONResponse {
+				ilog := util.Log(ctx)
+				ilog.Debug("Responding to sync since client gave up or timeout was reached")
 				syncReq.Response.NextBatch = syncReq.Since
 				// We should always try to include OTKs in sync responses, otherwise clients might upload keys
 				// even if that's not required. See also:
@@ -342,8 +342,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				// Only try to get OTKs if the context isn't already done.
 				if ctx.Err() == nil {
 					err = internal.DeviceOTKCounts(ctx, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
-					if err != nil && err != context.Canceled {
-						syncReq.Log.WithError(err).Warn("failed to get OTK counts")
+					if err != nil && !errors.Is(context.Canceled, err) {
+						ilog.WithError(err).Warn("failed to get OTK counts")
 					}
 				}
 				return util.JSONResponse{
@@ -354,24 +354,24 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 			select {
 			case <-ctx.Done(): // Caller gave up
-				return giveup()
+				return giveup(ctx)
 
 			case <-timer.C: // Timeout reached
-				return giveup()
+				return giveup(ctx)
 
 			case <-userStreamListener.GetNotifyChannel(syncReq.Since):
 				currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
-				syncReq.Log.WithField("currentPos", currentPos).Debug("Responding to sync after wake-up")
+				log.WithField("currentPos", currentPos).Debug("Responding to sync after wake-up")
 			}
 		} else {
-			syncReq.Log.WithField("currentPos", currentPos).Debug("Responding to sync immediately")
+			log.WithField("currentPos", currentPos).Debug("Responding to sync immediately")
 		}
 
 		withTransaction := func(from types.StreamPosition, f func(snapshot storage.DatabaseTransaction) types.StreamPosition) types.StreamPosition {
 			var succeeded bool
 			snapshot, err := rp.db.NewDatabaseSnapshot(ctx)
 			if err != nil {
-				frame.Log(ctx).WithError(err).Error("Failed to acquire database snapshot for sync request")
+				log.WithError(err).Error("Failed to acquire database snapshot for sync request")
 				return from
 			}
 			defer func() {
@@ -600,7 +600,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("newSyncRequest failed")
+		util.Log(req.Context()).WithError(err).Error("newSyncRequest failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -608,7 +608,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 	snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("Failed to acquire database snapshot for key change")
+		util.Log(req.Context()).WithError(err).Error("Failed to acquire database snapshot for key change")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -622,7 +622,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 		syncReq.Response, fromToken.DeviceListPosition, toToken.DeviceListPosition,
 	)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
+		util.Log(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

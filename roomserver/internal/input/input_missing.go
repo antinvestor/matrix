@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -42,7 +42,7 @@ func (p *parsedRespState) Events() []gomatrixserverlib.PDU {
 }
 
 type missingStateReq struct {
-	log             *frame.Entry
+	log             *util.LogEntry
 	virtualHost     spec.ServerName
 	origin          spec.ServerName
 	db              storage.RoomDatabase
@@ -81,7 +81,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	// event ids and then use /event to fetch the individual events.
 	// However not all version of synapse support /state_ids so you may
 	// need to fallback to /state.
-	t.log = frame.Log(ctx).WithField("txn_event", e.EventID()).
+	t.log = util.Log(ctx).WithField("txn_event", e.EventID()).
 		WithField("room_id", e.RoomID().String()).
 		WithField("txn_prev_events", e.PrevEventIDs())
 
@@ -349,10 +349,10 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 		return respState, true, nil
 	}
 
-	frame.Log(ctx).WithContext(ctx).Warn("State for event %s not available locally, falling back to federation (via %d servers)", eventID, len(t.servers))
+	util.Log(ctx).WithContext(ctx).Warn("State for event %s not available locally, falling back to federation (via %d servers)", eventID, len(t.servers))
 	respState, err := t.lookupStateBeforeEvent(ctx, roomVersion, roomID, eventID)
 	if err != nil {
-		frame.Log(ctx).WithContext(ctx).WithError(err).Error("Failed to look up state before event %s", eventID)
+		util.Log(ctx).WithContext(ctx).WithError(err).Error("Failed to look up state before event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupStateBeforeEvent: %w", err)
 	}
 
@@ -362,7 +362,7 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 	switch e := err.(type) {
 	case gomatrixserverlib.EventValidationError:
 		if !e.Persistable {
-			frame.Log(ctx).WithContext(ctx).WithError(err).Error("Failed to look up event %s", eventID)
+			util.Log(ctx).WithContext(ctx).WithError(err).Error("Failed to look up event %s", eventID)
 			return nil, false, e
 		}
 		validationError = e
@@ -371,7 +371,7 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 	case nil:
 		// do nothing
 	default:
-		frame.Log(ctx).WithContext(ctx).WithError(err).Error("Failed to look up event %s", eventID)
+		util.Log(ctx).WithContext(ctx).WithError(err).Error("Failed to look up event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupEvent: %w", err)
 	}
 	h = t.cacheAndReturn(h)
@@ -877,7 +877,7 @@ func (t *missingStateReq) createRespStateFromStateIDs(
 	for i := range stateEventIDs {
 		ev, ok := t.haveEvents[stateEventIDs[i]]
 		if !ok {
-			frame.Log(ctx).WithField("event_id", stateEventIDs[i]).Debug("Missing state event in createRespStateFromStateIDs")
+			util.Log(ctx).WithField("event_id", stateEventIDs[i]).Debug("Missing state event in createRespStateFromStateIDs")
 			continue
 		}
 		respState.StateEvents = append(respState.StateEvents, ev)
@@ -885,7 +885,7 @@ func (t *missingStateReq) createRespStateFromStateIDs(
 	for i := range authEventIDs {
 		ev, ok := t.haveEvents[authEventIDs[i]]
 		if !ok {
-			frame.Log(ctx).WithField("event_id", authEventIDs[i]).Debug("Missing auth event in createRespStateFromStateIDs")
+			util.Log(ctx).WithField("event_id", authEventIDs[i]).Debug("Missing auth event in createRespStateFromStateIDs")
 			continue
 		}
 		respState.AuthEvents = append(respState.AuthEvents, ev)

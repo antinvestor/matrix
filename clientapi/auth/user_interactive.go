@@ -20,8 +20,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/pitabwire/frame"
-
 	"golang.org/x/oauth2"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -182,7 +180,7 @@ func (u *UserInteractive) challenge(sessionID string) *util.JSONResponse {
 func (u *UserInteractive) NewSession(ctx context.Context) *util.JSONResponse {
 	sessionID, err := GenerateAccessToken()
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to generate session ID")
+		util.Log(ctx).WithError(err).Error("failed to generate session ID")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

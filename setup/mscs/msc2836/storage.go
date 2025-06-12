@@ -12,6 +12,7 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // Schema for edges and nodes tables
@@ -201,7 +202,7 @@ func (p *postgresDB) StoreRelation(ctx context.Context, ev *types.HeaderedEvent)
 			return result.Error
 		}
 
-		frame.Log(ctx).
+		util.Log(ctx).
 			WithField("child", child).
 			WithField("parent", parent).
 			WithField("rel_type", relType).Info("StoreRelation")

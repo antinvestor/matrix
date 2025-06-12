@@ -22,9 +22,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 
@@ -63,12 +62,12 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			// Try to load the filter from the database
 			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 			if err != nil {
-				frame.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+				util.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 				return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 			}
 			err = syncDB.GetFilter(req.Context(), &filter, localpart, filterQuery)
 			if err != nil && !sqlutil.ErrorIsNoRows(err) {
-				frame.Log(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
+				util.Log(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
 				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
 			}
 		}
@@ -84,16 +83,15 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		filter.Room.AccountData.Limit = math.MaxInt32
 	}
 
-	logger := frame.Log(req.Context()).
-		WithField("user_id", device.UserID).
-		WithField("device_id", device.ID).
-		WithField("since", since).
-		WithField("timeout", timeout).
-		WithField("limit", filter.Room.Timeline.Limit)
+	//logger := util.Log(req.Context()).
+	//	WithField("user_id", device.UserID).
+	//	WithField("device_id", device.ID).
+	//	WithField("since", since).
+	//	WithField("timeout", timeout).
+	//	WithField("limit", filter.Room.Timeline.Limit)
 
 	return &types.SyncRequest{
 		Context:           req.Context(),             //
-		Log:               logger,                    //
 		Device:            &device,                   //
 		Response:          types.NewResponse(),       // Populated by all streams
 		Filter:            filter,                    //

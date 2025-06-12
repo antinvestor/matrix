@@ -22,8 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -111,7 +109,7 @@ func Setup(
 	})
 
 	if cfg.Global.WellKnownServerName != "" {
-		frame.Log(ctx).Info("Setting m.server as %s at /.well-known/matrix/server", cfg.Global.WellKnownServerName)
+		util.Log(ctx).Info("Setting m.server as %s at /.well-known/matrix/server", cfg.Global.WellKnownServerName)
 		wkMux.Handle("/server", httputil.MakeExternalAPI("wellknown", func(req *http.Request) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusOK,
@@ -392,7 +390,7 @@ func Setup(
 				}
 			}
 
-			frame.Log(ctx).Debug("Processing make_join for user %s, room %s", userID.String(), roomID.String())
+			util.Log(ctx).Debug("Processing make_join for user %s, room %s", userID.String(), roomID.String())
 			return MakeJoin(
 				httpReq, request, cfg, rsAPI, *roomID, *userID, remoteVersions,
 			)
@@ -693,7 +691,7 @@ func MakeFedHTTPAPI(
 		)
 
 		enc := json.NewEncoder(w)
-		logger := frame.Log(req.Context())
+		logger := util.Log(req.Context())
 		if fedReq == nil {
 
 			logger.Debug("VerifyUserFromRequest -> HTTP ", req.RemoteAddr, errResp.Code)

@@ -19,13 +19,13 @@ import (
 	"encoding/json"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // SigningKeyUpdateConsumer consumes signing key updates that came in over federation.
@@ -56,7 +56,7 @@ func NewSigningKeyUpdateConsumer(
 // Handle is called in response to a message received on the
 // signing key update events topic from the key server.
 func (t *SigningKeyUpdateConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	var updatePayload api.CrossSigningKeyUpdate
 	err := json.Unmarshal(message, &updatePayload)
 	if err != nil {

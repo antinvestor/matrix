@@ -49,7 +49,7 @@ import (
 //
 //		err = testcontainers.TerminateContainer(container)
 //		if err != nil {
-//			frame.Log(ctx).WithError(err).Error("failed to terminate container")
+//			util.Log(ctx).WithError(err).Error("failed to terminate container")
 //		}
 //
 //	}, nil
@@ -75,7 +75,7 @@ func PrepareQueueConnection(_ context.Context, testOpts DependancyOption) (connS
 		return "", func(ctx context.Context) {}, err
 	}
 
-	natsUriStr = parsedNatsUri.String() + "?jetstream=true&stream_storage=file&stream_retention=interest"
+	natsUriStr = parsedNatsUri.String()
 
 	return config.DataSource(natsUriStr), func(ctx context.Context) {
 	}, nil

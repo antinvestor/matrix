@@ -18,9 +18,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/userapi/api"
@@ -28,7 +27,7 @@ import (
 
 // PerformLoginTokenCreation creates a new login token and associates it with the provided data.
 func (a *UserInternalAPI) PerformLoginTokenCreation(ctx context.Context, req *api.PerformLoginTokenCreationRequest, res *api.PerformLoginTokenCreationResponse) error {
-	frame.Log(ctx).WithField("user_id", req.Data.UserID).Info("PerformLoginTokenCreation")
+	util.Log(ctx).WithField("user_id", req.Data.UserID).Info("PerformLoginTokenCreation")
 	_, domain, err := gomatrixserverlib.SplitID('@', req.Data.UserID)
 	if err != nil {
 		return err
@@ -46,7 +45,7 @@ func (a *UserInternalAPI) PerformLoginTokenCreation(ctx context.Context, req *ap
 
 // PerformLoginTokenDeletion ensures the token doesn't exist.
 func (a *UserInternalAPI) PerformLoginTokenDeletion(ctx context.Context, req *api.PerformLoginTokenDeletionRequest, res *api.PerformLoginTokenDeletionResponse) error {
-	frame.Log(ctx).WithField("token", req.Token).Info("PerformLoginTokenDeletion")
+	util.Log(ctx).WithField("token", req.Token).Info("PerformLoginTokenDeletion")
 	return a.DB.RemoveLoginToken(ctx, req.Token)
 }
 

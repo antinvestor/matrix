@@ -3,6 +3,7 @@ package streams
 import (
 	"context"
 	"encoding/json"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/cacheutil"
@@ -31,6 +32,7 @@ func (p *TypingStreamProvider) IncrementalSync(
 	from, to types.StreamPosition,
 ) types.StreamPosition {
 	var err error
+	log := util.Log(ctx)
 	for roomID, membership := range req.Rooms {
 		if membership != spec.Join {
 			continue
@@ -58,7 +60,7 @@ func (p *TypingStreamProvider) IncrementalSync(
 				"user_ids": typingUsers,
 			})
 			if err != nil {
-				req.Log.WithError(err).Error("json.Marshal failed")
+				log.WithError(err).Error("json.Marshal failed")
 				return from
 			}
 

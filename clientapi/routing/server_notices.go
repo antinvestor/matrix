@@ -21,8 +21,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib/tokens"
 	"github.com/pitabwire/util"
@@ -67,7 +65,7 @@ func SendServerNotice(
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
 
-	log := frame.Log(req.Context())
+	log := util.Log(req.Context())
 
 	if device.AccountType != userapi.AccountTypeAdmin {
 		return util.JSONResponse{
@@ -186,7 +184,7 @@ func SendServerNotice(
 				},
 			}}
 			if err = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err != nil {
-				frame.Log(ctx).WithError(err).Error("saveTagData failed")
+				util.Log(ctx).WithError(err).Error("saveTagData failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -211,7 +209,7 @@ func SendServerNotice(
 		membershipRes := api.QueryMembershipForUserResponse{}
 		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("unable to query membership for user")
+			util.Log(ctx).WithError(err).Error("unable to query membership for user")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -325,7 +323,7 @@ func getSenderDevice(
 		cfg.Global.ServerNotices.AvatarURL,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
+		util.Log(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
 		return nil, err
 	}
 
@@ -336,7 +334,7 @@ func getSenderDevice(
 		cfg.Global.ServerNotices.DisplayName,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
+		util.Log(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
 		return nil, err
 	}
 

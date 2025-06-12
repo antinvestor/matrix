@@ -8,7 +8,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 func (r *FederationInternalAPI) KeyRing() *gomatrixserverlib.KeyRing {
@@ -64,7 +64,7 @@ func (r *FederationInternalAPI) FetchKeys(
 
 		// Ask the fetcher to look up our keys.
 		if err := r.handleFetcherKeys(ctx, now, fetcher, requests, results); err != nil {
-			frame.Log(ctx).WithError(err).
+			util.Log(ctx).WithError(err).
 				WithField("fetcher_name", fetcher.FetcherName()).
 				Error("Failed to retrieve %d key(s)", len(requests))
 			continue
@@ -78,7 +78,7 @@ func (r *FederationInternalAPI) FetchKeys(
 			// The results don't contain anything for this specific request, so
 			// we've failed to satisfy it from local keys, database keys or from
 			// all of the fetchers. Report an error.
-			frame.Log(ctx).
+			util.Log(ctx).
 				WithField("key_id", req.KeyID).
 				WithField("server_name", req.ServerName).
 				Warn("Failed to retrieve key")
@@ -187,7 +187,7 @@ func (r *FederationInternalAPI) handleFetcherKeys(
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	log := frame.Log(ctx).WithField("fetcher_name", fetcher.FetcherName())
+	log := util.Log(ctx).WithField("fetcher_name", fetcher.FetcherName())
 	log.WithField("key_count", len(requests)).Info("Fetching keys")
 
 	// Create a context that limits our requests to 30 seconds.

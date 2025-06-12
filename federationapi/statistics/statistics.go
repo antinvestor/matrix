@@ -8,10 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage"
+	"github.com/pitabwire/util"
 )
 
 // Statistics contains information about all of the remote federated
@@ -58,7 +57,7 @@ func NewStatistics(
 // does not exist, it will create empty statistics and return those.
 func (s *Statistics) ForServer(ctx context.Context, serverName spec.ServerName) *ServerStatistics {
 
-	logger := frame.Log(ctx).WithField("server", serverName)
+	logger := util.Log(ctx).WithField("server", serverName)
 
 	// Look up if we have statistics for this server already.
 	s.mutex.RLock()
@@ -175,7 +174,7 @@ func (s *ServerStatistics) Success(ctx context.Context, method SendMethod) {
 		s.successCounter.Add(1)
 		if s.blacklisted.Load() && s.statistics.DB != nil {
 			if err := s.statistics.DB.RemoveServerFromBlacklist(ctx, s.serverName); err != nil {
-				frame.Log(ctx).WithError(err).Error("Failed to remove %q from blacklist", s.serverName)
+				util.Log(ctx).WithError(err).Error("Failed to remove %q from blacklist", s.serverName)
 			}
 		}
 
@@ -204,7 +203,7 @@ func (s *ServerStatistics) Failure(ctx context.Context) (time.Time, bool) {
 			s.assumedOffline.CompareAndSwap(false, true)
 			if s.statistics.DB != nil {
 				if err := s.statistics.DB.SetServerAssumedOffline(ctx, s.serverName); err != nil {
-					frame.Log(ctx).WithError(err).Error("Failed to set %q as assumed offline", s.serverName)
+					util.Log(ctx).WithError(err).Error("Failed to set %q as assumed offline", s.serverName)
 				}
 			}
 		}
@@ -213,7 +212,7 @@ func (s *ServerStatistics) Failure(ctx context.Context) (time.Time, bool) {
 			s.blacklisted.Store(true)
 			if s.statistics.DB != nil {
 				if err := s.statistics.DB.AddServerToBlacklist(ctx, s.serverName); err != nil {
-					frame.Log(ctx).WithError(err).Error("Failed to add %q to blacklist", s.serverName)
+					util.Log(ctx).WithError(err).Error("Failed to add %q to blacklist", s.serverName)
 				}
 			}
 			s.ClearBackoff()
@@ -340,7 +339,7 @@ func (s *ServerStatistics) AddRelayServers(ctx context.Context, relayServers []s
 
 	err := s.statistics.DB.P2PAddRelayServersForServer(ctx, s.serverName, uniqueList)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("Failed to add relay servers for %q. Servers: %v", s.serverName, uniqueList)
+		util.Log(ctx).WithError(err).Error("Failed to add relay servers for %q. Servers: %v", s.serverName, uniqueList)
 		return
 	}
 

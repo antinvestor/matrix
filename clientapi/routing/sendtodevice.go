@@ -16,7 +16,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -53,7 +52,7 @@ func SendToDevice(
 			if err := syncProducer.SendToDevice(
 				req.Context(), device.UserID, userID, deviceID, eventType, message,
 			); err != nil {
-				frame.Log(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
+				util.Log(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},

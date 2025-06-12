@@ -44,7 +44,6 @@ import (
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/userutil"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -528,7 +527,7 @@ func Register(
 		}
 		nres := &userapi.QueryNumericLocalpartResponse{}
 		if err = userAPI.QueryNumericLocalpart(req.Context(), nreq, nres); err != nil {
-			frame.Log(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
+			util.Log(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -568,7 +567,7 @@ func Register(
 		return *internal.PasswordResponse(err)
 	}
 
-	logger := frame.Log(req.Context())
+	logger := util.Log(req.Context())
 	logger.
 		WithField("username", r.Username).
 		WithField("auth.type", r.Auth.Type).
@@ -727,7 +726,7 @@ func handleRegistrationFlow(
 			return util.JSONResponse{Code: http.StatusUnauthorized, JSON: spec.BadJSON(err.Error())}
 		case nil:
 		default:
-			frame.Log(req.Context()).WithError(err).Error("failed to validate recaptcha")
+			util.Log(req.Context()).WithError(err).Error("failed to validate recaptcha")
 			return util.JSONResponse{Code: http.StatusInternalServerError, JSON: spec.InternalServerError{}}
 		}
 

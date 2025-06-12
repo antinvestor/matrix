@@ -24,6 +24,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // pushersSchema defines the schema for pushers storage
@@ -162,7 +163,7 @@ func (s *pushersTable) SelectPushers(
 		pushers = append(pushers, pusher)
 	}
 
-	frame.Log(ctx).Debug("Database returned %d pushers", len(pushers))
+	util.Log(ctx).Debug("Database returned %d pushers", len(pushers))
 	return pushers, rows.Err()
 }
 

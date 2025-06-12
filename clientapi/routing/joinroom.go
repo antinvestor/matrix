@@ -21,8 +21,6 @@ import (
 
 	"github.com/antinvestor/gomatrix"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/httputil"
@@ -73,7 +71,7 @@ func JoinRoomByIDOrAlias(
 		joinReq.Content["displayname"] = profile.DisplayName
 		joinReq.Content["avatar_url"] = profile.AvatarURL
 	case appserviceAPI.ErrProfileNotExists:
-		frame.Log(req.Context()).Error("Unable to query user profile, no profile found.")
+		util.Log(req.Context()).Error("Unable to query user profile, no profile found.")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("Unable to query user profile, no profile found."),

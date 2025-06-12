@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
 var (
@@ -42,7 +41,7 @@ func ParseFlags(monolith bool) *config.Matrix {
 	}
 
 	ctx := context.Background()
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	if *configPath == "" {
 		log.Fatal("--config must be supplied")
 	}

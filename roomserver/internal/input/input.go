@@ -36,6 +36,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // Inputer is responsible for consuming from the roomserver input
@@ -216,7 +217,7 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 		switch {
 		case errors.As(err, &rejectedError):
 			// Don't send events that were rejected to Sentry
-			frame.Log(ctx).WithError(err).
+			util.Log(ctx).WithError(err).
 				WithField("room_id", inputRoomEvent.Event.RoomID()).
 				WithField("event_id", inputRoomEvent.Event.EventID()).
 				WithField("type", inputRoomEvent.Event.Type()).
@@ -224,7 +225,7 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 			err = nil
 		default:
 
-			frame.Log(ctx).WithError(err).
+			util.Log(ctx).WithError(err).
 				WithField("room_id", inputRoomEvent.Event.RoomID()).
 				WithField("event_id", inputRoomEvent.Event.EventID()).
 				WithField("type", inputRoomEvent.Event.Type()).
@@ -255,7 +256,7 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 
 		err0 := r.Qm.EnsurePublisherOk(ctx, replyToOpts)
 		if err0 != nil {
-			frame.Log(ctx).WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
+			util.Log(ctx).WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
 				WithField("event_id", inputRoomEvent.Event.EventID()).
 				WithField("type", inputRoomEvent.Event.Type()).
 				WithField("replyTo", replyTo).
@@ -273,7 +274,7 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 
 		err0 = r.Qm.Publish(ctx, replyToOpts.Ref(), []byte(errString))
 		if err0 != nil {
-			frame.Log(ctx).WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
+			util.Log(ctx).WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
 				WithField("event_id", inputRoomEvent.Event.EventID()).
 				WithField("type", inputRoomEvent.Event.Type()).
 				WithField("replyTo", replyTo).
@@ -336,7 +337,7 @@ func (r *Inputer) queueInputRoomEvents(
 
 		err = r.actorSystem.Publish(ctx, &roomID, e, header)
 		if err != nil {
-			frame.Log(ctx).WithError(err).WithField("room_id", roomID).
+			util.Log(ctx).WithError(err).WithField("room_id", roomID).
 				WithField("event_id", e.Event.EventID()).
 				Error("Roomserver failed to queue async event")
 			return nil, fmt.Errorf("r.Qm.Publish: %w", err)
@@ -371,7 +372,7 @@ func (r *Inputer) InputRoomEvents(
 	defer func(replySub frame.Subscriber, ctx context.Context) {
 		err = replySub.Stop(ctx)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("Roomserver failed to stop subscriber")
+			util.Log(ctx).WithError(err).Error("Roomserver failed to stop subscriber")
 		}
 	}(replySub, ctx) // nolint:errcheck
 	for i := 0; i < len(request.InputRoomEvents); i++ {

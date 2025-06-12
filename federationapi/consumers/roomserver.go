@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -30,8 +31,6 @@ import (
 	"github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-
-	"github.com/pitabwire/frame"
 
 	syncAPITypes "github.com/antinvestor/matrix/syncapi/types"
 
@@ -91,7 +90,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 	err := json.Unmarshal(message, &output)
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "roomserver_consumer").
 			Error("roomserver output log: message parse failure")
 		return nil
@@ -103,7 +102,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 		err = s.processMessage(ctx, *output.NewRoomEvent, output.NewRoomEvent.RewritesState)
 		if err != nil {
 			// panic rather than continue with an inconsistent database
-			frame.Log(ctx).
+			util.Log(ctx).
 				WithField("event_id", ev.EventID()).
 				WithField("event", string(ev.JSON())).
 				WithField("add", output.NewRoomEvent.AddsStateEventIDs).
@@ -115,7 +114,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 	case api.OutputTypeNewInboundPeek:
 		err = s.processInboundPeek(ctx, *output.NewInboundPeek)
 		if err != nil {
-			frame.Log(ctx).WithField(
+			util.Log(ctx).WithField(
 				"event", output.NewInboundPeek).
 				WithField("component", "roomserver_consumer").
 				WithError(err).Panic("roomserver output log: remote peek event failure")
@@ -123,22 +122,22 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 		}
 
 	case api.OutputTypePurgeRoom:
-		frame.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
+		util.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
 			WithField("component", "roomserver_consumer").
 			Warn("Purging room from federation API")
 		err = s.db.PurgeRoom(ctx, output.PurgeRoom.RoomID)
 		if err != nil {
-			frame.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
+			util.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
 				WithField("component", "roomserver_consumer").
 				WithError(err).Error("Failed to purge room from federation API")
 		} else {
-			frame.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
+			util.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
 				WithField("component", "roomserver_consumer").
 				Warn("Room purged from federation API")
 		}
 
 	default:
-		frame.Log(ctx).WithField("type", output.Type).
+		util.Log(ctx).WithField("type", output.Type).
 			WithField("component", "roomserver_consumer").
 			Debug("roomserver output log: ignoring unknown output type")
 	}
@@ -262,7 +261,7 @@ func (s *OutputRoomEventConsumer) sendPresence(ctx context.Context, roomID strin
 		RoomID:     roomID,
 	}, &queryRes)
 	if err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "roomserver_consumer").
 			Error("failed to calculate joined rooms for user")
 		return
@@ -276,7 +275,7 @@ func (s *OutputRoomEventConsumer) sendPresence(ctx context.Context, roomID strin
 			UserId: ev.Sender,
 		}))
 		if err0 != nil {
-			frame.Log(ctx).WithError(err0).
+			util.Log(ctx).WithError(err0).
 				WithField("component", "roomserver_consumer").
 				WithField("user_id", ev.Sender).
 				Error("unable to get presence")
@@ -308,13 +307,13 @@ func (s *OutputRoomEventConsumer) sendPresence(ctx context.Context, roomID strin
 		Origin: string(s.cfg.Global.ServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "roomserver_consumer").
 			Error("failed to marshal EDU JSON")
 		return
 	}
 	if err := s.queues.SendEDU(ctx, edu, s.cfg.Global.ServerName, joined); err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "roomserver_consumer").
 			Error("failed to send EDU")
 	}

@@ -24,7 +24,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/antinvestor/matrix/federationapi/statistics"
@@ -107,7 +107,7 @@ func NewOutgoingQueues(
 				serverNames[serverName] = struct{}{}
 			}
 		} else {
-			frame.Log(ctx).WithError(err).
+			util.Log(ctx).WithError(err).
 				WithField("component", "federation_queue").
 				Error("Failed to get PDU server names for destination queue hydration")
 		}
@@ -116,7 +116,7 @@ func NewOutgoingQueues(
 				serverNames[serverName] = struct{}{}
 			}
 		} else {
-			frame.Log(ctx).WithError(err).
+			util.Log(ctx).WithError(err).
 				WithField("component", "federation_queue").
 				Error("Failed to get EDU server names for destination queue hydration")
 		}
@@ -190,7 +190,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	destinations []spec.ServerName,
 ) error {
 	if oqs.disabled {
-		frame.Log(ctx).
+		util.Log(ctx).
 			WithField("component", "federation_queue").
 			Debug("Federation is disabled, not sending event")
 		return nil
@@ -218,7 +218,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		return nil
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("event_id", ev.EventID()).
 		WithField("destinations", len(destmap)).
 		WithField("event", ev.EventID()).
@@ -251,7 +251,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		destmap,
 		nid, // NIDs from federationapi_queue_json table
 	); err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "federation_queue").
 			WithField("nid", nid).
 			Error("Failed to associate PDUs with destinations")
@@ -276,7 +276,7 @@ func (oqs *OutgoingQueues) SendEDU(
 	destinations []spec.ServerName,
 ) error {
 	if oqs.disabled {
-		frame.Log(ctx).
+		util.Log(ctx).
 			WithField("component", "federation_queue").
 			Debug("Federation is disabled, not sending EDU")
 		return nil
@@ -304,7 +304,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		return nil
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("edu_type", e.Type).
 		WithField("destinations", len(destmap)).
 		WithField("edu_type", e.Type).
@@ -341,7 +341,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		e.Type,
 		nil, // this will use the default expireEDUTypes map
 	); err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "federation_queue").
 			Error("Failed to associate EDU with destinations")
 		return err

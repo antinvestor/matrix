@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/setup/config"
 )
@@ -29,7 +29,7 @@ func Open(ctx context.Context, dbProperties *config.DatabaseOptions, writer Writ
 	if err != nil {
 		return nil, err
 	}
-	logger := frame.Log(ctx).
+	logger := util.Log(ctx).
 		WithField("max_open_conns", dbProperties.MaxOpenConns()).
 		WithField("max_idle_conns", dbProperties.MaxIdleConns()).
 		WithField("conn_max_lifetime", dbProperties.ConnMaxLifetime()).
@@ -41,7 +41,7 @@ func Open(ctx context.Context, dbProperties *config.DatabaseOptions, writer Writ
 
 	if !*skipSanityChecks {
 		if dbProperties.MaxOpenConns() == 0 {
-			frame.Log(ctx).Warn("WARNING: Configuring 'max_open_conns' to be unlimited is not recommended. This can result in bad performance or deadlocks.")
+			util.Log(ctx).Warn("WARNING: Configuring 'max_open_conns' to be unlimited is not recommended. This can result in bad performance or deadlocks.")
 		}
 
 		// Perform a quick sanity check if possible that we aren't trying to use more database
@@ -54,7 +54,7 @@ func Open(ctx context.Context, dbProperties *config.DatabaseOptions, writer Writ
 			return nil, fmt.Errorf("failed to find reserved connections: %w", err)
 		}
 		if configured, allowed := dbProperties.MaxOpenConns(), maxVal-reserved; configured > allowed {
-			frame.Log(ctx).Error("ERROR: The configured 'max_open_conns' is greater than the %d non-superuser connections that PostgreSQL is configured to allow. This can result in bad performance or deadlocks. Please pay close attention to your configured database connection counts. If you REALLY know what you are doing and want to override this error, pass the --skip-db-sanity option to Matrix.", allowed)
+			util.Log(ctx).Error("ERROR: The configured 'max_open_conns' is greater than the %d non-superuser connections that PostgreSQL is configured to allow. This can result in bad performance or deadlocks. Please pay close attention to your configured database connection counts. If you REALLY know what you are doing and want to override this error, pass the --skip-db-sanity option to Matrix.", allowed)
 			return nil, fmt.Errorf("database sanity checks failed")
 		}
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"time"
 )
@@ -39,7 +39,7 @@ func (c *RoomServer) Verify(configErrs *ConfigErrors) {
 	if !gomatrixserverlib.KnownRoomVersion(c.DefaultRoomVersion) {
 		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.default_room_version': unsupported room version: %q", c.DefaultRoomVersion))
 	} else if !gomatrixserverlib.StableRoomVersion(c.DefaultRoomVersion) {
-		frame.Log(context.TODO()).Warn("WARNING: Provided default room version %q is unstable", c.DefaultRoomVersion)
+		util.Log(context.TODO()).Warn("WARNING: Provided default room version %q is unstable", c.DefaultRoomVersion)
 	}
 
 	c.ActorSystem.Verify(configErrs)
@@ -111,18 +111,17 @@ type RoomServerQueues struct {
 }
 
 func (q *RoomServerQueues) Defaults(opts DefaultOpts) {
-	q.InputRoomEvent = QueueOptions{
-		Prefix:     opts.QueuePrefix,
-		QReference: "RoomServerInputRoomEvent",
-		DS: opts.DSQueueConn.
-			ExtendQuery("subject", fmt.Sprintf("%s.*", InputRoomEvent)).
-			ExtendQuery("stream_subjects", fmt.Sprintf("%s.*", InputRoomEvent)).
-			ExtendQuery("stream_name", InputRoomEvent).
-			ExtendQuery("consumer_headers_only", "true").
-			ExtendQuery("consumer_deliver_policy", "all").
-			ExtendQuery("consumer_ack_policy", "explicit").
-			ExtendQuery("consumer_replay_policy", "instant"),
-	}
+
+	inputOpt := opts.defaultQ(InputRoomEvent)
+	inputOpt.DS = inputOpt.DS.
+		ExtendQuery("stream_subjects", fmt.Sprintf("%s.*", InputRoomEvent)).
+		ExtendQuery("stream_name", InputRoomEvent).
+		ExtendQuery("consumer_headers_only", "true").
+		ExtendQuery("consumer_deliver_policy", "all").
+		ExtendQuery("consumer_ack_policy", "explicit").
+		ExtendQuery("consumer_replay_policy", "instant")
+
+	q.InputRoomEvent = inputOpt
 }
 
 func (q *RoomServerQueues) Verify(configErrs *ConfigErrors) {

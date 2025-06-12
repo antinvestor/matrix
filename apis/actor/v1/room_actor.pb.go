@@ -22,134 +22,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type SetupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
-	QPrefix       string                 `protobuf:"bytes,2,opt,name=qPrefix,proto3" json:"qPrefix,omitempty"`
-	QRef          string                 `protobuf:"bytes,3,opt,name=qRef,proto3" json:"qRef,omitempty"`
-	QSubsUri      string                 `protobuf:"bytes,4,opt,name=qSubsUri,proto3" json:"qSubsUri,omitempty"`
-	QPubUri       string                 `protobuf:"bytes,5,opt,name=qPubUri,proto3" json:"qPubUri,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetupRequest) Reset() {
-	*x = SetupRequest{}
-	mi := &file_room_actor_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetupRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetupRequest) ProtoMessage() {}
-
-func (x *SetupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_actor_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetupRequest.ProtoReflect.Descriptor instead.
-func (*SetupRequest) Descriptor() ([]byte, []int) {
-	return file_room_actor_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *SetupRequest) GetRoomId() string {
-	if x != nil {
-		return x.RoomId
-	}
-	return ""
-}
-
-func (x *SetupRequest) GetQPrefix() string {
-	if x != nil {
-		return x.QPrefix
-	}
-	return ""
-}
-
-func (x *SetupRequest) GetQRef() string {
-	if x != nil {
-		return x.QRef
-	}
-	return ""
-}
-
-func (x *SetupRequest) GetQSubsUri() string {
-	if x != nil {
-		return x.QSubsUri
-	}
-	return ""
-}
-
-func (x *SetupRequest) GetQPubUri() string {
-	if x != nil {
-		return x.QPubUri
-	}
-	return ""
-}
-
-type SetupResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetupResponse) Reset() {
-	*x = SetupResponse{}
-	mi := &file_room_actor_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetupResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetupResponse) ProtoMessage() {}
-
-func (x *SetupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_actor_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetupResponse.ProtoReflect.Descriptor instead.
-func (*SetupResponse) Descriptor() ([]byte, []int) {
-	return file_room_actor_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *SetupResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
-func (x *SetupResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
 type PublishRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
@@ -161,7 +33,7 @@ type PublishRequest struct {
 
 func (x *PublishRequest) Reset() {
 	*x = PublishRequest{}
-	mi := &file_room_actor_proto_msgTypes[2]
+	mi := &file_room_actor_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -173,7 +45,7 @@ func (x *PublishRequest) String() string {
 func (*PublishRequest) ProtoMessage() {}
 
 func (x *PublishRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_actor_proto_msgTypes[2]
+	mi := &file_room_actor_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -186,7 +58,7 @@ func (x *PublishRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishRequest.ProtoReflect.Descriptor instead.
 func (*PublishRequest) Descriptor() ([]byte, []int) {
-	return file_room_actor_proto_rawDescGZIP(), []int{2}
+	return file_room_actor_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *PublishRequest) GetRoomId() string {
@@ -220,7 +92,7 @@ type PublishResponse struct {
 
 func (x *PublishResponse) Reset() {
 	*x = PublishResponse{}
-	mi := &file_room_actor_proto_msgTypes[3]
+	mi := &file_room_actor_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -232,7 +104,7 @@ func (x *PublishResponse) String() string {
 func (*PublishResponse) ProtoMessage() {}
 
 func (x *PublishResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_room_actor_proto_msgTypes[3]
+	mi := &file_room_actor_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -245,7 +117,7 @@ func (x *PublishResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishResponse.ProtoReflect.Descriptor instead.
 func (*PublishResponse) Descriptor() ([]byte, []int) {
-	return file_room_actor_proto_rawDescGZIP(), []int{3}
+	return file_room_actor_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *PublishResponse) GetSuccess() bool {
@@ -271,7 +143,7 @@ type WorkRequest struct {
 
 func (x *WorkRequest) Reset() {
 	*x = WorkRequest{}
-	mi := &file_room_actor_proto_msgTypes[4]
+	mi := &file_room_actor_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -283,7 +155,7 @@ func (x *WorkRequest) String() string {
 func (*WorkRequest) ProtoMessage() {}
 
 func (x *WorkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_room_actor_proto_msgTypes[4]
+	mi := &file_room_actor_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -296,10 +168,54 @@ func (x *WorkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkRequest.ProtoReflect.Descriptor instead.
 func (*WorkRequest) Descriptor() ([]byte, []int) {
-	return file_room_actor_proto_rawDescGZIP(), []int{4}
+	return file_room_actor_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *WorkRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+type StopRoomActor struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StopRoomActor) Reset() {
+	*x = StopRoomActor{}
+	mi := &file_room_actor_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StopRoomActor) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StopRoomActor) ProtoMessage() {}
+
+func (x *StopRoomActor) ProtoReflect() protoreflect.Message {
+	mi := &file_room_actor_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StopRoomActor.ProtoReflect.Descriptor instead.
+func (*StopRoomActor) Descriptor() ([]byte, []int) {
+	return file_room_actor_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *StopRoomActor) GetRoomId() string {
 	if x != nil {
 		return x.RoomId
 	}
@@ -310,16 +226,7 @@ var File_room_actor_proto protoreflect.FileDescriptor
 
 const file_room_actor_proto_rawDesc = "" +
 	"\n" +
-	"\x10room_actor.proto\x12\x05actor\"\x8a\x01\n" +
-	"\fSetupRequest\x12\x16\n" +
-	"\x06roomId\x18\x01 \x01(\tR\x06roomId\x12\x18\n" +
-	"\aqPrefix\x18\x02 \x01(\tR\aqPrefix\x12\x12\n" +
-	"\x04qRef\x18\x03 \x01(\tR\x04qRef\x12\x1a\n" +
-	"\bqSubsUri\x18\x04 \x01(\tR\bqSubsUri\x12\x18\n" +
-	"\aqPubUri\x18\x05 \x01(\tR\aqPubUri\"C\n" +
-	"\rSetupResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xc0\x01\n" +
+	"\x10room_actor.proto\x12\x05actor\"\xc0\x01\n" +
 	"\x0ePublishRequest\x12\x16\n" +
 	"\x06roomId\x18\x01 \x01(\tR\x06roomId\x12?\n" +
 	"\bmetadata\x18\x02 \x03(\v2#.actor.PublishRequest.MetadataEntryR\bmetadata\x12\x18\n" +
@@ -331,9 +238,10 @@ const file_room_actor_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"%\n" +
 	"\vWorkRequest\x12\x16\n" +
-	"\x06roomId\x18\x01 \x01(\tR\x06roomId2\x86\x01\n" +
-	"\x12RoomEventProcessor\x124\n" +
-	"\x05Setup\x12\x13.actor.SetupRequest\x1a\x14.actor.SetupResponse\"\x00\x12:\n" +
+	"\x06roomId\x18\x01 \x01(\tR\x06roomId\"'\n" +
+	"\rStopRoomActor\x12\x16\n" +
+	"\x06roomId\x18\x01 \x01(\tR\x06roomId2P\n" +
+	"\x12RoomEventProcessor\x12:\n" +
 	"\aPublish\x12\x15.actor.PublishRequest\x1a\x16.actor.PublishResponse\"\x00B|\n" +
 	"\tcom.actorB\x0eRoomActorProtoP\x01Z+github.com/antinvestor/matrix/apis/actor/v1\xa2\x02\x03AXX\xaa\x02\x05Actor\xca\x02\x05Actor\xe2\x02\x11Actor\\GPBMetadata\xea\x02\x05Actorb\x06proto3"
 
@@ -349,23 +257,20 @@ func file_room_actor_proto_rawDescGZIP() []byte {
 	return file_room_actor_proto_rawDescData
 }
 
-var file_room_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_room_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_room_actor_proto_goTypes = []any{
-	(*SetupRequest)(nil),    // 0: actor.SetupRequest
-	(*SetupResponse)(nil),   // 1: actor.SetupResponse
-	(*PublishRequest)(nil),  // 2: actor.PublishRequest
-	(*PublishResponse)(nil), // 3: actor.PublishResponse
-	(*WorkRequest)(nil),     // 4: actor.WorkRequest
-	nil,                     // 5: actor.PublishRequest.MetadataEntry
+	(*PublishRequest)(nil),  // 0: actor.PublishRequest
+	(*PublishResponse)(nil), // 1: actor.PublishResponse
+	(*WorkRequest)(nil),     // 2: actor.WorkRequest
+	(*StopRoomActor)(nil),   // 3: actor.StopRoomActor
+	nil,                     // 4: actor.PublishRequest.MetadataEntry
 }
 var file_room_actor_proto_depIdxs = []int32{
-	5, // 0: actor.PublishRequest.metadata:type_name -> actor.PublishRequest.MetadataEntry
-	0, // 1: actor.RoomEventProcessor.Setup:input_type -> actor.SetupRequest
-	2, // 2: actor.RoomEventProcessor.Publish:input_type -> actor.PublishRequest
-	1, // 3: actor.RoomEventProcessor.Setup:output_type -> actor.SetupResponse
-	3, // 4: actor.RoomEventProcessor.Publish:output_type -> actor.PublishResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
+	4, // 0: actor.PublishRequest.metadata:type_name -> actor.PublishRequest.MetadataEntry
+	0, // 1: actor.RoomEventProcessor.Publish:input_type -> actor.PublishRequest
+	1, // 2: actor.RoomEventProcessor.Publish:output_type -> actor.PublishResponse
+	2, // [2:3] is the sub-list for method output_type
+	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name
@@ -382,7 +287,7 @@ func file_room_actor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_room_actor_proto_rawDesc), len(file_room_actor_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -27,6 +27,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // userDailyVisitsSchema defines the schema for user daily visits
@@ -267,9 +268,9 @@ func (s *statsTable) startTimers(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 		default:
-			frame.Log(ctx).Info("Executing UpdateUserDailyVisits")
+			util.Log(ctx).Info("Executing UpdateUserDailyVisits")
 			if err := s.UpdateUserDailyVisits(ctx, time.Now(), s.lastUpdate); err != nil {
-				frame.Log(ctx).WithError(err).Error("failed to update daily user visits")
+				util.Log(ctx).WithError(err).Error("failed to update daily user visits")
 			}
 			time.AfterFunc(time.Hour*3, updateStatsFunc)
 		}
@@ -318,7 +319,7 @@ func (s *statsTable) registeredUserByType(ctx context.Context) (map[string]int64
 	).Rows()
 	if err != nil {
 		if !sqlutil.ErrorIsNoRows(err) {
-			frame.Log(ctx).Error("Failed to get registered users: ", err)
+			util.Log(ctx).Error("Failed to get registered users: ", err)
 		}
 		return nil, err
 	}
@@ -367,7 +368,7 @@ func (s *statsTable) r30Users(ctx context.Context) (map[string]int64, error) {
 
 	if err != nil {
 		if !sqlutil.ErrorIsNoRows(err) {
-			frame.Log(ctx).Error("Failed to get r30 users: ", err)
+			util.Log(ctx).Error("Failed to get r30 users: ", err)
 		}
 		return nil, err
 	}

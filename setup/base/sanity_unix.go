@@ -6,7 +6,7 @@ import (
 	"context"
 	"syscall"
 
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 func PlatformSanityChecks(ctx context.Context) {
@@ -16,7 +16,7 @@ func PlatformSanityChecks(ctx context.Context) {
 	// PostgreSQL amongst other things. Complain at startup if we think the
 	// number of file descriptors is too low.
 	warn := func(rLimit *syscall.Rlimit) {
-		frame.Log(ctx).Warn("IMPORTANT: Process file descriptor limit is currently %d, it is recommended to raise the limit for Global to at least 65535 to avoid issues", rLimit.Cur)
+		util.Log(ctx).Warn("IMPORTANT: Process file descriptor limit is currently %d, it is recommended to raise the limit for Global to at least 65535 to avoid issues", rLimit.Cur)
 	}
 	var rLimit syscall.Rlimit
 	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err == nil && rLimit.Cur < 65535 {
@@ -24,7 +24,7 @@ func PlatformSanityChecks(ctx context.Context) {
 		rLimit.Cur = 65535
 		if err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
 			// We failed to raise it, so log an error.
-			frame.Log(ctx).WithError(err).Warn("IMPORTANT: Failed to raise the file descriptor limit")
+			util.Log(ctx).WithError(err).Warn("IMPORTANT: Failed to raise the file descriptor limit")
 			warn(&rLimit)
 		} else if err = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err == nil && rLimit.Cur < 65535 {
 			// We think we successfully raised the limit, but a second call to

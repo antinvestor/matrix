@@ -21,8 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -34,6 +32,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 type Leaver struct {
@@ -54,7 +53,7 @@ func (r *Leaver) PerformLeave(
 	if !r.Cfg.Global.IsLocalServerName(req.Leaver.Domain()) {
 		return nil, fmt.Errorf("user %q does not belong to this homeserver", req.Leaver.String())
 	}
-	logger := frame.Log(ctx).WithContext(ctx).
+	logger := util.Log(ctx).WithContext(ctx).
 		WithField("room_id", req.RoomID).
 		WithField("user_id", req.Leaver.String())
 
@@ -240,21 +239,21 @@ func (r *Leaver) performFederatedRejectInvite(
 	if err := r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
 		// failures in PerformLeave should NEVER stop us from telling other components like the
 		// sync API that the invite was withdrawn. Otherwise we can end up with stuck invites.
-		frame.Log(ctx).WithError(err).Error("failed to PerformLeave, still retiring invite event")
+		util.Log(ctx).WithError(err).Error("failed to PerformLeave, still retiring invite event")
 	}
 
 	info, err := r.DB.RoomInfo(ctx, req.RoomID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to get RoomInfo, still retiring invite event")
+		util.Log(ctx).WithError(err).Error("failed to get RoomInfo, still retiring invite event")
 	}
 
 	ctx, updater, err := r.DB.MembershipUpdater(ctx, req.RoomID, string(leaver), true, info.RoomVersion)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to get MembershipUpdater, still retiring invite event")
+		util.Log(ctx).WithError(err).Error("failed to get MembershipUpdater, still retiring invite event")
 	}
 	if updater != nil {
 		if err = updater.Delete(ctx); err != nil {
-			frame.Log(ctx).WithError(err).Error("failed to delete membership, still retiring invite event")
+			util.Log(ctx).WithError(err).Error("failed to delete membership, still retiring invite event")
 		}
 	}
 

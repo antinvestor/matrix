@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -207,13 +206,13 @@ func (r *Admin) PerformAdminPurgeRoom(
 		return err
 	}
 
-	frame.Log(ctx).WithField("room_id", roomID).Warn("Purging room from roomserver")
+	util.Log(ctx).WithField("room_id", roomID).Warn("Purging room from roomserver")
 	if err := r.DB.PurgeRoom(ctx, roomID); err != nil {
-		frame.Log(ctx).WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
+		util.Log(ctx).WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
 		return err
 	}
 
-	frame.Log(ctx).WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
+	util.Log(ctx).WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
 
 	return r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, []api.OutputEvent{
 		{
@@ -302,7 +301,7 @@ func (r *Admin) PerformAdminDownloadState(
 		Type:     "org.matrix.dendrite.state_download",
 		SenderID: string(*senderID),
 		RoomID:   roomID,
-		Content:  spec.RawJSON("{}"),
+		Content:  json.RawMessage("{}"),
 	}
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForProtoEvent(proto)

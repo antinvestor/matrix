@@ -21,8 +21,6 @@ import (
 	"image"
 	"image/draw"
 
-	"github.com/pitabwire/frame"
-
 	// Imported for gif codec
 	_ "image/gif"
 	"image/jpeg"
@@ -40,6 +38,7 @@ import (
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/nfnt/resize"
+	"github.com/pitabwire/util"
 )
 
 // GenerateThumbnails generates the configured thumbnail sizes for the source file
@@ -51,7 +50,7 @@ func GenerateThumbnails(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *frame.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
 	img, err := readFile(string(src))
 	if err != nil {
@@ -88,7 +87,7 @@ func GenerateThumbnail(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *frame.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
 	img, err := readFile(string(src))
 	if err != nil {
@@ -152,7 +151,7 @@ func createThumbnail(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *frame.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
 	logger = logger.WithField("Width", config.Width).
 		WithField("Height", config.Height).
@@ -237,7 +236,7 @@ func createThumbnail(
 // adjustSize scales an image to fit within the provided width and height
 // If the source aspect ratio is different to the target dimensions, one edge will be smaller than requested
 // If crop is set to true, the image will be scaled to fill the width and height with any excess being cropped off
-func adjustSize(dst types.Path, img image.Image, w, h int, crop bool, logger *frame.Entry) (int, int, error) {
+func adjustSize(dst types.Path, img image.Image, w, h int, crop bool, logger *util.LogEntry) (int, int, error) {
 	var out image.Image
 	var err error
 	if crop {

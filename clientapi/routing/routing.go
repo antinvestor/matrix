@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
-	"github.com/pitabwire/frame"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 
@@ -121,7 +120,7 @@ func Setup(
 	sf := singleflight.Group{}
 
 	if cfg.Global.WellKnownClientName != "" {
-		log := frame.Log(ctx)
+		log := util.Log(ctx)
 		log.WithField("base_url", cfg.Global.WellKnownClientName).Info("Setting m.homeserver base_url at /.well-known/matrix/client")
 		if cfg.Global.WellKnownSlidingSyncProxy != "" {
 			log.WithField("proxy_url", cfg.Global.WellKnownSlidingSyncProxy).Info("Setting org.matrix.msc3575.proxy url at /.well-known/matrix/client")
@@ -167,7 +166,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	if cfg.RegistrationSharedSecret != "" {
-		frame.Log(ctx).Info("Enabling shared secret registration at /_synapse/admin/v1/register")
+		util.Log(ctx).Info("Enabling shared secret registration at /_synapse/admin/v1/register")
 		sr := NewSharedSecretRegistration(cfg.RegistrationSharedSecret)
 		synapseAdminRouter.Handle("/admin/v1/register",
 			httputil.MakeExternalAPI("shared_secret_registration", func(req *http.Request) util.JSONResponse {
@@ -266,10 +265,10 @@ func Setup(
 
 	// server notifications
 	if cfg.Global.ServerNotices.Enabled {
-		frame.Log(ctx).Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
+		util.Log(ctx).Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
 		serverNotificationSender, err := getSenderDevice(ctx, rsAPI, userAPI, cfg)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Fatal("unable to get account for sending server notices")
+			util.Log(ctx).WithError(err).Fatal("unable to get account for sending server notices")
 		}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",

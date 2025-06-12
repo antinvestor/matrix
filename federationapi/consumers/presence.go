@@ -20,6 +20,7 @@ import (
 	"strconv"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -30,7 +31,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/matrix/syncapi/types"
-	"github.com/pitabwire/frame"
 )
 
 // OutputPresenceConsumer consumes events that originate in the clientapi.
@@ -73,7 +73,7 @@ func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string
 	userID := metadata[queueutil.UserID]
 	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "federation_consumer").
 			WithField("user_id", userID).
 			Error("failed to extract domain from receipt sender")
@@ -85,7 +85,7 @@ func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string
 
 	parsedUserID, err := spec.NewUserID(userID, true)
 	if err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "federation_consumer").
 			WithField("user_id", userID).
 			Error("invalid user ID")
@@ -94,7 +94,7 @@ func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string
 
 	roomIDs, err := t.rsAPI.QueryRoomsForUser(ctx, *parsedUserID, "join")
 	if err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "federation_consumer").
 			Error("failed to calculate joined rooms for user")
 		return nil
@@ -115,7 +115,7 @@ func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string
 	// send this presence to all servers who share rooms with this user.
 	joined, err := t.db.GetJoinedHostsForRooms(ctx, roomIDStrs, true, true)
 	if err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "federation_consumer").
 			Error("failed to get joined hosts")
 		return nil
@@ -150,19 +150,19 @@ func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string
 		Origin: string(serverName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "federation_consumer").
 			Error("failed to marshal EDU JSON")
 		return nil
 	}
 
-	frame.Log(ctx).
+	util.Log(ctx).
 		WithField("component", "federation_consumer").
 		WithField("server_count", len(joined)).
 		Debug("sending presence EDU to servers")
 
 	if err = t.queues.SendEDU(ctx, edu, serverName, joined); err != nil {
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("component", "federation_consumer").
 			Error("failed to send EDU")
 		return err

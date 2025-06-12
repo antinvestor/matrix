@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -118,7 +116,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 
 		roomVersion, err := t.rsAPI.QueryRoomVersionForRoom(ctx, roomID)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", roomID)
+			util.Log(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", roomID)
 			return ""
 		}
 		roomVersions[roomID] = roomVersion
@@ -131,7 +129,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			RoomID string `json:"room_id"`
 		}
 		if err := json.Unmarshal(pdu, &header); err != nil {
-			frame.Log(ctx).WithError(err).Debug("Transaction: Failed to extract room ID from event")
+			util.Log(ctx).WithError(err).Debug("Transaction: Failed to extract room ID from event")
 			// We don't know the event ID at this point so we can't return the
 			// failure in the PDU results
 			continue
@@ -156,7 +154,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 					JSON: spec.BadJSON("PDU contains bad JSON"),
 				}
 			}
-			frame.Log(ctx).WithError(err).Debug("Transaction: Failed to parse event JSON of event %s", string(pdu))
+			util.Log(ctx).WithError(err).Debug("Transaction: Failed to parse event JSON of event %s", string(pdu))
 			continue
 		}
 		if event.Type() == spec.MRoomCreate && event.StateKeyEquals("") {
@@ -171,7 +169,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		if err = gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return t.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
-			frame.Log(ctx).WithError(err).Debug("Transaction: Couldn't validate signature of event %q", event.EventID())
+			util.Log(ctx).WithError(err).Debug("Transaction: Couldn't validate signature of event %q", event.EventID())
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
 			}
@@ -194,7 +192,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			nil,
 			true,
 		); err != nil {
-			frame.Log(ctx).WithError(err).Error("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
+			util.Log(ctx).WithError(err).Error("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
 			}
@@ -211,6 +209,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 
 // nolint:gocyclo
 func (t *TxnReq) processEDUs(ctx context.Context) {
+	log := util.Log(ctx)
 	for _, e := range t.EDUs {
 		EDUCountTotal.Inc()
 		switch e.Type {
@@ -222,7 +221,7 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 				Typing bool   `json:"typing"`
 			}
 			if err := json.Unmarshal(e.Content, &typingPayload); err != nil {
-				frame.Log(ctx).WithError(err).Debug("Failed to unmarshal typing event")
+				log.WithError(err).Debug("Failed to unmarshal typing event")
 				continue
 			}
 			if _, serverName, err := gomatrixserverlib.SplitID('@', typingPayload.UserID); err != nil {
@@ -233,13 +232,13 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 				continue
 			}
 			if err := t.producer.SendTyping(ctx, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
-				frame.Log(ctx).WithError(err).Error("Failed to send typing event to JetStream")
+				log.WithError(err).Error("Failed to send typing event to JetStream")
 			}
 		case spec.MDirectToDevice:
 			// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
 			var directPayload gomatrixserverlib.ToDeviceMessage
 			if err := json.Unmarshal(e.Content, &directPayload); err != nil {
-				frame.Log(ctx).WithError(err).Debug("Failed to unmarshal send-to-device events")
+				log.WithError(err).Debug("Failed to unmarshal send-to-device events")
 				continue
 			}
 			if _, serverName, err := gomatrixserverlib.SplitID('@', directPayload.Sender); err != nil {
@@ -254,7 +253,7 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 					// TODO: check that the user and the device actually exist here
 					if err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
 
-						frame.Log(ctx).WithError(err).
+						log.WithError(err).
 							WithField("sender", directPayload.Sender).
 							WithField("user_id", userID).
 							WithField("device_id", deviceID).
@@ -265,14 +264,14 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 		case spec.MDeviceListUpdate:
 			if err := t.producer.SendDeviceListUpdate(ctx, e.Content, t.Origin); err != nil {
 
-				frame.Log(ctx).WithError(err).Error("failed to InputDeviceListUpdate")
+				log.WithError(err).Error("failed to InputDeviceListUpdate")
 			}
 		case spec.MReceipt:
 			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
 			payload := map[string]types.FederationReceiptMRead{}
 
 			if err := json.Unmarshal(e.Content, &payload); err != nil {
-				frame.Log(ctx).WithError(err).Debug("Failed to unmarshal receipt event")
+				log.WithError(err).Debug("Failed to unmarshal receipt event")
 				continue
 			}
 
@@ -280,18 +279,18 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 				for userID, mread := range receipt.User {
 					_, domain, err := gomatrixserverlib.SplitID('@', userID)
 					if err != nil {
-						frame.Log(ctx).WithError(err).Debug("Failed to split domain from receipt event sender")
+						log.WithError(err).Debug("Failed to split domain from receipt event sender")
 						continue
 					}
 					if t.Origin != domain {
-						frame.Log(ctx).
+						log.
 							WithField("sender_domain", domain).
 							WithField("origin", t.Origin).
 							Debug("Dropping receipt event where sender domain doesn't match origin")
 						continue
 					}
 					if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs); err != nil {
-						frame.Log(ctx).WithError(err).
+						log.WithError(err).
 							WithField("sender", t.Origin).
 							WithField("user_id", userID).
 							WithField("room_id", roomID).
@@ -302,18 +301,19 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case types.MSigningKeyUpdate:
-			if err := t.producer.SendSigningKeyUpdate(ctx, e.Content, t.Origin); err != nil {
-
-				frame.Log(ctx).WithError(err).Error("Failed to process signing key update")
+			err := t.producer.SendSigningKeyUpdate(ctx, e.Content, t.Origin)
+			if err != nil {
+				log.WithError(err).Error("Failed to process signing key update")
 			}
 		case spec.MPresence:
 			if t.inboundPresenceEnabled {
-				if err := t.processPresence(ctx, e); err != nil {
-					frame.Log(ctx).WithError(err).Error("Failed to process presence update")
+				err := t.processPresence(ctx, e)
+				if err != nil {
+					log.WithError(err).Error("Failed to process presence update")
 				}
 			}
 		default:
-			frame.Log(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
+			log.WithField("type", e.Type).Debug("Unhandled EDU")
 		}
 	}
 }

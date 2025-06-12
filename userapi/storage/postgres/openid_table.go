@@ -9,6 +9,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // openIDTokenSchema defines the schema for the openid tokens table.
@@ -95,7 +96,7 @@ func (t *openIDTable) SelectOpenIDTokenAtrributes(
 
 	if err != nil {
 		if !sqlutil.ErrorIsNoRows(err) {
-			frame.Log(ctx).WithError(err).Error("Unable to retrieve token from the db")
+			util.Log(ctx).WithError(err).Error("Unable to retrieve token from the db")
 		}
 		return nil, err
 	}

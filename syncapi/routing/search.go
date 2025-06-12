@@ -20,8 +20,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
@@ -47,7 +45,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 	)
 	resErr := httputil.UnmarshalJSONRequest(req, &searchReq)
 	if resErr != nil {
-		frame.Log(ctx).Error("failed to unmarshal search request")
+		util.Log(ctx).Error("failed to unmarshal search request")
 		return *resErr
 	}
 
@@ -118,7 +116,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		searchReq.SearchCategories.RoomEvents.Filter.Limit, nextBatch,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("failed fulltext search")
+		util.Log(ctx).WithError(err).Error("failed fulltext search")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -167,7 +165,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		event := hit.Event
 		eventsBefore, eventsAfter, err := contextEvents(ctx, snapshot, event, roomFilter, searchReq)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("failed to get context events")
+			util.Log(ctx).WithError(err).Error("failed to get context events")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -175,7 +173,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		}
 		startToken, endToken, err := getStartEnd(ctx, snapshot, eventsBefore, eventsAfter)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("failed to get start/end")
+			util.Log(ctx).WithError(err).Error("failed to get start/end")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -186,7 +184,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		for _, ev := range append(eventsBefore, eventsAfter...) {
 			userID, queryErr := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
 			if queryErr != nil {
-				frame.Log(ctx).WithError(queryErr).WithField("sender_id", ev.SenderID()).Warn("failed to query userprofile")
+				util.Log(ctx).WithError(queryErr).WithField("sender_id", ev.SenderID()).Warn("failed to query userprofile")
 				continue
 			}
 
@@ -194,7 +192,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			if !ok {
 				stateEvent, stateErr := snapshot.GetStateEvent(ctx, ev.RoomID().String(), spec.MRoomMember, string(ev.SenderID()))
 				if stateErr != nil {
-					frame.Log(ctx).WithError(stateErr).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
+					util.Log(ctx).WithError(stateErr).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
 					continue
 				}
 				if stateEvent == nil {
@@ -213,7 +211,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		if err != nil {
-			frame.Log(req.Context()).WithError(err).WithField("senderID", event.SenderID()).Error("Failed converting to ClientEvent")
+			util.Log(req.Context()).WithError(err).WithField("senderID", event.SenderID()).Error("Failed converting to ClientEvent")
 			continue
 		}
 
@@ -244,7 +242,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			stateFilter := synctypes.DefaultStateFilter()
 			state, err := snapshot.CurrentState(ctx, event.RoomID().String(), &stateFilter, nil)
 			if err != nil {
-				frame.Log(ctx).WithError(err).Error("unable to get current state")
+				util.Log(ctx).WithError(err).Error("unable to get current state")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -279,7 +277,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		},
 	}
 
-	frame.Log(ctx).Debug("Full search request took %v", time.Since(start))
+	util.Log(ctx).Debug("Full search request took %v", time.Since(start))
 
 	succeeded = true
 	return util.JSONResponse{
@@ -298,19 +296,19 @@ func contextEvents(
 ) ([]*types.HeaderedEvent, []*types.HeaderedEvent, error) {
 	id, _, err := snapshot.SelectContextEvent(ctx, event.RoomID().String(), event.EventID())
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to query context event")
+		util.Log(ctx).WithError(err).Error("failed to query context event")
 		return nil, nil, err
 	}
 	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.BeforeLimit
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, event.RoomID().String(), roomFilter)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to query before context event")
+		util.Log(ctx).WithError(err).Error("failed to query before context event")
 		return nil, nil, err
 	}
 	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.AfterLimit
 	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, event.RoomID().String(), roomFilter)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to query after context event")
+		util.Log(ctx).WithError(err).Error("failed to query after context event")
 		return nil, nil, err
 	}
 	return eventsBefore, eventsAfter, err

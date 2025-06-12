@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -282,7 +281,7 @@ func AdminEvacuateRoom(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 			JSON: spec.NotFound(err.Error()),
 		}
 	default:
-		frame.Log(ctx).WithError(err).WithField("roomID", vars["roomID"]).Error("Failed to evacuate room")
+		util.Log(ctx).WithError(err).WithField("roomID", vars["roomID"]).Error("Failed to evacuate room")
 		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{
@@ -304,7 +303,7 @@ func AdminEvacuateUser(req *http.Request, rsAPI roomserverAPI.ClientRoomserverAP
 
 	affected, err := rsAPI.PerformAdminEvacuateUser(req.Context(), vars["userID"])
 	if err != nil {
-		frame.Log(ctx).WithError(err).WithField("userID", vars["userID"]).Error("Failed to evacuate user")
+		util.Log(ctx).WithError(err).WithField("userID", vars["userID"]).Error("Failed to evacuate user")
 		return util.MessageResponse(http.StatusBadRequest, err.Error())
 	}
 
@@ -422,13 +421,13 @@ func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *userapi.Devi
 
 	err := qm.RegisterPublisher(ctx, &cfg.Queues.InputFulltextReindex)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to register publisher for receipt event")
+		util.Log(ctx).WithError(err).Panic("failed to register publisher for receipt event")
 	}
 
 	err = qm.Publish(ctx, cfg.Queues.InputFulltextReindex.Ref(), []byte{})
 
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to publish nats message")
+		util.Log(ctx).WithError(err).Error("failed to publish nats message")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -503,7 +502,7 @@ func AdminDownloadState(req *http.Request, device *userapi.Device, rsAPI roomser
 				JSON: spec.NotFound(err.Error()),
 			}
 		}
-		frame.Log(ctx).WithError(err).
+		util.Log(ctx).WithError(err).
 			WithField("userID", device.UserID).
 			WithField("serverName", serverName).
 			WithField("roomID", roomID).
@@ -529,7 +528,7 @@ func GetEventReports(
 
 	eventReports, count, err := rsAPI.QueryAdminEventReports(req.Context(), from, limit, backwards, userID, roomID)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to query event reports")
+		util.Log(ctx).WithError(err).Error("failed to query event reports")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

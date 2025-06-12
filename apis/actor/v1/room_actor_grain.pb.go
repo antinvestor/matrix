@@ -62,7 +62,6 @@ type RoomEventProcessor interface {
 	Init(ctx cluster.GrainContext)
 	Terminate(ctx cluster.GrainContext)
 	ReceiveDefault(ctx cluster.GrainContext)
-	Setup(req *SetupRequest, ctx cluster.GrainContext) (*SetupResponse, error)
 	Publish(req *PublishRequest, ctx cluster.GrainContext) (*PublishResponse, error)
 }
 
@@ -70,33 +69,6 @@ type RoomEventProcessor interface {
 type RoomEventProcessorGrainClient struct {
 	Identity string
 	cluster  *cluster.Cluster
-}
-
-// Setup requests the execution on to the cluster with CallOptions
-func (g *RoomEventProcessorGrainClient) Setup(r *SetupRequest, opts ...cluster.GrainCallOption) (*SetupResponse, error) {
-	if g.cluster.Config.RequestLog {
-		g.cluster.Logger().Info("Requesting", slog.String("identity", g.Identity), slog.String("kind", "RoomEventProcessor"), slog.String("method", "Setup"), slog.Any("request", r))
-	}
-	bytes, err := proto.Marshal(r)
-	if err != nil {
-		return nil, err
-	}
-	reqMsg := &cluster.GrainRequest{MethodIndex: 0, MessageData: bytes}
-	resp, err := g.cluster.Request(g.Identity, "RoomEventProcessor", reqMsg, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("error request: %w", err)
-	}
-	switch msg := resp.(type) {
-	case *SetupResponse:
-		return msg, nil
-	case *cluster.GrainErrorResponse:
-		if msg == nil {
-			return nil, nil
-		}
-		return nil, msg
-	default:
-		return nil, fmt.Errorf("unknown response type %T", resp)
-	}
 }
 
 // Publish requests the execution on to the cluster with CallOptions
@@ -108,7 +80,7 @@ func (g *RoomEventProcessorGrainClient) Publish(r *PublishRequest, opts ...clust
 	if err != nil {
 		return nil, err
 	}
-	reqMsg := &cluster.GrainRequest{MethodIndex: 1, MessageData: bytes}
+	reqMsg := &cluster.GrainRequest{MethodIndex: 0, MessageData: bytes}
 	resp, err := g.cluster.Request(g.Identity, "RoomEventProcessor", reqMsg, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error request: %w", err)
@@ -155,26 +127,6 @@ func (a *RoomEventProcessorActor) Receive(ctx actor.Context) {
 	case *cluster.GrainRequest:
 		switch msg.MethodIndex {
 		case 0:
-			req := &SetupRequest{}
-			err := proto.Unmarshal(msg.MessageData, req)
-			if err != nil {
-				ctx.Logger().Error("[Grain] Setup(SetupRequest) proto.Unmarshal failed.", slog.Any("error", err))
-				resp := cluster.NewGrainErrorResponse(cluster.ErrorReason_INVALID_ARGUMENT, err.Error()).
-					WithMetadata(map[string]string{
-						"argument": req.String(),
-					})
-				ctx.Respond(resp)
-				return
-			}
-
-			r0, err := a.inner.Setup(req, a.ctx)
-			if err != nil {
-				resp := cluster.FromError(err)
-				ctx.Respond(resp)
-				return
-			}
-			ctx.Respond(r0)
-		case 1:
 			req := &PublishRequest{}
 			err := proto.Unmarshal(msg.MessageData, req)
 			if err != nil {

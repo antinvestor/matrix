@@ -63,10 +63,10 @@ type UserAPIQueues struct {
 }
 
 func (q *UserAPIQueues) Defaults(opts DefaultOpts) {
-	q.OutputReceiptEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "UserAPIReceiptConsumer", DS: opts.DSQueueConn.ExtendPath(OutputReceiptEvent).ExtendQuery("stream_name", OutputReceiptEvent)}
-	q.InputDeviceListUpdate = QueueOptions{Prefix: opts.QueuePrefix, QReference: "KeyServerInputDeviceListConsumer", DS: opts.DSQueueConn.ExtendPath(InputDeviceListUpdate).ExtendQuery("stream_name", InputDeviceListUpdate)}
-	q.InputSigningKeyUpdate = QueueOptions{Prefix: opts.QueuePrefix, QReference: "KeyServerSigningKeyConsumer", DS: opts.DSQueueConn.ExtendPath(InputSigningKeyUpdate).ExtendQuery("stream_name", InputSigningKeyUpdate)}
-	q.OutputRoomEvent = QueueOptions{Prefix: opts.QueuePrefix, QReference: "UserAPIRoomServerConsumer", DS: opts.DSQueueConn.ExtendPath(OutputRoomEvent).ExtendQuery("stream_name", OutputRoomEvent)}
+	q.OutputReceiptEvent = opts.defaultQ(OutputReceiptEvent)
+	q.InputDeviceListUpdate = opts.defaultQ(InputDeviceListUpdate)
+	q.InputSigningKeyUpdate = opts.defaultQ(InputSigningKeyUpdate)
+	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent)
 }
 
 func (q *UserAPIQueues) Verify(configErrs *ConfigErrors) {

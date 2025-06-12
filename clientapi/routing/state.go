@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -56,7 +54,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		RoomID:       roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{},
 	}, &stateRes); err != nil {
-		frame.Log(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
+		util.Log(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -76,7 +74,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		if ev.Type() == spec.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
-				frame.Log(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
+				util.Log(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -102,7 +100,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		// user's membership if we want the latest state or not.
 		userID, err := spec.NewUserID(device.UserID, true)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("UserID is invalid")
+			util.Log(ctx).WithError(err).Error("UserID is invalid")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.Unknown("Device UserID is invalid"),
@@ -113,7 +111,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			UserID: *userID,
 		}, &membershipRes)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
+			util.Log(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -137,7 +135,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		wantLatestState = true
 	}
 
-	frame.Log(ctx).WithField("roomID", roomID).WithField("state_at_event", !wantLatestState).Info("Fetching all state")
+	util.Log(ctx).WithField("roomID", roomID).WithField("state_at_event", !wantLatestState).Info("Fetching all state")
 
 	stateEvents := []synctypes.ClientEvent{}
 	if wantLatestState {
@@ -163,7 +161,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 			StateToFetch: []gomatrixserverlib.StateKeyTuple{},
 		}, &stateAfterRes)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
+			util.Log(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -174,7 +172,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 				return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 			})
 			if err != nil {
-				frame.Log(ctx).WithError(err).Error("Failed converting to ClientEvent")
+				util.Log(ctx).WithError(err).Error("Failed converting to ClientEvent")
 				continue
 			}
 			stateEvents = append(
@@ -225,7 +223,7 @@ func OnIncomingStateTypeRequest(
 		})
 		if err != nil {
 			// TODO: work out better logic for failure cases (e.g. sender ID not found)
-			frame.Log(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
+			util.Log(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),
@@ -259,7 +257,7 @@ func OnIncomingStateTypeRequest(
 		RoomID:       roomID,
 		StateToFetch: stateToFetch,
 	}, &stateRes); err != nil {
-		frame.Log(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
+		util.Log(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -273,7 +271,7 @@ func OnIncomingStateTypeRequest(
 		if ev.Type() == spec.MRoomHistoryVisibility {
 			content := map[string]string{}
 			if err := json.Unmarshal(ev.Content(), &content); err != nil {
-				frame.Log(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
+				util.Log(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -297,7 +295,7 @@ func OnIncomingStateTypeRequest(
 	if !worldReadable {
 		userID, err := spec.NewUserID(device.UserID, true)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("UserID is invalid")
+			util.Log(ctx).WithError(err).Error("UserID is invalid")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.Unknown("Device UserID is invalid"),
@@ -310,7 +308,7 @@ func OnIncomingStateTypeRequest(
 			UserID: *userID,
 		}, &membershipRes)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
+			util.Log(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -334,7 +332,7 @@ func OnIncomingStateTypeRequest(
 		wantLatestState = true
 	}
 
-	frame.Log(ctx).WithField("roomID", roomID).WithField("evType", evType).WithField("stateKey", stateKey).WithField("state_at_event", !wantLatestState).Info("Fetching state")
+	util.Log(ctx).WithField("roomID", roomID).WithField("evType", evType).WithField("stateKey", stateKey).WithField("state_at_event", !wantLatestState).Info("Fetching state")
 
 	var event *types.HeaderedEvent
 	if wantLatestState {
@@ -363,7 +361,7 @@ func OnIncomingStateTypeRequest(
 			},
 		}, &stateAfterRes)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
+			util.Log(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

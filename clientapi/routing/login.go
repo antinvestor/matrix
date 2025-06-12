@@ -18,8 +18,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
@@ -84,7 +82,7 @@ func completeAuth(
 
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
+		util.Log(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -97,7 +95,7 @@ func completeAuth(
 
 	localpart, serverName, err := userutil.ParseUsernameParam(login.Username(), cfg)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
+		util.Log(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

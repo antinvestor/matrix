@@ -18,8 +18,6 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -56,7 +54,7 @@ func GetMemberships(
 
 	var queryRes api.QueryMembershipForUserResponse
 	if queryErr := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); queryErr != nil {
-		frame.Log(req.Context()).WithError(queryErr).Error("rsAPI.QueryMembershipsForRoom failed")
+		util.Log(req.Context()).WithError(queryErr).Error("rsAPI.QueryMembershipsForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -86,7 +84,7 @@ func GetMemberships(
 			// If you have left the room then this will be the members of the room when you left.
 			atToken, err = db.EventPositionInTopology(req.Context(), queryRes.EventID)
 			if err != nil {
-				frame.Log(req.Context()).WithError(err).Error("unable to get 'atToken'")
+				util.Log(req.Context()).WithError(err).Error("unable to get 'atToken'")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -97,7 +95,7 @@ func GetMemberships(
 
 	eventIDs, err := db.SelectMemberships(req.Context(), roomID, atToken, membership, notMembership)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("db.SelectMemberships failed")
+		util.Log(req.Context()).WithError(err).Error("db.SelectMemberships failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -106,7 +104,7 @@ func GetMemberships(
 
 	qryRes := &api.QueryEventsByIDResponse{}
 	if err := rsAPI.QueryEventsByID(req.Context(), &api.QueryEventsByIDRequest{EventIDs: eventIDs, RoomID: roomID}, qryRes); err != nil {
-		frame.Log(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
+		util.Log(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

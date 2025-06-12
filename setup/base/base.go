@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal"
@@ -111,7 +112,7 @@ func SetupHTTPOption(
 
 ) (frame.Option, error) {
 
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 
@@ -132,7 +133,7 @@ func SetupHTTPOption(
 	if err := tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
 		"Version": internal.VersionString(),
 	}); err != nil {
-		frame.Log(ctx).WithError(err).Error("failed to execute landing page template")
+		util.Log(ctx).WithError(err).Error("failed to execute landing page template")
 		return nil, err
 	}
 
@@ -178,7 +179,7 @@ func SetupHTTPOption(
 	externalRouter.NotFoundHandler = httputil.NotFoundCORSHandler
 	externalRouter.MethodNotAllowedHandler = httputil.NotAllowedHandler
 
-	return frame.HttpHandler(externalRouter), nil
+	return frame.WithHttpHandler(externalRouter), nil
 
 }
 
@@ -191,8 +192,8 @@ func WaitForShutdown(ctx context.Context) {
 	}
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
 
-	frame.Log(ctx).Warn("Shutdown signal received")
+	util.Log(ctx).Warn("Shutdown signal received")
 
 	// ShutdownDendrite and WaitForComponentsToFinish are not used in this function, so we don't need to call them
-	frame.Log(ctx).Warn("Matrix is exiting now")
+	util.Log(ctx).Warn("Matrix is exiting now")
 }

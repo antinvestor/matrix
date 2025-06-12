@@ -2,8 +2,9 @@ package streams
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/pitabwire/util"
 
-	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
@@ -44,6 +45,9 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
+
+	log := util.Log(ctx)
+
 	r := types.Range{
 		From: from,
 		To:   to,
@@ -53,7 +57,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 		ctx, req.Device.UserID, r, &req.Filter.AccountData,
 	)
 	if err != nil {
-		req.Log.WithError(err).Error("p.Cm.GetAccountDataInRange failed")
+		log.WithError(err).Error("p.Cm.GetAccountDataInRange failed")
 		return from
 	}
 
@@ -75,7 +79,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 			dataRes := userapi.QueryAccountDataResponse{}
 			err = p.userAPI.QueryAccountData(ctx, &dataReq, &dataRes)
 			if err != nil {
-				req.Log.WithError(err).Error("p.userAPI.QueryAccountData failed")
+				log.WithError(err).Error("p.userAPI.QueryAccountData failed")
 				continue
 			}
 			if roomID == "" {
@@ -84,7 +88,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 						req.Response.AccountData.Events,
 						synctypes.ClientEvent{
 							Type:    dataType,
-							Content: spec.RawJSON(globalData),
+							Content: json.RawMessage(globalData),
 						},
 					)
 				}
@@ -98,7 +102,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 						joinData.AccountData.Events,
 						synctypes.ClientEvent{
 							Type:    dataType,
-							Content: spec.RawJSON(roomData),
+							Content: json.RawMessage(roomData),
 						},
 					)
 					req.Response.Rooms.Join[roomID] = joinData

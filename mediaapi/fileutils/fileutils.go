@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -68,7 +68,7 @@ func GetPathFromBase64Hash(base64Hash types.Base64Hash, absBasePath config.Path)
 // If the final path exists and the file size matches, the file does not need to be moved.
 // In error cases where the file is not a duplicate, the caller may decide to remove the final path.
 // Returns the final path of the file, whether it is a duplicate and an error.
-func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata, absBasePath config.Path, logger *frame.Entry) (types.Path, bool, error) {
+func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata, absBasePath config.Path, logger *util.LogEntry) (types.Path, bool, error) {
 	// Note: in all error and success cases, we need to remove the temporary directory
 	defer RemoveDir(tmpDir, logger)
 	duplicate := false
@@ -98,7 +98,7 @@ func MoveFileWithHashCheck(tmpDir types.Path, mediaMetadata *types.MediaMetadata
 }
 
 // RemoveDir removes a directory and logs a warning in case of errors
-func RemoveDir(dir types.Path, logger *frame.Entry) {
+func RemoveDir(dir types.Path, logger *util.LogEntry) {
 	dirErr := os.RemoveAll(string(dir))
 	if dirErr != nil {
 		logger.WithError(dirErr).WithField("dir", dir).Warn("failed to remove directory")
@@ -111,7 +111,7 @@ func WriteTempFile(
 	ctx context.Context, reqReader io.Reader, absBasePath config.Path,
 ) (hash types.Base64Hash, size types.FileSizeBytes, path types.Path, err error) {
 	size = -1
-	logger := frame.Log(ctx)
+	logger := util.Log(ctx)
 	tmpFileWriter, tmpFile, tmpDir, err := createTempFileWriter(absBasePath)
 	if err != nil {
 		return

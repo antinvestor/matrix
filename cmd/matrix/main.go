@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/pitabwire/util"
+
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	"github.com/antinvestor/matrix/internal/queueutil"
 
@@ -53,10 +55,10 @@ func main() {
 	cfg := setup.ParseFlags(true)
 	globalCfg := cfg.Global
 
-	ctx, service := frame.NewService(serviceName, frame.Config(&globalCfg))
+	ctx, service := frame.NewService(serviceName, frame.WithConfig(&globalCfg))
 	defer service.Stop(ctx)
 
-	log := service.L(ctx)
+	log := util.Log(ctx)
 
 	log.
 		WithField("oauth2 service uri", globalCfg.Oauth2ServiceURI).
@@ -82,8 +84,7 @@ func main() {
 	var dnsCache *fclient.DNSCache
 	if globalCfg.DNSCache.Enabled {
 		dnsCache = fclient.NewDNSCache(
-			globalCfg.DNSCache.CacheSize,
-			globalCfg.DNSCache.CacheLifetime,
+			globalCfg.DNSCache.CacheSize, globalCfg.DNSCache.CacheLifetime, []string{}, []string{},
 		)
 		log.Info(
 			"DNS cache enabled (size %d, lifetime %s)",
@@ -243,7 +244,7 @@ func main() {
 	}
 
 	serviceOptions := []frame.Option{httpOpt}
-	service.Init(serviceOptions...)
+	service.Init(ctx, serviceOptions...)
 
 	log.WithField("server http port", globalCfg.HttpServerPort).
 		Info(" Initiating server operations")

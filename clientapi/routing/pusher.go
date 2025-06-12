@@ -22,7 +22,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
@@ -34,7 +33,7 @@ func GetPushers(
 	var queryRes userapi.QueryPushersResponse
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -45,7 +44,7 @@ func GetPushers(
 		ServerName: domain,
 	}, &queryRes)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("QueryPushers failed")
+		util.Log(req.Context()).WithError(err).Error("QueryPushers failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -69,7 +68,7 @@ func SetPusher(
 ) util.JSONResponse {
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -108,7 +107,7 @@ func SetPusher(
 	body.SessionID = device.SessionID
 	err = userAPI.PerformPusherSet(req.Context(), &body, &struct{}{})
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("PerformPusherSet failed")
+		util.Log(req.Context()).WithError(err).Error("PerformPusherSet failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

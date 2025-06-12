@@ -25,8 +25,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth"
 	"github.com/antinvestor/matrix/internal"
@@ -74,7 +72,7 @@ func MakeAuthAPI(
 	checks ...AuthAPIOption,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
-		log := frame.Log(req.Context())
+		log := util.Log(req.Context())
 		device, err := auth.VerifyUserFromRequest(req, userAPI)
 		if err != nil {
 			log.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
@@ -82,7 +80,7 @@ func MakeAuthAPI(
 		}
 		// add the user ID to the log
 		log = log.WithField("user_id", device.UserID)
-		req = req.WithContext(frame.LogToContext(req.Context(), log))
+		req = req.WithContext(util.ContextWithLogger(req.Context(), log))
 		// add the user to Sentry, if enabled
 		hub := sentry.GetHubFromContext(req.Context())
 		if hub != nil {
@@ -156,7 +154,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		nextWriter := w
 		if verbose {
-			logger := frame.Log(req.Context())
+			logger := util.Log(req.Context())
 			// Log outgoing response
 			rec := httptest.NewRecorder()
 			nextWriter = rec
@@ -226,7 +224,7 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 		}
 
 		if opts.WithAuth {
-			logger := frame.Log(req.Context())
+			logger := util.Log(req.Context())
 			_, jsonErr := auth.VerifyUserFromRequest(req, userAPI)
 			if jsonErr != nil {
 				w.WriteHeader(jsonErr.Code)
@@ -259,7 +257,7 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics
 func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
-	logger := frame.Log(context.TODO())
+	logger := util.Log(context.TODO())
 
 	if b.Username == "" || b.Password == "" {
 		logger.Warn("Metrics are exposed without protection. Make sure you set up protection at proxy level.")

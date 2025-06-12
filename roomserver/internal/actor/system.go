@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -90,7 +90,7 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	// Create the room actor props for the cluster
 	roomProcessorKind := actorV1.NewRoomEventProcessorKind(func() actorV1.RoomEventProcessor {
-		return NewRoomActor(ctx, m.cluster, svc, m.qm, m.handlerFunc)
+		return NewRoomActor(ctx, m.cluster, svc, m.qOpts, m.qm, m.handlerFunc)
 	}, 0)
 
 	// Create the cluster configuration
@@ -112,27 +112,8 @@ func (m *Manager) Start(ctx context.Context) error {
 // EnsureRoomActorExists creates or gets a room actor for the specified room
 func (m *Manager) EnsureRoomActorExists(ctx context.Context, roomID *spec.RoomID) (*actorV1.RoomEventProcessorGrainClient, error) {
 
-	subsQOpts, err := RoomifyQOpts(ctx, m.qOpts, roomID, true)
-	if err != nil {
-		return nil, err
-	}
-
-	pubQOpts, err := RoomifyQOpts(ctx, m.qOpts, roomID, false)
-	if err != nil {
-		return nil, err
-	}
-
 	roomActor := actorV1.GetRoomEventProcessorGrainClient(m.cluster, roomID.String())
-	_, err = roomActor.Setup(&actorV1.SetupRequest{
-		RoomId:   roomID.String(),
-		QPrefix:  subsQOpts.Prefix,
-		QRef:     subsQOpts.QReference,
-		QSubsUri: subsQOpts.DS.String(),
-		QPubUri:  pubQOpts.DS.String(),
-	})
-	if err != nil {
-		return nil, err
-	}
+
 	return roomActor, nil
 }
 
@@ -176,7 +157,7 @@ func (m *Manager) Shutdown(ctx context.Context) {
 // indefinitely for rooms that might no longer be active, since they do
 // have an interest overhead in the NATS Server. If the room becomes
 // active again then we'll recreate the consumer anyway.
-const inactiveThreshold = time.Hour * 24
+const maximumConsumerInactivityThreshold = time.Hour * 24
 
 // An event being processed by a room actor is only allowed 5 seconds maximum.
 // If the event takes longer than this then we will assume it has issues and the message will be redelivered.
@@ -187,25 +168,29 @@ const maximumProcessingTime = time.Second * 15
 // for rooms that might no longer be active, since they do have an
 // interest overhead in the NATS Server. If the room becomes active
 // again then we'll recreate the actor anyway.
-const actorIdlingTime = time.Minute * 1
+const maximumIdlingTime = time.Minute * 1
 
 func RoomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.RoomID, isSubscriber bool) (*config.QueueOptions, error) {
 
 	ds := opts.DS
+
+	cleanedRoomID := queueutil.Tokenise(roomId.String())
+
 	if ds.IsNats() {
 
-		subject := fmt.Sprintf("%s.%s", config.InputRoomEvent, queueutil.Tokenise(roomId.String()))
-		ds = ds.ExtendQuery("subject", subject)
+		subject := fmt.Sprintf("%s.%s", config.InputRoomEvent, cleanedRoomID)
+		ds = ds.DelPath().ExtendQuery("subject", subject)
 
 		if isSubscriber {
+
 			ds = ds.ExtendQuery("consumer_filter_subject", subject)
-			durable := fmt.Sprintf("Durable%s%s", config.InputRoomEvent, queueutil.Tokenise(roomId.String()))
+			durable := strings.Replace(fmt.Sprintf("Durable%s", subject), ".", "_", -1)
 
 			ds = ds.ExtendQuery("consumer_durable_name", durable)
 			ds = ds.ExtendQuery("consumer_deliver_policy", "all")
 			ds = ds.ExtendQuery("consumer_ack_policy", "explicit")
-			ds = ds.ExtendQuery("consumer_ack_wait", strconv.FormatInt(int64(maximumProcessingTime), 10))
-			ds = ds.ExtendQuery("consumer_inactive_threshold", strconv.FormatInt(int64(inactiveThreshold), 10))
+			ds = ds.ExtendQuery("consumer_ack_wait", maximumProcessingTime.String())
+			ds = ds.ExtendQuery("consumer_inactive_threshold", maximumConsumerInactivityThreshold.String())
 			ds = ds.ExtendQuery("consumer_headers_only", "false")
 			ds = ds.ExtendQuery("receive_batch_max_batch_size", "1")
 		} else {
@@ -214,11 +199,11 @@ func RoomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.Roo
 		}
 
 	} else {
-		ds = opts.DS.ExtendPath(queueutil.Tokenise(roomId.String()))
+		ds = ds.SuffixPath(cleanedRoomID)
 	}
 
 	return &config.QueueOptions{
-		QReference: fmt.Sprintf("%s%s", opts.QReference, queueutil.Tokenise(roomId.String())),
+		QReference: fmt.Sprintf("%s%s", opts.QReference, cleanedRoomID),
 		Prefix:     opts.Prefix,
 		DS:         ds,
 	}, nil

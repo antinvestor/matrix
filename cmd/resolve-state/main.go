@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -79,7 +80,7 @@ func main() {
 	cfg.Global.Cache.MaxAge = time.Minute * 5
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to create cache")
+		util.Log(ctx).WithError(err).Panic("failed to create cache")
 	}
 
 	fmt.Println("Opening database")

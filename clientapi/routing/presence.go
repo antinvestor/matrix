@@ -21,7 +21,6 @@ import (
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	presenceV1 "buf.build/gen/go/antinvestor/presence/protocolbuffers/go"
 	"connectrpc.com/connect"
-	"github.com/pitabwire/frame"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
@@ -71,7 +70,7 @@ func SetPresence(
 	}
 	err := producer.SendPresence(req.Context(), userID, presenceStatus, presence.StatusMsg)
 	if err != nil {
-		frame.Log(req.Context()).WithError(err).Error("failed to update presence")
+		util.Log(req.Context()).WithError(err).Error("failed to update presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -98,7 +97,7 @@ func GetPresence(
 	}))
 
 	if err != nil {
-		frame.Log(ctx).WithError(err).Error("unable to get presence")
+		util.Log(ctx).WithError(err).Error("unable to get presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

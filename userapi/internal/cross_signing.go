@@ -21,9 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -466,7 +465,7 @@ func (a *UserInternalAPI) processOtherSignatures(
 func (a *UserInternalAPI) crossSigningKeysFromDatabase(
 	ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse,
 ) {
-	log := frame.Log(ctx)
+	log := util.Log(ctx)
 	for targetUserID := range req.UserToDevices {
 		keys, err := a.KeyDatabase.CrossSigningKeysForUser(ctx, targetUserID)
 		if err != nil {

@@ -18,7 +18,7 @@ import (
 	"context"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -55,11 +55,11 @@ func AddPublicRoutes(
 
 	syncCm, err := cm.FromOptions(ctx, &cfgSyncAPI.Database)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to obtain sync db connection manager")
+		util.Log(ctx).WithError(err).Panic("failed to obtain sync db connection manager")
 	}
 	syncDB, err := storage.NewSyncServerDatabase(ctx, syncCm)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to connect to sync db")
+		util.Log(ctx).WithError(err).Panic("failed to connect to sync db")
 	}
 
 	eduCache := cacheutil.NewTypingCache()
@@ -67,7 +67,7 @@ func AddPublicRoutes(
 	strms := streams.NewSyncStreamProviders(ctx, syncDB, userAPI, rsAPI, eduCache, caches, ntf)
 	ntf.SetCurrentPosition(strms.Latest(ctx))
 	if err = ntf.Load(ctx, syncDB); err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to load notifier ")
+		util.Log(ctx).WithError(err).Panic("failed to load notifier ")
 	}
 
 	presenceConsumer, err := consumers.NewPresenceConsumer(
@@ -77,12 +77,12 @@ func AddPublicRoutes(
 	)
 
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start presence consumer")
+		util.Log(ctx).WithError(err).Panic("failed to start presence consumer")
 	}
 
 	err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputPresenceEvent)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to register publisher for output presence event")
+		util.Log(ctx).WithError(err).Panic("failed to register publisher for output presence event")
 	}
 
 	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
@@ -97,7 +97,7 @@ func AddPublicRoutes(
 		strms.DeviceListStreamProvider,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start key change consumer")
+		util.Log(ctx).WithError(err).Panic("failed to start key change consumer")
 	}
 
 	var asProducer *producers.AppserviceEventProducer
@@ -105,7 +105,7 @@ func AddPublicRoutes(
 
 		err = qm.RegisterPublisher(ctx, &cfg.AppServiceAPI.Queues.OutputAppserviceEvent)
 		if err != nil {
-			frame.Log(ctx).WithError(err).Panic("failed to register publisher for output appservice event")
+			util.Log(ctx).WithError(err).Panic("failed to register publisher for output appservice event")
 		}
 
 		asProducer = &producers.AppserviceEventProducer{
@@ -118,7 +118,7 @@ func AddPublicRoutes(
 		strms.InviteStreamProvider, rsAPI, asProducer,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start room server consumer")
+		util.Log(ctx).WithError(err).Panic("failed to start room server consumer")
 	}
 
 	err = consumers.NewOutputClientDataConsumer(
@@ -126,35 +126,35 @@ func AddPublicRoutes(
 		strms.AccountDataStreamProvider,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start client data consumer")
+		util.Log(ctx).WithError(err).Panic("failed to start client data consumer")
 	}
 
 	err = consumers.NewOutputNotificationDataConsumer(
 		ctx, &cfgSyncAPI, qm, syncDB, ntf, strms.NotificationDataStreamProvider,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start notification data consumer")
+		util.Log(ctx).WithError(err).Panic("failed to start notification data consumer")
 	}
 
 	err = consumers.NewOutputTypingEventConsumer(
 		ctx, &cfgSyncAPI, qm, eduCache, ntf, strms.TypingStreamProvider,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start typing consumer")
+		util.Log(ctx).WithError(err).Panic("failed to start typing consumer")
 	}
 
 	err = consumers.NewOutputSendToDeviceEventConsumer(
 		ctx, &cfgSyncAPI, qm, syncDB, userAPI, ntf, strms.SendToDeviceStreamProvider,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start send-to-device consumer")
+		util.Log(ctx).WithError(err).Panic("failed to start send-to-device consumer")
 	}
 
 	err = consumers.NewOutputReceiptEventConsumer(
 		ctx, &cfgSyncAPI, qm, syncDB, ntf, strms.ReceiptStreamProvider,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start receipts consumer")
+		util.Log(ctx).WithError(err).Panic("failed to start receipts consumer")
 	}
 
 	rateLimits := httputil.NewRateLimits(&cfg.ClientAPI.RateLimiting)
@@ -165,6 +165,6 @@ func AddPublicRoutes(
 		rateLimits,
 	)
 	if err != nil {
-		frame.Log(ctx).WithError(err).Panic("failed to start receipts consumer")
+		util.Log(ctx).WithError(err).Panic("failed to start receipts consumer")
 	}
 }

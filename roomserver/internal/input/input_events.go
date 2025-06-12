@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/tidwall/gjson"
@@ -106,7 +106,7 @@ func (r *Inputer) processRoomEvent(
 	// Parse and validate the event JSON
 	headered := input.Event
 	event := headered.PDU
-	logger := frame.Log(ctx).
+	logger := util.Log(ctx).
 		WithField("event_id", event.EventID()).
 		WithField("room_id", event.RoomID().String()).
 		WithField("kind", input.Kind).
@@ -510,7 +510,7 @@ func (r *Inputer) processRoomEvent(
 				var aclEvent *types.HeaderedEvent
 				aclEvent, err = r.DB.GetStateEvent(ctx, event.RoomID().String(), acls.MRoomServerACL, "")
 				if err != nil {
-					frame.Log(ctx).WithError(err).Error("failed to get server ACLs")
+					util.Log(ctx).WithError(err).Error("failed to get server ACLs")
 				}
 				if aclEvent != nil {
 					strippedEvent := tables.StrippedEvent{
@@ -554,7 +554,7 @@ func (r *Inputer) processRoomEvent(
 	// If guest_access changed and is not can_join, kick all guest users.
 	if event.Type() == spec.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
 		if err = r.kickGuests(ctx, event, roomInfo); err != nil && !sqlutil.ErrorIsNoRows(err) {
-			frame.Log(ctx).WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
+			util.Log(ctx).WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
 		}
 	}
 
@@ -691,7 +691,7 @@ func (r *Inputer) processStateBefore(
 // nolint: gocyclo
 func (r *Inputer) fetchAuthEvents(
 	ctx context.Context,
-	logger *frame.Entry,
+	logger *util.LogEntry,
 	roomInfo *types.RoomInfo,
 	virtualHost spec.ServerName,
 	event *types.HeaderedEvent,
