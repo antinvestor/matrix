@@ -5,14 +5,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 )
 
 func newSyncDB(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.Database {

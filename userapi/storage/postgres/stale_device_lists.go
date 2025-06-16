@@ -19,14 +19,12 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/lib/pq"
-
-	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-
 	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
 )
 

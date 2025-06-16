@@ -5,18 +5,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/antinvestor/matrix/userapi"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/roomserver/internal/input"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/antinvestor/matrix/userapi"
 )
 
 func TestSingleTransactionOnInput(t *testing.T) {
@@ -32,6 +30,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
+
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
@@ -58,13 +57,8 @@ func TestSingleTransactionOnInput(t *testing.T) {
 			Event: &types.HeaderedEvent{PDU: event},
 		}
 
-		inputter, err := input.NewInputer(ctx, &cfg.RoomServer, nil, qm, "", nil, nil, nil, nil, nil, nil, nil, nil, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		res := &api.InputRoomEventsResponse{}
-		inputter.InputRoomEvents(
+		rsAPI.InputRoomEvents(
 			ctx,
 			&api.InputRoomEventsRequest{
 				InputRoomEvents: []api.InputRoomEvent{in},

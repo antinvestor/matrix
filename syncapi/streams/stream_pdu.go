@@ -7,21 +7,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/pitabwire/util"
-
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/internal"
+	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-
-	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/antinvestor/matrix/syncapi/notifier"
+	"github.com/pitabwire/util"
 )
 
 // The max number of per-room goroutines to have running.

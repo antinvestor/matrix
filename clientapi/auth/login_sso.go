@@ -23,10 +23,8 @@ import (
 	"time"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
-
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/matrix/setup/config"
+	"golang.org/x/oauth2"
 )
 
 // maxHTTPTimeout is an upper bound on an HTTP request to an LoginSSO

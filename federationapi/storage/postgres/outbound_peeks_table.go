@@ -18,9 +18,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/antinvestor/matrix/federationapi/storage/tables"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"

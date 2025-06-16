@@ -11,20 +11,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/pitabwire/frame"
-
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/routing"
 	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 )
 
 type server struct {
@@ -120,7 +117,7 @@ func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *confi
 		s.config = &cfg.FederationAPI
 
 		s.cache, err = cacheutil.NewCache(&config.CacheOptions{
-			ConnectionString: globalCfg.Cache.ConnectionString,
+			CacheURI: globalCfg.Cache.CacheURI,
 		})
 		if err != nil {
 			panic("can't create cache : " + err.Error())

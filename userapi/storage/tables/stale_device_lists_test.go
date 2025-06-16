@@ -4,16 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/pitabwire/frame"
-
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/userapi/storage/postgres"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/antinvestor/matrix/userapi/storage/postgres"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/pitabwire/frame"
 )
 
 func mustCreateTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) tables.StaleDeviceLists {

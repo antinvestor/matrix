@@ -2,15 +2,14 @@ package sqlutil_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-
-	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestConnectionManager(t *testing.T) {
@@ -42,18 +41,12 @@ func TestConnectionManager(t *testing.T) {
 
 	t.Run("global connection pool", func(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-			ctx, svc, cfg := testrig.Init(t, testOpts)
+			ctx, svc, _ := testrig.Init(t, testOpts)
 			defer svc.Stop(ctx)
 
-			cm, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &cfg.Global.DatabaseOptions)
-			if err != nil {
-				t.Fatal(err)
-			}
+			cm := sqlutil.NewConnectionManager(svc)
 
 			db := cm.Connection(ctx, true)
-			if err != nil {
-				t.Fatal(err)
-			}
 
 			// reuse existing connection
 			db2 := cm.Connection(ctx, true)
@@ -67,7 +60,7 @@ func TestConnectionManager(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			//We check the underlaying database connection as gorm mutates quickly
+			// We check the underlaying database connection as gorm mutates quickly
 			if !reflect.DeepEqual(sqlDb1, sqlDb2) {
 				t.Fatalf("expected database connection to be reused")
 			}
@@ -81,7 +74,7 @@ func TestConnectionManager(t *testing.T) {
 			defer svc.Stop(ctx)
 
 			var err error
-			cm, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &config.DatabaseOptions{ConnectionString: cfg.Global.DatabaseOptions.ConnectionString})
+			cm, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &config.DatabaseOptions{DatabaseURI: config.DataSource(strings.Join(cfg.Global.DatabasePrimaryURL, ","))})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -98,7 +91,7 @@ func TestConnectionManager(t *testing.T) {
 	defer svc.Stop(ctx)
 
 	// test invalid connection string configured
-	_, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &config.DatabaseOptions{ConnectionString: "http://"})
+	_, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &config.DatabaseOptions{DatabaseURI: "http://"})
 	if err == nil {
 		t.Fatalf("expected an error but got none")
 	}

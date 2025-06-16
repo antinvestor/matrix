@@ -20,15 +20,8 @@ import (
 	"time"
 
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
-	"github.com/antinvestor/matrix/internal/cacheutil"
-	"github.com/antinvestor/matrix/internal/httputil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
-
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/consumers"
 	"github.com/antinvestor/matrix/federationapi/internal"
@@ -37,10 +30,14 @@ import (
 	"github.com/antinvestor/matrix/federationapi/routing"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
+	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/setup/config"
 	userAPI "github.com/antinvestor/matrix/userapi/api"
-
-	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/pitabwire/util"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.

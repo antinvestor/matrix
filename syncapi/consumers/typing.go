@@ -19,15 +19,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/util"
 )
 
 // OutputTypingEventConsumer consumes events that originated in the EDU server.

@@ -10,24 +10,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/syncapi/synctypes"
-	"github.com/antinvestor/matrix/userapi/types"
-	"github.com/pitabwire/util"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/internal/pushrules"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/antinvestor/matrix/userapi/types"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const loginTokenLifetime = time.Minute

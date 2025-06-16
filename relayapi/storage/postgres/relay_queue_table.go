@@ -17,14 +17,13 @@ package postgres
 import (
 	"context"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
 // SQL query definitions as package-level constants

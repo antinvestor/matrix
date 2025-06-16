@@ -7,34 +7,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/stretchr/testify/assert"
-	"github.com/tidwall/gjson"
-
-	"github.com/antinvestor/matrix/roomserver/acls"
-	"github.com/antinvestor/matrix/roomserver/state"
-	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/userapi"
-
-	userAPI "github.com/antinvestor/matrix/userapi/api"
-
-	"github.com/antinvestor/gomatrixserverlib"
-
-	"github.com/antinvestor/matrix/federationapi"
-	"github.com/antinvestor/matrix/syncapi"
-
 	"github.com/antinvestor/matrix/roomserver"
+	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage"
+	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/syncapi"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/antinvestor/matrix/userapi"
+	userAPI "github.com/antinvestor/matrix/userapi/api"
+	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/gjson"
 )
 
 var testIsBlacklistedOrBackingOff = func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error) {
@@ -356,9 +350,9 @@ func TestPurgeRoom(t *testing.T) {
 
 		// wait for all consumers to process the purge event
 
-		//jsCtx, _ := qm.Prepare(deadline, &cfg.Global.JetStream)
+		// jsCtx, _ := qm.Prepare(deadline, &cfg.Global.JetStream)
 		//
-		//for sum > 0 {
+		// for sum > 0 {
 		//	if deadline.Err() != nil {
 		//		t.Fatalf("test timed out after %s", timeout)
 		//	}
@@ -368,7 +362,7 @@ func TestPurgeRoom(t *testing.T) {
 		//		sum += x.NumAckPending
 		//	}
 		//	time.Sleep(time.Millisecond)
-		//}
+		// }
 
 		roomInfo, err = db.RoomInfo(ctx, room.ID)
 		if err != nil {

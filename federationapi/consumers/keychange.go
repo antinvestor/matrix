@@ -18,18 +18,16 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/types"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // KeyChangeConsumer consumes events that originate in key server.

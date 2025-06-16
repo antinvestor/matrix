@@ -23,17 +23,17 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 )
 
-//const NatsImage = "nats:2.10"
+// const NatsImage = "nats:2.10"
 //
-//func setupNats(ctx context.Context) (*tcNats.NATSContainer, error) {
+// func setupNats(ctx context.Context) (*tcNats.NATSContainer, error) {
 //	return tcNats.Run(ctx, NatsImage)
-//}
+// }
 
 // PrepareQueueConnection Prepare a nats connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same connection, which will have data from previous tests
 // unless close() is called.
-//func PrepareQueueConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
+// func PrepareQueueConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
 //
 //	container, err := setupNats(ctx)
 //	if err != nil {
@@ -53,13 +53,13 @@ import (
 //		}
 //
 //	}, nil
-//}
+// }
 
 // PrepareQueueConnection Prepare a nats connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareQueueConnection(_ context.Context, testOpts DependancyOption) (connStr config.DataSource, close func(ctx context.Context), err error) {
+func PrepareQueueConnection(_ context.Context, randomnesPrefix string, testOpts DependancyOption) (connStr config.DataSource, close func(ctx context.Context), err error) {
 
 	if testOpts.Queue() != DefaultQueue {
 		return "", func(ctx context.Context) {}, fmt.Errorf(" %s is unsupported, only nats is the supported queue for now", testOpts.Queue())

@@ -8,9 +8,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -20,6 +17,8 @@ import (
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 )

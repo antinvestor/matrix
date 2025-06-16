@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	asAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/internal/eventutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/types"

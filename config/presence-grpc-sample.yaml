@@ -9,7 +9,7 @@ global:
 # SyncAPI configuration
 syncapi:
   database:
-    connection_string: "postgresql://user:password@localhost/syncapi"
+    database_uri: "postgresql://user:password@localhost/syncapi"
   matrix:
     # gRPC Presence Configuration
     presence_grpc_enabled: true        # Enable gRPC presence service
@@ -20,7 +20,7 @@ syncapi:
 # ClientAPI configuration
 clientapi:
   database:
-    connection_string: "postgresql://user:password@localhost/clientapi"
+    database_uri: "postgresql://user:password@localhost/clientapi"
   matrix:
     # gRPC Presence Configuration
     presence_grpc_enabled: true        # Enable gRPC clients
@@ -28,7 +28,7 @@ clientapi:
 # FederationAPI configuration
 federationapi:
   database:
-    connection_string: "postgresql://user:password@localhost/federationapi"
+    database_uri: "postgresql://user:password@localhost/federationapi"
   matrix:
     # gRPC Presence Configuration
     presence_grpc_enabled: true        # Enable gRPC clients

@@ -7,19 +7,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pitabwire/frame"
-
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 func mustMakeDBs(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (

@@ -3,15 +3,12 @@ package producers
 import (
 	"context"
 
+	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/util"
-
-	"github.com/antinvestor/gomatrixserverlib"
-
-	"github.com/antinvestor/matrix/internal/eventutil"
-
 	"github.com/antinvestor/matrix/userapi/storage"
+	"github.com/pitabwire/util"
 )
 
 // SyncAPI produces messages for the Sync API server to consume.

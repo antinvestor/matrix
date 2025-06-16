@@ -18,16 +18,15 @@ import (
 	"context"
 	"sync"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/appservice/consumers"
 	"github.com/antinvestor/matrix/appservice/query"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers

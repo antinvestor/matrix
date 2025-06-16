@@ -17,17 +17,12 @@ package syncapi
 import (
 	"context"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
-	"github.com/antinvestor/matrix/internal/httputil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
-	userapi "github.com/antinvestor/matrix/userapi/api"
-
 	"github.com/antinvestor/matrix/internal/cacheutil"
-
+	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/consumers"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/producers"
@@ -35,6 +30,8 @@ import (
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/sync"
+	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the SyncAPI

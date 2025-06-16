@@ -6,9 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/test/testrig"
 )
 
 func TestNewAuthenticator(t *testing.T) {

@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/userutil"
 	"github.com/antinvestor/matrix/internal"
@@ -31,6 +29,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
+	"golang.org/x/oauth2"
 )
 
 // devicesSchema defines the schema for devices table.

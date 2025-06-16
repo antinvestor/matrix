@@ -11,32 +11,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/clientapi/producers"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/gorilla/mux"
-	"github.com/stretchr/testify/assert"
-	"github.com/tidwall/gjson"
-
+	"github.com/antinvestor/matrix/roomserver"
+	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/routing"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
-
-	"github.com/antinvestor/matrix/clientapi/producers"
-	"github.com/antinvestor/matrix/roomserver"
-	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/gorilla/mux"
+	"github.com/pitabwire/frame"
+	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/gjson"
 )
 
 type syncRoomserverAPI struct {
@@ -189,7 +185,7 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 		},
 	}
 
-	syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
+	syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
 		// wait for the last sent eventID to come down sync
 		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
 		return gjson.Get(syncBody, path).Exists()
@@ -284,7 +280,7 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 		},
 	}
 
-	syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
+	syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
 		// wait for the last sent eventID to come down sync
 		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
 		return gjson.Get(syncBody, path).Exists()
@@ -334,7 +330,7 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 				t.Fatalf("failed to publish events: %v", err)
 			}
 
-			syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
+			syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
 				// wait for the last sent eventID to come down sync
 				path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
 				return gjson.Get(syncBody, path).Exists()
@@ -389,7 +385,7 @@ func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
 }
 
 func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption) {
-	//t.Skip("Skipped, possibly fixed")
+	// t.Skip("Skipped, possibly fixed")
 	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
@@ -474,7 +470,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 		if len(res.Rooms.Join) != 1 {
 			t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
 		}
-		//t.Logf("since=%s res state:%+v res timeline:%+v", since, res.Rooms.Join[room.ID].State.Events, res.Rooms.Join[room.ID].Timeline.Events)
+		// t.Logf("since=%s res state:%+v res timeline:%+v", since, res.Rooms.Join[room.ID].State.Events, res.Rooms.Join[room.ID].Timeline.Events)
 		gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
 		for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
 			gotEventIDs[j] = ev.EventID
@@ -658,7 +654,7 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 				if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
-				syncUntil(t, routers, aliceDev.AccessToken, false,
+				syncUntil(ctx, t, routers, aliceDev.AccessToken, false,
 					func(syncBody string) bool {
 						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, beforeJoinBody)
 						return gjson.Get(syncBody, path).Exists()
@@ -698,7 +694,7 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 				if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
-				syncUntil(t, routers, aliceDev.AccessToken, false,
+				syncUntil(ctx, t, routers, aliceDev.AccessToken, false,
 					func(syncBody string) bool {
 						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, afterJoinBody)
 						return gjson.Get(syncBody, path).Exists()
@@ -935,7 +931,7 @@ func TestGetMembership(t *testing.T) {
 				if tc.useSleep {
 					time.Sleep(time.Millisecond * 100)
 				} else {
-					syncUntil(t, routers, aliceDev.AccessToken, false, func(syncBody string) bool {
+					syncUntil(ctx, t, routers, aliceDev.AccessToken, false, func(syncBody string) bool {
 						// wait for the last sent eventID to come down sync
 						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
 						return gjson.Get(syncBody, path).Exists()
@@ -1082,7 +1078,7 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 			}
 		}
 
-		syncUntil(t, routers, alice.AccessToken,
+		syncUntil(ctx, t, routers, alice.AccessToken,
 			len(tc.want) == 0,
 			func(body string) bool {
 				return gjson.Get(body, fmt.Sprintf(`to_device.events.#(content.dummy=="message %d")`, msgCounter)).Exists()
@@ -1233,7 +1229,7 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 		t.Fatalf("failed to send events: %v", err)
 	}
 
-	syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
+	syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
 		// wait for the last sent eventID to come down sync
 		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, thirdMsg.EventID())
 		return gjson.Get(syncBody, path).Exists()
@@ -1428,7 +1424,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 			t.Fatalf("failed to send events: %v", err)
 		}
 
-		syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
+		syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
 			// wait for the last sent eventID to come down sync
 			path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, e.EventID())
 
@@ -1465,7 +1461,7 @@ func searchRequest(t *testing.T, router *mux.Router, accessToken, searchTerm str
 	assert.NoError(t, err)
 	return body
 }
-func syncUntil(t *testing.T,
+func syncUntil(ctx context.Context, t *testing.T,
 	routers httputil.Routers, accessToken string,
 	skip bool,
 	checkFunc func(syncBody string) bool,
@@ -1480,7 +1476,6 @@ func syncUntil(t *testing.T,
 	// loop on /sync until we receive the last send message or timeout after 5 seconds, since we don't know if the message made it
 	// to the syncAPI when hitting /sync
 	done := make(chan bool)
-	defer close(done)
 	go func() {
 		for {
 			w := httptest.NewRecorder()
@@ -1490,12 +1485,15 @@ func syncUntil(t *testing.T,
 			})))
 			if checkFunc(w.Body.String()) {
 				done <- true
+				close(done)
 				return
 			}
 		}
+
 	}()
 
 	select {
+	case <-ctx.Done():
 	case <-done:
 	case <-time.After(time.Second * 5):
 		t.Fatalf("Timed out waiting for messages")

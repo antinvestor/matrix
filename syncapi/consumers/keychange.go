@@ -19,8 +19,6 @@ import (
 	"encoding/json"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/notifier"
@@ -28,6 +26,7 @@ import (
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // OutputKeyChangeEventConsumer consumes events that originated in the key server.

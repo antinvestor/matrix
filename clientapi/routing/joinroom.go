@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrix"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/httputil"

@@ -19,9 +19,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pitabwire/util"
-	"golang.org/x/crypto/ed25519"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -29,6 +26,8 @@ import (
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"golang.org/x/crypto/ed25519"
 )
 
 type queryKeysRequest struct {

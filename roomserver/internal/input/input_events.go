@@ -24,28 +24,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pitabwire/util"
-
-	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/roomserver/acls"
-	"github.com/antinvestor/matrix/roomserver/internal/helpers"
-	"github.com/prometheus/client_golang/prometheus"
-
-	userAPI "github.com/antinvestor/matrix/userapi/api"
-
 	fedapi "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/hooks"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/state"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
+	userAPI "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/tidwall/gjson"
 )
 
 var processRoomEventDuration = prometheus.NewHistogramVec(

@@ -14,14 +14,16 @@ type SyncAPI struct {
 
 func (c *SyncAPI) Defaults(opts DefaultOpts) {
 	c.Fulltext.Defaults(opts)
-	c.Database.ConnectionString = opts.DSDatabaseConn
+	c.Database.Reference = "SyncAPI"
+	c.Database.Prefix = opts.RandomnessPrefix
+	c.Database.DatabaseURI = opts.DSDatabaseConn
 	c.Queues.Defaults(opts)
 }
 
-func (c *SyncAPI) Verify(configErrs *ConfigErrors) {
+func (c *SyncAPI) Verify(configErrs *Errors) {
 	c.Fulltext.Verify(configErrs)
-	if c.Database.ConnectionString == "" {
-		checkNotEmpty(configErrs, "sync_api.database", string(c.Database.ConnectionString))
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "sync_api.database", string(c.Database.DatabaseURI))
 	}
 }
 
@@ -38,7 +40,7 @@ func (f *Fulltext) Defaults(opts DefaultOpts) {
 	f.Language = "en"
 }
 
-func (f *Fulltext) Verify(configErrs *ConfigErrors) {
+func (f *Fulltext) Verify(configErrs *Errors) {
 	if !f.Enabled {
 		return
 	}
@@ -88,7 +90,7 @@ func (q *SyncQueues) Defaults(opts DefaultOpts) {
 	q.OutputPresenceEvent = opts.defaultQ(OutputPresenceEvent)
 }
 
-func (q *SyncQueues) Verify(configErrs *ConfigErrors) {
+func (q *SyncQueues) Verify(configErrs *Errors) {
 
 	checkNotEmpty(configErrs, "syncapi.queues.output_room_event", string(q.OutputRoomEvent.DS))
 	checkNotEmpty(configErrs, "syncapi.queues.output_client_data", string(q.OutputClientData.DS))

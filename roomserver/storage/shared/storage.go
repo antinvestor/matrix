@@ -11,17 +11,15 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/eventutil"
-	"github.com/antinvestor/matrix/roomserver/api"
-	"github.com/pitabwire/util"
-
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 // Ideally, when we have both events we should redact the event JSON and forget about the redaction, but we currently

@@ -20,20 +20,18 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/pitabwire/util"
-	"github.com/tidwall/gjson"
-
-	"github.com/antinvestor/gomatrixserverlib/spec"
-	rstypes "github.com/antinvestor/matrix/roomserver/types"
-	userapi "github.com/antinvestor/matrix/userapi/api"
-
 	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
+	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
+	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 // Database is a temporary struct until we have made syncserver.go the same for both pq/sqlite
@@ -76,9 +74,8 @@ func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransactio
 	}
 
 	ctx, txn, err := d.Cm.BeginTx(ctx, &writerOpt)
-
 	if err != nil {
-		return nil, err
+		 return nil, err
 	}
 	return &DatabaseTransaction{
 		Database: d,
@@ -483,7 +480,7 @@ func (d *Database) fetchMissingStateEvents(
 		// this error again when we work out what it is and fix it, otherwise we
 		// just end up returning lots of 500s to the client and that breaks
 		// pretty much everything, rather than just sending what we have.
-		//return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(stateEvents), len(missing))
+		// return nil, fmt.Errorf("failed to map all event IDs to events: (got %d, wanted %d)", len(stateEvents), len(missing))
 	}
 	events = append(events, stateEvents...)
 	return events, nil

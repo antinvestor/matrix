@@ -24,14 +24,12 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth"
-
 	"github.com/antinvestor/matrix/setup/config"
 	uapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
+	"golang.org/x/oauth2"
 )
 
 // SSORedirect implements /login/sso/redirect

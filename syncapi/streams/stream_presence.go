@@ -18,16 +18,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pitabwire/util"
 	"sync"
-
-	"github.com/tidwall/gjson"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 type PresenceStreamProvider struct {

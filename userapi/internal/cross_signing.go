@@ -21,15 +21,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/types"
-
+	"github.com/pitabwire/util"
 	"golang.org/x/crypto/curve25519"
 )
 

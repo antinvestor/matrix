@@ -27,18 +27,16 @@ import (
 
 	// Imported for png codec
 	_ "image/png"
-
-	// Imported for webp codec
-	_ "golang.org/x/image/webp"
-
 	"os"
 	"time"
 
+	// Imported for webp codec
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/nfnt/resize"
 	"github.com/pitabwire/util"
+	_ "golang.org/x/image/webp"
 )
 
 // GenerateThumbnails generates the configured thumbnail sizes for the source file

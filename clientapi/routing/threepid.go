@@ -17,6 +17,7 @@ package routing
 import (
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
@@ -25,8 +26,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 	userdb "github.com/antinvestor/matrix/userapi/storage"
-
-	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/pitabwire/util"
 )
 

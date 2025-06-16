@@ -18,11 +18,7 @@ import (
 	"net/http"
 
 	"connectrpc.com/connect"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/gorilla/mux"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -30,6 +26,8 @@ import (
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/sync"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/gorilla/mux"
+	"github.com/pitabwire/util"
 )
 
 // Setup configures the given mux with sync-server listeners

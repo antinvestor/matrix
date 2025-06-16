@@ -30,12 +30,10 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/setup"
 	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
-
 	"golang.org/x/term"
-
-	"github.com/antinvestor/matrix/setup"
 )
 
 const usage = `Usage: %s

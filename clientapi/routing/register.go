@@ -30,12 +30,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tidwall/gjson"
-
-	"github.com/antinvestor/matrix/internal"
-	"github.com/antinvestor/matrix/internal/eventutil"
-	"github.com/antinvestor/matrix/setup/config"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/gomatrixserverlib/tokens"
@@ -43,9 +37,13 @@ import (
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/userutil"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/eventutil"
+	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/tidwall/gjson"
 )
 
 var (
@@ -621,7 +619,7 @@ func handleGuestRegistration(
 			JSON: spec.Unknown("Failed to generate access token"),
 		}
 	}
-	//we don't allow guests to specify their own device_id
+	// we don't allow guests to specify their own device_id
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(req.Context(), &userapi.PerformDeviceCreationRequest{
 		Localpart:         res.Account.Localpart,

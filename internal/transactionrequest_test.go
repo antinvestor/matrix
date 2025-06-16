@@ -23,25 +23,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
-
-	"github.com/antinvestor/matrix/setup/config"
-
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/stretchr/testify/assert"
-	"gotest.tools/v3/poll"
-
 	"github.com/antinvestor/matrix/federationapi/producers"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
-
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	keyAPI "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/frame"
+	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/poll"
 )
 
 const (
@@ -224,27 +219,27 @@ func createTransactionWithEDU(ctx context.Context, svc *frame.Service, cfg *conf
 	cfgUserApi := cfg.UserAPI
 	cfgSyncApi := cfg.SyncAPI
 
-	err := qm.RegisterPublisher(ctx, &cfgSyncApi.Queues.OutputReceiptEvent)
+	err := qm.EnsurePublisherOk(ctx, &cfgSyncApi.Queues.OutputReceiptEvent)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = qm.RegisterPublisher(ctx, &cfgSyncApi.Queues.OutputSendToDeviceEvent)
+	err = qm.EnsurePublisherOk(ctx, &cfgSyncApi.Queues.OutputSendToDeviceEvent)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = qm.RegisterPublisher(ctx, &cfgSyncApi.Queues.OutputTypingEvent)
+	err = qm.EnsurePublisherOk(ctx, &cfgSyncApi.Queues.OutputTypingEvent)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = qm.RegisterPublisher(ctx, &cfgSyncApi.Queues.OutputPresenceEvent)
+	err = qm.EnsurePublisherOk(ctx, &cfgSyncApi.Queues.OutputPresenceEvent)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = qm.RegisterPublisher(ctx, &cfgUserApi.Queues.InputDeviceListUpdate)
+	err = qm.EnsurePublisherOk(ctx, &cfgUserApi.Queues.InputDeviceListUpdate)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = qm.RegisterPublisher(ctx, &cfgUserApi.Queues.InputSigningKeyUpdate)
+	err = qm.EnsurePublisherOk(ctx, &cfgUserApi.Queues.InputSigningKeyUpdate)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -565,7 +560,7 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 	defer svc.Stop(ctx)
 
 	edu := gomatrixserverlib.EDU{Type: "m.signing_key_update"}
-	if edu.Content, err = json.Marshal(map[string]interface{}{}); err != nil {
+	if edu.Content, err = json.Marshal(map[string]any{}); err != nil {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.signing_key_update"}

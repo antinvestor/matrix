@@ -36,7 +36,8 @@ doc:    ## generate godocs and start a local documentation webserver on port 808
 	godoc -http=:8085 -index
 
 goimports:
-	find . -name \*.go -not -path .git -exec goimports -w {} \;
+	find . -name '*.go' -not -path './vendor/*' -not -path './.git/*' -exec sed -i '/^import (/,/^)/{/^$$/d}' {} +
+	find . -name '*.go' -not -path './vendor/*' -not -path './.git/*' -exec goimports -w {} +
 
 .PHONY: build generate-grpc
 

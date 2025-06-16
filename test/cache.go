@@ -25,17 +25,17 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-//const RedisImage = "redis:7"
+// const RedisImage = "redis:7"
 //
-//func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
+// func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
 //	return tcRedis.Run(ctx, RedisImage)
-//}
+// }
 //
-//// testContainerRedisDataSource Prepare a redis connection string for testing.
-//// Returns the connection string to use and a close function which must be called when the test finishes.
-//// Calling this function twice will return the same database, which will have data from previous tests
-//// unless close() is called.
-//func testContainerRedisDataSource(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
+// // testContainerRedisDataSource Prepare a redis connection string for testing.
+// // Returns the connection string to use and a close function which must be called when the test finishes.
+// // Calling this function twice will return the same database, which will have data from previous tests
+// // unless close() is called.
+// func testContainerRedisDataSource(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
 //
 //	container, err := setupRedis(ctx)
 //	if err != nil {
@@ -53,7 +53,7 @@ import (
 //			util.Log(ctx).WithError(err).Error("failed to terminate container")
 //		}
 //	}, nil
-//}
+// }
 
 func clearCache(ctx context.Context, redisUriStr string) error {
 
@@ -70,7 +70,7 @@ func clearCache(ctx context.Context, redisUriStr string) error {
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareCacheConnection(ctx context.Context, testOpts DependancyOption) (connStr config.DataSource, close func(ctx context.Context), err error) {
+func PrepareCacheConnection(ctx context.Context, randomnesPrefix string, testOpts DependancyOption) (connStr config.DataSource, close func(ctx context.Context), err error) {
 
 	if testOpts.Cache() != DefaultCache {
 		return "", func(ctx context.Context) {}, fmt.Errorf(" %s is unsupported, only redis is the usable cache", testOpts.Cache())

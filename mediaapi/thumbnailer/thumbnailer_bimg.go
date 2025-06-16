@@ -21,13 +21,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/containerd/log"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
-
+	"github.com/pitabwire/util"
 	"gopkg.in/h2non/bimg.v1"
 )
 
@@ -78,7 +75,7 @@ func GenerateThumbnail(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *log.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
 	if err != nil {
@@ -116,7 +113,7 @@ func createThumbnail(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *log.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
 	logger = logger.
 		WithField("Width", config.Width).
@@ -211,7 +208,7 @@ func isLargerThanOriginal(config types.ThumbnailSize, img *bimg.Image) bool {
 // resize scales an image to fit within the provided width and height
 // If the source aspect ratio is different to the target dimensions, one edge will be smaller than requested
 // If crop is set to true, the image will be scaled to fill the width and height with any excess being cropped off
-func resize(dst types.Path, inImage *bimg.Image, w, h int, crop bool, logger *log.Entry) (int, int, error) {
+func resize(dst types.Path, inImage *bimg.Image, w, h int, crop bool, logger *util.LogEntry) (int, int, error) {
 	inSize, err := inImage.Size()
 	if err != nil {
 		return -1, -1, err

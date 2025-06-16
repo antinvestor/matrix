@@ -3,11 +3,10 @@ package config
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/pitabwire/util"
-
-	"time"
 )
 
 type RoomServer struct {
@@ -25,15 +24,17 @@ type RoomServer struct {
 
 func (c *RoomServer) Defaults(opts DefaultOpts) {
 	c.DefaultRoomVersion = gomatrixserverlib.RoomVersionV10
-	c.Database.ConnectionString = opts.DSDatabaseConn
+	c.Database.Reference = "RoomServer"
+	c.Database.Prefix = opts.RandomnessPrefix
+	c.Database.DatabaseURI = opts.DSDatabaseConn
 	c.Queues.Defaults(opts)
 
 	c.ActorSystem.Defaults(opts)
 }
 
-func (c *RoomServer) Verify(configErrs *ConfigErrors) {
-	if c.Database.ConnectionString == "" {
-		checkNotEmpty(configErrs, "room_server.database.connection_string", string(c.Database.ConnectionString))
+func (c *RoomServer) Verify(configErrs *Errors) {
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "room_server.database.database_uri", string(c.Database.DatabaseURI))
 	}
 
 	if !gomatrixserverlib.KnownRoomVersion(c.DefaultRoomVersion) {
@@ -77,7 +78,7 @@ func (c *ActorConfig) Defaults(opts DefaultOpts) {
 
 }
 
-func (c *ActorConfig) Verify(configErrs *ConfigErrors) {
+func (c *ActorConfig) Verify(configErrs *Errors) {
 	// Only verify if the actor system is enabled
 	if !c.Enabled {
 		return
@@ -124,6 +125,6 @@ func (q *RoomServerQueues) Defaults(opts DefaultOpts) {
 	q.InputRoomEvent = inputOpt
 }
 
-func (q *RoomServerQueues) Verify(configErrs *ConfigErrors) {
+func (q *RoomServerQueues) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "room_server.queues.input_room_event", string(q.InputRoomEvent.DS))
 }

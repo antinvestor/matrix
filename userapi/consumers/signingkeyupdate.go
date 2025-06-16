@@ -18,11 +18,10 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"

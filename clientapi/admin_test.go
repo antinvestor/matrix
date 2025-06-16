@@ -10,27 +10,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	capi "github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/roomserver/api"
 	basepkg "github.com/antinvestor/matrix/setup/base"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi"
-	"github.com/pitabwire/util"
-	"github.com/tidwall/gjson"
-
-	capi "github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi"
 	uapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 func TestAdminCreateToken(t *testing.T) {

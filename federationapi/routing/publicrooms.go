@@ -9,10 +9,9 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/pitabwire/util"
 )
 
 type PublicRoomReq struct {

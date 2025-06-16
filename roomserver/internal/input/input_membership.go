@@ -18,13 +18,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/antinvestor/matrix/internal"
-	"github.com/antinvestor/matrix/roomserver/storage/tables"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 )
 

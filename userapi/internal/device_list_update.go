@@ -25,16 +25,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antinvestor/matrix/federationapi/statistics"
-	rsapi "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/federationapi/statistics"
+	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

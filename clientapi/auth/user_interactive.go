@@ -20,14 +20,12 @@ import (
 	"net/http"
 	"sync"
 
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-
 	"github.com/tidwall/gjson"
+	"golang.org/x/oauth2"
 )
 
 // Type represents an auth type

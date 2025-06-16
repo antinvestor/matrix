@@ -21,22 +21,19 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
+	presenceV1 "buf.build/gen/go/antinvestor/presence/protocolbuffers/go"
+	"connectrpc.com/connect"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/types"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-
 	syncAPITypes "github.com/antinvestor/matrix/syncapi/types"
-
-	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
-	presenceV1 "buf.build/gen/go/antinvestor/presence/protocolbuffers/go"
-	"connectrpc.com/connect"
+	"github.com/pitabwire/util"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.

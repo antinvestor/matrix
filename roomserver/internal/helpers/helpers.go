@@ -5,12 +5,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/auth"
 	"github.com/antinvestor/matrix/roomserver/state"
@@ -18,6 +15,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/util"
 )
 
 // TODO: temporary package which has helper functions used by both internal/perform packages.

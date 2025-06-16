@@ -70,13 +70,15 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 			},
 		},
 	}
-	c.Database.ConnectionString = opts.DSDatabaseConn
+	c.Database.Reference = "FederationAPI"
+	c.Database.Prefix = opts.RandomnessPrefix
+	c.Database.DatabaseURI = opts.DSDatabaseConn
 	c.Queues.Defaults(opts)
 }
 
-func (c *FederationAPI) Verify(configErrs *ConfigErrors) {
-	if c.Global.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
+func (c *FederationAPI) Verify(configErrs *Errors) {
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "federation_api.database.database_uri", string(c.Database.DatabaseURI))
 	}
 }
 
@@ -99,7 +101,7 @@ func (c *Proxy) Defaults() {
 	c.Port = 8080
 }
 
-func (c *Proxy) Verify(configErrs *ConfigErrors) {
+func (c *Proxy) Verify(configErrs *Errors) {
 }
 
 // KeyPerspectives are used to configure perspective key servers for
@@ -147,7 +149,7 @@ func (q *FederationAPIQueues) Defaults(opts DefaultOpts) {
 	q.OutputTypingEvent = opts.defaultQ(OutputTypingEvent)
 }
 
-func (q *FederationAPIQueues) Verify(configErrs *ConfigErrors) {
+func (q *FederationAPIQueues) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "federation_api.queues.output_presence_event", string(q.OutputPresenceEvent.DS))
 	checkNotEmpty(configErrs, "federation_api.queues.output_receipt_event", string(q.OutputReceiptEvent.DS))
 	checkNotEmpty(configErrs, "federation_api.queues.output_room_event", string(q.OutputRoomEvent.DS))

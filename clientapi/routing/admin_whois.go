@@ -19,7 +19,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/userapi/api"
-
 	"github.com/pitabwire/util"
 )
 

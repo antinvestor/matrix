@@ -52,7 +52,7 @@ func (c *AppServiceAPI) Defaults(opts DefaultOpts) {
 	c.Queues.Defaults(opts)
 }
 
-func (c *AppServiceAPI) Verify(configErrs *ConfigErrors) {
+func (c *AppServiceAPI) Verify(configErrs *Errors) {
 }
 
 // ApplicationServiceNamespace is the namespace that a specific application
@@ -349,16 +349,16 @@ func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
 
 		// Check required fields
 		if appservice.ID == "" {
-			return ConfigErrors([]string{"Application service ID is required"})
+			return Errors([]string{"Application service ID is required"})
 		}
 		if appservice.ASToken == "" {
-			return ConfigErrors([]string{"Application service Token is required"})
+			return Errors([]string{"Application service Token is required"})
 		}
 		if appservice.HSToken == "" {
-			return ConfigErrors([]string{"Homeserver Token is required"})
+			return Errors([]string{"Homeserver Token is required"})
 		}
 		if appservice.SenderLocalpart == "" {
-			return ConfigErrors([]string{"Sender Localpart is required"})
+			return Errors([]string{"Sender Localpart is required"})
 		}
 
 		// Check if the url has trailing /'s. If so, remove them
@@ -367,13 +367,13 @@ func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
 		// Check if we've already seen this ID. No two application services
 		// can have the same ID or token.
 		if idMap[appservice.ID] {
-			return ConfigErrors([]string{fmt.Sprintf(
+			return Errors([]string{fmt.Sprintf(
 				"Application service ID %s must be unique", appservice.ID,
 			)})
 		}
 		// Check if we've already seen this token
 		if tokenMap[appservice.ASToken] {
-			return ConfigErrors([]string{fmt.Sprintf(
+			return Errors([]string{fmt.Sprintf(
 				"Application service Token %s must be unique", appservice.ASToken,
 			)})
 		}
@@ -407,7 +407,7 @@ func validateNamespace(
 ) error {
 	// Check that namespace(s) are valid regex
 	if !IsValidRegex(namespace.Regex) {
-		return ConfigErrors([]string{fmt.Sprintf(
+		return Errors([]string{fmt.Sprintf(
 			"Invalid regex string for Application Service %s", appservice.ID,
 		)})
 	}
@@ -419,7 +419,7 @@ func validateNamespace(
 
 		correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
 		if !correctFormat {
-			return ConfigErrors([]string{fmt.Sprintf(
+			return Errors([]string{fmt.Sprintf(
 				"Invalid user group_id field for application service %s.",
 				appservice.ID,
 			)})
@@ -447,6 +447,6 @@ func (q *AppServiceQueues) Defaults(opts DefaultOpts) {
 	q.OutputAppserviceEvent = opts.defaultQ(OutputAppserviceEvent)
 }
 
-func (q *AppServiceQueues) Verify(configErrs *ConfigErrors) {
+func (q *AppServiceQueues) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "appservice.queues.output_appservice_event", string(q.OutputAppserviceEvent.DS))
 }

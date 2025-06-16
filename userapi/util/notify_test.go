@@ -7,20 +7,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
-	"github.com/pitabwire/util"
-	"golang.org/x/crypto/bcrypt"
-
-	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
 	userUtil "github.com/antinvestor/matrix/userapi/util"
+	"github.com/pitabwire/util"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func queryUserIDForSender(senderID spec.SenderID) (*spec.UserID, error) {

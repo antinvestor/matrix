@@ -22,15 +22,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib"
-
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 const defaultSyncTimeout = time.Duration(0)
@@ -83,7 +81,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		filter.Room.AccountData.Limit = math.MaxInt32
 	}
 
-	//logger := util.Log(req.Context()).
+	// logger := util.Log(req.Context()).
 	//	WithField("user_id", device.UserID).
 	//	WithField("device_id", device.ID).
 	//	WithField("since", since).

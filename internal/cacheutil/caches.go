@@ -97,13 +97,13 @@ func maxAgeOfHalfHour(b time.Duration) time.Duration {
 
 func NewCache(cfg *config.CacheOptions) (*Caches, error) {
 
-	if cfg.ConnectionString == "" {
+	if cfg.CacheURI == "" {
 		return nil, errors.New("no url to cache specified")
 	}
 
-	if !cfg.ConnectionString.IsRedis() {
+	if !cfg.CacheURI.IsRedis() {
 		return nil, errors.New("only redis is currently supported as cache")
 	}
 
-	return NewRedisCache(string(cfg.ConnectionString), cfg.MaxAge)
+	return NewRedisCache(string(cfg.CacheURI), cfg.MaxAge)
 }

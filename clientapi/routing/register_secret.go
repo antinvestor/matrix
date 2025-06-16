@@ -12,9 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/patrickmn/go-cache"
-
 	"github.com/antinvestor/matrix/internal"
+	"github.com/patrickmn/go-cache"
 	"github.com/pitabwire/util"
 )
 

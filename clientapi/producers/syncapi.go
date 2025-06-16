@@ -18,18 +18,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
 	"strconv"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // SyncAPIProducer produces events for the sync API server to consume

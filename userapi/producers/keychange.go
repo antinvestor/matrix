@@ -19,10 +19,9 @@ import (
 
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
+	"github.com/pitabwire/util"
 )
 
 // KeyChange produces key change events for the sync API and federation sender to consume

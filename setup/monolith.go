@@ -18,11 +18,6 @@ import (
 	"context"
 
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
-	"github.com/antinvestor/matrix/internal/queueutil"
-
-	"github.com/antinvestor/matrix/syncapi"
-	userAPI "github.com/antinvestor/matrix/userapi/api"
-
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/gomatrixserverlib"
@@ -34,6 +29,7 @@ import (
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/internal/transactions"
 	"github.com/antinvestor/matrix/mediaapi"
@@ -41,6 +37,8 @@ import (
 	relayAPI "github.com/antinvestor/matrix/relayapi/api"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/syncapi"
+	userAPI "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/frame"
 )
 

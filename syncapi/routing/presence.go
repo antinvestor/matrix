@@ -3,15 +3,14 @@ package routing
 import (
 	"context"
 
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
+	presenceV1 "buf.build/gen/go/antinvestor/presence/protocolbuffers/go"
 	"connectrpc.com/connect"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/gorilla/mux"
-
-	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
-	presenceV1 "buf.build/gen/go/antinvestor/presence/protocolbuffers/go"
 )
 
 // PresenceServer implements the PresenceService connect interface

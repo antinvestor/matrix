@@ -23,7 +23,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/util"
-
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )

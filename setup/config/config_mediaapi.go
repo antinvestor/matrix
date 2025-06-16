@@ -55,12 +55,14 @@ func (c *MediaAPI) Defaults(opts DefaultOpts) {
 			ResizeMethod: "scale",
 		},
 	}
-	c.Database.ConnectionString = opts.DSDatabaseConn
+	c.Database.Reference = "MediaAPI"
+	c.Database.Prefix = opts.RandomnessPrefix
+	c.Database.DatabaseURI = opts.DSDatabaseConn
 	c.BasePath = "/tmp/media_store"
 
 }
 
-func (c *MediaAPI) Verify(configErrs *ConfigErrors) {
+func (c *MediaAPI) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))
 	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(c.MaxFileSizeBytes))
 	checkPositive(configErrs, "media_api.max_thumbnail_generators", int64(c.MaxThumbnailGenerators))
@@ -70,7 +72,7 @@ func (c *MediaAPI) Verify(configErrs *ConfigErrors) {
 		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].height", i), int64(size.Height))
 	}
 
-	if c.Global.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "media_api.database.database_uri", string(c.Database.DatabaseURI))
 	}
 }

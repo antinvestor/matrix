@@ -21,26 +21,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	api2 "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/userapi/producers"
-	"github.com/pitabwire/util"
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/internal"
+	"github.com/antinvestor/matrix/userapi/producers"
 	"github.com/antinvestor/matrix/userapi/storage"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (

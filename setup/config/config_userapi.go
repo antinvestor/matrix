@@ -37,14 +37,16 @@ func (c *UserAPI) Defaults(opts DefaultOpts) {
 	c.BCryptCost = bcrypt.DefaultCost
 	c.OpenIDTokenLifetimeMS = DefaultOpenIDTokenLifetimeMS
 	c.WorkerCount = 8
-	c.AccountDatabase.ConnectionString = opts.DSDatabaseConn
+	c.AccountDatabase.Reference = "UserAPI"
+	c.AccountDatabase.Prefix = opts.RandomnessPrefix
+	c.AccountDatabase.DatabaseURI = opts.DSDatabaseConn
 	c.Queues.Defaults(opts)
 }
 
-func (c *UserAPI) Verify(configErrs *ConfigErrors) {
+func (c *UserAPI) Verify(configErrs *Errors) {
 	checkPositive(configErrs, "user_api.openid_token_lifetime_ms", c.OpenIDTokenLifetimeMS)
-	if c.AccountDatabase.ConnectionString == "" {
-		checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
+	if c.AccountDatabase.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "user_api.account_database.database_uri", string(c.AccountDatabase.DatabaseURI))
 	}
 }
 
@@ -69,7 +71,7 @@ func (q *UserAPIQueues) Defaults(opts DefaultOpts) {
 	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent)
 }
 
-func (q *UserAPIQueues) Verify(configErrs *ConfigErrors) {
+func (q *UserAPIQueues) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "user_api.queues.output_receipt_event", string(q.OutputReceiptEvent.DS))
 	checkNotEmpty(configErrs, "user_api.queues.input_device_list_update", string(q.InputDeviceListUpdate.DS))
 	checkNotEmpty(configErrs, "user_api.queues.input_signing_key_update", string(q.InputSigningKeyUpdate.DS))

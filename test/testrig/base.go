@@ -19,10 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
+	"github.com/pitabwire/frame"
 )
 
 func newService(t *testing.T) (context.Context, *frame.Service) {
@@ -52,9 +51,6 @@ func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.
 	cfg.Global.Cache.MaxAge = time.Minute * 5
 	cfg.Global.Cache.EstimatedMaxSize = 8 * 1024 * 1024
 	cfg.Global.Cache.EnablePrometheus = false
-
-	cfg.Global.DatabaseOptions.MaxOpenConnections = 10
-	cfg.Global.DatabaseOptions.ConnMaxLifetimeSeconds = 60
 
 	for _, conn := range defaultOpts.DSDatabaseConn.ToArray() {
 		cfg.Global.DatabasePrimaryURL = append(cfg.Global.DatabasePrimaryURL, string(conn))
@@ -87,11 +83,9 @@ func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *fr
 	}
 	srv.AddCleanupMethod(clearConfig)
 
-	srvOpts := []frame.Option{frame.WithConfig(&cfg.Global), frame.WithDatastore(), frame.WithPoolCapacity(5), frame.WithPoolConcurrency(4)}
+	srvOpts := []frame.Option{frame.WithConfig(&cfg.Global), frame.WithDatastore(), frame.WithWorkerPoolOptions(frame.WithSinglePoolCapacity(40), frame.WithConcurrency(2), frame.WithPoolCount(1))}
 
 	srv.Init(ctx, srvOpts...)
-
-	createStreamForQueueConfig(ctx, t, srv, cfg)
 
 	return ctx, srv, cfg
 }

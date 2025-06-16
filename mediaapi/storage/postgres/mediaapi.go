@@ -17,10 +17,12 @@ package postgres
 
 import (
 	"context"
+
+	_ "github.com/lib/pq"
+
 	// Import the postgres database driver.
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/shared"
-	_ "github.com/lib/pq"
 )
 
 // NewDatabase opens a postgres database.

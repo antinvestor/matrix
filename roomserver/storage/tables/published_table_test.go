@@ -6,16 +6,13 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/pitabwire/frame"
-
-	"github.com/antinvestor/matrix/test/testrig"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/postgres"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
+	"github.com/stretchr/testify/assert"
 )
 
 func mustCreatePublishedTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) tables.Published {

@@ -22,20 +22,18 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrix"
-	"github.com/antinvestor/gomatrixserverlib/tokens"
-	"github.com/pitabwire/util"
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/antinvestor/matrix/roomserver/types"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib/tokens"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/transactions"
 	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Unspecced server notice request

@@ -18,11 +18,10 @@ package postgres
 import (
 	"context"
 	// Import the postgres database driver.
-	_ "github.com/lib/pq"
-
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
+	_ "github.com/lib/pq"
 )
 
 // A Database is used to store room events and stream offsets.

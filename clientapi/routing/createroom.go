@@ -22,15 +22,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
+	"github.com/antinvestor/matrix/clientapi/httputil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	roomserverVersion "github.com/antinvestor/matrix/roomserver/version"
-	"github.com/antinvestor/matrix/userapi/api"
-
-	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
 )
 

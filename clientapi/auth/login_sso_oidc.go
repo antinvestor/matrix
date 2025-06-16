@@ -27,11 +27,10 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/util"
+	"golang.org/x/oauth2"
 )
 
 // oidcDiscoveryMaxStaleness indicates how stale the Discovery

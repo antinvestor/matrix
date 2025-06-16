@@ -20,15 +20,14 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	keytypes "github.com/antinvestor/matrix/userapi/types"
-	"github.com/pitabwire/util"
-	"github.com/tidwall/gjson"
-
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
+	keytypes "github.com/antinvestor/matrix/userapi/types"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 // DeviceOTKCounts adds one-time key counts to the /sync response

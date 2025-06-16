@@ -22,15 +22,9 @@ import (
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
 
-	//"github.com/antinvestor/matrix/roomserver/internal"
+	// "github.com/antinvestor/matrix/roomserver/internal"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/util"
-
-	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	"github.com/antinvestor/matrix/syncapi/synctypes"
-
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/internal/cacheutil"
@@ -39,7 +33,11 @@ import (
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/pitabwire/util"
 )
 
 type Queryer struct {

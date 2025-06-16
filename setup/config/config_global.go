@@ -45,7 +45,7 @@ type Global struct {
 	// component does not specify any database options of its own, then this pool of
 	// connections will be used instead. This way we don't have to manage connection
 	// counts on a per-component basis, but can instead do it for the entire monolith.
-	DatabaseOptions DatabaseOptions `yaml:"database,omitempty"`
+	// DatabaseOptions DatabaseOptions `yaml:"database,omitempty"`
 
 	// The server name to delegate server-server communications to, with optional port
 	WellKnownServerName string `yaml:"well_known_server_name"`
@@ -107,7 +107,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	}
 
 	c.KeyValidityPeriod = time.Hour * 24 * 7
-	c.DatabaseOptions.Defaults(opts)
+	// c.DatabaseOptions.Defaults(opts)
 	c.Metrics.Defaults(opts)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
@@ -120,14 +120,8 @@ func (c *Global) Defaults(opts DefaultOpts) {
 }
 
 func (c *Global) LoadEnv() error {
-	err := frame.ConfigFillFromEnv(c)
-	if err != nil {
-		return err
-	}
-	err = c.DatabaseOptions.LoadEnv()
-	if err != nil {
-		return err
-	}
+
+	err := frame.ConfigFillEnv(c)
 	if err != nil {
 		return err
 	}
@@ -138,7 +132,7 @@ func (c *Global) LoadEnv() error {
 	return nil
 }
 
-func (c *Global) Verify(configErrs *ConfigErrors) {
+func (c *Global) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
 
@@ -151,7 +145,7 @@ func (c *Global) Verify(configErrs *ConfigErrors) {
 		v.Verify(configErrs)
 	}
 
-	c.DatabaseOptions.Verify(configErrs)
+	// c.DatabaseOptions.Verify(configErrs)
 	c.Metrics.Verify(configErrs)
 	c.Sentry.Verify(configErrs)
 	c.DNSCache.Verify(configErrs)
@@ -252,7 +246,7 @@ type VirtualHost struct {
 	AllowGuests bool `yaml:"allow_guests"`
 }
 
-func (v *VirtualHost) Verify(configErrs *ConfigErrors) {
+func (v *VirtualHost) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "virtual_host.*.server_name", string(v.ServerName))
 }
 
@@ -304,7 +298,7 @@ func (c *Metrics) Defaults(opts DefaultOpts) {
 
 }
 
-func (c *Metrics) Verify(configErrs *ConfigErrors) {
+func (c *Metrics) Verify(configErrs *Errors) {
 }
 
 // ServerNotices defines the configuration used for sending server notices
@@ -328,11 +322,11 @@ func (c *ServerNotices) Defaults(opts DefaultOpts) {
 	c.AvatarURL = ""
 }
 
-func (c *ServerNotices) Verify(errors *ConfigErrors) {}
+func (c *ServerNotices) Verify(errors *Errors) {}
 
 type CacheOptions struct {
 	// The connection string,
-	ConnectionString DataSource `env:"CACHE_URI" yaml:"connection_string"`
+	CacheURI DataSource `env:"CACHE_URI" yaml:"cache_uri"`
 
 	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
 	MaxAge           time.Duration `yaml:"max_age"`
@@ -341,13 +335,9 @@ type CacheOptions struct {
 
 func (c *CacheOptions) LoadEnv() error {
 
-	err := frame.ConfigFillFromEnv(c)
-	if err != nil {
-		c.ConnectionString = DataSource(os.Getenv("CACHE_URI"))
-	}
-
-	if !c.ConnectionString.IsRedis() {
-		util.Log(context.TODO()).WithField("cache_uri", c.ConnectionString).Warn("Invalid cache uri in the config")
+	cacheURI := os.Getenv("CACHE_URI")
+	if cacheURI != "" {
+		c.CacheURI = DataSource(cacheURI)
 	}
 	return nil
 }
@@ -355,25 +345,25 @@ func (c *CacheOptions) LoadEnv() error {
 func (c *CacheOptions) Defaults(opts DefaultOpts) {
 	connectionUriStr := string(opts.DSCacheConn)
 	if connectionUriStr != "" {
-		c.ConnectionString = DataSource(connectionUriStr)
+		c.CacheURI = DataSource(connectionUriStr)
 	}
 
-	c.ConnectionString = opts.DSCacheConn
+	c.CacheURI = opts.DSCacheConn
 	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
 	c.MaxAge = time.Hour
 }
 
-func (c *CacheOptions) Verify(configErrs *ConfigErrors) {
+func (c *CacheOptions) Verify(configErrs *Errors) {
 	checkPositive(configErrs, "max_size_estimated", int64(c.EstimatedMaxSize))
 
-	checkNotEmpty(configErrs, "global.cache.connection_string", string(c.ConnectionString))
+	checkNotEmpty(configErrs, "global.cache.cache_uri", string(c.CacheURI))
 }
 
 type QueueOptions struct {
 	Prefix     string `yaml:"prefix"`
 	QReference string `yaml:"reference"`
 	// The connection string,
-	DS DataSource `yaml:"uri"`
+	DS DataSource `yaml:"queue_uri"`
 }
 
 func (q *QueueOptions) Ref() string {
@@ -413,15 +403,11 @@ func (q *QueueOptions) DSrc() DataSource {
 	return DataSource(uri.String())
 }
 
-func (q *QueueOptions) LoadEnv() error {
+func (q *QueueOptions) LoadEnv(ctx context.Context) error {
 
-	err := frame.ConfigFillFromEnv(q)
-	if err != nil {
-		q.DS = DataSource(os.Getenv("QUEUE_URI"))
-	}
-
+	q.DS = DataSource(os.Getenv("QUEUE_URI"))
 	if !q.DS.IsQueue() {
-		util.Log(context.TODO()).WithField("queue_uri", q.DS).Warn("Invalid queue uri in the config")
+		util.Log(ctx).WithField("queue_uri", q.DS).Warn("Invalid queue uri in the config")
 	}
 	return nil
 }
@@ -436,10 +422,10 @@ func (q *QueueOptions) Defaults(opts DefaultOpts) {
 	q.Prefix = "Matrix_"
 }
 
-func (q *QueueOptions) Verify(configErrs *ConfigErrors) {
+func (q *QueueOptions) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "global.queue.topic_prefix", q.Prefix)
 
-	checkNotEmpty(configErrs, "global.queue.connection_string", string(q.DS))
+	checkNotEmpty(configErrs, "global.queue.queue_uri", string(q.DS))
 }
 
 // ReportStats configures opt-in phone-home statistics reporting.
@@ -456,7 +442,7 @@ func (c *ReportStats) Defaults() {
 	c.Endpoint = "https://panopticon.matrix.org/push"
 }
 
-func (c *ReportStats) Verify(configErrs *ConfigErrors) {
+func (c *ReportStats) Verify(configErrs *Errors) {
 	// We prefer to hit panopticon (https://github.com/matrix-org/panopticon) directly over
 	// the "old" matrix.org endpoint.
 	if c.Endpoint == "https://matrix.org/report-usage-stats/push" {
@@ -482,12 +468,14 @@ func (c *Sentry) Defaults() {
 	c.Enabled = false
 }
 
-func (c *Sentry) Verify(configErrs *ConfigErrors) {
+func (c *Sentry) Verify(configErrs *Errors) {
 }
 
 type DatabaseOptions struct {
+	Prefix    string `yaml:"prefix"`
+	Reference string `yaml:"reference"`
 	// The connection string, file:filename.db or postgres://server....
-	ConnectionString DataSource `env:"DATABASE_URI"  yaml:"connection_string"`
+	DatabaseURI DataSource `env:"DATABASE_URI"  yaml:"database_uri"`
 	// Maximum open connections to the Cm (0 = use default, negative means unlimited)
 	MaxOpenConnections int `yaml:"max_open_conns"`
 	// Maximum idle connections to the Cm (0 = use default, negative means unlimited)
@@ -496,15 +484,15 @@ type DatabaseOptions struct {
 	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
 }
 
-func (c *DatabaseOptions) LoadEnv() error {
+func (c *DatabaseOptions) Ref() string {
+	return fmt.Sprintf("%s%s", c.Prefix, c.Reference)
+}
 
-	err := frame.ConfigFillFromEnv(c)
-	if err != nil {
-		c.ConnectionString = DataSource(os.Getenv("DATABASE_URI"))
-	}
+func (c *DatabaseOptions) LoadEnv(ctx context.Context) error {
 
-	if !c.ConnectionString.IsPostgres() {
-		util.Log(context.TODO()).WithField("db_uri", c.ConnectionString).Warn("Invalid database uri in the config")
+	c.DatabaseURI = DataSource(os.Getenv("DATABASE_URI"))
+	if !c.DatabaseURI.IsPostgres() {
+		util.Log(ctx).WithField("database_uri", c.DatabaseURI).Warn("Invalid database uri in the config")
 	}
 	return nil
 }
@@ -513,7 +501,7 @@ func (c *DatabaseOptions) Defaults(opts DefaultOpts) {
 
 	databaseUriStr := string(opts.DSDatabaseConn)
 	if databaseUriStr != "" {
-		c.ConnectionString = DataSource(databaseUriStr)
+		c.DatabaseURI = DataSource(databaseUriStr)
 	}
 
 	c.MaxOpenConnections = 90
@@ -521,13 +509,13 @@ func (c *DatabaseOptions) Defaults(opts DefaultOpts) {
 	c.ConnMaxLifetimeSeconds = -1
 }
 
-func (c *DatabaseOptions) Verify(configErrs *ConfigErrors) {
+func (c *DatabaseOptions) Verify(configErrs *Errors) {
 
-	if c.ConnectionString != "" {
+	if c.DatabaseURI != "" {
 		return
 	}
 
-	checkNotEmpty(configErrs, "global.database.connection_string", string(c.ConnectionString))
+	checkNotEmpty(configErrs, "global.database.database_uri", string(c.DatabaseURI))
 
 }
 
@@ -561,7 +549,7 @@ func (c *DNSCacheOptions) Defaults() {
 	c.CacheLifetime = time.Minute * 5
 }
 
-func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors) {
+func (c *DNSCacheOptions) Verify(configErrs *Errors) {
 	checkPositive(configErrs, "cache_size", int64(c.CacheSize))
 	checkPositive(configErrs, "cache_lifetime", int64(c.CacheLifetime))
 }
@@ -610,5 +598,5 @@ func (d *DistributedAPI) Defaults() {
 	d.Enabled = false
 }
 
-func (d *DistributedAPI) Verify(configErrs *ConfigErrors) {
+func (d *DistributedAPI) Verify(configErrs *Errors) {
 }

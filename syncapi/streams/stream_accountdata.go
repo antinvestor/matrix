@@ -3,12 +3,12 @@ package streams
 import (
 	"context"
 	"encoding/json"
-	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 type AccountDataStreamProvider struct {
@@ -62,7 +62,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 	}
 
 	// Iterate over the rooms
-	for roomID, dataTypes := range dataTypes {
+	for roomID, roomDataTypes := range dataTypes {
 		// For a complete sync, make sure we're only including this room if
 		// that room was present in the joined rooms.
 		if from == 0 && roomID != "" && !req.IsRoomPresent(roomID) {
@@ -70,7 +70,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 		}
 
 		// Request the missing data from the database
-		for _, dataType := range dataTypes {
+		for _, dataType := range roomDataTypes {
 			dataReq := userapi.QueryAccountDataRequest{
 				UserID:   req.Device.UserID,
 				RoomID:   roomID,
@@ -94,8 +94,8 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 				}
 			} else {
 				if roomData, ok := dataRes.RoomAccountData[roomID][dataType]; ok {
-					joinData, ok := req.Response.Rooms.Join[roomID]
-					if !ok {
+					joinData, joinOK := req.Response.Rooms.Join[roomID]
+					if !joinOK {
 						joinData = types.NewJoinResponse()
 					}
 					joinData.AccountData.Events = append(

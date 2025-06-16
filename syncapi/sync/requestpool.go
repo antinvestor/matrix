@@ -26,9 +26,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
@@ -38,6 +35,8 @@ import (
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // RequestPool manages HTTP long-poll connections for /sync
@@ -234,6 +233,7 @@ func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Pr
 }
 
 func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device) {
+
 	if _, ok := rp.lastseen.LoadOrStore(device.UserID+device.ID, struct{}{}); ok {
 		return
 	}
@@ -258,7 +258,12 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 		UserAgent:  req.UserAgent(),
 	}
 	lsres := &userapi.PerformLastSeenUpdateResponse{}
-	go rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres) // nolint:errcheck
+	go func(ctx context.Context) {
+		err := rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres)
+		if err != nil {
+			util.Log(req.Context()).WithError(err).Error("PerformLastSeenUpdate failed")
+		}
+	}(req.Context())
 
 	rp.lastseen.Store(device.UserID+device.ID, time.Now())
 }
@@ -326,8 +331,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 		// if the since token matches the current positions, wait via the notifier
 		if !rp.shouldReturnImmediately(syncReq, currentPos) {
+
 			timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled above
-			defer timer.Stop()
 
 			userStreamListener := rp.Notifier.GetListener(*syncReq)
 			defer userStreamListener.Close()
@@ -354,29 +359,34 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 			select {
 			case <-ctx.Done(): // Caller gave up
+
+				timer.Stop()
+				userStreamListener.Close()
 				return giveup(ctx)
 
 			case <-timer.C: // Timeout reached
+				timer.Stop()
+				userStreamListener.Close()
 				return giveup(ctx)
 
 			case <-userStreamListener.GetNotifyChannel(syncReq.Since):
+				timer.Stop()
 				currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
 				log.WithField("currentPos", currentPos).Debug("Responding to sync after wake-up")
 			}
-		} else {
-			log.WithField("currentPos", currentPos).Debug("Responding to sync immediately")
 		}
 
+
 		withTransaction := func(from types.StreamPosition, f func(snapshot storage.DatabaseTransaction) types.StreamPosition) types.StreamPosition {
-			var succeeded bool
-			snapshot, err := rp.db.NewDatabaseSnapshot(ctx)
-			if err != nil {
-				log.WithError(err).Error("Failed to acquire database snapshot for sync request")
+
+			snapshot, snapErr := rp.db.NewDatabaseSnapshot(ctx)
+			if snapErr != nil {
+				log.WithError(snapErr).Error("Failed to acquire database snapshot for sync request")
 				return from
 			}
 			defer func() {
-				succeeded = err == nil
-				sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+				succeeded := snapErr == nil
+				sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &snapErr)
 			}()
 			return f(snapshot)
 		}

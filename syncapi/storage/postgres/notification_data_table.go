@@ -17,13 +17,12 @@ package postgres
 import (
 	"context"
 
-	"github.com/lib/pq"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
 )
 

@@ -21,7 +21,6 @@ import (
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	presenceV1 "buf.build/gen/go/antinvestor/presence/protocolbuffers/go"
 	"connectrpc.com/connect"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"

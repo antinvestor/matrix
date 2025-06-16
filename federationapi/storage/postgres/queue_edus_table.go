@@ -17,12 +17,11 @@ package postgres
 import (
 	"context"
 
-	"github.com/lib/pq"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/storage/tables"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
 )
 

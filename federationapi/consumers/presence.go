@@ -19,18 +19,16 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	fedTypes "github.com/antinvestor/matrix/federationapi/types"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/util"
 )
 
 // OutputPresenceConsumer consumes events that originate in the clientapi.

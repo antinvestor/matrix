@@ -18,18 +18,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/pushgateway"
-	"github.com/antinvestor/matrix/userapi/storage"
-
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-
 	"github.com/antinvestor/matrix/userapi/producers"
+	"github.com/antinvestor/matrix/userapi/storage"
 	userapiutil "github.com/antinvestor/matrix/userapi/util"
-
 	"github.com/pitabwire/util"
 )
 
@@ -89,7 +85,7 @@ func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[st
 		return nil
 	}
 
-	//TODO: previously this was extracted from message metadata, figure a way too pass in a stable position
+	// TODO: previously this was extracted from message metadata, figure a way too pass in a stable position
 	timeNow := time.Now()
 
 	updated, err := s.db.SetNotificationsRead(ctx, localpart, domain, roomID, uint64(spec.AsTimestamp(timeNow)), true)

@@ -8,6 +8,7 @@ services:
       POSTGRES_USER: matrix
       POSTGRES_DB: matrix
       RUST_BACKTRACE: "1"
+      POSTGRES_LOG_STATEMENT: all
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U matrix" ]
       interval: 2s

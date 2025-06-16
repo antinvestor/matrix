@@ -6,9 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/antinvestor/matrix/internal"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/pitabwire/frame"

@@ -23,7 +23,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-
 	"github.com/antinvestor/matrix/internal/eventutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 )

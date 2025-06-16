@@ -23,11 +23,10 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrix"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // RequestTurnServer implements:

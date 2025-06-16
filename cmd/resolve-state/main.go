@@ -4,13 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/antinvestor/matrix/setup/config"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/pitabwire/frame"
-	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -20,6 +18,8 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // This is a utility for inspecting state snapshots and running state resolution
@@ -68,8 +68,8 @@ func main() {
 	}
 
 	dbOpts := cfg.RoomServer.Database
-	if dbOpts.ConnectionString == "" {
-		dbOpts = cfg.Global.DatabaseOptions
+	if dbOpts.DatabaseURI == "" {
+		dbOpts.DatabaseURI =  config.DataSource(strings.Join(cfg.Global.DatabasePrimaryURL, ","))
 	}
 
 	cm, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &dbOpts)

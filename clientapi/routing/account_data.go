@@ -26,7 +26,6 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/userapi/api"
-
 	"github.com/pitabwire/util"
 )
 

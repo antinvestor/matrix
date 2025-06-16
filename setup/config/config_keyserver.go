@@ -9,13 +9,15 @@ type KeyServer struct {
 }
 
 func (c *KeyServer) Defaults(opts DefaultOpts) {
-	c.Database.ConnectionString = opts.DSDatabaseConn
+	c.Database.Reference = "KeyServer"
+	c.Database.Prefix = opts.RandomnessPrefix
+	c.Database.DatabaseURI = opts.DSDatabaseConn
 	c.Queues.Defaults(opts)
 }
 
-func (c *KeyServer) Verify(configErrs *ConfigErrors) {
-	if c.Database.ConnectionString == "" {
-		checkNotEmpty(configErrs, "key_server.database.connection_string", string(c.Database.ConnectionString))
+func (c *KeyServer) Verify(configErrs *Errors) {
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "key_server.database.database_uri", string(c.Database.DatabaseURI))
 	}
 }
 
@@ -29,6 +31,6 @@ func (q *KeyServerQueues) Defaults(opts DefaultOpts) {
 	q.OutputKeyChangeEvent = opts.defaultQ(OutputKeyChangeEvent)
 }
 
-func (q *KeyServerQueues) Verify(configErrs *ConfigErrors) {
+func (q *KeyServerQueues) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "key_server.queues.output_key_change_event", string(q.OutputKeyChangeEvent.DS))
 }

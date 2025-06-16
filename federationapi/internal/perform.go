@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -20,6 +18,7 @@ import (
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/roomserver/version"
+	"github.com/pitabwire/util"
 )
 
 // PerformDirectoryLookup implements api.FederationInternalAPI

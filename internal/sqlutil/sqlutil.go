@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
 var skipSanityChecks = flag.Bool("skip-db-sanity", false, "Ignore sanity checks on the database connections (NOT RECOMMENDED!)")
@@ -18,12 +17,12 @@ var skipSanityChecks = flag.Bool("skip-db-sanity", false, "Ignore sanity checks 
 // usually consisting of at least a database name and connection information.
 func Open(ctx context.Context, dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) {
 	var err error
-	if !dbProperties.ConnectionString.IsPostgres() {
-		return nil, fmt.Errorf("invalid database connection string %q", dbProperties.ConnectionString)
+	if !dbProperties.DatabaseURI.IsPostgres() {
+		return nil, fmt.Errorf("invalid database connection string %q", dbProperties.DatabaseURI)
 	}
 
 	driverName := "postgres"
-	dsn := string(dbProperties.ConnectionString)
+	dsn := string(dbProperties.DatabaseURI)
 
 	db, err := sql.Open(driverName, dsn)
 	if err != nil {

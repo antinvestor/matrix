@@ -23,8 +23,6 @@ import (
 	"sort"
 	"strings"
 
-	"gorm.io/gorm"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -35,6 +33,7 @@ import (
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
+	"gorm.io/gorm"
 )
 
 // SQL schema definition for the output room events table

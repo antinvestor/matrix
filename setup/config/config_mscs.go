@@ -13,7 +13,9 @@ type MSCs struct {
 }
 
 func (c *MSCs) Defaults(opts DefaultOpts) {
-	c.Database.ConnectionString = opts.DSDatabaseConn
+	c.Database.Reference = "MSCs"
+	c.Database.Prefix = opts.RandomnessPrefix
+	c.Database.DatabaseURI = opts.DSDatabaseConn
 }
 
 // Enabled returns true if the given msc is enabled. Should in the form 'msc12345'.
@@ -26,8 +28,8 @@ func (c *MSCs) Enabled(msc string) bool {
 	return false
 }
 
-func (c *MSCs) Verify(configErrs *ConfigErrors) {
-	if c.Database.ConnectionString == "" {
-		checkNotEmpty(configErrs, "mscs.database.connection_string", string(c.Database.ConnectionString))
+func (c *MSCs) Verify(configErrs *Errors) {
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "mscs.database.database_uri", string(c.Database.DatabaseURI))
 	}
 }

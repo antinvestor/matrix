@@ -150,7 +150,7 @@ func (t *eventStateKeysTable) BulkSelectEventStateKeyNID(
 	var stateKey string
 	var stateKeyNID int64
 	for rows.Next() {
-		if err := rows.Scan(&stateKey, &stateKeyNID); err != nil {
+		if err = rows.Scan(&stateKey, &stateKeyNID); err != nil {
 			return nil, err
 		}
 		result[stateKey] = types.EventStateKeyNID(stateKeyNID)

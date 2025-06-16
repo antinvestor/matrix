@@ -20,14 +20,13 @@ import (
 	"net/http"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/pitabwire/util"
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/sync"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}
@@ -51,7 +50,7 @@ func GetFilter(
 
 	filter := synctypes.DefaultFilter()
 	if err := syncDB.GetFilter(req.Context(), &filter, localpart, filterID); err != nil {
-		//TODO better error handling. This error message is *probably* right,
+		// TODO better error handling. This error message is *probably* right,
 		// but if there are obscure db errors, this will also be returned,
 		// even though it is not correct.
 		return util.JSONResponse{

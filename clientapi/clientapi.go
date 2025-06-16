@@ -18,9 +18,6 @@ import (
 	"context"
 
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
@@ -29,11 +26,12 @@ import (
 	"github.com/antinvestor/matrix/clientapi/routing"
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/transactions"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.

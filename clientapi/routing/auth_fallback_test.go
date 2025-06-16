@@ -8,11 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antinvestor/matrix/test"
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 )
 
 func Test_AuthFallback(t *testing.T) {
@@ -36,7 +35,7 @@ func Test_AuthFallback(t *testing.T) {
 							cfg.ClientAPI.RecaptchaFormField = "h-captcha-response"
 							cfg.ClientAPI.RecaptchaSitekeyClass = "h-captcha"
 						}
-						cfgErrs := &config.ConfigErrors{}
+						cfgErrs := &config.Errors{}
 						cfg.ClientAPI.Verify(cfgErrs)
 						if len(*cfgErrs) > 0 {
 							t.Fatalf("(hCaptcha=%v) unexpected config errors: %s", useHCaptcha, cfgErrs.Error())

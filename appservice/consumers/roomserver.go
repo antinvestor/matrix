@@ -25,17 +25,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-
 	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/pitabwire/util"
 )
 
 // ApplicationServiceTransaction is the transaction that is sent off to an
@@ -151,7 +148,7 @@ func (s *OutputRoomEventConsumer) Handle(
 	}
 
 	txnID := ""
-	//TODO: Switch to something stable. Try to get the message metadata, if we're able to, use the timestamp as the txnID
+	// TODO: Switch to something stable. Try to get the message metadata, if we're able to, use the timestamp as the txnID
 	txnID = strconv.Itoa(int(time.Now().Unix()))
 
 	// Send event to any relevant application services. If we hit

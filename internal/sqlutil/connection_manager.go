@@ -20,10 +20,9 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/frame" // assumed path; adjust if needed
+	"github.com/pitabwire/util"
 	"gorm.io/gorm"
 )
 
@@ -48,7 +47,7 @@ type Connections struct {
 }
 
 func (c *Connections) DS() *config.DataSource {
-	slc := c.opts.ConnectionString.ToArray()
+	slc := c.opts.DatabaseURI.ToArray()
 	if len(slc) == 0 {
 		return nil
 	}
@@ -177,7 +176,7 @@ func NewConnectionManager(service *frame.Service) ConnectionManager {
 		cfg := service.Config().(frame.ConfigurationDatabase)
 		primaryUrl := cfg.GetDatabasePrimaryHostURL()
 		if len(primaryUrl) > 0 {
-			opts = &config.DatabaseOptions{ConnectionString: config.DataSource(primaryUrl[0])}
+			opts = &config.DatabaseOptions{DatabaseURI: config.DataSource(primaryUrl[0])}
 		}
 
 		cfg.GetDatabaseMigrationPath()
@@ -192,7 +191,7 @@ func NewConnectionManager(service *frame.Service) ConnectionManager {
 
 // NewConnectionManagerWithOptions ensures a Pool exists for the given options and returns a copy with that as primary
 func NewConnectionManagerWithOptions(ctx context.Context, service *frame.Service, opts *config.DatabaseOptions) (ConnectionManager, error) {
-	connStr := opts.ConnectionString
+	connStr := opts.DatabaseURI
 	if connStr == "" {
 		return nil, errors.New("no database connection string provided")
 	}
@@ -206,18 +205,16 @@ func NewConnectionManagerWithOptions(ctx context.Context, service *frame.Service
 		return nil, errors.New("primary database connection should be a postgresql url")
 	}
 
-	primaryConnStr := string(primaryConn)
-
-	pool := service.DBPool(primaryConnStr)
+	pool := service.DBPool(opts.Ref())
 	if pool == nil {
 		var dbOpts []frame.Option
 		for _, conn := range connSlice {
 			if conn.IsPostgres() {
-				dbOpts = append(dbOpts, frame.WithDatastoreConnectionWithName(primaryConnStr, string(conn), false))
+				dbOpts = append(dbOpts, frame.WithDatastoreConnectionWithName(opts.Ref(), string(conn), false))
 			}
 		}
 		service.Init(ctx, dbOpts...)
-		pool = service.DBPool(primaryConnStr)
+		pool = service.DBPool(opts.Ref())
 	}
 
 	// Return a copy with new main

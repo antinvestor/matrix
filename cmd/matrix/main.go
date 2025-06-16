@@ -19,33 +19,28 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pitabwire/util"
-
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
-	"github.com/antinvestor/matrix/internal/queueutil"
-
-	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
-	"github.com/pitabwire/frame"
-
 	apis "github.com/antinvestor/apis/go/common"
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
+	"github.com/antinvestor/matrix/appservice"
+	"github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/getsentry/sentry-go"
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/antinvestor/matrix/appservice"
-	"github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/setup"
 	basepkg "github.com/antinvestor/matrix/setup/base"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/mscs"
 	"github.com/antinvestor/matrix/userapi"
+	"github.com/getsentry/sentry-go"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
@@ -66,11 +61,11 @@ func main() {
 		WithField("debug", globalCfg.LoggingLevel()).
 		Info("debug configuration values")
 
-	configErrors := &config.ConfigErrors{}
+	configErrors := &config.Errors{}
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			log.WithField("error", err).Error("Configuration error")
+			log.WithField("issue", err).Error("Configuration error")
 		}
 		log.Fatal("Failed to start due to configuration errors")
 	}
@@ -246,7 +241,7 @@ func main() {
 	serviceOptions := []frame.Option{httpOpt}
 	service.Init(ctx, serviceOptions...)
 
-	log.WithField("server http port", globalCfg.HttpServerPort).
+	log.WithField("server http port", globalCfg.HTTPServerPort).
 		Info(" Initiating server operations")
 	defer monolith.Service.Stop(ctx)
 	err = monolith.Service.Run(ctx, "")

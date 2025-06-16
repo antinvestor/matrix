@@ -28,15 +28,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pitabwire/frame"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/setup/config"
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/gorilla/mux"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -116,7 +115,7 @@ func SetupHTTPOption(
 
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 
-	//Redirect for Landing Page
+	// Redirect for Landing Page
 	externalRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
 	})
@@ -179,7 +178,7 @@ func SetupHTTPOption(
 	externalRouter.NotFoundHandler = httputil.NotFoundCORSHandler
 	externalRouter.MethodNotAllowedHandler = httputil.NotAllowedHandler
 
-	return frame.WithHttpHandler(externalRouter), nil
+	return frame.WithHTTPHandler(externalRouter), nil
 
 }
 

@@ -18,15 +18,12 @@ import (
 	"context"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/util"
-
-	"github.com/antinvestor/matrix/roomserver/storage/tables"
-
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 var keyContentFields = map[string]string{

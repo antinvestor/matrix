@@ -20,14 +20,13 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/lib/pq"
-	"github.com/pitabwire/frame"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // SQL schema for the state snapshot table

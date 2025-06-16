@@ -9,14 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antinvestor/matrix/test"
-
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/pitabwire/util"
 )
 

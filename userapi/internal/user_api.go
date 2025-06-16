@@ -26,18 +26,14 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
+	clientapi "github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
+	"github.com/antinvestor/matrix/clientapi/userutil"
 	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/pushrules"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/pitabwire/util"
-
-	"golang.org/x/crypto/bcrypt"
-
-	clientapi "github.com/antinvestor/matrix/clientapi/api"
-	"github.com/antinvestor/matrix/clientapi/userutil"
-	"github.com/antinvestor/matrix/internal/eventutil"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	synctypes "github.com/antinvestor/matrix/syncapi/types"
@@ -46,6 +42,8 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	userapiUtil "github.com/antinvestor/matrix/userapi/util"
+	"github.com/pitabwire/util"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserInternalAPI struct {

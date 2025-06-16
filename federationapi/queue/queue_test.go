@@ -22,23 +22,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/pitabwire/frame"
-
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/cacheutil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/test/testrig"
-	"gotest.tools/v3/poll"
-
-	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
+	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
+	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/poll"
 )
 
 func mustCreateFederationDatabase(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, realDatabase bool) storage.Database {

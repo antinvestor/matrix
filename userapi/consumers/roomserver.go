@@ -8,19 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/pushrules"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
@@ -30,6 +26,7 @@ import (
 	userAPITypes "github.com/antinvestor/matrix/userapi/types"
 	userapiutil "github.com/antinvestor/matrix/userapi/util"
 	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 type OutputRoomEventConsumer struct {
@@ -113,7 +110,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID().String())
 	}
 
-	//TODO: previously this was extracted from message metadata, figure a way too pass in a stable position
+	// TODO: previously this was extracted from message metadata, figure a way too pass in a stable position
 	timeNow := time.Now()
 
 	if err := s.processMessage(ctx, event, uint64(spec.AsTimestamp(timeNow))); err != nil {

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/stretchr/testify/assert"
 )
 

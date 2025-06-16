@@ -19,13 +19,12 @@ import (
 	"encoding/json"
 	"time"
 
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
+	"golang.org/x/oauth2"
 )
 
 // loginTokenSchema defines the schema for the login tokens table.

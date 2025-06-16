@@ -25,10 +25,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
 // GetPathFromBase64Hash evaluates the path to a media file from its Base64Hash

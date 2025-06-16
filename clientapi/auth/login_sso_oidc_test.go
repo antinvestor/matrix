@@ -9,9 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/test/testrig"
 )
 
 func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {

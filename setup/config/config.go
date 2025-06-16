@@ -28,10 +28,9 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
+	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v3"
-
-	jaegerconfig "github.com/uber/jaeger-client-go/config"
 )
 
 // keyIDRegexp defines allowable characters in Key IDs.
@@ -281,9 +280,9 @@ type ThumbnailSize struct {
 	ResizeMethod string `yaml:"method,omitempty"`
 }
 
-// ConfigErrors stores problems encountered when parsing a config file.
+// Errors stores problems encountered when parsing a config file.
 // It implements the error interface.
-type ConfigErrors []string
+type Errors []string
 
 // Load a yaml config file for a server run as multiple processes or as a monolith.
 // Checks the config to ensure that it is valid.
@@ -434,10 +433,10 @@ func (config *Matrix) LoadEnv() error {
 }
 
 type DefaultOpts struct {
-	DSDatabaseConn DataSource
-	DSCacheConn    DataSource
-	DSQueueConn    DataSource
-	QueuePrefix    string
+	DSDatabaseConn   DataSource
+	DSCacheConn      DataSource
+	DSQueueConn      DataSource
+	RandomnessPrefix string
 }
 
 func (d *DefaultOpts) defaultQ(s string) QueueOptions {
@@ -448,7 +447,7 @@ func (d *DefaultOpts) defaultQ(s string) QueueOptions {
 
 		durable := strings.Replace(fmt.Sprintf("ConsumerDurable_%s", s), ".", "_", -1)
 
-		return QueueOptions{Prefix: d.QueuePrefix, QReference: ref, DS: d.DSQueueConn.
+		return QueueOptions{Prefix: d.RandomnessPrefix, QReference: ref, DS: d.DSQueueConn.
 			ExtendQuery("jetstream", "true").
 			ExtendQuery("subject", s).
 			ExtendQuery("stream_name", s).
@@ -461,7 +460,7 @@ func (d *DefaultOpts) defaultQ(s string) QueueOptions {
 			ExtendQuery("consumer_ack_policy", "explicit"),
 		}
 	}
-	return QueueOptions{Prefix: d.QueuePrefix, QReference: ref, DS: d.DSQueueConn.SuffixPath(s)}
+	return QueueOptions{Prefix: d.RandomnessPrefix, QReference: ref, DS: d.DSQueueConn.SuffixPath(s)}
 }
 
 // Defaults sets default config values if they are not explicitly set.
@@ -482,9 +481,9 @@ func (config *Matrix) Defaults(opts DefaultOpts) {
 	config.Wiring()
 }
 
-func (config *Matrix) Verify(configErrs *ConfigErrors) {
+func (config *Matrix) Verify(configErrs *Errors) {
 	type verifiable interface {
-		Verify(configErrs *ConfigErrors)
+		Verify(configErrs *Errors)
 	}
 	for _, c := range []verifiable{
 		&config.Global, &config.ClientAPI, &config.FederationAPI,
@@ -499,28 +498,20 @@ func (config *Matrix) Verify(configErrs *ConfigErrors) {
 func (config *Matrix) Wiring() {
 	config.ClientAPI.Global = &config.Global
 	config.FederationAPI.Global = &config.Global
-	config.FederationAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
 	config.KeyServer.Global = &config.Global
-	config.KeyServer.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
 	config.MediaAPI.Global = &config.Global
-	config.MediaAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
 	config.RoomServer.Global = &config.Global
-	config.RoomServer.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
 	config.SyncAPI.Global = &config.Global
-	config.SyncAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
 	config.UserAPI.Global = &config.Global
-	config.UserAPI.AccountDatabase.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 	config.AppServiceAPI.Global = &config.Global
 	config.RelayAPI.Global = &config.Global
-	config.RelayAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
 	config.MSCs.Matrix = &config.Global
-	config.MSCs.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
 	config.ClientAPI.Derived = &config.Derived
 	config.AppServiceAPI.Derived = &config.Derived
@@ -529,7 +520,7 @@ func (config *Matrix) Wiring() {
 
 // Error returns a string detailing how many errors were contained within a
 // configErrors type.
-func (errs ConfigErrors) Error() string {
+func (errs Errors) Error() string {
 	if len(errs) == 1 {
 		return errs[0]
 	}
@@ -543,13 +534,13 @@ func (errs ConfigErrors) Error() string {
 // the client code.
 // This method is safe to use with an uninitialise configErrors because
 // if it is nil, it will be properly allocated.
-func (errs *ConfigErrors) Add(str string) {
+func (errs *Errors) Add(str string) {
 	*errs = append(*errs, str)
 }
 
 // checkNotEmpty verifies the given value is not empty in the configuration.
 // If it is, adds an error to the list.
-func checkNotEmpty(configErrs *ConfigErrors, key, value string) {
+func checkNotEmpty(configErrs *Errors, key, value string) {
 	if value == "" {
 		configErrs.Add(fmt.Sprintf("missing config key %q", key))
 	}
@@ -557,7 +548,7 @@ func checkNotEmpty(configErrs *ConfigErrors, key, value string) {
 
 // checkPositive verifies the given value is positive (zero included)
 // in the configuration. If it is not, adds an error to the list.
-func checkPositive(configErrs *ConfigErrors, key string, value int64) {
+func checkPositive(configErrs *Errors, key string, value int64) {
 	if value < 0 {
 		configErrs.Add(fmt.Sprintf("invalid value for config key %q: %d", key, value))
 	}
@@ -566,7 +557,7 @@ func checkPositive(configErrs *ConfigErrors, key string, value int64) {
 // check returns an error type containing all errors found within the config
 // file.
 func (config *Matrix) check() error { // monolithic
-	var configErrs ConfigErrors
+	var configErrs Errors
 
 	if config.Version != Version {
 		configErrs.Add(fmt.Sprintf(

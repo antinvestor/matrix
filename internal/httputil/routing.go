@@ -21,7 +21,6 @@ import (
 
 	"connectrpc.com/connect"
 	"connectrpc.com/validate"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/gorilla/mux"
 )

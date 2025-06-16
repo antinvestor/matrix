@@ -25,10 +25,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 const (
@@ -125,7 +124,7 @@ func clearDatabase(ctx context.Context, connectionString string) error {
 	return nil
 }
 
-func generateNewDBName() (string, error) {
+func generateNewDBName(randomnesPrefix string) (string, error) {
 	// we cannot use 'matrix_test' here else 2x concurrently running packages will try to use the same db.
 	// instead, hash the current working directory, snaffle the first 16 bytes and append that to matrix_test
 	// and use that as the unique db name. We do this because packages are per-directory hence by hashing the
@@ -135,7 +134,7 @@ func generateNewDBName() (string, error) {
 		return "", err
 	}
 	hash := sha256.Sum256([]byte(wd))
-	databaseName := fmt.Sprintf("matrix_tests_%s", hex.EncodeToString(hash[:16]))
+	databaseName := fmt.Sprintf("matrix_tests_%s_%s", randomnesPrefix, hex.EncodeToString(hash[:16]))
 	return databaseName, nil
 }
 
@@ -143,7 +142,7 @@ func generateNewDBName() (string, error) {
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareDatabaseConnection(ctx context.Context, testOpts DependancyOption) (postgresDataSource config.DataSource, close func(context.Context), err error) {
+func PrepareDatabaseConnection(ctx context.Context, randomnesPrefix string, testOpts DependancyOption) (postgresDataSource config.DataSource, close func(context.Context), err error) {
 
 	if testOpts.Database() != DefaultDB {
 		return "", func(ctx context.Context) {}, errors.New("only postgresql is the supported database for now")
@@ -158,7 +157,7 @@ func PrepareDatabaseConnection(ctx context.Context, testOpts DependancyOption) (
 		return "", func(ctx context.Context) {}, err
 	}
 
-	newDatabaseName, err := generateNewDBName()
+	newDatabaseName, err := generateNewDBName(randomnesPrefix)
 	if err != nil {
 		return "", func(ctx context.Context) {}, err
 	}

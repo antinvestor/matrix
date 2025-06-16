@@ -450,13 +450,13 @@ func (oq *destinationQueue) nextTransaction(ctx context.Context,
 	case nil:
 		// Clean up the transaction in the database.
 		if pduReceipts != nil {
-			//util.Log(ctx).Info("Cleaning PDUs %q", pduReceipt.String())
+			// util.Log(ctx).Info("Cleaning PDUs %q", pduReceipt.String())
 			if err = oq.db.CleanPDUs(ctx, oq.destination, pduReceipts); err != nil {
 				util.Log(ctx).WithError(err).Error("Failed to clean PDUs for server %q", t.Destination)
 			}
 		}
 		if eduReceipts != nil {
-			//util.Log(ctx).Info("Cleaning EDUs %q", eduReceipt.String())
+			// util.Log(ctx).Info("Cleaning EDUs %q", eduReceipt.String())
 			if err = oq.db.CleanEDUs(ctx, oq.destination, eduReceipts); err != nil {
 				util.Log(ctx).WithError(err).Error("Failed to clean EDUs for server %q", t.Destination)
 			}

@@ -17,14 +17,11 @@ package storage
 import (
 	"context"
 	"fmt"
-
-	profilev1 "github.com/antinvestor/apis/go/profile/v1"
-
 	"time"
 
+	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-
 	"github.com/antinvestor/matrix/userapi/storage/distributed"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
 )

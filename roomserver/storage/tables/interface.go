@@ -8,9 +8,8 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/tidwall/gjson"
 )
 
 var ErrOptimisationNotSupported = errors.New("optimisation not supported")
@@ -102,7 +101,7 @@ type StateSnapshot interface {
 type StateBlock interface {
 	BulkInsertStateData(ctx context.Context, entries types.StateEntries) (types.StateBlockNID, error)
 	BulkSelectStateBlockEntries(ctx context.Context, stateBlockNIDs types.StateBlockNIDs) ([][]types.EventNID, error)
-	//BulkSelectFilteredStateBlockEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
+	// BulkSelectFilteredStateBlockEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 }
 
 type RoomAliases interface {

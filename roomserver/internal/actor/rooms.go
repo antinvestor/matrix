@@ -6,15 +6,13 @@ import (
 	"sync/atomic"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-
 	actorV1 "github.com/antinvestor/matrix/apis/actor/v1"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/cluster"
 	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
-
-	"github.com/asynkron/protoactor-go/actor"
 )
 
 // RoomActor is an actor that processes messages for a specific room
@@ -205,7 +203,7 @@ func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkReque
 
 	log := ra.log
 
-	work := frame.NewJob(func(ctx context.Context, result frame.JobResultPipe[any]) error {
+	work := frame.NewJob(func(ctx context.Context, _ frame.JobResultPipe) error {
 		defer func() {
 			// Reset processing flag when job completes
 			ra.jobProcessing.Swap(false)
@@ -215,7 +213,7 @@ func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkReque
 
 		// Check if subscription is active
 		if ra.subscription == nil {
-			log.Error(" no subscription initialized for room")
+			log.Error(" no subscription initialised for room")
 			return fmt.Errorf("subscription not initialized for room %s", req.GetRoomId())
 		}
 

@@ -76,7 +76,7 @@ func (c *ClientAPI) Defaults(opts DefaultOpts) {
 	c.Queues.Defaults(opts)
 }
 
-func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
+func (c *ClientAPI) Verify(configErrs *Errors) {
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
 	if c.RecaptchaEnabled {
@@ -129,7 +129,7 @@ type LoginSSO struct {
 	DefaultProviderID string `yaml:"default_provider"`
 }
 
-func (sso *LoginSSO) Verify(configErrs *ConfigErrors) {
+func (sso *LoginSSO) Verify(configErrs *Errors) {
 	var foundDefaultProvider bool
 	seenPIDs := make(map[string]bool, len(sso.Providers))
 	for _, p := range sso.Providers {
@@ -175,12 +175,12 @@ func (idp *IdentityProvider) WithDefaults() IdentityProvider {
 	return p
 }
 
-func (idp *IdentityProvider) Verify(configErrs *ConfigErrors) {
+func (idp *IdentityProvider) Verify(configErrs *Errors) {
 	p := idp.WithDefaults()
 	p.verifyNormalized(configErrs)
 }
 
-func (idp *IdentityProvider) verifyNormalized(configErrs *ConfigErrors) {
+func (idp *IdentityProvider) verifyNormalized(configErrs *Errors) {
 	checkNotEmpty(configErrs, "client_api.sso.providers.id", idp.ID)
 	checkNotEmpty(configErrs, "client_api.sso.providers.name", idp.Name)
 
@@ -212,7 +212,7 @@ type TURN struct {
 	Password string `yaml:"turn_password"`
 }
 
-func (c *TURN) Verify(configErrs *ConfigErrors) {
+func (c *TURN) Verify(configErrs *Errors) {
 	value := c.UserLifetime
 	if value != "" {
 		if _, err := time.ParseDuration(value); err != nil {
@@ -238,7 +238,7 @@ type RateLimiting struct {
 	ExemptUserIDs []string `yaml:"exempt_user_ids"`
 }
 
-func (r *RateLimiting) Verify(configErrs *ConfigErrors) {
+func (r *RateLimiting) Verify(configErrs *Errors) {
 	if r.Enabled {
 		checkPositive(configErrs, "client_api.rate_limiting.threshold", r.Threshold)
 		checkPositive(configErrs, "client_api.rate_limiting.cooloff_ms", r.CooloffMS)
@@ -259,6 +259,6 @@ func (q *ClientQueues) Defaults(opts DefaultOpts) {
 	q.InputFulltextReindex = opts.defaultQ(InputFulltextReindex)
 }
 
-func (q *ClientQueues) Verify(configErrs *ConfigErrors) {
+func (q *ClientQueues) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "client_api.queues.input_fulltext_reindex", string(q.InputFulltextReindex.DS))
 }

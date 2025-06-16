@@ -2,10 +2,10 @@ package streams
 
 import (
 	"context"
-	"github.com/pitabwire/util"
 
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/util"
 )
 
 type SendToDeviceStreamProvider struct {

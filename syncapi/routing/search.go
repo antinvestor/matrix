@@ -22,10 +22,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
@@ -33,6 +29,8 @@ import (
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 // nolint:gocyclo
@@ -151,14 +149,14 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 	groups := make(map[string]RoomResult)
 	knownUsersProfiles := make(map[string]ProfileInfoResponse)
 
-	//orderByTime := searchReq.SearchCategories.RoomEvents.OrderBy == "recent"
+	// orderByTime := searchReq.SearchCategories.RoomEvents.OrderBy == "recent"
 
 	// Sort the events by depth, as the returned values aren't ordered
-	//if orderByTime {
+	// if orderByTime {
 	//	sort.Slice(evs, func(i, j int) bool {
 	//		return evs[i].Depth() > evs[j].Depth()
 	//	})
-	//}
+	// }
 
 	stateForRooms := make(map[string][]synctypes.ClientEvent)
 	for _, hit := range result.Results {

@@ -12,13 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pitabwire/frame"
-
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/httputil"
 	basepkg "github.com/antinvestor/matrix/setup/base"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,7 +40,7 @@ func TestLandingPage_Tcp(t *testing.T) {
 	s.Close()
 
 	httpUrl, err := url.Parse(s.URL)
-	cfg.Global.HttpServerPort = fmt.Sprintf(":%s", httpUrl.Port())
+	cfg.Global.HTTPServerPort = fmt.Sprintf(":%s", httpUrl.Port())
 
 	ctx, service := frame.NewServiceWithContext(ctx, "matrix tests",
 		frame.WithConfig(&cfg.Global))

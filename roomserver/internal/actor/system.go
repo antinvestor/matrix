@@ -194,8 +194,7 @@ func RoomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.Roo
 			ds = ds.ExtendQuery("consumer_headers_only", "false")
 			ds = ds.ExtendQuery("receive_batch_max_batch_size", "1")
 		} else {
-			ds = ds.RemoveQuery("stream_subjects", "stream_storage", "stream_retention", "consumer_ack_policy",
-				"consumer_deliver_policy", "consumer_headers_only", "consumer_replay_policy", "stream_name")
+			ds = ds.RemoveQuery("consumer_ack_policy", "consumer_deliver_policy", "consumer_headers_only", "consumer_replay_policy")
 		}
 
 	} else {

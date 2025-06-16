@@ -18,15 +18,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/queueutil"
-
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/internal/pushgateway"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/consumers"
@@ -34,7 +33,6 @@ import (
 	"github.com/antinvestor/matrix/userapi/producers"
 	"github.com/antinvestor/matrix/userapi/storage"
 	userapiutil "github.com/antinvestor/matrix/userapi/util"
-	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/pitabwire/util"
 )
 

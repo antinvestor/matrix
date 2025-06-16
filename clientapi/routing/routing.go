@@ -20,17 +20,9 @@ import (
 	"strings"
 
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
-
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/gorilla/mux"
-	"github.com/pitabwire/util"
-	"github.com/prometheus/client_golang/prometheus"
-
-	"golang.org/x/sync/singleflight"
-
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/clientapi/auth"
@@ -43,6 +35,10 @@ import (
 	"github.com/antinvestor/matrix/setup/base"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/gorilla/mux"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/singleflight"
 )
 
 type WellKnownClientHomeserver struct {

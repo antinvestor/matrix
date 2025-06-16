@@ -11,7 +11,6 @@ import (
 
 	"github.com/antinvestor/matrix/clientapi/auth"
 	"github.com/antinvestor/matrix/clientapi/userutil"
-
 	"github.com/antinvestor/matrix/setup/config"
 	uapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/google/go-cmp/cmp"
@@ -256,7 +255,7 @@ func TestSSOCallback(t *testing.T) {
 			WantLocationRE:  `http://matrix.example.com/continue\?loginToken=atoken`,
 			WantSetCookieRE: "sso_nonce=;",
 
-			//WantAccountCreation:    []*uapi.PerformAccountCreationRequest{{Localpart: "asuggestedid", AccountType: uapi.AccountTypeUser, OnConflict: uapi.ConflictAbort}},
+			// WantAccountCreation:    []*uapi.PerformAccountCreationRequest{{Localpart: "asuggestedid", AccountType: uapi.AccountTypeUser, OnConflict: uapi.ConflictAbort}},
 			WantLoginTokenCreation: []*uapi.PerformLoginTokenCreationRequest{{Data: uapi.LoginTokenData{UserID: "@asuggestedid:aservername"}}},
 			WantQueryLocalpart:     []*uapi.QuerySSOAccountRequest{{ServerName: "aservername", Issuer: "anissuer", Subject: "asuggestedid"}},
 		},
@@ -291,7 +290,7 @@ func TestSSOCallback(t *testing.T) {
 			WantLocationRE:  `http://matrix.example.com/continue\?loginToken=atoken`,
 			WantSetCookieRE: "sso_nonce=;",
 
-			//WantAccountCreation:    []*uapi.PerformAccountCreationRequest{{Localpart: "12345", AccountType: uapi.AccountTypeUser, OnConflict: uapi.ConflictAbort}},
+			// WantAccountCreation:    []*uapi.PerformAccountCreationRequest{{Localpart: "12345", AccountType: uapi.AccountTypeUser, OnConflict: uapi.ConflictAbort}},
 			WantLoginTokenCreation: []*uapi.PerformLoginTokenCreationRequest{{Data: uapi.LoginTokenData{UserID: "@12345:aservername"}}},
 			WantQueryLocalpart:     []*uapi.QuerySSOAccountRequest{{ServerName: "aservername", Issuer: "anissuer", Subject: "12345"}},
 		},

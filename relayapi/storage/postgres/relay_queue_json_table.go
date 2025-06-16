@@ -17,13 +17,11 @@ package postgres
 import (
 	"context"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
 // relayQueueJSONSchema defines the table structure for storing JSON event content

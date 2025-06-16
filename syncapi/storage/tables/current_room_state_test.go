@@ -5,10 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pitabwire/frame"
-
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
@@ -16,6 +12,8 @@ import (
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 )
 
 func newCurrentRoomStateTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, sqlutil.ConnectionManager) {

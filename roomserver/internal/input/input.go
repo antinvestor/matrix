@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -170,13 +171,18 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, messag
 
 func replyQOpts(ctx context.Context, opts *config.QueueOptions) (*config.QueueOptions, error) {
 
-	replyTo := fmt.Sprintf("__ReplyQueue_%s", frame.GenerateID(ctx))
+	replyTo := fmt.Sprintf("__Reply.%s", frame.GenerateID(ctx))
 
 	ds := opts.DS
 	if ds.IsNats() {
 
-		ds = ds.RemoveQuery("jetstream", "stream_storage", "stream_retention")
-		ds = ds.ExtendQuery("subject", replyTo)
+		ds = ds.RemoveQuery( "stream_storage", "stream_retention")
+		ds = ds.ExtendQuery("subject", replyTo).
+			ExtendQuery("stream_subjects", "__Reply.*").
+			ExtendQuery("stream_name", "InputRoomEventReplies").
+			ExtendQuery("stream_storage", "memory").
+			ExtendQuery("consumer_filter_subject", replyTo).
+			ExtendQuery("consumer_durable_name", strings.ReplaceAll( strings.ReplaceAll( replyTo, ".",""), "_",""))
 
 	} else {
 		ds = config.DataSource(fmt.Sprintf("mem://%s", replyTo))
@@ -248,6 +254,11 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 	replyTo, ok := metadata["sync_uri"]
 	if ok {
 
+		log := util.Log(ctx).WithField("room_id", inputRoomEvent.Event.RoomID()).
+			WithField("event_id", inputRoomEvent.Event.EventID()).
+			WithField("type", inputRoomEvent.Event.Type()).
+			WithField("replyTo", replyTo)
+
 		replyToOpts := &config.QueueOptions{
 			DS:         config.DataSource(replyTo),
 			Prefix:     metadata["sync_prefix"],
@@ -256,7 +267,7 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 
 		err0 := r.Qm.EnsurePublisherOk(ctx, replyToOpts)
 		if err0 != nil {
-			util.Log(ctx).WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
+			log.WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
 				WithField("event_id", inputRoomEvent.Event.EventID()).
 				WithField("type", inputRoomEvent.Event.Type()).
 				WithField("replyTo", replyTo).
@@ -274,7 +285,7 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 
 		err0 = r.Qm.Publish(ctx, replyToOpts.Ref(), []byte(errString))
 		if err0 != nil {
-			util.Log(ctx).WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
+			log.WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
 				WithField("event_id", inputRoomEvent.Event.EventID()).
 				WithField("type", inputRoomEvent.Event.Type()).
 				WithField("replyTo", replyTo).

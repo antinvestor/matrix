@@ -18,11 +18,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // PerformLoginTokenCreation creates a new login token and associates it with the provided data.

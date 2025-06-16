@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"golang.org/x/crypto/bcrypt"
-	"gopkg.in/yaml.v3"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
+	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
