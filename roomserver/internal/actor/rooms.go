@@ -186,7 +186,7 @@ func (ra *RoomActor) Publish(req *actorV1.PublishRequest, gctx cluster.GrainCont
 
 	// Check if publisher is active
 	if ra.publisher == nil {
-		return nil, fmt.Errorf("publisher not initialized for room %s", req.GetRoomId())
+		return nil, fmt.Errorf("publisher not initialised for room %s", req.GetRoomId())
 	}
 
 	err := ra.publisher.Publish(ra.ctx, req.GetPayload(), req.GetMetadata())
@@ -214,7 +214,7 @@ func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkReque
 		// Check if subscription is active
 		if ra.subscription == nil {
 			log.Error(" no subscription initialised for room")
-			return fmt.Errorf("subscription not initialized for room %s", req.GetRoomId())
+			return fmt.Errorf("subscription not initialised for room %s", req.GetRoomId())
 		}
 
 		requestCtx, cancelFn := context.WithTimeout(ctx, maximumIdlingTime)

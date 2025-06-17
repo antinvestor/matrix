@@ -78,7 +78,7 @@ func PrepareCacheConnection(ctx context.Context, randomnesPrefix string, testOpt
 
 	redisUriStr := os.Getenv("TESTING_CACHE_URI")
 	if redisUriStr == "" {
-		redisUriStr = "redis://matrix:s3cr3t@127.0.0.1:6379"
+		redisUriStr = "redis://matrix:s3cr3t@localhost:6378"
 	}
 
 	parsedUri, err := url.Parse(redisUriStr)

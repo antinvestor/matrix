@@ -376,7 +376,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			}
 		}
 
-
 		withTransaction := func(from types.StreamPosition, f func(snapshot storage.DatabaseTransaction) types.StreamPosition) types.StreamPosition {
 
 			snapshot, snapErr := rp.db.NewDatabaseSnapshot(ctx)

@@ -150,7 +150,7 @@ func PrepareDatabaseConnection(ctx context.Context, randomnesPrefix string, test
 
 	postgresUriStr := os.Getenv("TESTING_DATABASE_URI")
 	if postgresUriStr == "" {
-		postgresUriStr = "postgres://matrix:s3cr3t@127.0.0.1:5432/matrix?sslmode=disable"
+		postgresUriStr = "postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable"
 	}
 	parsedPostgresUri, err := url.Parse(postgresUriStr)
 	if err != nil {

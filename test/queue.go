@@ -67,7 +67,7 @@ func PrepareQueueConnection(_ context.Context, randomnesPrefix string, testOpts 
 
 	natsUriStr := os.Getenv("TESTING_QUEUE_URI")
 	if natsUriStr == "" {
-		natsUriStr = "nats://localhost:4222"
+		natsUriStr = "nats://matrix:s3cr3t@localhost:4221"
 	}
 
 	parsedNatsUri, err := url.Parse(natsUriStr)

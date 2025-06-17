@@ -66,7 +66,7 @@ func NewRoomserverAPI(
 
 	serverACLs := acls.NewServerACLs(ctx, roomserverDB)
 
-	err := qm.RegisterPublisher(ctx, &cfg.SyncAPI.Queues.OutputRoomEvent)
+	err := qm.EnsurePublisherOk(ctx, &cfg.SyncAPI.Queues.OutputRoomEvent)
 	if err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to register publisher for output room event")
 	}
@@ -92,7 +92,7 @@ func NewRoomserverAPI(
 	return a
 }
 
-// SetFederationInputAPI passes in a federation input API reference so that we can
+// SetFederationAPI passes in a federation input API reference so that we can
 // avoid the chicken-and-egg problem of both the roomserver input API and the
 // federation input API being interdependent.
 func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {

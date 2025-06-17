@@ -179,7 +179,7 @@ func (p *SyncAPIProducer) SendDeviceListUpdate(
 		WithField("component", "syncapi_producer").
 		WithField("device_list_update", h).
 		Debug("Sending device list update")
-	return p.Qm.Publish(ctx, p.TopicPresenceEvent, []byte(deviceListUpdate), h)
+	return p.Qm.Publish(ctx, p.TopicDeviceListUpdate, deviceListUpdate, h)
 }
 
 func (p *SyncAPIProducer) SendSigningKeyUpdate(

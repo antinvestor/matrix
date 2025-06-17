@@ -4,11 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/antinvestor/matrix/setup/config"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/antinvestor/matrix/setup/config"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -69,7 +70,7 @@ func main() {
 
 	dbOpts := cfg.RoomServer.Database
 	if dbOpts.DatabaseURI == "" {
-		dbOpts.DatabaseURI =  config.DataSource(strings.Join(cfg.Global.DatabasePrimaryURL, ","))
+		dbOpts.DatabaseURI = config.DataSource(strings.Join(cfg.Global.DatabasePrimaryURL, ","))
 	}
 
 	cm, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &dbOpts)

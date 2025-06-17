@@ -445,7 +445,7 @@ func (d *DefaultOpts) defaultQ(s string) QueueOptions {
 
 	if d.DSQueueConn.IsNats() {
 
-		durable := strings.Replace(fmt.Sprintf("ConsumerDurable_%s", s), ".", "_", -1)
+		durable := strings.ReplaceAll(fmt.Sprintf("ConsumerDurable_%s", s), ".", "_")
 
 		return QueueOptions{Prefix: d.RandomnessPrefix, QReference: ref, DS: d.DSQueueConn.
 			ExtendQuery("jetstream", "true").

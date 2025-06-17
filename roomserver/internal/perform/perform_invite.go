@@ -17,6 +17,7 @@ package perform
 import (
 	"context"
 	"crypto/ed25519"
+	"errors"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -166,7 +167,7 @@ func (r *Inviter) PerformInvite(
 		}
 	}
 
-	input := gomatrixserverlib.PerformInviteInput{
+	inviteInput := gomatrixserverlib.PerformInviteInput{
 		RoomID:            req.InviteInput.RoomID,
 		RoomVersion:       info.RoomVersion,
 		Inviter:           req.InviteInput.Inviter,
@@ -201,7 +202,7 @@ func (r *Inviter) PerformInvite(
 				return gomatrixserverlib.LatestEvents{}, nil
 			}
 
-			stateEvents := []gomatrixserverlib.PDU{}
+			var stateEvents []gomatrixserverlib.PDU
 			for _, event := range res.StateEvents {
 				stateEvents = append(stateEvents, event.PDU)
 			}
@@ -221,10 +222,11 @@ func (r *Inviter) PerformInvite(
 		},
 	}
 
-	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, input, r.FSAPI)
+	inviteEvent, err := gomatrixserverlib.PerformInvite(ctx, inviteInput, r.FSAPI)
 	if err != nil {
-		switch e := err.(type) {
-		case spec.MatrixError:
+		var e spec.MatrixError
+		switch {
+		case errors.As(err, &e):
 			if e.ErrCode == spec.ErrorForbidden {
 				return api.ErrNotAllowed{Err: fmt.Errorf("%s", e.Err)}
 			}
@@ -232,7 +234,7 @@ func (r *Inviter) PerformInvite(
 		return err
 	}
 
-	// Send the invite event to the roomserver input stream. This will
+	// Send the invite event to the roomserver inviteInput stream. This will
 	// notify existing users in the room about the invite, update the
 	// membership table and ensure that the event is ready and available
 	// to use as an auth event when accepting the invite.
@@ -249,7 +251,8 @@ func (r *Inviter) PerformInvite(
 	}
 	inputRes := &api.InputRoomEventsResponse{}
 	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
-	if err := inputRes.Err(); err != nil {
+	err = inputRes.Err()
+	if err != nil {
 		util.Log(ctx).WithField("event_id", inviteEvent.EventID()).Error("r.InputRoomEvents failed")
 		return api.ErrNotAllowed{Err: err}
 	}

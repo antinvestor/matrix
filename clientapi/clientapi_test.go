@@ -759,7 +759,8 @@ func TestMembership(t *testing.T) {
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
 		// Create the room
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+		err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false)
+		if err != nil {
 			t.Fatal(err)
 		}
 

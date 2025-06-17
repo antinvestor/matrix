@@ -117,12 +117,7 @@ func (s *syncUserAPI) PerformLastSeenUpdate(ctx context.Context, req *userapi.Pe
 }
 
 func TestSyncAPIAccessTokens(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		testSyncAccessTokens(t, testOpts)
-	})
-}
 
-func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
@@ -133,87 +128,90 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(svc)
-	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
-	qm := queueutil.NewQueueManager(svc)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
+		qm := queueutil.NewQueueManager(svc)
 
-	msgs := toQueueMsgs(t, room.Events()...)
+		msgs := toQueueMsgs(t, room.Events()...)
 
-	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
-	err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
-	if err != nil {
-		t.Fatalf("failed to publish events: %v", err)
-	}
+		err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
+		if err != nil {
+			t.Fatalf("failed to publish events: %v", err)
+		}
 
-	testCases := []struct {
-		name            string
-		req             *http.Request
-		wantCode        int
-		wantJoinedRooms []string
-	}{
-		{
-			name: "missing access token",
-			req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-				"timeout": "0",
-			})),
-			wantCode: 401,
-		},
-		{
-			name: "unknown access token",
-			req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-				"access_token": "foo",
-				"timeout":      "0",
-			})),
-			wantCode: 401,
-		},
-		{
-			name: "valid access token",
-			req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-				"access_token": alice.AccessToken,
-				"timeout":      "0",
-			})),
-			wantCode:        200,
-			wantJoinedRooms: []string{room.ID},
-		},
-	}
+		testCases := []struct {
+			name            string
+			req             *http.Request
+			wantCode        int
+			wantJoinedRooms []string
+		}{
+			{
+				name: "missing access token",
+				req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+					"timeout": "0",
+				})),
+				wantCode: 401,
+			},
+			{
+				name: "unknown access token",
+				req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+					"access_token": "foo",
+					"timeout":      "0",
+				})),
+				wantCode: 401,
+			},
+			{
+				name: "valid access token",
+				req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+					"access_token": alice.AccessToken,
+					"timeout":      "0",
+				})),
+				wantCode:        200,
+				wantJoinedRooms: []string{room.ID},
+			},
+		}
 
-	syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
-		// wait for the last sent eventID to come down sync
-		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
-		return gjson.Get(syncBody, path).Exists()
+		syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
+			// wait for the last sent eventID to come down sync
+			path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
+			return gjson.Get(syncBody, path).Exists()
+		})
+
+		for _, tc := range testCases {
+			w := httptest.NewRecorder()
+			routers.Client.ServeHTTP(w, tc.req)
+			if w.Code != tc.wantCode {
+				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+			}
+			if tc.wantJoinedRooms != nil {
+				var res types.Response
+				err = json.NewDecoder(w.Body).Decode(&res)
+				if err != nil {
+					t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
+				}
+				if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
+					t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
+				}
+				t.Logf("res: %+v", res.Rooms.Join[room.ID])
+
+				gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+				for i, ev := range res.Rooms.Join[room.ID].Timeline.Events {
+					gotEventIDs[i] = ev.EventID
+				}
+				test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
+			}
+		}
 	})
-
-	for _, tc := range testCases {
-		w := httptest.NewRecorder()
-		routers.Client.ServeHTTP(w, tc.req)
-		if w.Code != tc.wantCode {
-			t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
-		}
-		if tc.wantJoinedRooms != nil {
-			var res types.Response
-			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-				t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
-			}
-			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
-				t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
-			}
-			t.Logf("res: %+v", res.Rooms.Join[room.ID])
-
-			gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
-			for i, ev := range res.Rooms.Join[room.ID].Timeline.Events {
-				gotEventIDs[i] = ev.EventID
-			}
-			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
-		}
-	}
 }
 
 func TestSyncAPIEventFormatPowerLevels(t *testing.T) {
@@ -959,10 +957,7 @@ func TestGetMembership(t *testing.T) {
 }
 
 func TestSendToDevice(t *testing.T) {
-	test.WithAllDatabases(t, testSendToDevice)
-}
 
-func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 	user := test.NewUser(t)
 	alice := userapi.Device{
 		ID:          "ALICEID",
@@ -972,139 +967,141 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(svc)
-	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 
-	qm := queueutil.NewQueueManager(svc)
+		qm := queueutil.NewQueueManager(svc)
 
-	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
 
-	cfgSyncAPI := cfg.SyncAPI
-	err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputSendToDeviceEvent)
-	if err != nil {
-		t.Fatalf("failed to register publisher: %v", err)
-	}
+		cfgSyncAPI := cfg.SyncAPI
+		err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputSendToDeviceEvent)
+		if err != nil {
+			t.Fatalf("failed to register publisher: %v", err)
+		}
 
-	producer := producers.SyncAPIProducer{
-		TopicSendToDeviceEvent: cfgSyncAPI.Queues.OutputSendToDeviceEvent.Ref(),
-		Qm:                     qm,
-	}
+		producer := producers.SyncAPIProducer{
+			TopicSendToDeviceEvent: cfgSyncAPI.Queues.OutputSendToDeviceEvent.Ref(),
+			Qm:                     qm,
+		}
 
-	msgCounter := 0
+		msgCounter := 0
 
-	testCases := []struct {
-		name              string
-		since             string
-		want              []string
-		sendMessagesCount int
-	}{
-		{
-			name: "initial sync, no messages",
-			want: []string{},
-		},
-		{
-			name:              "initial sync, one new message",
-			sendMessagesCount: 1,
-			want: []string{
-				"message 1",
+		testCases := []struct {
+			name              string
+			since             string
+			want              []string
+			sendMessagesCount int
+		}{
+			{
+				name: "initial sync, no messages",
+				want: []string{},
 			},
-		},
-		{
-			name:              "initial sync, two new messages", // we didn't advance the since token, so we'll receive two messages
-			sendMessagesCount: 1,
-			want: []string{
-				"message 1",
-				"message 2",
+			{
+				name:              "initial sync, one new message",
+				sendMessagesCount: 1,
+				want: []string{
+					"message 1",
+				},
 			},
-		},
-		{
-			name:  "incremental sync, one message", // this deletes message 1, as we advanced the since token
-			since: types.StreamingToken{SendToDevicePosition: 1}.String(),
-			want: []string{
-				"message 2",
+			{
+				name:              "initial sync, two new messages", // we didn't advance the since token, so we'll receive two messages
+				sendMessagesCount: 1,
+				want: []string{
+					"message 1",
+					"message 2",
+				},
 			},
-		},
-		{
-			name:  "failed incremental sync, one message", // didn't advance since, so still the same message
-			since: types.StreamingToken{SendToDevicePosition: 1}.String(),
-			want: []string{
-				"message 2",
+			{
+				name:  "incremental sync, one message", // this deletes message 1, as we advanced the since token
+				since: types.StreamingToken{SendToDevicePosition: 1}.String(),
+				want: []string{
+					"message 2",
+				},
 			},
-		},
-		{
-			name:  "incremental sync, no message",                         // this should delete message 2
-			since: types.StreamingToken{SendToDevicePosition: 2}.String(), // next_batch from previous sync
-			want:  []string{},
-		},
-		{
-			name:              "incremental sync, three new messages",
-			since:             types.StreamingToken{SendToDevicePosition: 2}.String(),
-			sendMessagesCount: 3,
-			want: []string{
-				"message 3", // message 2 was deleted in the previous test
-				"message 4",
-				"message 5",
+			{
+				name:  "failed incremental sync, one message", // didn't advance since, so still the same message
+				since: types.StreamingToken{SendToDevicePosition: 1}.String(),
+				want: []string{
+					"message 2",
+				},
 			},
-		},
-		{
-			name: "initial sync, three messages", // we expect three messages, as we didn't go beyond "2"
-			want: []string{
-				"message 3",
-				"message 4",
-				"message 5",
+			{
+				name:  "incremental sync, no message",                         // this should delete message 2
+				since: types.StreamingToken{SendToDevicePosition: 2}.String(), // next_batch from previous sync
+				want:  []string{},
 			},
-		},
-		{
-			name:  "incremental sync, no messages", // advance the sync token, no new messages
-			since: types.StreamingToken{SendToDevicePosition: 5}.String(),
-			want:  []string{},
-		},
-	}
+			{
+				name:              "incremental sync, three new messages",
+				since:             types.StreamingToken{SendToDevicePosition: 2}.String(),
+				sendMessagesCount: 3,
+				want: []string{
+					"message 3", // message 2 was deleted in the previous test
+					"message 4",
+					"message 5",
+				},
+			},
+			{
+				name: "initial sync, three messages", // we expect three messages, as we didn't go beyond "2"
+				want: []string{
+					"message 3",
+					"message 4",
+					"message 5",
+				},
+			},
+			{
+				name:  "incremental sync, no messages", // advance the sync token, no new messages
+				since: types.StreamingToken{SendToDevicePosition: 5}.String(),
+				want:  []string{},
+			},
+		}
 
-	for _, tc := range testCases {
-		// Send to-device messages of type "m.dendrite.test" with content `{"dummy":"message $counter"}`
-		for i := 0; i < tc.sendMessagesCount; i++ {
-			msgCounter++
-			msg := json.RawMessage(fmt.Sprintf(`{"dummy":"message %d"}`, msgCounter))
-			if err := producer.SendToDevice(ctx, user.ID, user.ID, alice.ID, "m.dendrite.test", msg); err != nil {
-				t.Fatalf("unable to send to device message: %v", err)
+		for _, tc := range testCases {
+			// Send to-device messages of type "m.dendrite.test" with content `{"dummy":"message $counter"}`
+			for i := 0; i < tc.sendMessagesCount; i++ {
+				msgCounter++
+				msg := json.RawMessage(fmt.Sprintf(`{"dummy":"message %d"}`, msgCounter))
+				if err := producer.SendToDevice(ctx, user.ID, user.ID, alice.ID, "m.dendrite.test", msg); err != nil {
+					t.Fatalf("unable to send to device message: %v", err)
+				}
+			}
+
+			syncUntil(ctx, t, routers, alice.AccessToken,
+				len(tc.want) == 0,
+				func(body string) bool {
+					return gjson.Get(body, fmt.Sprintf(`to_device.events.#(content.dummy=="message %d")`, msgCounter)).Exists()
+				},
+			)
+
+			// Execute a /sync request, recording the response
+			w := httptest.NewRecorder()
+			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+				"access_token": alice.AccessToken,
+				"since":        tc.since,
+			})))
+
+			// Extract the to_device.events, # gets all values of an array, in this case a string slice with "message $counter" entries
+			events := gjson.Get(w.Body.String(), "to_device.events.#.content.dummy").Array()
+			got := make([]string, len(events))
+			for i := range events {
+				got[i] = events[i].String()
+			}
+
+			// Ensure the messages we received are as we expect them to be
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Logf("[%s|since=%s]: Sync: %s", tc.name, tc.since, w.Body.String())
+				t.Fatalf("[%s|since=%s]: got: %+v, want: %+v", tc.name, tc.since, got, tc.want)
 			}
 		}
-
-		syncUntil(ctx, t, routers, alice.AccessToken,
-			len(tc.want) == 0,
-			func(body string) bool {
-				return gjson.Get(body, fmt.Sprintf(`to_device.events.#(content.dummy=="message %d")`, msgCounter)).Exists()
-			},
-		)
-
-		// Execute a /sync request, recording the response
-		w := httptest.NewRecorder()
-		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-			"access_token": alice.AccessToken,
-			"since":        tc.since,
-		})))
-
-		// Extract the to_device.events, # gets all values of an array, in this case a string slice with "message $counter" entries
-		events := gjson.Get(w.Body.String(), "to_device.events.#.content.dummy").Array()
-		got := make([]string, len(events))
-		for i := range events {
-			got[i] = events[i].String()
-		}
-
-		// Ensure the messages we received are as we expect them to be
-		if !reflect.DeepEqual(got, tc.want) {
-			t.Logf("[%s|since=%s]: Sync: %s", tc.name, tc.since, w.Body.String())
-			t.Fatalf("[%s|since=%s]: got: %+v, want: %+v", tc.name, tc.since, got, tc.want)
-		}
-	}
+	})
 }
 
 func TestContext(t *testing.T) {

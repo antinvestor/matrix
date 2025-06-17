@@ -75,7 +75,7 @@ func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransactio
 
 	ctx, txn, err := d.Cm.BeginTx(ctx, &writerOpt)
 	if err != nil {
-		 return nil, err
+		return nil, err
 	}
 	return &DatabaseTransaction{
 		Database: d,

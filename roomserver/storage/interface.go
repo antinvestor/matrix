@@ -128,13 +128,13 @@ type Database interface {
 	RemoveRoomAlias(ctx context.Context, alias string) error
 	// Build a membership updater for the target user in a room.
 	MembershipUpdater(ctx context.Context, roomID, targetUserID string, targetLocal bool, roomVersion gomatrixserverlib.RoomVersion) (context.Context, *shared.MembershipUpdater, error)
-	// Lookup the membership of a given user in a given room.
+	// GetMembership Lookup the membership of a given user in a given room.
 	// Returns the numeric ID of the latest membership event sent from this user
 	// in this room, along a boolean set to true if the user is still in this room,
 	// false if not.
 	// Returns an error if there was a problem talking to the database.
 	GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderID spec.SenderID) (membershipEventNID types.EventNID, stillInRoom, isRoomForgotten bool, err error)
-	// Lookup the membership event numeric IDs for all user that are or have
+	// GetMembershipEventNIDsForRoom Lookup the membership event numeric IDs for all user that are or have
 	// been members of a given room. Only lookup events of "join" membership if
 	// joinOnly is set to true.
 	// Returns an error if there was a problem talking to the database.
@@ -143,7 +143,7 @@ type Database interface {
 	// not found.
 	// Returns an error if the retrieval went wrong.
 	EventsFromIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]types.Event, error)
-	// PerformPublish publishes or unpublishes a room from the room directory. Returns a database error, if any.
+	// PublishRoom publishes or unpublishes a room from the room directory. Returns a database error, if any.
 	PublishRoom(ctx context.Context, roomID, appserviceID, networkID string, publish bool) error
 	// Returns a list of room IDs for rooms which are published.
 	GetPublishedRooms(ctx context.Context, networkID string, includeAllNetworks bool) ([]string, error)

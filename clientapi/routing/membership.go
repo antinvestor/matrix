@@ -492,7 +492,7 @@ func buildMembershipEvent(
 // loadProfile lookups the profile of a given user from the database and returns
 // it if the user is local to this server, or returns an empty profile if not.
 // Returns an error if the retrieval failed or if the first parameter isn't a
-// valid Global ID.
+// valid Matrix ID.
 func loadProfile(
 	ctx context.Context,
 	userID string,
@@ -543,39 +543,42 @@ func checkAndProcessThreepid(
 	roomID string,
 	evTime time.Time,
 ) (inviteStored bool, errRes *util.JSONResponse) {
-
+	ctx := req.Context()
 	inviteStored, err := threepid.CheckAndProcessInvite(
-		req.Context(), device, body, cfg, rsAPI, profileAPI,
+		ctx, device, body, cfg, rsAPI, profileAPI,
 		roomID, evTime,
 	)
+
+	log := util.Log(ctx)
+
 	switch e := err.(type) {
 	case nil:
 	case threepid.ErrMissingParameter:
-		util.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		log.WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(err.Error()),
 		}
 	case threepid.ErrNotTrusted:
-		util.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		log.WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotTrusted(body.IDServer),
 		}
 	case eventutil.ErrRoomNoExists:
-		util.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		log.WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound(err.Error()),
 		}
 	case gomatrixserverlib.BadJSONError:
-		util.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		log.WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(e.Error()),
 		}
 	default:
-		util.Log(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		log.WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

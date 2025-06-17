@@ -171,25 +171,26 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, messag
 
 func replyQOpts(ctx context.Context, opts *config.QueueOptions) (*config.QueueOptions, error) {
 
-	replyTo := fmt.Sprintf("__Reply.%s", frame.GenerateID(ctx))
-
+	requestID := frame.GenerateID(ctx)
+	replySubjectPrefix := fmt.Sprintf("%s_Reply", opts.Ref())
+	replySubject := fmt.Sprintf("%s.%s", replySubjectPrefix, requestID)
 	ds := opts.DS
 	if ds.IsNats() {
 
-		ds = ds.RemoveQuery( "stream_storage", "stream_retention")
-		ds = ds.ExtendQuery("subject", replyTo).
-			ExtendQuery("stream_subjects", "__Reply.*").
-			ExtendQuery("stream_name", "InputRoomEventReplies").
+		ds = ds.RemoveQuery("stream_storage", "stream_retention", "consumer_headers_only")
+		ds = ds.ExtendQuery("subject", replySubject).
+			ExtendQuery("stream_subjects", fmt.Sprintf("%s.*", replySubjectPrefix)).
+			ExtendQuery("stream_name", replySubjectPrefix).
 			ExtendQuery("stream_storage", "memory").
-			ExtendQuery("consumer_filter_subject", replyTo).
-			ExtendQuery("consumer_durable_name", strings.ReplaceAll( strings.ReplaceAll( replyTo, ".",""), "_",""))
+			ExtendQuery("consumer_filter_subject", replySubject).
+			ExtendQuery("consumer_durable_name", requestID)
 
 	} else {
-		ds = config.DataSource(fmt.Sprintf("mem://%s", replyTo))
+		ds = config.DataSource(fmt.Sprintf("mem://%s", replySubject))
 	}
 
 	return &config.QueueOptions{
-		QReference: fmt.Sprintf("%s%s", opts.QReference, replyTo),
+		QReference: fmt.Sprintf("Reply_%s", requestID),
 		Prefix:     opts.Prefix,
 		DS:         ds,
 	}, nil
@@ -219,6 +220,9 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 		&inputRoomEvent,
 	)
 	if err != nil {
+
+		errString = err.Error()
+
 		var rejectedError types.RejectedError
 		switch {
 		case errors.As(err, &rejectedError):
@@ -228,19 +232,23 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 				WithField("event_id", inputRoomEvent.Event.EventID()).
 				WithField("type", inputRoomEvent.Event.Type()).
 				Warn("Roomserver rejected event")
-			err = nil
+
 		default:
 
 			util.Log(ctx).WithError(err).
 				WithField("room_id", inputRoomEvent.Event.RoomID()).
 				WithField("event_id", inputRoomEvent.Event.EventID()).
 				WithField("type", inputRoomEvent.Event.Type()).
-				Warn("Roomserver failed to process event")
+				Error("Roomserver failed to process event")
 
-			// Even though we failed to process this message (e.g. due to Matrix restarting and receiving a context canceled),
-			// the message may already have been queued for redelivery or will be, so this makes sure that we still reprocess the msg
-			// after restarting. We only Ack if the context was not yet canceled.
-			errString = err.Error()
+		}
+
+		// Even though we failed to process this message (e.g. due to Matrix restarting and receiving a context canceled),
+		// the message may already have been queued for redelivery or will be, so this makes sure that we still reprocess the msg
+		// after restarting. We only Ack if the context was not yet canceled.
+
+		if ctx.Err() == nil {
+			err = nil
 		}
 
 	}
@@ -254,18 +262,20 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 	replyTo, ok := metadata["sync_uri"]
 	if ok {
 
-		log := util.Log(ctx).WithField("room_id", inputRoomEvent.Event.RoomID()).
+		log := util.Log(ctx).
+			WithField("error", errString).
+			WithField("room_id", inputRoomEvent.Event.RoomID()).
 			WithField("event_id", inputRoomEvent.Event.EventID()).
 			WithField("type", inputRoomEvent.Event.Type()).
 			WithField("replyTo", replyTo)
 
-		replyToOpts := &config.QueueOptions{
+		replyOpts := &config.QueueOptions{
 			DS:         config.DataSource(replyTo),
 			Prefix:     metadata["sync_prefix"],
 			QReference: metadata["sync_ref"],
 		}
 
-		err0 := r.Qm.EnsurePublisherOk(ctx, replyToOpts)
+		err0 := r.Qm.EnsurePublisherOk(ctx, replyOpts)
 		if err0 != nil {
 			log.WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
 				WithField("event_id", inputRoomEvent.Event.EventID()).
@@ -277,13 +287,13 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 
 		defer func() {
 
-			err = r.Qm.DiscardPublisher(ctx, replyToOpts.Ref())
-			if err != nil {
+			err0 = r.Qm.DiscardPublisher(ctx, replyOpts.Ref())
+			if err0 != nil {
 				return
 			}
 		}()
 
-		err0 = r.Qm.Publish(ctx, replyToOpts.Ref(), []byte(errString))
+		err0 = r.Qm.Publish(ctx, replyOpts.Ref(), errString)
 		if err0 != nil {
 			log.WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
 				WithField("event_id", inputRoomEvent.Event.EventID()).
@@ -386,16 +396,35 @@ func (r *Inputer) InputRoomEvents(
 			util.Log(ctx).WithError(err).Error("Roomserver failed to stop subscriber")
 		}
 	}(replySub, ctx) // nolint:errcheck
-	for i := 0; i < len(request.InputRoomEvents); i++ {
-		msg, err0 := replySub.Receive(ctx)
-		if err0 != nil {
-			response.ErrMsg = err0.Error()
-			return
-		}
-		msg.Ack()
-		if len(msg.Body) > 0 {
-			response.ErrMsg = string(msg.Body)
-		}
 
+
+	receivedResponseCount := 0
+
+	// Set up a goroutine to cancel our wait operations if the parent context is cancelled
+	for range len(request.InputRoomEvents){
+		select {
+		case <-ctx.Done():
+			return
+		default:
+
+			msg, err0 := replySub.Receive(ctx)
+			if err0 != nil {
+				util.Log(ctx).WithError(err0).Error("Roomserver failed to receive response")
+				response.ErrMsg = err0.Error()
+				return
+			}
+
+			if msg != nil {
+				msg.Ack()
+				receivedResponseCount ++
+
+				if len(msg.Body) > 0 {
+					if errMsg := string(msg.Body); errMsg != "" {
+						response.ErrMsg  = strings.Join([]string{response.ErrMsg , errMsg}, "\n")
+					}
+				}
+			}
+
+		}
 	}
 }

@@ -63,7 +63,7 @@ func NewManager(ctx context.Context, config *config.ActorConfig, qm queueutil.Qu
 	return manager
 }
 
-// Start initializes the actor system
+// Start initialises the actor system
 func (m *Manager) Start(ctx context.Context) error {
 	var err error
 
@@ -184,7 +184,7 @@ func RoomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.Roo
 		if isSubscriber {
 
 			ds = ds.ExtendQuery("consumer_filter_subject", subject)
-			durable := strings.Replace(fmt.Sprintf("Durable%s", subject), ".", "_", -1)
+			durable := strings.ReplaceAll(fmt.Sprintf("Durable%s", subject), ".", "_")
 
 			ds = ds.ExtendQuery("consumer_durable_name", durable)
 			ds = ds.ExtendQuery("consumer_deliver_policy", "all")
