@@ -84,6 +84,8 @@ func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string
 			queueutil.RoomID:        roomID,
 		}
 
+		logger.WithField("topic", r.Topic.DSrc()).Info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+
 		err = r.Qm.Publish(ctx, r.Topic.Ref(), update, h)
 		if err != nil {
 			logger.WithError(err).WithField("topic", r.Topic).Error("Failed to produce to topic ")

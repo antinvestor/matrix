@@ -1303,7 +1303,7 @@ func Setup(
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	// Key Backup Versions (Metadata)
+	// K Backup Versions (Metadata)
 
 	getBackupKeysVersion := httputil.MakeAuthAPI("get_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))

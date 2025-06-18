@@ -76,18 +76,17 @@ type SyncQueues struct {
 
 func (q *SyncQueues) Defaults(opts DefaultOpts) {
 
-	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent)
-	q.OutputClientData = opts.defaultQ(OutputClientData)
-	q.OutputKeyChangeEvent = opts.defaultQ(OutputKeyChangeEvent)
-	q.OutputSendToDeviceEvent = opts.defaultQ(OutputSendToDeviceEvent)
+	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputRoomEvent"})
+	q.OutputClientData = opts.defaultQ(OutputClientData, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputClientDataEvent"})
+	q.OutputKeyChangeEvent = opts.defaultQ(OutputKeyChangeEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputKeyChangeEvent"})
+	q.OutputSendToDeviceEvent = opts.defaultQ(OutputSendToDeviceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputSendToDeviceEvent"})
 
-	q.OutputTypingEvent = opts.defaultQ(OutputTypingEvent)
-	q.OutputTypingEvent.DS = q.OutputTypingEvent.DS.ExtendQuery("stream_storage", "memory")
+	q.OutputTypingEvent = opts.defaultQ(OutputTypingEvent, KVOpt{K: "stream_storage", V: "memory"}, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputTypingEvent"})
 
-	q.OutputReceiptEvent = opts.defaultQ(OutputReceiptEvent)
-	q.OutputStreamEvent = opts.defaultQ(OutputStreamEvent)
-	q.OutputNotificationData = opts.defaultQ(OutputNotificationData)
-	q.OutputPresenceEvent = opts.defaultQ(OutputPresenceEvent)
+	q.OutputReceiptEvent = opts.defaultQ(OutputReceiptEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputReceiptEvent"})
+	q.OutputStreamEvent = opts.defaultQ(OutputStreamEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputStreamEvent"})
+	q.OutputNotificationData = opts.defaultQ(OutputNotificationData, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputNotificationEvent"})
+	q.OutputPresenceEvent = opts.defaultQ(OutputPresenceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputPresenceEvent"})
 }
 
 func (q *SyncQueues) Verify(configErrs *Errors) {

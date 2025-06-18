@@ -82,12 +82,13 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 		return nil
 	}
 
+	log := util.Log(ctx)
 	// Parse out the event JSON
 	var output api.OutputEvent
 	err := json.Unmarshal(message, &output)
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		util.Log(ctx).WithError(err).
+		log.WithError(err).
 			WithField("component", "roomserver_consumer").
 			Error("roomserver output log: message parse failure")
 		return nil
@@ -99,7 +100,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 		err = s.processMessage(ctx, *output.NewRoomEvent, output.NewRoomEvent.RewritesState)
 		if err != nil {
 			// panic rather than continue with an inconsistent database
-			util.Log(ctx).
+			log.
 				WithField("event_id", ev.EventID()).
 				WithField("event", string(ev.JSON())).
 				WithField("add", output.NewRoomEvent.AddsStateEventIDs).
@@ -111,7 +112,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 	case api.OutputTypeNewInboundPeek:
 		err = s.processInboundPeek(ctx, *output.NewInboundPeek)
 		if err != nil {
-			util.Log(ctx).WithField(
+			log.WithField(
 				"event", output.NewInboundPeek).
 				WithField("component", "roomserver_consumer").
 				WithError(err).Panic("roomserver output log: remote peek event failure")
@@ -119,22 +120,22 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 		}
 
 	case api.OutputTypePurgeRoom:
-		util.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
+		log.WithField("room_id", output.PurgeRoom.RoomID).
 			WithField("component", "roomserver_consumer").
 			Warn("Purging room from federation API")
 		err = s.db.PurgeRoom(ctx, output.PurgeRoom.RoomID)
 		if err != nil {
-			util.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
+			log.WithField("room_id", output.PurgeRoom.RoomID).
 				WithField("component", "roomserver_consumer").
 				WithError(err).Error("Failed to purge room from federation API")
 		} else {
-			util.Log(ctx).WithField("room_id", output.PurgeRoom.RoomID).
+			log.WithField("room_id", output.PurgeRoom.RoomID).
 				WithField("component", "roomserver_consumer").
 				Warn("Room purged from federation API")
 		}
 
 	default:
-		util.Log(ctx).WithField("type", output.Type).
+		log.WithField("type", output.Type).
 			WithField("component", "roomserver_consumer").
 			Debug("roomserver output log: ignoring unknown output type")
 	}

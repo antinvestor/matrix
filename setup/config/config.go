@@ -33,7 +33,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// keyIDRegexp defines allowable characters in Key IDs.
+// keyIDRegexp defines allowable characters in K IDs.
 var keyIDRegexp = regexp.MustCompile("^ed25519:[a-zA-Z0-9_]+$")
 
 // Version is the current version of the config format.
@@ -439,15 +439,20 @@ type DefaultOpts struct {
 	RandomnessPrefix string
 }
 
-func (d *DefaultOpts) defaultQ(s string) QueueOptions {
+type KVOpt struct {
+	K string
+	V string
+}
+
+func (d *DefaultOpts) defaultQ(s string, opts ...KVOpt) QueueOptions {
 
 	ref := fmt.Sprintf("%s_Ref", s)
 
 	if d.DSQueueConn.IsNats() {
 
-		durable := strings.ReplaceAll(fmt.Sprintf("ConsumerDurable_%s", s), ".", "_")
+		durable := strings.ReplaceAll(fmt.Sprintf("CnsDurable_%s", s), ".", "_")
 
-		return QueueOptions{Prefix: d.RandomnessPrefix, QReference: ref, DS: d.DSQueueConn.
+		ds := d.DSQueueConn.
 			ExtendQuery("jetstream", "true").
 			ExtendQuery("subject", s).
 			ExtendQuery("stream_name", s).
@@ -457,8 +462,13 @@ func (d *DefaultOpts) defaultQ(s string) QueueOptions {
 			ExtendQuery("consumer_filter_subject", s).
 			ExtendQuery("consumer_durable_name", durable).
 			ExtendQuery("consumer_deliver_policy", "all").
-			ExtendQuery("consumer_ack_policy", "explicit"),
+			ExtendQuery("consumer_ack_policy", "explicit")
+
+		for _, kv := range opts {
+			ds = ds.ExtendQuery(kv.K, kv.V)
 		}
+
+		return QueueOptions{Prefix: d.RandomnessPrefix, QReference: ref, DS: ds}
 	}
 	return QueueOptions{Prefix: d.RandomnessPrefix, QReference: ref, DS: d.DSQueueConn.SuffixPath(s)}
 }
@@ -602,7 +612,7 @@ func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserv
 			return "", nil, fmt.Errorf("keyBlock is nil %q", path)
 		}
 		if keyBlock.Type == "MATRIX PRIVATE KEY" {
-			keyID := keyBlock.Headers["Key-ID"]
+			keyID := keyBlock.Headers["K-ID"]
 			if keyID == "" {
 				return "", nil, fmt.Errorf("missing key ID in PEM data in %q", path)
 			}

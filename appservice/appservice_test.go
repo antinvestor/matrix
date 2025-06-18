@@ -426,8 +426,8 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 }
 
 // Note: If this test panics, it is because we timed out waiting for the
-// join event to come through to the appservice and we close the Cm/shutdown Matrix. This makes the
-// syncAPI unhappy, as it is unable to write to the database.
+// join event to come through to the appservice and we close the Cm/shutdown Matrix.
+// This makes syncAPI unhappy, as it is unable to write to the database.
 func TestOutputAppserviceEvent(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
@@ -470,6 +470,11 @@ func TestOutputAppserviceEvent(t *testing.T) {
 
 		// create a dummy AS url, handling the events
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			t.Logf("||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+			t.Logf("|||||||||||||||||||||||||||||||||||||||||    Received AS request |||||||||||||||||||||||||||||||||")
+			t.Logf("||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+
 			var txn consumers.ApplicationServiceTransaction
 			err = json.NewDecoder(r.Body).Decode(&txn)
 			if err != nil {

@@ -142,11 +142,11 @@ type FederationAPIQueues struct {
 }
 
 func (q *FederationAPIQueues) Defaults(opts DefaultOpts) {
-	q.OutputPresenceEvent = opts.defaultQ(OutputPresenceEvent)
-	q.OutputReceiptEvent = opts.defaultQ(OutputReceiptEvent)
-	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent)
-	q.OutputSendToDeviceEvent = opts.defaultQ(OutputSendToDeviceEvent)
-	q.OutputTypingEvent = opts.defaultQ(OutputTypingEvent)
+	q.OutputPresenceEvent = opts.defaultQ(OutputPresenceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputPresenceEvent"})
+	q.OutputReceiptEvent = opts.defaultQ(OutputReceiptEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputReceiptEvent"})
+	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputRoomEvent"})
+	q.OutputSendToDeviceEvent = opts.defaultQ(OutputSendToDeviceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputSendToDeviceEvent"})
+	q.OutputTypingEvent = opts.defaultQ(OutputTypingEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputTypingEvent"})
 }
 
 func (q *FederationAPIQueues) Verify(configErrs *Errors) {

@@ -193,6 +193,8 @@ func RoomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.Roo
 			ds = ds.ExtendQuery("consumer_inactive_threshold", maximumConsumerInactivityThreshold.String())
 			ds = ds.ExtendQuery("consumer_headers_only", "false")
 			ds = ds.ExtendQuery("receive_batch_max_batch_size", "1")
+			ds = ds.ExtendQuery("consumer_replay_policy", "instant")
+			ds = ds.ExtendQuery("consumer_max_ack_pending", "1")
 		} else {
 			ds = ds.RemoveQuery("consumer_ack_policy", "consumer_deliver_policy", "consumer_headers_only", "consumer_replay_policy")
 		}

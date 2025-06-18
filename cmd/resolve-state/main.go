@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antinvestor/matrix/setup/config"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/cacheutil"
@@ -19,6 +17,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )

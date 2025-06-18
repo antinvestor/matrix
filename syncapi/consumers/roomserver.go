@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -75,7 +74,14 @@ func NewOutputRoomEventConsumer(
 		asProducer:   asProducer,
 	}
 
-	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputRoomEvent, c)
+	outRmOpts := &cfg.Queues.OutputRoomEvent
+	outRmOpts.DS = outRmOpts.DS.
+		ExtendQuery("consumer_max_ack_pending", "1").
+		ExtendQuery("consumer_replay_policy", "instant")
+
+	util.Log(ctx).WithField("topic", outRmOpts.DSrc()).Info("+++++++++ Registering OutputRoomEventConsumer")
+
+	return qm.RegisterSubscriber(ctx, outRmOpts, c)
 }
 
 // Handle is called when the sync server receives a new event from the room server output log.
@@ -87,7 +93,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 	var output api.OutputEvent
 
 	log := util.Log(ctx)
-
+	log.Info("+++++++++++++++roomserver output log: new message")
 	if err = json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Error("roomserver output log: message parse failure")
@@ -108,6 +114,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 		}
 		err = s.onNewRoomEvent(ctx, *output.NewRoomEvent)
 		if err == nil && s.asProducer != nil {
+			log.Info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$  piping event to App Service")
 			if err = s.asProducer.ProduceRoomEvents(ctx, message, metadata); err != nil {
 				log.WithError(err).Warn("failed to produce OutputAppserviceEvent")
 			}

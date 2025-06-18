@@ -87,7 +87,7 @@ type ApplicationService struct {
 	HSToken string `yaml:"hs_token"`
 	// Localpart of application service user
 	SenderLocalpart string `yaml:"sender_localpart"`
-	// Information about an application service's namespaces. Key is either
+	// Information about an application service's namespaces. K is either
 	// "users", "aliases" or "rooms"
 	NamespaceMap map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
 	// Whether rate limiting is applied to each application service user

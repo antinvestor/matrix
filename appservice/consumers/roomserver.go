@@ -94,7 +94,7 @@ func (s *OutputRoomEventConsumer) Handle(
 	if !ok {
 		return nil
 	}
-	logger.WithField("appservice", state.ID).Debug("Appservice worker received %d message(s) from roomserver", 1)
+	logger.WithField("appservice", state.ID).Info("Appservice worker received %d message(s) from roomserver", 1)
 	events := make([]*types.HeaderedEvent, 0, 1)
 
 	// Only handle events we care about

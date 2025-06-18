@@ -576,7 +576,7 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 		var output keyAPI.CrossSigningKeyUpdate
 		if err = json.Unmarshal(message, &output); err != nil {
 			// If the message was invalid, log it and move on to the next message in the stream
-			println(" CrsSgn Key ", string(message), " error : ", err.Error())
+			println(" CrsSgn K ", string(message), " error : ", err.Error())
 			return nil
 		}
 

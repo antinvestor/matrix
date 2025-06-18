@@ -145,7 +145,7 @@ func TestUserRoomKeys(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, key.Public(), pubKey)
 
-		// Key doesn't exist, we shouldn't get anything back
+		// K doesn't exist, we shouldn't get anything back
 		gotKey, err = db.SelectUserRoomPrivateKey(ctx, *userID, *doesNotExist)
 		assert.NoError(t, err)
 		assert.Nil(t, gotKey)

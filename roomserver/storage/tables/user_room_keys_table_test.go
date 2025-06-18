@@ -80,7 +80,7 @@ func TestUserRoomKeysTable(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, key2.Public(), gotPubKey)
 
-			// Key doesn't exist
+			// K doesn't exist
 			gotKey, err = tab.SelectUserRoomPrivateKey(ctx, userNID, 2)
 			assert.NoError(t, err)
 			assert.Nil(t, gotKey)

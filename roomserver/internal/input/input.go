@@ -126,7 +126,7 @@ func NewInputer(
 	return c, err
 }
 
-func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
 
 	roomId, err := spec.NewRoomID(metadata["room_id"])
 	if err != nil {
@@ -136,34 +136,6 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, messag
 	_, err = r.actorSystem.EnsureRoomActorExists(ctx, roomId)
 	if err != nil {
 		return err
-	}
-
-	qOpts := &r.Cfg.Queues.InputRoomEvent
-	if !qOpts.DS.IsNats() {
-
-		roomOpts, err0 := actor.RoomifyQOpts(ctx, qOpts, roomId, false)
-		if err0 != nil {
-			return err0
-		}
-
-		defer func() {
-
-			err = r.Qm.DiscardPublisher(ctx, roomOpts.Ref())
-			if err != nil {
-				return
-			}
-		}()
-
-		err = r.Qm.EnsurePublisherOk(ctx, roomOpts)
-		if err != nil {
-			return err
-		}
-
-		err = r.Qm.Publish(ctx, roomOpts.Ref(), message, metadata)
-		if err != nil {
-			return err
-		}
-
 	}
 
 	return nil
@@ -391,17 +363,16 @@ func (r *Inputer) InputRoomEvents(
 	// input we submitted. The last error value we receive will
 	// be the one returned as the error string.
 	defer func(replySub frame.Subscriber, ctx context.Context) {
-		err = replySub.Stop(ctx)
+		err = r.Qm.DiscardSubscriber(ctx, replySub.Ref())
 		if err != nil {
 			util.Log(ctx).WithError(err).Error("Roomserver failed to stop subscriber")
 		}
 	}(replySub, ctx) // nolint:errcheck
 
-
 	receivedResponseCount := 0
 
 	// Set up a goroutine to cancel our wait operations if the parent context is cancelled
-	for range len(request.InputRoomEvents){
+	for range len(request.InputRoomEvents) {
 		select {
 		case <-ctx.Done():
 			return
@@ -416,11 +387,11 @@ func (r *Inputer) InputRoomEvents(
 
 			if msg != nil {
 				msg.Ack()
-				receivedResponseCount ++
+				receivedResponseCount++
 
 				if len(msg.Body) > 0 {
 					if errMsg := string(msg.Body); errMsg != "" {
-						response.ErrMsg  = strings.Join([]string{response.ErrMsg , errMsg}, "\n")
+						response.ErrMsg = strings.Join([]string{response.ErrMsg, errMsg}, "\n")
 					}
 				}
 			}

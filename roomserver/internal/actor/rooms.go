@@ -2,6 +2,7 @@ package actor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -133,9 +134,6 @@ func (ra *RoomActor) Init(gctx cluster.GrainContext) {
 	}
 
 	gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: ra.roomID})
-
-	log.With("roomID", roomID).Info("--------------- Successfully Setup Room    ")
-
 }
 func (ra *RoomActor) Terminate(gctx cluster.GrainContext) {
 	var err error
@@ -160,6 +158,8 @@ func (ra *RoomActor) Terminate(gctx cluster.GrainContext) {
 
 func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 
+	log := gctx.Logger()
+
 	msg := gctx.Message()
 
 	switch msgT := msg.(type) {
@@ -174,11 +174,19 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 		}
 
 		// Process the next message and determine whether there are more to process
-		ra.nextEvent(gctx, msgT)
+		eventWork := ra.nextEventJob(gctx, msgT)
 
-	default:
+		err := frame.SubmitJob(ra.ctx, ra.svc, eventWork)
+		if err != nil {
+			ra.jobProcessing.Swap(false)
 
-		ra.log.With("message", msg).Debug("--------------- Unknown            ")
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				// Reset processing flag on error
+				return
+			}
+
+			log.With("error", err).Error("could not submit message for processing")
+		}
 	}
 }
 
@@ -197,19 +205,17 @@ func (ra *RoomActor) Publish(req *actorV1.PublishRequest, gctx cluster.GrainCont
 	return &actorV1.PublishResponse{Success: true, Message: "ok"}, nil
 }
 
-// nextEvent pulls a message from the queue and processes it
+// nextEventJob pulls a message from the queue and processes it
 // returns message ID if a message was processed, empty string if no message was available
-func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkRequest) {
+func (ra *RoomActor) nextEventJob(gctx cluster.GrainContext, req *actorV1.WorkRequest) frame.Job {
 
-	log := ra.log
-
-	work := frame.NewJob(func(ctx context.Context, _ frame.JobResultPipe) error {
+	return frame.NewJob(func(ctx context.Context, _ frame.JobResultPipe) error {
 		defer func() {
 			// Reset processing flag when job completes
 			ra.jobProcessing.Swap(false)
 		}()
 
-		log = ra.log.WithContext(ctx)
+		log := ra.log.WithContext(ctx)
 
 		// Check if subscription is active
 		if ra.subscription == nil {
@@ -222,13 +228,17 @@ func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkReque
 		cancelFn()
 		if err != nil {
 
-			if ra.subscription.Idle() {
-				gctx.Request(gctx.Self(), &actorV1.StopRoomActor{RoomId: ra.roomID})
-				return err
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				// Reset processing flag on error
+
+				if ra.subscription.IsIdle() {
+					gctx.Request(gctx.Self(), &actorV1.StopRoomActor{RoomId: ra.roomID})
+					return nil
+				}
 			}
 
 			gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: ra.roomID})
-			return err
+			return nil
 		}
 
 		// Process the message
@@ -237,7 +247,7 @@ func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkReque
 			log.WithError(err).Error(" failed to process event")
 			msg.Nack()
 
-			return err
+			return nil
 		}
 		msg.Ack()
 
@@ -246,13 +256,4 @@ func (ra *RoomActor) nextEvent(gctx cluster.GrainContext, req *actorV1.WorkReque
 
 		return nil
 	})
-
-	err := frame.SubmitJob(ra.ctx, ra.svc, work)
-	if err != nil {
-
-		log.With("error", err).Error("could not submit message for processing")
-		// Reset processing flag on error
-		ra.jobProcessing.Swap(false)
-
-	}
 }

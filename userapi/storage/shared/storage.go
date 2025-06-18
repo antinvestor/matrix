@@ -873,7 +873,7 @@ func (d *Database) RemovePusher(
 	})
 }
 
-// RemovePushers deletes all pushers that match given App Id and Push Key pair.
+// RemovePushers deletes all pushers that match given App Id and Push K pair.
 // Invoked when `append` parameter is false in
 // https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-pushers-set
 func (d *Database) RemovePushers(

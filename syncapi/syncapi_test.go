@@ -474,7 +474,8 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 			gotEventIDs[j] = ev.EventID
 		}
 
-		if since == "s0_0_0_0_0_0_0_0_0" || since == "s1_0_0_0_0_0_0_0_0" {
+		if i < 2 {
+			t.Logf("since; matching %v for got : %v and want : %v", since, len(gotEventIDs), len(room.Events()))
 			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
 		} else {
 			t.Logf("since; matching %v for got : %v and want : %v", since, len(gotEventIDs), len(room.Events()[i:]))
@@ -546,12 +547,7 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 
 // This is mainly what Sytest is doing in "test_history_visibility"
 func TestMessageHistoryVisibility(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		testHistoryVisibility(t, testOpts)
-	})
-}
 
-func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 	type result struct {
 		seeWithoutJoin bool
 		seeBeforeJoin  bool
@@ -622,101 +618,103 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 			userType = "real user"
 		}
 
-		ctx, svc, cfg := testrig.Init(t, testOpts)
-		defer svc.Stop(ctx)
+		test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+			ctx, svc, cfg := testrig.Init(t, testOpts)
+			defer svc.Stop(ctx)
 
-		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
-		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(svc)
-		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
-		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
-		}
-		qm := queueutil.NewQueueManager(svc)
+			cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
+			routers := httputil.NewRouters()
+			cm := sqlutil.NewConnectionManager(svc)
+			caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+			if err != nil {
+				t.Fatalf("failed to create a cache: %v", err)
+			}
+			qm := queueutil.NewQueueManager(svc)
 
-		// Use the actual internal roomserver API
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
-		rsAPI.SetFederationAPI(ctx, nil, nil)
-		AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
+			// Use the actual internal roomserver API
+			rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+			rsAPI.SetFederationAPI(ctx, nil, nil)
+			AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
 
-		for _, tc := range testCases {
-			testname := fmt.Sprintf("%s - %s", tc.historyVisibility, userType)
-			t.Run(testname, func(t *testing.T) {
-				// create a room with the given visibility
-				room := test.NewRoom(t, alice, test.RoomHistoryVisibility(tc.historyVisibility))
+			for _, tc := range testCases {
+				testname := fmt.Sprintf("%s - %s", tc.historyVisibility, userType)
+				t.Run(testname, func(t *testing.T) {
+					// create a room with the given visibility
+					room := test.NewRoom(t, alice, test.RoomHistoryVisibility(tc.historyVisibility))
 
-				// send the events/messages to NATS to create the rooms
-				beforeJoinBody := fmt.Sprintf("Before invite in a %s room", tc.historyVisibility)
-				beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": beforeJoinBody})
-				eventsToSend := append(room.Events(), beforeJoinEv)
-				if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
-					t.Fatalf("failed to send events: %v", err)
-				}
-				syncUntil(ctx, t, routers, aliceDev.AccessToken, false,
-					func(syncBody string) bool {
-						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, beforeJoinBody)
-						return gjson.Get(syncBody, path).Exists()
-					},
-				)
+					// send the events/messages to NATS to create the rooms
+					beforeJoinBody := fmt.Sprintf("Before invite in a %s room", tc.historyVisibility)
+					beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": beforeJoinBody})
+					eventsToSend := append(room.Events(), beforeJoinEv)
+					if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
+						t.Fatalf("failed to send events: %v", err)
+					}
+					syncUntil(ctx, t, routers, aliceDev.AccessToken, false,
+						func(syncBody string) bool {
+							path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, beforeJoinBody)
+							return gjson.Get(syncBody, path).Exists()
+						},
+					)
 
-				// There is only one event, we expect only to be able to see this, if the room is world_readable
-				w := httptest.NewRecorder()
-				routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": bobDev.AccessToken,
-					"dir":          "b",
-					"filter":       `{"lazy_load_members":true}`, // check that lazy loading doesn't break history visibility
-				})))
-				if w.Code != 200 {
-					t.Logf("%s", w.Body.String())
-					t.Fatalf("got HTTP %d want %d", w.Code, 200)
-				}
-				// We only care about the returned events at this point
-				var res struct {
-					Chunk []synctypes.ClientEvent `json:"chunk"`
-				}
-				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-					t.Errorf("failed to decode response body: %s", err)
-				}
+					// There is only one event, we expect only to be able to see this, if the room is world_readable
+					w := httptest.NewRecorder()
+					routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
+						"access_token": bobDev.AccessToken,
+						"dir":          "b",
+						"filter":       `{"lazy_load_members":true}`, // check that lazy loading doesn't break history visibility
+					})))
+					if w.Code != 200 {
+						t.Logf("%s", w.Body.String())
+						t.Fatalf("got HTTP %d want %d", w.Code, 200)
+					}
+					// We only care about the returned events at this point
+					var res struct {
+						Chunk []synctypes.ClientEvent `json:"chunk"`
+					}
+					if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+						t.Errorf("failed to decode response body: %s", err)
+					}
 
-				verifyEventVisible(t, tc.wantResult.seeWithoutJoin, beforeJoinEv, res.Chunk)
+					verifyEventVisible(t, tc.wantResult.seeWithoutJoin, beforeJoinEv, res.Chunk)
 
-				// Create invite, a message, join the room and create another message.
-				inviteEv := room.CreateAndInsert(t, alice, "m.room.member", map[string]interface{}{"membership": "invite"}, test.WithStateKey(bob.ID))
-				afterInviteEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After invite in a %s room", tc.historyVisibility)})
-				joinEv := room.CreateAndInsert(t, bob, "m.room.member", map[string]interface{}{"membership": "join"}, test.WithStateKey(bob.ID))
-				afterJoinBody := fmt.Sprintf("After join in a %s room", tc.historyVisibility)
-				msgEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": afterJoinBody})
+					// Create invite, a message, join the room and create another message.
+					inviteEv := room.CreateAndInsert(t, alice, "m.room.member", map[string]interface{}{"membership": "invite"}, test.WithStateKey(bob.ID))
+					afterInviteEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After invite in a %s room", tc.historyVisibility)})
+					joinEv := room.CreateAndInsert(t, bob, "m.room.member", map[string]interface{}{"membership": "join"}, test.WithStateKey(bob.ID))
+					afterJoinBody := fmt.Sprintf("After join in a %s room", tc.historyVisibility)
+					msgEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": afterJoinBody})
 
-				eventsToSend = append([]*rstypes.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
+					eventsToSend = append([]*rstypes.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
 
-				if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
-					t.Fatalf("failed to send events: %v", err)
-				}
-				syncUntil(ctx, t, routers, aliceDev.AccessToken, false,
-					func(syncBody string) bool {
-						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, afterJoinBody)
-						return gjson.Get(syncBody, path).Exists()
-					},
-				)
+					if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
+						t.Fatalf("failed to send events: %v", err)
+					}
+					syncUntil(ctx, t, routers, aliceDev.AccessToken, false,
+						func(syncBody string) bool {
+							path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, afterJoinBody)
+							return gjson.Get(syncBody, path).Exists()
+						},
+					)
 
-				// Verify the messages after/before invite are visible or not
-				w = httptest.NewRecorder()
-				routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": bobDev.AccessToken,
-					"dir":          "b",
-				})))
-				if w.Code != 200 {
-					t.Logf("%s", w.Body.String())
-					t.Fatalf("got HTTP %d want %d", w.Code, 200)
-				}
-				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-					t.Errorf("failed to decode response body: %s", err)
-				}
-				// verify results
-				verifyEventVisible(t, tc.wantResult.seeBeforeJoin, beforeJoinEv, res.Chunk)
-				verifyEventVisible(t, tc.wantResult.seeAfterInvite, afterInviteEv, res.Chunk)
-			})
-		}
+					// Verify the messages after/before invite are visible or not
+					w = httptest.NewRecorder()
+					routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
+						"access_token": bobDev.AccessToken,
+						"dir":          "b",
+					})))
+					if w.Code != 200 {
+						t.Logf("%s", w.Body.String())
+						t.Fatalf("got HTTP %d want %d", w.Code, 200)
+					}
+					if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+						t.Errorf("failed to decode response body: %s", err)
+					}
+					// verify results
+					verifyEventVisible(t, tc.wantResult.seeBeforeJoin, beforeJoinEv, res.Chunk)
+					verifyEventVisible(t, tc.wantResult.seeAfterInvite, afterInviteEv, res.Chunk)
+				})
+			}
+		})
 	}
 }
 

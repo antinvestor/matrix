@@ -253,10 +253,11 @@ func OnIncomingStateTypeRequest(
 	// so that we can look at the history visibility of the room. If the
 	// room is world-readable then we will always return the latest state.
 	stateRes := api.QueryLatestEventsAndStateResponse{}
-	if err := rsAPI.QueryLatestEventsAndState(ctx, &api.QueryLatestEventsAndStateRequest{
+	err = rsAPI.QueryLatestEventsAndState(ctx, &api.QueryLatestEventsAndStateRequest{
 		RoomID:       roomID,
 		StateToFetch: stateToFetch,
-	}, &stateRes); err != nil {
+	}, &stateRes)
+	if err != nil {
 		util.Log(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

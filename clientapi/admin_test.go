@@ -936,20 +936,22 @@ func TestAdminEvacuateRoom(t *testing.T) {
 
 		// Wait for the FS API to have consumed every message
 		timeout := time.After(time.Second)
-		for {
+
+		subs, err0 := qm.GetSubscriber(cfg.FederationAPI.Queues.OutputRoomEvent.Ref())
+		if err0 != nil {
+			t.Fatalf("failed to get OutputRoomEvent subscriber: %v", err0)
+		}
+
+		outerLoop: for {
 			select {
 			case <-timeout:
 				t.Fatalf("FS API didn't process all events in time")
 			default:
+				if subs.IsIdle() {
+					break outerLoop
+				}
+				time.Sleep(time.Millisecond * 10)
 			}
-			subs, err0 := qm.GetSubscriber(cfg.FederationAPI.Queues.OutputRoomEvent.Ref())
-			if err0 != nil {
-				t.Fatalf("failed to get OutputRoomEvent subscriber: %v", err0)
-			}
-			if subs.Idle() {
-				break
-			}
-			time.Sleep(time.Millisecond * 10)
 		}
 	})
 }
@@ -989,10 +991,10 @@ func TestAdminEvacuateUser(t *testing.T) {
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// Create the room
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", api.DoNotSendToOtherServers, nil, false); err != nil {
+		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", api.DoNotSendToOtherServers, nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room2.Events(), "test", "test", api.DoNotSendToOtherServers, nil, false); err != nil {
+		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room2.Events(), "test", "test", api.DoNotSendToOtherServers, nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 
@@ -1053,7 +1055,7 @@ func TestAdminEvacuateUser(t *testing.T) {
 			if err0 != nil {
 				t.Fatalf("failed to get OutputRoomEvent subscriber: %v", err0)
 			}
-			if subs.Idle() {
+			if subs.IsIdle() {
 				break
 			}
 			time.Sleep(time.Millisecond * 10)

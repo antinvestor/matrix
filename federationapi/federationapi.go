@@ -57,27 +57,27 @@ func AddPublicRoutes(
 	cfgUserApi := &dendriteConfig.UserAPI
 	mscCfg := &dendriteConfig.MSCs
 
-	err := qm.RegisterPublisher(ctx, &cfg.Queues.OutputReceiptEvent)
+	err := qm.EnsurePublisherOk(ctx, &cfg.Queues.OutputReceiptEvent)
 	if err != nil {
 		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register receipt event publisher")
 	}
-	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputSendToDeviceEvent)
+	err = qm.EnsurePublisherOk(ctx, &cfg.Queues.OutputSendToDeviceEvent)
 	if err != nil {
 		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register send to device event publisher")
 	}
-	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputTypingEvent)
+	err = qm.EnsurePublisherOk(ctx, &cfg.Queues.OutputTypingEvent)
 	if err != nil {
 		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register typing event publisher")
 	}
-	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputPresenceEvent)
+	err = qm.EnsurePublisherOk(ctx, &cfg.Queues.OutputPresenceEvent)
 	if err != nil {
 		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register presence event publisher")
 	}
-	err = qm.RegisterPublisher(ctx, &cfgUserApi.Queues.InputDeviceListUpdate)
+	err = qm.EnsurePublisherOk(ctx, &cfgUserApi.Queues.InputDeviceListUpdate)
 	if err != nil {
 		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register input device list update event publisher")
 	}
-	err = qm.RegisterPublisher(ctx, &cfgUserApi.Queues.InputSigningKeyUpdate)
+	err = qm.EnsurePublisherOk(ctx, &cfgUserApi.Queues.InputSigningKeyUpdate)
 	if err != nil {
 		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register input signing key event publisher")
 	}

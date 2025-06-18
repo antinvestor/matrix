@@ -473,8 +473,8 @@ github.com/pierrec/lz4 v1.0.2-0.20190131084431-473cd7ce01a1/go.mod h1:3/3N9NVKO0
 github.com/pierrec/lz4 v2.0.5+incompatible/go.mod h1:pdkljMzZIN41W+lC3N2tnIh5sFi+IEE17M5jbnwPHcY=
 github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=
 github.com/pingcap/errors v0.11.4/go.mod h1:Oi8TUi2kEtXXLMJk9l1cGmz20kV3TaQ0usTwv5KuLY8=
-github.com/pitabwire/frame v1.45.2 h1:KXkoo5XajgWt7TtW+IliaukxdXh+V8aUeTBBMjJzzpU=
-github.com/pitabwire/frame v1.45.2/go.mod h1:i4z0BmbH+RlrYOcVSazqA6paPinexItqpRArFiBfU4A=
+github.com/pitabwire/frame v1.46.3 h1:cUe1ZHT9mCksL6+VTa+gxVRfN8SpmTVue1zp3llT8gg=
+github.com/pitabwire/frame v1.46.3/go.mod h1:i4z0BmbH+RlrYOcVSazqA6paPinexItqpRArFiBfU4A=
 github.com/pitabwire/natspubsub v0.5.1 h1:sCu8xP9jJ/AA/rvoKl/1aEYsgSVVU05ab8pCdb+wfgI=
 github.com/pitabwire/natspubsub v0.5.1/go.mod h1:fxAKe9c9Kf0NIxZZ7tLM7DXuq1OGv4+AsaoaWOPScrI=
 github.com/pitabwire/util v0.2.5 h1:UsxC8T2CmQgNVyi5sYYfpQiyoj5wQIySO9mPLxzJBoA=
