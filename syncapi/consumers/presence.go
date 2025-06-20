@@ -21,6 +21,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -77,7 +78,7 @@ func (s *PresenceConsumer) register(ctx context.Context) error {
 }
 
 func (s *PresenceConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
-	userID := metadata[queueutil.UserID]
+	userID := metadata[constants.UserID]
 	presence := metadata["presence"]
 	timestamp := metadata["last_active_ts"]
 	fromSync, _ := strconv.ParseBool(metadata["from_sync"])

@@ -7,15 +7,6 @@ import (
 	"github.com/pitabwire/frame"
 )
 
-const (
-	UserID        = "user_id"
-	RoomID        = "room_id"
-	EventID       = "event_id"
-	RoomEventType = "output_room_event_type"
-
-	AppServiceIDToken = "appservice_id_token"
-)
-
 type QueueManager interface {
 	RegisterPublisher(ctx context.Context, opts *config.QueueOptions) error
 	GetPublisher(ref string) (frame.Publisher, error)

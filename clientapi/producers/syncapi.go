@@ -24,6 +24,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
@@ -48,9 +49,9 @@ func (p *SyncAPIProducer) SendReceipt(
 	log := util.Log(ctx)
 
 	h := map[string]string{
-		queueutil.UserID:  userID,
-		queueutil.RoomID:  roomID,
-		queueutil.EventID: eventID,
+		constants.UserID:  userID,
+		constants.RoomID:  roomID,
+		constants.EventID: eventID,
 		"type":            receiptType,
 		"timestamp":       fmt.Sprintf("%d", timestamp),
 	}
@@ -110,7 +111,7 @@ func (p *SyncAPIProducer) SendToDevice(
 
 		h := map[string]string{
 			"sender":         sender,
-			queueutil.UserID: userID,
+			constants.UserID: userID,
 		}
 
 		if err = p.Qm.Publish(ctx, p.TopicSendToDeviceEvent, ote, h); err != nil {
@@ -130,8 +131,8 @@ func (p *SyncAPIProducer) SendTyping(
 ) error {
 
 	h := map[string]string{
-		queueutil.UserID: userID,
-		queueutil.RoomID: roomID,
+		constants.UserID: userID,
+		constants.RoomID: roomID,
 		"typing":         strconv.FormatBool(typing),
 		"timeout_ms":     strconv.Itoa(int(timeoutMS)),
 	}
@@ -143,7 +144,7 @@ func (p *SyncAPIProducer) SendPresence(
 ) error {
 
 	h := map[string]string{
-		queueutil.UserID: userID,
+		constants.UserID: userID,
 		"presence":       presence.String(),
 	}
 	if statusMsg != nil {

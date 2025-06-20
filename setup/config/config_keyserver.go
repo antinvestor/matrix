@@ -1,5 +1,9 @@
 package config
 
+import (
+	"github.com/antinvestor/matrix/setup/constants"
+)
+
 type KeyServer struct {
 	Global *Global `yaml:"-"`
 
@@ -28,7 +32,7 @@ type KeyServerQueues struct {
 }
 
 func (q *KeyServerQueues) Defaults(opts DefaultOpts) {
-	q.OutputKeyChangeEvent = opts.defaultQ(OutputKeyChangeEvent)
+	q.OutputKeyChangeEvent = opts.defaultQ(constants.OutputKeyChangeEvent)
 }
 
 func (q *KeyServerQueues) Verify(configErrs *Errors) {

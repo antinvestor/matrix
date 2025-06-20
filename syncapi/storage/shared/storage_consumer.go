@@ -59,7 +59,7 @@ type Database struct {
 func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransaction, error) {
 
 	sqlOpt := []*sql.TxOptions{
-		&sql.TxOptions{
+		{
 			// Set the isolation level so that we see a snapshot of the database.
 			// In PostgreSQL repeatable read transactions will see a snapshot taken
 			// at the first query, and since the transaction is read-only it can't

@@ -7,12 +7,11 @@
 package v1
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -22,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type PublishRequest struct {
+type ProgressRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
 	Metadata      map[string]string      `protobuf:"bytes,2,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -31,20 +30,20 @@ type PublishRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PublishRequest) Reset() {
-	*x = PublishRequest{}
+func (x *ProgressRequest) Reset() {
+	*x = ProgressRequest{}
 	mi := &file_room_actor_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PublishRequest) String() string {
+func (x *ProgressRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PublishRequest) ProtoMessage() {}
+func (*ProgressRequest) ProtoMessage() {}
 
-func (x *PublishRequest) ProtoReflect() protoreflect.Message {
+func (x *ProgressRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_room_actor_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -56,54 +55,59 @@ func (x *PublishRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PublishRequest.ProtoReflect.Descriptor instead.
-func (*PublishRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProgressRequest.ProtoReflect.Descriptor instead.
+func (*ProgressRequest) Descriptor() ([]byte, []int) {
 	return file_room_actor_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *PublishRequest) GetRoomId() string {
+func (x *ProgressRequest) GetRoomId() string {
 	if x != nil {
 		return x.RoomId
 	}
 	return ""
 }
 
-func (x *PublishRequest) GetMetadata() map[string]string {
+func (x *ProgressRequest) GetMetadata() map[string]string {
 	if x != nil {
 		return x.Metadata
 	}
 	return nil
 }
 
-func (x *PublishRequest) GetPayload() []byte {
+func (x *ProgressRequest) GetPayload() []byte {
 	if x != nil {
 		return x.Payload
 	}
 	return nil
 }
 
-type PublishResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+type ProgressResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Message        string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	State          string                 `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
+	ActiveMessages int64                  `protobuf:"varint,3,opt,name=ActiveMessages,proto3" json:"ActiveMessages,omitempty"` // Currently active messages being processed
+	LastActivity   int64                  `protobuf:"varint,4,opt,name=LastActivity,proto3" json:"LastActivity,omitempty"`     // Last activity timestamp in UnixNano
+	ProcessingTime int64                  `protobuf:"varint,5,opt,name=ProcessingTime,proto3" json:"ProcessingTime,omitempty"` // Total processing time in nanoseconds
+	MessageCount   int64                  `protobuf:"varint,6,opt,name=MessageCount,proto3" json:"MessageCount,omitempty"`     // Total messages processed
+	ErrorCount     int64                  `protobuf:"varint,7,opt,name=ErrorCount,proto3" json:"ErrorCount,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
-func (x *PublishResponse) Reset() {
-	*x = PublishResponse{}
+func (x *ProgressResponse) Reset() {
+	*x = ProgressResponse{}
 	mi := &file_room_actor_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PublishResponse) String() string {
+func (x *ProgressResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PublishResponse) ProtoMessage() {}
+func (*ProgressResponse) ProtoMessage() {}
 
-func (x *PublishResponse) ProtoReflect() protoreflect.Message {
+func (x *ProgressResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_room_actor_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -115,23 +119,58 @@ func (x *PublishResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PublishResponse.ProtoReflect.Descriptor instead.
-func (*PublishResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProgressResponse.ProtoReflect.Descriptor instead.
+func (*ProgressResponse) Descriptor() ([]byte, []int) {
 	return file_room_actor_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *PublishResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
-func (x *PublishResponse) GetMessage() string {
+func (x *ProgressResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
 	return ""
+}
+
+func (x *ProgressResponse) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *ProgressResponse) GetActiveMessages() int64 {
+	if x != nil {
+		return x.ActiveMessages
+	}
+	return 0
+}
+
+func (x *ProgressResponse) GetLastActivity() int64 {
+	if x != nil {
+		return x.LastActivity
+	}
+	return 0
+}
+
+func (x *ProgressResponse) GetProcessingTime() int64 {
+	if x != nil {
+		return x.ProcessingTime
+	}
+	return 0
+}
+
+func (x *ProgressResponse) GetMessageCount() int64 {
+	if x != nil {
+		return x.MessageCount
+	}
+	return 0
+}
+
+func (x *ProgressResponse) GetErrorCount() int64 {
+	if x != nil {
+		return x.ErrorCount
+	}
+	return 0
 }
 
 type WorkRequest struct {
@@ -226,23 +265,30 @@ var File_room_actor_proto protoreflect.FileDescriptor
 
 const file_room_actor_proto_rawDesc = "" +
 	"\n" +
-	"\x10room_actor.proto\x12\x05actor\"\xc0\x01\n" +
-	"\x0ePublishRequest\x12\x16\n" +
-	"\x06roomId\x18\x01 \x01(\tR\x06roomId\x12?\n" +
-	"\bmetadata\x18\x02 \x03(\v2#.actor.PublishRequest.MetadataEntryR\bmetadata\x12\x18\n" +
+	"\x10room_actor.proto\x12\x05actor\"\xc2\x01\n" +
+	"\x0fProgressRequest\x12\x16\n" +
+	"\x06roomId\x18\x01 \x01(\tR\x06roomId\x12@\n" +
+	"\bmetadata\x18\x02 \x03(\v2$.actor.ProgressRequest.MetadataEntryR\bmetadata\x12\x18\n" +
 	"\apayload\x18\x03 \x01(\fR\apayload\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"E\n" +
-	"\x0fPublishResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"%\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfa\x01\n" +
+	"\x10ProgressResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12\x14\n" +
+	"\x05state\x18\x02 \x01(\tR\x05state\x12&\n" +
+	"\x0eActiveMessages\x18\x03 \x01(\x03R\x0eActiveMessages\x12\"\n" +
+	"\fLastActivity\x18\x04 \x01(\x03R\fLastActivity\x12&\n" +
+	"\x0eProcessingTime\x18\x05 \x01(\x03R\x0eProcessingTime\x12\"\n" +
+	"\fMessageCount\x18\x06 \x01(\x03R\fMessageCount\x12\x1e\n" +
+	"\n" +
+	"ErrorCount\x18\a \x01(\x03R\n" +
+	"ErrorCount\"%\n" +
 	"\vWorkRequest\x12\x16\n" +
 	"\x06roomId\x18\x01 \x01(\tR\x06roomId\"'\n" +
 	"\rStopRoomActor\x12\x16\n" +
-	"\x06roomId\x18\x01 \x01(\tR\x06roomId2P\n" +
-	"\x12RoomEventProcessor\x12:\n" +
-	"\aPublish\x12\x15.actor.PublishRequest\x1a\x16.actor.PublishResponse\"\x00B|\n" +
+	"\x06roomId\x18\x01 \x01(\tR\x06roomId2S\n" +
+	"\x12RoomEventProcessor\x12=\n" +
+	"\bProgress\x12\x16.actor.ProgressRequest\x1a\x17.actor.ProgressResponse\"\x00B|\n" +
 	"\tcom.actorB\x0eRoomActorProtoP\x01Z+github.com/antinvestor/matrix/apis/actor/v1\xa2\x02\x03AXX\xaa\x02\x05Actor\xca\x02\x05Actor\xe2\x02\x11Actor\\GPBMetadata\xea\x02\x05Actorb\x06proto3"
 
 var (
@@ -259,16 +305,16 @@ func file_room_actor_proto_rawDescGZIP() []byte {
 
 var file_room_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_room_actor_proto_goTypes = []any{
-	(*PublishRequest)(nil),  // 0: actor.PublishRequest
-	(*PublishResponse)(nil), // 1: actor.PublishResponse
-	(*WorkRequest)(nil),     // 2: actor.WorkRequest
-	(*StopRoomActor)(nil),   // 3: actor.StopRoomActor
-	nil,                     // 4: actor.PublishRequest.MetadataEntry
+	(*ProgressRequest)(nil),  // 0: actor.ProgressRequest
+	(*ProgressResponse)(nil), // 1: actor.ProgressResponse
+	(*WorkRequest)(nil),      // 2: actor.WorkRequest
+	(*StopRoomActor)(nil),    // 3: actor.StopRoomActor
+	nil,                      // 4: actor.ProgressRequest.MetadataEntry
 }
 var file_room_actor_proto_depIdxs = []int32{
-	4, // 0: actor.PublishRequest.metadata:type_name -> actor.PublishRequest.MetadataEntry
-	0, // 1: actor.RoomEventProcessor.Publish:input_type -> actor.PublishRequest
-	1, // 2: actor.RoomEventProcessor.Publish:output_type -> actor.PublishResponse
+	4, // 0: actor.ProgressRequest.metadata:type_name -> actor.ProgressRequest.MetadataEntry
+	0, // 1: actor.RoomEventProcessor.Progress:input_type -> actor.ProgressRequest
+	1, // 2: actor.RoomEventProcessor.Progress:output_type -> actor.ProgressResponse
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name

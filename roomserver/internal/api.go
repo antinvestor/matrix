@@ -9,6 +9,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	asAPI "github.com/antinvestor/matrix/appservice/api"
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/acls"
@@ -49,6 +50,7 @@ type RoomserverInternalAPI struct {
 	fsAPI                  fsAPI.RoomserverFederationAPI
 	asAPI                  asAPI.AppServiceInternalAPI
 	Qm                     queueutil.QueueManager
+	Am                     actorutil.ActorManager
 	OutputProducer         *producers.RoomEventProducer
 	PerspectiveServerNames []spec.ServerName
 	enableMetrics          bool
@@ -56,8 +58,9 @@ type RoomserverInternalAPI struct {
 }
 
 func NewRoomserverAPI(
-	ctx context.Context, cfg *config.Matrix, roomserverDB storage.Database,
-	qm queueutil.QueueManager, caches cacheutil.RoomServerCaches, enableMetrics bool,
+	ctx context.Context, cfg *config.Matrix,
+	roomserverDB storage.Database, qm queueutil.QueueManager, caches cacheutil.RoomServerCaches,
+	am actorutil.ActorManager, enableMetrics bool,
 ) *RoomserverInternalAPI {
 	var perspectiveServerNames []spec.ServerName
 	for _, kp := range cfg.FederationAPI.KeyPerspectives {
@@ -66,15 +69,16 @@ func NewRoomserverAPI(
 
 	serverACLs := acls.NewServerACLs(ctx, roomserverDB)
 
-	err := qm.EnsurePublisherOk(ctx, &cfg.SyncAPI.Queues.OutputRoomEvent)
+	outputRoomEvtOpts := &cfg.SyncAPI.Queues.OutputRoomEvent
+	err := qm.EnsurePublisherOk(ctx, outputRoomEvtOpts)
 	if err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to register publisher for output room event")
 	}
 
 	producer := &producers.RoomEventProducer{
-		Topic: &cfg.SyncAPI.Queues.OutputRoomEvent,
-		Qm:    qm,
-		ACLs:  serverACLs,
+		OutputTopicRef: outputRoomEvtOpts.Ref(),
+		Qm:             qm,
+		ACLs:           serverACLs,
 	}
 	a := &RoomserverInternalAPI{
 		DB:                     roomserverDB,
@@ -84,6 +88,7 @@ func NewRoomserverAPI(
 		PerspectiveServerNames: perspectiveServerNames,
 		OutputProducer:         producer,
 		Qm:                     qm,
+		Am:                     am,
 		ServerACLs:             serverACLs,
 		enableMetrics:          enableMetrics,
 		defaultRoomVersion:     cfg.RoomServer.DefaultRoomVersion,
@@ -109,7 +114,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAP
 	}
 
 	inputer, err := input.NewInputer(
-		ctx, &r.Cfg.RoomServer, r.DB, r.Qm,
+		ctx, &r.Cfg.RoomServer, r.DB, r.Qm, r.Am,
 		r.ServerName,
 		r.SigningIdentityFor,
 		fsAPI, r,
@@ -223,7 +228,8 @@ func (r *RoomserverInternalAPI) HandleInvite(
 	if err != nil {
 		return err
 	}
-	return r.OutputProducer.ProduceRoomEvents(ctx, inviteEvent.RoomID().String(), outputEvents)
+	roomID := inviteEvent.RoomID()
+	return r.OutputProducer.ProduceRoomEvents(ctx, &roomID, outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformCreateRoom(
@@ -252,7 +258,14 @@ func (r *RoomserverInternalAPI) PerformLeave(
 	if len(outputEvents) == 0 {
 		return nil
 	}
-	return r.OutputProducer.ProduceRoomEvents(ctx, req.RoomID, outputEvents)
+
+	roomID, err := spec.NewRoomID(req.RoomID)
+	if err != nil {
+
+		return err
+	}
+
+	return r.OutputProducer.ProduceRoomEvents(ctx, roomID, outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformForget(

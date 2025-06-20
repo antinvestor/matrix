@@ -8,12 +8,11 @@ package v1
 
 import (
 	fmt "fmt"
-	slog "log/slog"
-	time "time"
-
 	actor "github.com/asynkron/protoactor-go/actor"
 	cluster "github.com/asynkron/protoactor-go/cluster"
 	proto "google.golang.org/protobuf/proto"
+	slog "log/slog"
+	time "time"
 )
 
 var xRoomEventProcessorFactory func() RoomEventProcessor
@@ -62,7 +61,7 @@ type RoomEventProcessor interface {
 	Init(ctx cluster.GrainContext)
 	Terminate(ctx cluster.GrainContext)
 	ReceiveDefault(ctx cluster.GrainContext)
-	Publish(req *PublishRequest, ctx cluster.GrainContext) (*PublishResponse, error)
+	Progress(req *ProgressRequest, ctx cluster.GrainContext) (*ProgressResponse, error)
 }
 
 // RoomEventProcessorGrainClient holds the base data for the RoomEventProcessorGrain
@@ -71,10 +70,10 @@ type RoomEventProcessorGrainClient struct {
 	cluster  *cluster.Cluster
 }
 
-// Publish requests the execution on to the cluster with CallOptions
-func (g *RoomEventProcessorGrainClient) Publish(r *PublishRequest, opts ...cluster.GrainCallOption) (*PublishResponse, error) {
+// Progress requests the execution on to the cluster with CallOptions
+func (g *RoomEventProcessorGrainClient) Progress(r *ProgressRequest, opts ...cluster.GrainCallOption) (*ProgressResponse, error) {
 	if g.cluster.Config.RequestLog {
-		g.cluster.Logger().Info("Requesting", slog.String("identity", g.Identity), slog.String("kind", "RoomEventProcessor"), slog.String("method", "Publish"), slog.Any("request", r))
+		g.cluster.Logger().Info("Requesting", slog.String("identity", g.Identity), slog.String("kind", "RoomEventProcessor"), slog.String("method", "Progress"), slog.Any("request", r))
 	}
 	bytes, err := proto.Marshal(r)
 	if err != nil {
@@ -86,7 +85,7 @@ func (g *RoomEventProcessorGrainClient) Publish(r *PublishRequest, opts ...clust
 		return nil, fmt.Errorf("error request: %w", err)
 	}
 	switch msg := resp.(type) {
-	case *PublishResponse:
+	case *ProgressResponse:
 		return msg, nil
 	case *cluster.GrainErrorResponse:
 		if msg == nil {
@@ -127,10 +126,10 @@ func (a *RoomEventProcessorActor) Receive(ctx actor.Context) {
 	case *cluster.GrainRequest:
 		switch msg.MethodIndex {
 		case 0:
-			req := &PublishRequest{}
+			req := &ProgressRequest{}
 			err := proto.Unmarshal(msg.MessageData, req)
 			if err != nil {
-				ctx.Logger().Error("[Grain] Publish(PublishRequest) proto.Unmarshal failed.", slog.Any("error", err))
+				ctx.Logger().Error("[Grain] Progress(ProgressRequest) proto.Unmarshal failed.", slog.Any("error", err))
 				resp := cluster.NewGrainErrorResponse(cluster.ErrorReason_INVALID_ARGUMENT, err.Error()).
 					WithMetadata(map[string]string{
 						"argument": req.String(),
@@ -139,7 +138,7 @@ func (a *RoomEventProcessorActor) Receive(ctx actor.Context) {
 				return
 			}
 
-			r0, err := a.inner.Publish(req, a.ctx)
+			r0, err := a.inner.Progress(req, a.ctx)
 			if err != nil {
 				resp := cluster.FromError(err)
 				ctx.Respond(resp)

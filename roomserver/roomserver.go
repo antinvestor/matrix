@@ -17,6 +17,7 @@ package roomserver
 import (
 	"context"
 
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -37,6 +38,7 @@ func NewInternalAPI(
 	cm sqlutil.ConnectionManager,
 	qm queueutil.QueueManager,
 	caches cacheutil.RoomServerCaches,
+	am actorutil.ActorManager,
 	enableMetrics bool,
 ) api.RoomserverInternalAPI {
 
@@ -50,7 +52,5 @@ func NewInternalAPI(
 		util.Log(ctx).WithError(err).Panic("failed to connect to room server db")
 	}
 
-	return internal.NewRoomserverAPI(
-		ctx, cfg, roomserverDB, qm, caches, enableMetrics,
-	)
+	return internal.NewRoomserverAPI(ctx, cfg, roomserverDB, qm, caches, am, enableMetrics)
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/pushrules"
@@ -17,6 +18,7 @@ import (
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
@@ -33,6 +35,7 @@ type OutputRoomEventConsumer struct {
 	cfg          *config.UserAPI
 	rsAPI        rsapi.UserRoomserverAPI
 	qm           queueutil.QueueManager
+	am           actorutil.ActorManager
 	db           storage.UserDatabase
 	pgClient     pushgateway.Client
 	syncProducer *producers.SyncAPI
@@ -47,6 +50,7 @@ func NewOutputRoomEventConsumer(
 	ctx context.Context,
 	cfg *config.UserAPI,
 	qm queueutil.QueueManager,
+	am actorutil.ActorManager,
 	store storage.UserDatabase,
 	pgClient pushgateway.Client,
 	rsAPI rsapi.UserRoomserverAPI,
@@ -65,17 +69,39 @@ func NewOutputRoomEventConsumer(
 		countsLock:   sync.Mutex{},
 		serverName:   cfg.Global.ServerName,
 	}
-	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputRoomEvent, c)
+
+	am.EnableFunction(actorutil.ActorFunctionUserAPIServer, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
+	c.am = am
+
+	outputQOpts := &cfg.Queues.OutputRoomEvent
+	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject")
+
+	util.Log(ctx).WithField("url", outputQOpts.DSrc()).Info(" +++++++++++++++++++++++++  User API consume output room events ")
+
+	return qm.RegisterSubscriber(ctx, outputQOpts, c)
 }
 
-func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
+
+	util.Log(ctx).Info(" +++++++++++++++++++++++++  User api a new output room event ")
+
+	roomId, err := constants.DecodeRoomID(metadata[constants.RoomID])
+	if err != nil {
+		return err
+	}
+
+	return s.am.EnsureRoomActorExists(ctx, actorutil.ActorFunctionUserAPIServer, roomId)
+}
+
+func (s *OutputRoomEventConsumer) HandleRoomEvent(ctx context.Context, metadata map[string]string, message []byte) error {
 	// Only handle events we care about
 
 	log := util.Log(ctx)
+	log.Info("++++++++++++++ USERAPI consumed outputRoomEvent")
 
 	var event *rstypes.HeaderedEvent
 	var isNewRoomEvent bool
-	switch rsapi.OutputType(metadata[queueutil.RoomEventType]) {
+	switch rsapi.OutputType(metadata[constants.RoomEventType]) {
 
 	case rsapi.OutputTypeNewRoomEvent:
 		isNewRoomEvent = true

@@ -173,9 +173,9 @@ func (r *Admin) PerformAdminEvacuateUser(
 
 	allRooms := append(roomIDs, inviteRoomIDs...)
 	affected = make([]string, 0, len(allRooms))
-	for _, roomID := range allRooms {
+	for _, roomIDStr := range allRooms {
 		leaveReq := &api.PerformLeaveRequest{
-			RoomID: roomID,
+			RoomID: roomIDStr,
 			Leaver: *fullUserID,
 		}
 		leaveRes := &api.PerformLeaveResponse{}
@@ -183,10 +183,16 @@ func (r *Admin) PerformAdminEvacuateUser(
 		if err0 != nil {
 			return nil, err0
 		}
-		affected = append(affected, roomID)
+		affected = append(affected, roomIDStr)
 		if len(outputEvents) == 0 {
 			continue
 		}
+
+		roomID, err0 := spec.NewRoomID(roomIDStr)
+		if err0 != nil {
+			continue
+		}
+
 		err0 = r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, outputEvents)
 		if err0 != nil {
 			return nil, err0
@@ -198,26 +204,30 @@ func (r *Admin) PerformAdminEvacuateUser(
 // PerformAdminPurgeRoom removes all traces for the given room from the database.
 func (r *Admin) PerformAdminPurgeRoom(
 	ctx context.Context,
-	roomID string,
+	roomIDStr string,
 ) error {
-	// Validate we actually got a room ID and nothing else
-	if _, _, err := gomatrixserverlib.SplitID('!', roomID); err != nil {
+
+	log := util.Log(ctx).WithField("room_id", roomIDStr)
+	roomID, err := spec.NewRoomID(roomIDStr)
+	if err != nil {
+		log.WithError(err).Warn("Could not parse room id")
 		return err
 	}
 
-	util.Log(ctx).WithField("room_id", roomID).Warn("Purging room from roomserver")
-	if err := r.DB.PurgeRoom(ctx, roomID); err != nil {
-		util.Log(ctx).WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
+	log.Warn("Purging room from roomserver")
+	err = r.DB.PurgeRoom(ctx, roomID.String())
+	if err != nil {
+		log.WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
 		return err
 	}
 
-	util.Log(ctx).WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
+	log.WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
 
 	return r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypePurgeRoom,
 			PurgeRoom: &api.OutputPurgeRoom{
-				RoomID: roomID,
+				RoomID: roomID.String(),
 			},
 		},
 	})

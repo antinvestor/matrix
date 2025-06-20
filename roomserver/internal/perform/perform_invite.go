@@ -88,7 +88,7 @@ func (r *Inviter) IsKnownRoom(ctx context.Context, roomID spec.RoomID) (bool, er
 	if err != nil {
 		return false, fmt.Errorf("failed to load RoomInfo: %w", err)
 	}
-	return (info != nil && !info.IsStub()), nil
+	return info != nil && !info.IsStub(), nil
 }
 
 func (r *Inviter) StateQuerier() gomatrixserverlib.StateQuerier {

@@ -26,15 +26,16 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedapi "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/roomserver/internal/actor"
 	"github.com/antinvestor/matrix/roomserver/internal/query"
 	"github.com/antinvestor/matrix/roomserver/producers"
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
@@ -68,20 +69,22 @@ import (
 // up, so they will do nothing until a new event comes in for B
 // or C.
 type Inputer struct {
-	Cfg             *config.RoomServer
-	DB              storage.RoomDatabase
-	Qm              queueutil.QueueManager
-	ServerName      spec.ServerName
-	SigningIdentity func(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
-	FSAPI           fedapi.RoomserverFederationAPI
-	RSAPI           api.RoomserverInternalAPI
-	KeyRing         gomatrixserverlib.JSONVerifier
-	ACLs            *acls.ServerACLs
-	OutputProducer  *producers.RoomEventProducer
-	Queryer         *query.Queryer
-	UserAPI         userapi.RoomserverUserAPI
-	actorSystem     *actor.Manager
-	EnableMetrics   bool
+	Cfg                     *config.RoomServer
+	DB                      storage.RoomDatabase
+	Qm                      queueutil.QueueManager
+	Am                      actorutil.ActorManager
+	ServerName              spec.ServerName
+	SigningIdentity         func(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error)
+	FSAPI                   fedapi.RoomserverFederationAPI
+	RSAPI                   api.RoomserverInternalAPI
+	KeyRing                 gomatrixserverlib.JSONVerifier
+	ACLs                    *acls.ServerACLs
+	OutputProducer          *producers.RoomEventProducer
+	Queryer                 *query.Queryer
+	UserAPI                 userapi.RoomserverUserAPI
+	EnableMetrics           bool
+	repliesTopicRef         string
+	inputRoomEventsTopicRef string
 }
 
 func NewInputer(
@@ -89,6 +92,7 @@ func NewInputer(
 	cfg *config.RoomServer,
 	db storage.RoomDatabase,
 	qm queueutil.QueueManager,
+	am actorutil.ActorManager,
 	serverName spec.ServerName,
 	signingIdentity func(ctx context.Context, roomID spec.RoomID, senderID spec.UserID) (fclient.SigningIdentity, error),
 	fsAPI fedapi.RoomserverFederationAPI,
@@ -116,53 +120,80 @@ func NewInputer(
 		EnableMetrics:   enableMetrics,
 	}
 
-	c.actorSystem = actor.NewManager(ctx, &cfg.ActorSystem, qm, &cfg.Queues.InputRoomEvent, c.HandleRoomEvent)
-	err := c.actorSystem.Start(ctx)
+	inputQOpts := &cfg.Queues.InputRoomEvent
+
+	am.EnableFunction(actorutil.ActorFunctionRoomServer, inputQOpts, c.HandleRoomEvent)
+	c.Am = am
+
+	err := c.Qm.EnsurePublisherOk(ctx, inputQOpts)
+	if err != nil {
+		return nil, err
+	}
+	c.inputRoomEventsTopicRef = inputQOpts.Ref()
+
+	replyPubOpts, err := replyQOpts(ctx, inputQOpts, "", false)
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.Qm.RegisterSubscriber(ctx, &cfg.Queues.InputRoomEvent, c)
+	err = c.Qm.EnsurePublisherOk(ctx, replyPubOpts)
+	if err != nil {
+		return nil, err
+	}
+	c.repliesTopicRef = replyPubOpts.Ref()
+
+	inputQOpts.DS = inputQOpts.DS.RemoveQuery("subject")
+
+	err = c.Qm.RegisterSubscriber(ctx, inputQOpts, c)
 	return c, err
 }
 
 func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
 
-	roomId, err := spec.NewRoomID(metadata["room_id"])
+	roomId, err := constants.DecodeRoomID(metadata[constants.RoomID])
 	if err != nil {
 		return err
 	}
 
-	_, err = r.actorSystem.EnsureRoomActorExists(ctx, roomId)
+	metrics, err := r.Am.Progress(ctx, actorutil.ActorFunctionRoomServer, roomId)
 	if err != nil {
 		return err
 	}
+
+	util.Log(ctx).WithField("metrics", metrics).Debug(" +++++++++++++  Inputer.Handle")
 
 	return nil
 }
 
-func replyQOpts(ctx context.Context, opts *config.QueueOptions) (*config.QueueOptions, error) {
+func replyQOpts(_ context.Context, opts *config.QueueOptions, requestID string, isSubscriber bool) (*config.QueueOptions, error) {
 
-	requestID := frame.GenerateID(ctx)
-	replySubjectPrefix := fmt.Sprintf("%s_Reply", opts.Ref())
-	replySubject := fmt.Sprintf("%s.%s", replySubjectPrefix, requestID)
+	suffixedReplySubject := fmt.Sprintf("%s_Reply", constants.InputRoomEvent)
+
 	ds := opts.DS
 	if ds.IsNats() {
 
-		ds = ds.RemoveQuery("stream_storage", "stream_retention", "consumer_headers_only")
-		ds = ds.ExtendQuery("subject", replySubject).
-			ExtendQuery("stream_subjects", fmt.Sprintf("%s.*", replySubjectPrefix)).
-			ExtendQuery("stream_name", replySubjectPrefix).
-			ExtendQuery("stream_storage", "memory").
-			ExtendQuery("consumer_filter_subject", replySubject).
-			ExtendQuery("consumer_durable_name", requestID)
+		ds = ds.RemoveQuery("subject", "consumer_headers_only").
+			ExtendQuery("stream_subjects", fmt.Sprintf("%s.*", suffixedReplySubject)).
+			ExtendQuery("stream_name", suffixedReplySubject).
+			ExtendQuery("stream_storage", "memory")
 
+		if isSubscriber {
+
+			durable := strings.ReplaceAll(fmt.Sprintf("Durable_%s_%s", suffixedReplySubject, requestID), ".", "_")
+
+			ds = ds.ExtendQuery("consumer_durable_name", durable).
+				ExtendQuery("consumer_filter_subject", fmt.Sprintf("%s.%s", suffixedReplySubject, requestID))
+
+		} else {
+			ds = ds.ExtendQuery("subject", suffixedReplySubject).
+				ExtendQuery(constants.QueueHeaderToExtendSubject, constants.SynchronousReplyMsgID)
+		}
 	} else {
-		ds = config.DataSource(fmt.Sprintf("mem://%s", replySubject))
+		ds = config.DataSource(fmt.Sprintf("mem://%s", suffixedReplySubject))
 	}
 
 	return &config.QueueOptions{
-		QReference: fmt.Sprintf("Reply_%s", requestID),
+		QReference: fmt.Sprintf("%s_%s", suffixedReplySubject, requestID),
 		Prefix:     opts.Prefix,
 		DS:         ds,
 	}, nil
@@ -231,7 +262,7 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 	// that field, so send back the error string (if any). If there
 	// was no error then we'll return a blank message, which means
 	// that everything was OK.
-	replyTo, ok := metadata["sync_uri"]
+	responseMsgID, ok := metadata[constants.SynchronousReplyMsgID]
 	if ok {
 
 		log := util.Log(ctx).
@@ -239,38 +270,16 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 			WithField("room_id", inputRoomEvent.Event.RoomID()).
 			WithField("event_id", inputRoomEvent.Event.EventID()).
 			WithField("type", inputRoomEvent.Event.Type()).
-			WithField("replyTo", replyTo)
+			WithField("sync_reply_msg_id", responseMsgID)
 
-		replyOpts := &config.QueueOptions{
-			DS:         config.DataSource(replyTo),
-			Prefix:     metadata["sync_prefix"],
-			QReference: metadata["sync_ref"],
-		}
-
-		err0 := r.Qm.EnsurePublisherOk(ctx, replyOpts)
+		err0 := r.Qm.Publish(ctx, r.repliesTopicRef, errString, map[string]string{
+			constants.SynchronousReplyMsgID: metadata[constants.SynchronousReplyMsgID],
+		})
 		if err0 != nil {
 			log.WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
 				WithField("event_id", inputRoomEvent.Event.EventID()).
 				WithField("type", inputRoomEvent.Event.Type()).
-				WithField("replyTo", replyTo).
-				Warn("Publisher to reply to is not available")
-			return nil
-		}
-
-		defer func() {
-
-			err0 = r.Qm.DiscardPublisher(ctx, replyOpts.Ref())
-			if err0 != nil {
-				return
-			}
-		}()
-
-		err0 = r.Qm.Publish(ctx, replyOpts.Ref(), errString)
-		if err0 != nil {
-			log.WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).
-				WithField("event_id", inputRoomEvent.Event.EventID()).
-				WithField("type", inputRoomEvent.Event.Type()).
-				WithField("replyTo", replyTo).
+				WithField("sync_reply_msg_id", responseMsgID).
 				Warn("Roomserver failed to respond for sync event")
 		}
 	}
@@ -289,16 +298,18 @@ func (r *Inputer) queueInputRoomEvents(
 	// bother, so these values will remain empty.
 
 	var replyToOpts *config.QueueOptions
+	var requestMsgID string
 	if !request.Asynchronous {
-		replyToOpts, err = replyQOpts(ctx, &r.Cfg.Queues.InputRoomEvent)
+		requestMsgID = frame.GenerateID(ctx)
+		replyToOpts, err = replyQOpts(ctx, &r.Cfg.Queues.InputRoomEvent, requestMsgID, true)
 		if err != nil {
 			return nil, err
 		}
 		err = r.Qm.RegisterSubscriber(ctx, replyToOpts)
-
 		if err != nil {
 			return nil, err
 		}
+
 		replySub, err = r.Qm.GetSubscriber(replyToOpts.Ref())
 		if err != nil {
 			return nil, err
@@ -318,17 +329,15 @@ func (r *Inputer) queueInputRoomEvents(
 		roomID := e.Event.RoomID()
 
 		header := map[string]string{
-			"room_id":      roomID.String(),
-			"virtual_host": string(request.VirtualHost),
+			constants.RoomID: constants.EncodeRoomID(&roomID),
+			"virtual_host":   string(request.VirtualHost),
 		}
 
 		if replyToOpts != nil {
-			header["sync_prefix"] = replyToOpts.Prefix
-			header["sync_ref"] = replyToOpts.Ref()
-			header["sync_uri"] = string(replyToOpts.DS)
+			header[constants.SynchronousReplyMsgID] = requestMsgID
 		}
 
-		err = r.actorSystem.Publish(ctx, &roomID, e, header)
+		err = r.Qm.Publish(ctx, r.inputRoomEventsTopicRef, e, header)
 		if err != nil {
 			util.Log(ctx).WithError(err).WithField("room_id", roomID).
 				WithField("event_id", e.Event.EventID()).
@@ -373,6 +382,7 @@ func (r *Inputer) InputRoomEvents(
 
 	// Set up a goroutine to cancel our wait operations if the parent context is cancelled
 	for range len(request.InputRoomEvents) {
+
 		select {
 		case <-ctx.Done():
 			return

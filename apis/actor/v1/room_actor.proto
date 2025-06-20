@@ -4,15 +4,20 @@ package actor;
 
 option go_package = "github.com/antinvestor/matrix/apis/actor/v1;actorV1";
 
-message PublishRequest {
+message ProgressRequest {
   string roomId = 1;
   map<string, string> metadata = 2;
   bytes payload = 3;
 }
 
-message PublishResponse {
-  bool success = 1;
-  string message = 2;
+message ProgressResponse {
+  string message = 1;
+  string state = 2;
+  int64  ActiveMessages = 3;// Currently active messages being processed
+  int64   LastActivity = 4;// Last activity timestamp in UnixNano
+  int64    ProcessingTime = 5;  // Total processing time in nanoseconds
+  int64    MessageCount = 6;   // Total messages processed
+  int64      ErrorCount = 7;
 }
 
 message WorkRequest {
@@ -25,5 +30,5 @@ message StopRoomActor {
 
 
 service RoomEventProcessor {
-  rpc Publish (PublishRequest) returns (PublishResponse) {}
+  rpc Progress (ProgressRequest) returns (ProgressResponse) {}
 }

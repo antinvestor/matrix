@@ -21,6 +21,7 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -64,7 +65,7 @@ func (s *OutputNotificationDataConsumer) Handle(ctx context.Context, metadata ma
 
 	log := util.Log(ctx)
 
-	userID := metadata[queueutil.UserID]
+	userID := metadata[constants.UserID]
 
 	// Parse out the event JSON
 	var data eventutil.NotificationData

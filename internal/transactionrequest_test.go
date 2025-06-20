@@ -30,6 +30,7 @@ import (
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
@@ -288,9 +289,9 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 
 	h := &msgHandler{f: func(ctx context.Context, metadata map[string]string, message []byte) error {
 
-		room := metadata[queueutil.RoomID]
+		room := metadata[constants.RoomID]
 		assert.Equal(t, roomID, room)
-		user := metadata[queueutil.UserID]
+		user := metadata[constants.UserID]
 		assert.Equal(t, userID, user)
 		typ, parseErr := strconv.ParseBool(metadata["typing"])
 		if parseErr != nil {
@@ -530,7 +531,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 	h := &msgHandler{f: func(ctx context.Context, metadata map[string]string, message []byte) error {
 
 		var output types.OutputReceiptEvent
-		output.RoomID = metadata[queueutil.RoomID]
+		output.RoomID = metadata[constants.RoomID]
 		assert.Equal(t, roomID, output.RoomID)
 
 		received.Store(true)
@@ -631,7 +632,7 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 
 	h := &msgHandler{f: func(ctx context.Context, metadata map[string]string, message []byte) error {
 
-		userIDRes := metadata[queueutil.UserID]
+		userIDRes := metadata[constants.UserID]
 		presenceRes := metadata["presence"]
 		assert.Equal(t, userID, userIDRes)
 		assert.Equal(t, presence, presenceRes)

@@ -16,12 +16,13 @@ package producers
 
 import (
 	"context"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/pitabwire/util"
 	"github.com/tidwall/gjson"
 )
@@ -33,12 +34,12 @@ var keyContentFields = map[string]string{
 }
 
 type RoomEventProducer struct {
-	Topic *config.QueueOptions
-	ACLs  *acls.ServerACLs
+	OutputTopicRef string
+	ACLs           *acls.ServerACLs
 	Qm    queueutil.QueueManager
 }
 
-func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string, updates []api.OutputEvent) error {
+func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID *spec.RoomID, updates []api.OutputEvent) error {
 	var err error
 
 	log := util.Log(ctx)
@@ -80,15 +81,13 @@ func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID string
 		}
 
 		h := map[string]string{
-			queueutil.RoomEventType: string(update.Type),
-			queueutil.RoomID:        roomID,
+			constants.RoomEventType: string(update.Type),
+			constants.RoomID:        constants.EncodeRoomID(roomID),
 		}
 
-		logger.WithField("topic", r.Topic.DSrc()).Info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-
-		err = r.Qm.Publish(ctx, r.Topic.Ref(), update, h)
+		err = r.Qm.Publish(ctx, r.OutputTopicRef, update, h)
 		if err != nil {
-			logger.WithError(err).WithField("topic", r.Topic).Error("Failed to produce to topic ")
+			logger.WithError(err).WithField("topic", r.OutputTopicRef).Error("Failed to produce to topic ")
 			return err
 		}
 	}

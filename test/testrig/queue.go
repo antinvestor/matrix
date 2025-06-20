@@ -7,6 +7,7 @@ import (
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 )
 
 type QMsg struct {
@@ -37,8 +38,8 @@ func NewOutputEventMsg(t *testing.T, roomID string, update api.OutputEvent) *QMs
 
 	msg := QMsg{
 		Header: map[string]string{
-			queueutil.RoomEventType: string(update.Type),
-			queueutil.RoomID:        roomID,
+			constants.RoomEventType: string(update.Type),
+			constants.RoomID:        roomID,
 		},
 		Data: update,
 	}

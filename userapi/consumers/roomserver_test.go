@@ -10,6 +10,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/pushrules"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -154,12 +155,16 @@ func TestLocalRoomMembers(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(svc)
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		db, err := storage.NewUserDatabase(ctx, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 		assert.NoError(t, err)
@@ -306,11 +311,15 @@ func BenchmarkLocalRoomMembers(b *testing.B) {
 
 	cm := sqlutil.NewConnectionManager(svc)
 	qm := queueutil.NewQueueManager(svc)
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
 	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 	db, err := storage.NewUserDatabase(ctx, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 	assert.NoError(b, err)

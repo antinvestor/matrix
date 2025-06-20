@@ -23,6 +23,7 @@ import (
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/userapi/producers"
 	"github.com/antinvestor/matrix/userapi/storage"
 	userapiutil "github.com/antinvestor/matrix/userapi/util"
@@ -63,9 +64,9 @@ func NewOutputReceiptEventConsumer(
 
 func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
-	userID := metadata[queueutil.UserID]
-	roomID := metadata[queueutil.RoomID]
-	readPos := metadata[queueutil.EventID]
+	userID := metadata[constants.UserID]
+	roomID := metadata[constants.RoomID]
+	readPos := metadata[constants.EventID]
 	evType := metadata["type"]
 
 	if readPos == "" || (evType != "m.read" && evType != "m.read.private") {

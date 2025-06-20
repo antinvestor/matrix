@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"time"
+
+	"github.com/antinvestor/matrix/setup/constants"
 )
 
 type ClientAPI struct {
@@ -256,7 +258,7 @@ type ClientQueues struct {
 }
 
 func (q *ClientQueues) Defaults(opts DefaultOpts) {
-	q.InputFulltextReindex = opts.defaultQ(InputFulltextReindex)
+	q.InputFulltextReindex = opts.defaultQ(constants.InputFulltextReindex)
 }
 
 func (q *ClientQueues) Verify(configErrs *Errors) {

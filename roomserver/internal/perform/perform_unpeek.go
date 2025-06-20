@@ -37,8 +37,12 @@ type Unpeeker struct {
 // PerformUnpeek handles un-peeking matrix rooms, including over federation by talking to the federationapi.
 func (r *Unpeeker) PerformUnpeek(
 	ctx context.Context,
-	roomID, userID, deviceID string,
+	roomIDStr string, userID, deviceID string,
 ) error {
+	roomID, err := spec.NewRoomID(roomIDStr)
+	if err != nil {
+		return api.ErrInvalidID{Err: err}
+	}
 	// FIXME: there's way too much duplication with performJoin
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -47,7 +51,7 @@ func (r *Unpeeker) PerformUnpeek(
 	if !r.Cfg.Global.IsLocalServerName(domain) {
 		return api.ErrInvalidID{Err: fmt.Errorf("user %q does not belong to this homeserver", userID)}
 	}
-	if strings.HasPrefix(roomID, "!") {
+	if strings.HasPrefix(roomID.String(), "!") {
 		return r.performUnpeekRoomByID(ctx, roomID, userID, deviceID)
 	}
 	return api.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid", roomID)}
@@ -55,10 +59,10 @@ func (r *Unpeeker) PerformUnpeek(
 
 func (r *Unpeeker) performUnpeekRoomByID(
 	ctx context.Context,
-	roomID, userID, deviceID string,
+	roomID *spec.RoomID, userID, deviceID string,
 ) (err error) {
 	// Get the domain part of the room ID.
-	_, _, err = gomatrixserverlib.SplitID('!', roomID)
+	_, _, err = gomatrixserverlib.SplitID('!', roomID.String())
 	if err != nil {
 		return api.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", roomID, err)}
 	}
@@ -72,7 +76,7 @@ func (r *Unpeeker) performUnpeekRoomByID(
 		{
 			Type: api.OutputTypeRetirePeek,
 			RetirePeek: &api.OutputRetirePeek{
-				RoomID:   roomID,
+				RoomID:   roomID.String(),
 				UserID:   userID,
 				DeviceID: deviceID,
 			},

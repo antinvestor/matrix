@@ -30,6 +30,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/routing"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -122,6 +123,7 @@ func NewInternalAPI(
 	mcfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	qm queueutil.QueueManager,
+	am actorutil.ActorManager,
 	federation fclient.FederationClient,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	caches *cacheutil.Caches,
@@ -162,7 +164,7 @@ func NewInternalAPI(
 	)
 
 	err = consumers.NewOutputRoomEventConsumer(
-		ctx, cfg, qm, queues, federationDB, rsAPI, presenceCli,
+		ctx, cfg, qm, am, queues, federationDB, rsAPI, presenceCli,
 	)
 	if err != nil {
 		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start room server consumer")

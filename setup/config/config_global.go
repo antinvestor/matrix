@@ -92,6 +92,9 @@ type Global struct {
 	DistributedAPI DistributedAPI `yaml:"distributed_api"`
 
 	SyncAPIPresenceURI string `yaml:"sync_api_presence_uri"`
+
+	// Actors contains configuration for the Proto.Actor based distributed event processing system
+	Actors ActorOptions `yaml:"actors,omitempty"`
 }
 
 func (c *Global) Defaults(opts DefaultOpts) {
@@ -117,6 +120,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	c.DistributedAPI.Defaults()
 
 	c.SyncAPIPresenceURI = fmt.Sprintf("http://localhost%s", c.Port())
+	c.Actors.Defaults(opts)
 }
 
 func (c *Global) LoadEnv() error {
@@ -152,6 +156,7 @@ func (c *Global) Verify(configErrs *Errors) {
 	c.ServerNotices.Verify(configErrs)
 	c.ReportStats.Verify(configErrs)
 	c.Cache.Verify(configErrs)
+	c.Actors.Verify(configErrs)
 }
 
 func (c *Global) IsLocalServerName(serverName spec.ServerName) bool {
@@ -585,6 +590,65 @@ func (d *DataUnit) UnmarshalText(text []byte) error {
 	}
 	*d = DataUnit(v * magnitude)
 	return nil
+}
+
+// ActorOptions contains configuration for the Proto.Actor system used for distributed event processing
+type ActorOptions struct {
+	// Enabled determines whether the actor system is enabled
+	Enabled bool `yaml:"enabled"`
+
+	// Host to use for the actor system
+	Host string `yaml:"host"`
+
+	// Port to use for the actor system
+	Port int `yaml:"port"`
+
+	// ClusterMode specifies the clustering mode: "kubernetes", "automanaged", or "none"
+	ClusterMode string `yaml:"cluster_mode"`
+
+	// ClusterSeeds is a list of cluster seed nodes in the format "host:port"
+	ClusterSeeds []string `yaml:"cluster_seeds"`
+
+	// IdleTimeout is the duration after which a room actor will stop if no messages are received
+	IdleTimeout time.Duration `yaml:"idle_timeout"`
+
+	// FunctionPrefix represents the prefix to use for prefixing room id actor based on function
+	FunctionPrefix string `yaml:"function_prefix"`
+}
+
+func (c *ActorOptions) Defaults(opts DefaultOpts) {
+	// Default ActorSystem configuration
+	c.Enabled = false // Disabled by default for backward compatibility
+	c.Host = "localhost"
+	c.Port = 8090
+	c.ClusterMode = "none" // Default to no clustering
+	c.ClusterSeeds = []string{"127.0.0.1:8090"}
+	c.IdleTimeout = 1 * time.Minute
+	c.FunctionPrefix = "RoomServer"
+
+}
+
+func (c *ActorOptions) Verify(configErrs *Errors) {
+	// Only verify if the actor system is enabled
+	if !c.Enabled {
+		return
+	}
+
+	// Verify actor system configuration
+	if c.Port <= 0 || c.Port > 65535 {
+		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.actor_system.port': %d, must be between 1 and 65535", c.Port))
+	}
+
+	// Verify cluster mode
+	validModes := map[string]bool{"none": true, "kubernetes": true}
+	if _, valid := validModes[c.ClusterMode]; !valid {
+		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.actor_system.cluster_mode': %s, must be one of 'none' or 'kubernetes'", c.ClusterMode))
+	}
+
+	// Verify idle timeout
+	if c.IdleTimeout < 10*time.Second {
+		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.actor_system.idle_timeout': %s, must be at least 10 seconds", c.IdleTimeout))
+	}
 }
 
 // DistributedAPI The configuration to enable the use of distributed stores of data

@@ -22,6 +22,7 @@ import (
 	"github.com/antinvestor/matrix/clientapi"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/federationapi/statistics"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -154,11 +155,16 @@ func TestAppserviceInternalAPI(t *testing.T) {
 
 		// Create required internal APIs
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+
 		cm := sqlutil.NewConnectionManager(svc)
 
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		asAPI := appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
 
 		runCases(t, asAPI)
@@ -249,10 +255,14 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	}
 	// Create required internal APIs
 	qm := queueutil.NewQueueManager(svc)
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
 	cm := sqlutil.NewConnectionManager(svc)
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
-	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
 
 	t.Run("UserIDExists", func(t *testing.T) {
@@ -355,6 +365,10 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(svc)
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		evChan := make(chan struct{})
 		// create a dummy AS url, handling the events
@@ -398,9 +412,9 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		// Create required internal APIs
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		// start the consumer
 		appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
 
@@ -439,6 +453,10 @@ func TestOutputAppserviceEvent(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(svc)
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		evChan := make(chan struct{})
 
@@ -447,7 +465,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		// Create required internal APIs
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
 		// Create the router, so we can hit `/joined_members`
@@ -457,7 +475,9 @@ func TestOutputAppserviceEvent(t *testing.T) {
 			bob: {},
 		}
 
-		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		rsAPI.SetUserAPI(ctx, usrAPI)
+
 		clientapi.AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, usrAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 		createAccessTokens(t, accessTokens, usrAPI, ctx, routers)
 
@@ -539,7 +559,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
 
 		// Start the syncAPI to have `/joined_members` available
-		syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, usrAPI, rsAPI, caches, cacheutil.DisableMetrics)
+		syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, am, usrAPI, rsAPI, caches, cacheutil.DisableMetrics)
 
 		// start the consumer
 		appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)

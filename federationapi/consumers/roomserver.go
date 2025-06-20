@@ -29,9 +29,11 @@ import (
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/types"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	syncAPITypes "github.com/antinvestor/matrix/syncapi/types"
 	"github.com/pitabwire/util"
 )
@@ -42,6 +44,7 @@ type OutputRoomEventConsumer struct {
 	rsAPI          api.FederationRoomserverAPI
 	qm             queueutil.QueueManager
 	db             storage.Database
+	am             actorutil.ActorManager
 	queues         *queue.OutgoingQueues
 	presenceClient presencev1connect.PresenceServiceClient
 }
@@ -51,6 +54,7 @@ func NewOutputRoomEventConsumer(
 	ctx context.Context,
 	cfg *config.FederationAPI,
 	qm queueutil.QueueManager,
+	am actorutil.ActorManager,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 	rsAPI api.FederationRoomserverAPI,
@@ -65,15 +69,35 @@ func NewOutputRoomEventConsumer(
 		presenceClient: presenceClient,
 	}
 
-	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputRoomEvent, c)
+	am.EnableFunction(actorutil.ActorFunctionFederationAPIServer, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
+	c.am = am
+
+	outputQOpts := &cfg.Queues.OutputRoomEvent
+	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject")
+
+	util.Log(ctx).WithField("url", outputQOpts.DSrc()).Info(" +++++++++++++++++++++++++  Federatiorn API consume output room events ")
+
+	return qm.RegisterSubscriber(ctx, outputQOpts, c)
 }
 
-// Handle is called when the federation server receives a new event from the room server output log.
+func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
+
+	util.Log(ctx).Info(" +++++++++++++++++++++++++  Federation api a new output room event ")
+
+	roomId, err := constants.DecodeRoomID(metadata[constants.RoomID])
+	if err != nil {
+		return err
+	}
+
+	return s.am.EnsureRoomActorExists(ctx, actorutil.ActorFunctionFederationAPIServer, roomId)
+}
+
+// HandleRoomEvent is called when the federation server receives a new event from the room server output log.
 // It is unsafe to call this with messages for the same room in multiple gorountines
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
-func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
-	receivedType := api.OutputType(metadata[queueutil.RoomEventType])
+func (s *OutputRoomEventConsumer) HandleRoomEvent(ctx context.Context, metadata map[string]string, message []byte) error {
+	receivedType := api.OutputType(metadata[constants.RoomEventType])
 
 	// Only handle events we care about, avoids unneeded unmarshalling
 	switch receivedType {

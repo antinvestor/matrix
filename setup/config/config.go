@@ -462,7 +462,8 @@ func (d *DefaultOpts) defaultQ(s string, opts ...KVOpt) QueueOptions {
 			ExtendQuery("consumer_filter_subject", s).
 			ExtendQuery("consumer_durable_name", durable).
 			ExtendQuery("consumer_deliver_policy", "all").
-			ExtendQuery("consumer_ack_policy", "explicit")
+			ExtendQuery("consumer_ack_policy", "explicit").
+			ExtendQuery("consumer_replay_policy", "instant")
 
 		for _, kv := range opts {
 			ds = ds.ExtendQuery(kv.K, kv.V)

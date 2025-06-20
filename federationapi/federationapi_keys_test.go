@@ -16,6 +16,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/routing"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -87,10 +88,10 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 	return
 }
 
-func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *config.Matrix) {
-	var err error
-	for _, s := range servers {
+func createFederationDbKeys(ctx context.Context, t *testing.T, svc *frame.Service, cfg0 *config.Matrix) {
 
+	for _, s := range servers {
+		var err error
 		// Make a copy of the configuration to avoid modifying the original
 		cfg := *cfg0
 
@@ -104,7 +105,7 @@ func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *confi
 		// Generate a new key.
 		_, globalCfg.PrivateKey, err = ed25519.GenerateKey(nil)
 		if err != nil {
-			panic("can't generate identity key: " + err.Error())
+			t.Fatalf("can't generate identity key: %v", err)
 		}
 
 		globalCfg.KeyID = serverKeyID
@@ -120,10 +121,15 @@ func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *confi
 			CacheURI: globalCfg.Cache.CacheURI,
 		})
 		if err != nil {
-			panic("can't create cache : " + err.Error())
+			t.Fatalf("can't create cache : %v", err)
 		}
 
 		qm := queueutil.NewQueueManager(svc)
+
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		// Create a transport which redirects federation requests to
 		// the mock round tripper. Since we're not *really* listening for
@@ -136,7 +142,7 @@ func createFederationDbKeys(ctx context.Context, svc *frame.Service, cfg0 *confi
 
 		// Finally, build the server key APIs.
 
-		s.api = NewInternalAPI(ctx, &cfg, cm, qm, s.fedclient, nil, s.cache, nil, true, nil)
+		s.api = NewInternalAPI(ctx, &cfg, cm, qm, am, s.fedclient, nil, s.cache, nil, true, nil)
 	}
 }
 
@@ -160,7 +166,7 @@ func TestServersRequestOwnKeys(t *testing.T) {
 	ctx, svc, cfg := testrig.Init(t)
 	defer svc.Stop(ctx)
 
-	createFederationDbKeys(ctx, svc, cfg)
+	createFederationDbKeys(ctx, t, svc, cfg)
 
 	for name, s := range servers {
 
@@ -193,7 +199,7 @@ func TestRenewalBehaviour(t *testing.T) {
 	ctx, svc, cfg := testrig.Init(t)
 	defer svc.Stop(ctx)
 
-	createFederationDbKeys(ctx, svc, cfg)
+	createFederationDbKeys(ctx, t, svc, cfg)
 
 	req := gomatrixserverlib.PublicKeyLookupRequest{
 		ServerName: serverC.name,

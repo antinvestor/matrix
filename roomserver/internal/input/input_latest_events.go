@@ -182,6 +182,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents(ctx context.Context) error {
 	}
 	updates = append(updates, *update)
 
+	roomID := u.event.RoomID()
+
 	// Send the event to the output logs.
 	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
 	// (n.b. this means that it's possible that the same event will be sent twice if the transaction fails but
@@ -190,7 +192,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents(ctx context.Context) error {
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = u.api.OutputProducer.ProduceRoomEvents(ctx, u.event.RoomID().String(), updates); err != nil {
+	err = u.api.OutputProducer.ProduceRoomEvents(ctx, &roomID , updates)
+	if err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}
 

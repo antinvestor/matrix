@@ -118,14 +118,14 @@ func (r *Peeker) performPeekRoomByAlias(
 func (r *Peeker) performPeekRoomByID(
 	ctx context.Context,
 	req *api.PerformPeekRequest,
-) (roomID string, err error) {
-	roomID = req.RoomIDOrAlias
+) (string, error) {
 
-	// Get the domain part of the room ID.
-	_, domain, err := gomatrixserverlib.SplitID('!', roomID)
+	roomID, err := spec.NewRoomID(req.RoomIDOrAlias)
 	if err != nil {
 		return "", api.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", roomID, err)}
 	}
+	// Get the domain part of the room ID.
+	domain := roomID.Domain()
 
 	// handle federated peeks
 	// FIXME: don't create an outbound peek if we already have one going.
@@ -152,7 +152,7 @@ func (r *Peeker) performPeekRoomByID(
 	// XXX: we should probably factor out history_visibility checks into a common utility method somewhere
 	// which handles the default value etc.
 	var worldReadable = false
-	if ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", ""); ev != nil {
+	if ev, _ := r.DB.GetStateEvent(ctx, roomID.String(), "m.room.history_visibility", ""); ev != nil {
 		content := map[string]string{}
 		if err = json.Unmarshal(ev.Content(), &content); err != nil {
 			util.Log(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
@@ -167,7 +167,7 @@ func (r *Peeker) performPeekRoomByID(
 		return "", api.ErrNotAllowed{Err: fmt.Errorf("room is not world-readable")}
 	}
 
-	if ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.encryption", ""); ev != nil {
+	if ev, _ := r.DB.GetStateEvent(ctx, roomID.String(), "m.room.encryption", ""); ev != nil {
 		return "", api.ErrNotAllowed{Err: fmt.Errorf("cannot peek into an encrypted room")}
 	}
 
@@ -177,7 +177,7 @@ func (r *Peeker) performPeekRoomByID(
 		{
 			Type: api.OutputTypeNewPeek,
 			NewPeek: &api.OutputNewPeek{
-				RoomID:   roomID,
+				RoomID:   roomID.String(),
 				UserID:   req.UserID,
 				DeviceID: req.DeviceID,
 			},
@@ -191,5 +191,5 @@ func (r *Peeker) performPeekRoomByID(
 	// it will have been overwritten with a room ID by performPeekRoomByAlias.
 	// We should now include this in the response so that the CS API can
 	// return the right room ID.
-	return roomID, nil
+	return roomID.String(), nil
 }

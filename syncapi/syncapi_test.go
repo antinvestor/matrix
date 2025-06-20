@@ -14,6 +14,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/producers"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -140,9 +141,14 @@ func TestSyncAPIAccessTokens(t *testing.T) {
 		}
 		qm := queueutil.NewQueueManager(svc)
 
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+
 		msgs := toQueueMsgs(t, room.Events()...)
 
-		AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
 		err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
 		if err != nil {
@@ -250,8 +256,13 @@ func testSyncEventFormatPowerLevels(ctx context.Context, svc *frame.Service, cfg
 	}
 	qm := queueutil.NewQueueManager(svc)
 
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
+
 	msgs := toQueueMsgs(t, room.Events()...)
-	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
 	err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
 	if err != nil {
@@ -405,6 +416,11 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 	}
 	qm := queueutil.NewQueueManager(svc)
 
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
+
 	// order is:
 	// m.room.create
 	// m.room.member
@@ -413,7 +429,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 	// m.room.history_visibility
 	msgs := toQueueMsgs(t, room.Events()...)
 	sinceTokens := make([]string, len(msgs))
-	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
 	for i, msg := range msgs {
 
@@ -516,7 +532,12 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 	cfg.Global.Presence.EnableInbound = true
 	qm := queueutil.NewQueueManager(svc)
 
-	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
+
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
 	w := httptest.NewRecorder()
 	routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 		"access_token": alice.AccessToken,
@@ -630,11 +651,15 @@ func TestMessageHistoryVisibility(t *testing.T) {
 				t.Fatalf("failed to create a cache: %v", err)
 			}
 			qm := queueutil.NewQueueManager(svc)
+			am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+			if err != nil {
+				t.Fatalf("failed to create an actor manager: %v", err)
+			}
 
 			// Use the actual internal roomserver API
-			rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+			rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 			rsAPI.SetFederationAPI(ctx, nil, nil)
-			AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
+			AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
 
 			for _, tc := range testCases {
 				testname := fmt.Sprintf("%s - %s", tc.historyVisibility, userType)
@@ -902,12 +927,16 @@ func TestGetMembership(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		// Use an actual roomserver for this
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
-		AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -978,7 +1007,12 @@ func TestSendToDevice(t *testing.T) {
 
 		qm := queueutil.NewQueueManager(svc)
 
-		AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
 
 		cfgSyncAPI := cfg.SyncAPI
 		err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputSendToDeviceEvent)
@@ -1208,10 +1242,14 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 
 	// Use an actual roomserver for this
 	qm := queueutil.NewQueueManager(svc)
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 
-	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches, cacheutil.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches, cacheutil.DisableMetrics)
 
 	room := test.NewRoom(t, user)
 
@@ -1388,12 +1426,16 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	// Use an actual roomserver for this
 	qm := queueutil.NewQueueManager(svc)
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
 
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 
 	room := test.NewRoom(t, user)
-	AddPublicRoutes(ctx, routers, cfg, cm, qm, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
 	if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 		t.Fatalf("failed to send events: %v", err)

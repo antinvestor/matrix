@@ -1,4 +1,4 @@
-package config
+package constants
 
 const (
 	InputRoomEvent          = "InputRoomEvent"
@@ -17,4 +17,10 @@ const (
 	RequestPresence         = "GetPresence"
 	OutputPresenceEvent     = "OutputPresenceEvent"
 	InputFulltextReindex    = "InputFulltextReindex"
+)
+
+// Constants related to extending a subject via headers
+const (
+	QueueHeaderToExtendSubject = "header_to_extended_subject"
+	SynchronousReplyMsgID      = "sync_reply_msg_id"
 )

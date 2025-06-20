@@ -25,6 +25,7 @@ import (
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/pitabwire/util"
 )
 
@@ -58,8 +59,8 @@ func NewOutputTypingConsumer(
 // events topic from the client api.
 func (t *OutputTypingConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	// Extract the typing event from msg.
-	roomID := metadata[queueutil.RoomID]
-	userID := metadata[queueutil.UserID]
+	roomID := metadata[constants.RoomID]
+	userID := metadata[constants.UserID]
 	typing, err := strconv.ParseBool(metadata["typing"])
 	if err != nil {
 		util.Log(ctx).WithError(err).Error("EDU output log: typing parse failure")

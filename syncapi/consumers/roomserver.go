@@ -20,12 +20,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/producers"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -42,6 +45,7 @@ type OutputRoomEventConsumer struct {
 	cfg          *config.SyncAPI
 	rsAPI        api.SyncRoomserverAPI
 	qm           queueutil.QueueManager
+	am           actorutil.ActorManager
 	topic        *config.QueueOptions
 	db           storage.Database
 	pduStream    streams.StreamProvider
@@ -55,6 +59,7 @@ func NewOutputRoomEventConsumer(
 	ctx context.Context,
 	cfg *config.SyncAPI,
 	qm queueutil.QueueManager,
+	am actorutil.ActorManager,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	pduStream streams.StreamProvider,
@@ -74,26 +79,39 @@ func NewOutputRoomEventConsumer(
 		asProducer:   asProducer,
 	}
 
-	outRmOpts := &cfg.Queues.OutputRoomEvent
-	outRmOpts.DS = outRmOpts.DS.
-		ExtendQuery("consumer_max_ack_pending", "1").
-		ExtendQuery("consumer_replay_policy", "instant")
+	am.EnableFunction(actorutil.ActorFunctionSyncAPIServer, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
+	c.am = am
 
-	util.Log(ctx).WithField("topic", outRmOpts.DSrc()).Info("+++++++++ Registering OutputRoomEventConsumer")
+	outputQOpts := &cfg.Queues.OutputRoomEvent
+	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject")
 
-	return qm.RegisterSubscriber(ctx, outRmOpts, c)
+	util.Log(ctx).WithField("url", outputQOpts.DSrc()).Info(" +++++++++++++++++++++++++  Sync API consume output room events ")
+
+	return qm.RegisterSubscriber(ctx, outputQOpts, c)
 }
 
-// Handle is called when the sync server receives a new event from the room server output log.
+func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
+
+	util.Log(ctx).Info(" +++++++++++++++++++++++++  Sync api a new output room event ")
+
+	roomId, err := constants.DecodeRoomID(metadata[constants.RoomID])
+	if err != nil {
+		return err
+	}
+
+	return s.am.EnsureRoomActorExists(ctx, actorutil.ActorFunctionSyncAPIServer, roomId)
+}
+
+// HandleRoomEvent is called when the sync server receives a new event from the room server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+func (s *OutputRoomEventConsumer) HandleRoomEvent(ctx context.Context, metadata map[string]string, message []byte) error {
 	// Parse out the event JSON
 	var err error
 	var output api.OutputEvent
 
 	log := util.Log(ctx)
-	log.Info("+++++++++++++++roomserver output log: new message")
+	log.Info("+++++++++++++++ SYNCAPI roomserver output log: new message")
 	if err = json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Error("roomserver output log: message parse failure")

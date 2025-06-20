@@ -20,12 +20,14 @@ import (
 	"github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/internal"
 	"github.com/antinvestor/matrix/federationapi/routing"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	userapi "github.com/antinvestor/matrix/userapi/api"
@@ -190,6 +192,12 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 		t.Fatalf("failed to create a cache: %v", err)
 	}
 	qm := queueutil.NewQueueManager(svc)
+
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
+
 	cfg.FederationAPI.PreferDirectFetch = true
 	cfg.FederationAPI.KeyPerspectives = nil
 
@@ -240,7 +248,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 			},
 		},
 	}
-	fsapi := federationapi.NewInternalAPI(ctx, cfg, cm, qm, fc, fedRSApi, caches, nil, false, nil)
+	fsapi := federationapi.NewInternalAPI(ctx, cfg, cm, qm, am, fc, fedRSApi, caches, nil, false, nil)
 
 	var resp api.PerformJoinResponse
 	fsapi.PerformJoin(ctx, &api.PerformJoinRequest{
@@ -270,7 +278,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 
 	msg := &testrig.QMsg{
 		Header: map[string]string{
-			queueutil.UserID: key.UserID,
+			constants.UserID: key.UserID,
 		},
 		Data: key,
 	}
@@ -463,6 +471,12 @@ func TestNotaryServer(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
+
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+
 		fc := &fedClient{
 			keys: map[spec.ServerName]struct {
 				key   ed25519.PrivateKey
@@ -479,7 +493,7 @@ func TestNotaryServer(t *testing.T) {
 			},
 		}
 
-		fedAPI := federationapi.NewInternalAPI(ctx, cfg, cm, qm, fc, nil, caches, nil, true, nil)
+		fedAPI := federationapi.NewInternalAPI(ctx, cfg, cm, qm, am, fc, nil, caches, nil, true, nil)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {

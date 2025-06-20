@@ -1,8 +1,11 @@
 package config
 
 import (
+	"fmt"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/setup/constants"
 )
 
 type FederationAPI struct {
@@ -142,11 +145,19 @@ type FederationAPIQueues struct {
 }
 
 func (q *FederationAPIQueues) Defaults(opts DefaultOpts) {
-	q.OutputPresenceEvent = opts.defaultQ(OutputPresenceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputPresenceEvent"})
-	q.OutputReceiptEvent = opts.defaultQ(OutputReceiptEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputReceiptEvent"})
-	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputRoomEvent"})
-	q.OutputSendToDeviceEvent = opts.defaultQ(OutputSendToDeviceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputSendToDeviceEvent"})
-	q.OutputTypingEvent = opts.defaultQ(OutputTypingEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputTypingEvent"})
+	q.OutputPresenceEvent = opts.defaultQ(constants.OutputPresenceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputPresenceEvent"})
+	q.OutputReceiptEvent = opts.defaultQ(constants.OutputReceiptEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputReceiptEvent"})
+
+	q.OutputRoomEvent = opts.defaultQ(constants.OutputRoomEvent,
+		KVOpt{K: "stream_retention", V: "interest"},
+		KVOpt{K: "stream_subjects", V: fmt.Sprintf("%s.*", constants.OutputRoomEvent)},
+		KVOpt{K: "consumer_filter_subject", V: fmt.Sprintf("%s.*", constants.OutputRoomEvent)},
+		KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputRoomEvent"},
+		KVOpt{K: "consumer_headers_only", V: "true"},
+		KVOpt{K: constants.QueueHeaderToExtendSubject, V: constants.RoomID})
+
+	q.OutputSendToDeviceEvent = opts.defaultQ(constants.OutputSendToDeviceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputSendToDeviceEvent"})
+	q.OutputTypingEvent = opts.defaultQ(constants.OutputTypingEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputTypingEvent"})
 }
 
 func (q *FederationAPIQueues) Verify(configErrs *Errors) {

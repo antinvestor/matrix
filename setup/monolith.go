@@ -27,6 +27,7 @@ import (
 	"github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/federationapi"
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -74,7 +75,7 @@ func (m *Monolith) AddAllPublicRoutes(
 	cm sqlutil.ConnectionManager,
 	qm queueutil.QueueManager,
 	caches *cacheutil.Caches,
-
+	am actorutil.ActorManager,
 	enableMetrics bool,
 ) {
 	userDirectoryProvider := m.ExtUserDirectoryProvider
@@ -90,7 +91,7 @@ func (m *Monolith) AddAllPublicRoutes(
 		ctx, routers, cfg, qm, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
 	)
 	mediaapi.AddPublicRoutes(ctx, routers, cm, cfg, m.UserAPI, m.Client, m.FedClient, m.KeyRing)
-	syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
+	syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, am, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
 
 	if m.RelayAPI != nil {
 		relayapi.AddPublicRoutes(ctx, routers, cfg, m.KeyRing, m.RelayAPI)

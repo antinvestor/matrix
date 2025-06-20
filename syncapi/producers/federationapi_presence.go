@@ -22,6 +22,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/types"
 )
 
@@ -36,7 +37,7 @@ func (f *FederationAPIPresenceProducer) SendPresence(ctx context.Context,
 ) error {
 
 	header := map[string]string{
-		queueutil.UserID: userID,
+		constants.UserID: userID,
 		"presence":       presence.String(),
 		"from_sync":      "true", // only update last_active_ts and presence
 		"last_active_ts": strconv.Itoa(int(spec.AsTimestamp(time.Now()))),

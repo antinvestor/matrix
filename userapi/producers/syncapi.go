@@ -7,6 +7,7 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/pitabwire/util"
 )
@@ -54,7 +55,7 @@ func (p *SyncAPI) SendAccountData(ctx context.Context, userID string, data event
 		Debug("Producing to topic '%s'", p.clientDataTopic)
 
 	header := map[string]string{
-		queueutil.UserID: userID,
+		constants.UserID: userID,
 	}
 
 	err := p.qm.Publish(ctx, p.clientDataTopic.Ref(), data, header)
@@ -93,7 +94,7 @@ func (p *SyncAPI) sendNotificationData(ctx context.Context, userID string, data 
 		Debug("Producing to topic '%s'", p.notificationDataTopic)
 
 	header := map[string]string{
-		queueutil.UserID: userID,
+		constants.UserID: userID,
 	}
 
 	err := p.qm.Publish(ctx, p.notificationDataTopic.Ref(), data, header)

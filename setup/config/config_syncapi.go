@@ -1,5 +1,11 @@
 package config
 
+import (
+	"fmt"
+
+	"github.com/antinvestor/matrix/setup/constants"
+)
+
 type SyncAPI struct {
 	Global *Global `yaml:"-"`
 
@@ -76,17 +82,24 @@ type SyncQueues struct {
 
 func (q *SyncQueues) Defaults(opts DefaultOpts) {
 
-	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputRoomEvent"})
-	q.OutputClientData = opts.defaultQ(OutputClientData, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputClientDataEvent"})
-	q.OutputKeyChangeEvent = opts.defaultQ(OutputKeyChangeEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputKeyChangeEvent"})
-	q.OutputSendToDeviceEvent = opts.defaultQ(OutputSendToDeviceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputSendToDeviceEvent"})
+	q.OutputRoomEvent = opts.defaultQ(constants.OutputRoomEvent,
+		KVOpt{K: "stream_retention", V: "interest"},
+		KVOpt{K: "stream_subjects", V: fmt.Sprintf("%s.*", constants.OutputRoomEvent)},
+		KVOpt{K: "consumer_filter_subject", V: fmt.Sprintf("%s.*", constants.OutputRoomEvent)},
+		KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputRoomEvent"},
+		KVOpt{K: "consumer_headers_only", V: "true"},
+		KVOpt{K: constants.QueueHeaderToExtendSubject, V: constants.RoomID})
 
-	q.OutputTypingEvent = opts.defaultQ(OutputTypingEvent, KVOpt{K: "stream_storage", V: "memory"}, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputTypingEvent"})
+	q.OutputClientData = opts.defaultQ(constants.OutputClientData, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputClientDataEvent"})
+	q.OutputKeyChangeEvent = opts.defaultQ(constants.OutputKeyChangeEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputKeyChangeEvent"})
+	q.OutputSendToDeviceEvent = opts.defaultQ(constants.OutputSendToDeviceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputSendToDeviceEvent"})
 
-	q.OutputReceiptEvent = opts.defaultQ(OutputReceiptEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputReceiptEvent"})
-	q.OutputStreamEvent = opts.defaultQ(OutputStreamEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputStreamEvent"})
-	q.OutputNotificationData = opts.defaultQ(OutputNotificationData, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputNotificationEvent"})
-	q.OutputPresenceEvent = opts.defaultQ(OutputPresenceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputPresenceEvent"})
+	q.OutputTypingEvent = opts.defaultQ(constants.OutputTypingEvent, KVOpt{K: "stream_storage", V: "memory"}, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputTypingEvent"})
+
+	q.OutputReceiptEvent = opts.defaultQ(constants.OutputReceiptEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputReceiptEvent"})
+	q.OutputStreamEvent = opts.defaultQ(constants.OutputStreamEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputStreamEvent"})
+	q.OutputNotificationData = opts.defaultQ(constants.OutputNotificationData, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputNotificationEvent"})
+	q.OutputPresenceEvent = opts.defaultQ(constants.OutputPresenceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputPresenceEvent"})
 }
 
 func (q *SyncQueues) Verify(configErrs *Errors) {

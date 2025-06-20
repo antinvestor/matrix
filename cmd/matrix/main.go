@@ -27,6 +27,7 @@ import (
 	"github.com/antinvestor/matrix/appservice"
 	"github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -172,13 +173,18 @@ func main() {
 
 	qm := queueutil.NewQueueManager(service)
 
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		log.WithError(err).Panic("failed to create the system actor manager")
+	}
+
 	presenceCli := presencev1connect.NewPresenceServiceClient(
 		http.DefaultClient, cfg.Global.SyncAPIPresenceURI,
 	)
 
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.EnableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.EnableMetrics)
 	fsAPI := federationapi.NewInternalAPI(
-		ctx, cfg, cm, qm, federationClient, rsAPI, caches, nil, false, presenceCli,
+		ctx, cfg, cm, qm, am, federationClient, rsAPI, caches, nil, false, presenceCli,
 	)
 
 	keyRing := fsAPI.KeyRing()
@@ -188,7 +194,7 @@ func main() {
 	// dependency. Other components also need updating after their dependencies are up.
 	rsAPI.SetFederationAPI(ctx, fsAPI, keyRing)
 
-	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, federationClient, profileCli, cacheutil.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, federationClient, profileCli, cacheutil.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
 	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI)
 
 	rsAPI.SetAppserviceAPI(ctx, asAPI)
@@ -213,7 +219,7 @@ func main() {
 
 		PresenceCli: presenceCli,
 	}
-	monolith.AddAllPublicRoutes(ctx, cfg, routers, cm, qm, caches, cacheutil.EnableMetrics)
+	monolith.AddAllPublicRoutes(ctx, cfg, routers, cm, qm, caches, am, cacheutil.EnableMetrics)
 
 	if len(cfg.MSCs.MSCs) > 0 {
 		err = mscs.Enable(ctx, cfg, cm, routers, &monolith, caches)

@@ -1,15 +1,16 @@
-package actor_test
+package actorutil_test
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antinvestor/matrix/setup/constants"
 	"testing"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/antinvestor/matrix/roomserver/internal/actor"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/stretchr/testify/assert"
@@ -58,7 +59,7 @@ func TestRoomActorIntegration(t *testing.T) {
 				// Use the actual queue manager as requested
 				qm := queueutil.NewQueueManager(svc)
 
-				// Define the message handler function that will collect processed messages
+				// Define the message handlerFunc function that will collect processed messages
 				handlerFunc := func(ctx context.Context, metadata map[string]string, message []byte) error {
 
 					var msg map[string]any
@@ -72,16 +73,29 @@ func TestRoomActorIntegration(t *testing.T) {
 				}
 
 				roomCfg := &cfg.RoomServer
+
+				inputQOpts := &roomCfg.Queues.InputRoomEvent
 				// Create the actor system with the real queue manager
 				// The field is ActorSystem, not Actor
-				actorSystem := actor.NewManager(ctx, &roomCfg.ActorSystem, qm, &roomCfg.Queues.InputRoomEvent, handlerFunc)
-				err := actorSystem.Start(ctx)
-				require.NoError(t, err, "Failed to start actor system")
+				am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+				require.NoError(t, err, "Failed to create actor system manager")
+
+				am.EnableFunction(actorutil.ActorFunctionRoomServer, &roomCfg.Queues.InputRoomEvent, handlerFunc)
+				require.NoError(t, err, "Failed to enable actor system")
+
+
+				err = qm.EnsurePublisherOk(ctx, inputQOpts)
+				require.NoError(t, err, "Failed to ensure publisher is available")
+
+				inputRoomEventsTopicRef := inputQOpts.Ref()
 
 				var roomID *spec.RoomID
 				// Create a room ID
 				roomID, err = spec.NewRoomID(tc.roomID)
 				require.NoError(t, err, "Failed to create room ID")
+
+				_, err = am.Progress(ctx, actorutil.ActorFunctionRoomServer, roomID)
+				require.NoError(t, err, "Failed to bootup room ID actor")
 
 				// Generate and push messages to the queue
 				for i := 0; i < tc.messageCount; i++ {
@@ -93,11 +107,12 @@ func TestRoomActorIntegration(t *testing.T) {
 					}
 
 					metadata := map[string]string{
+						constants.RoomID: constants.EncodeRoomID(roomID),
 						"index": fmt.Sprintf("%d", i),
 					}
 
-					err = actorSystem.Publish(ctx, roomID, message, metadata)
-					require.NoError(t, err, " | ++++++++++++++++++++++++++++++++++++++ Failed to publish message")
+					err = qm.Publish(ctx, inputRoomEventsTopicRef , message, metadata)
+					require.NoError(t, err, "Failed to publish message")
 
 					tc.sentMsgs = append(tc.sentMsgs, message)
 				}

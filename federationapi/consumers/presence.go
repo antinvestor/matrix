@@ -27,6 +27,7 @@ import (
 	"github.com/antinvestor/matrix/internal/queueutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/pitabwire/util"
 )
@@ -68,7 +69,7 @@ func NewOutputPresenceConsumer(
 // events topic from the client api.
 func (t *OutputPresenceConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	// only send presence events which originated from us
-	userID := metadata[queueutil.UserID]
+	userID := metadata[constants.UserID]
 	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.Log(ctx).WithError(err).

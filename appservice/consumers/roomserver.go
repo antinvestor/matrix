@@ -31,6 +31,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/pitabwire/util"
 )
@@ -90,7 +91,7 @@ func (s *OutputRoomEventConsumer) Handle(
 ) error {
 	logger := util.Log(ctx)
 
-	state, ok := s.appServiceMap[metadata[queueutil.AppServiceIDToken]]
+	state, ok := s.appServiceMap[metadata[constants.AppServiceIDToken]]
 	if !ok {
 		return nil
 	}
@@ -98,7 +99,7 @@ func (s *OutputRoomEventConsumer) Handle(
 	events := make([]*types.HeaderedEvent, 0, 1)
 
 	// Only handle events we care about
-	receivedType := api.OutputType(metadata[queueutil.RoomEventType])
+	receivedType := api.OutputType(metadata[constants.RoomEventType])
 	if receivedType != api.OutputTypeNewRoomEvent && receivedType != api.OutputTypeNewInviteEvent {
 		return nil
 	}

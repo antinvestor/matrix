@@ -11,6 +11,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/federationapi/statistics"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/httputil"
@@ -53,12 +54,16 @@ func TestUsers(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 		cm := sqlutil.NewConnectionManager(svc)
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
-		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		rsAPI.SetUserAPI(ctx, usrAPI)
 
 		t.Run("shared users", func(t *testing.T) {
@@ -195,8 +200,12 @@ func Test_QueryLeftUsers(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 		cm := sqlutil.NewConnectionManager(svc)
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		// Create the room
@@ -247,6 +256,10 @@ func TestPurgeRoom(t *testing.T) {
 		defer svc.Stop(ctx)
 
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 		routers := httputil.NewRouters()
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
@@ -258,14 +271,14 @@ func TestPurgeRoom(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 
 		// this starts the JetStream consumers
-		fsAPI := federationapi.NewInternalAPI(ctx, cfg, cm, qm, nil, rsAPI, caches, nil, true, nil)
+		fsAPI := federationapi.NewInternalAPI(ctx, cfg, cm, qm, am, nil, rsAPI, caches, nil, true, nil)
 		rsAPI.SetFederationAPI(ctx, fsAPI, nil)
 
-		userAPIV := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, fsAPI.IsBlacklistedOrBackingOff)
-		syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, userAPIV, rsAPI, caches, cacheutil.DisableMetrics)
+		userAPIV := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+		syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, am, userAPIV, rsAPI, caches, cacheutil.DisableMetrics)
 
 		// Create the room
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
@@ -552,7 +565,11 @@ func TestRedaction(t *testing.T) {
 		}
 
 		qm := queueutil.NewQueueManager(svc)
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -736,6 +753,10 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 		defer svc.Stop(ctx)
 
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
@@ -743,7 +764,7 @@ func TestQueryRestrictedJoinAllowed(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
 		for _, tc := range testCases {
@@ -1066,6 +1087,10 @@ func TestUpgrade(t *testing.T) {
 		defer svc.Stop(ctx)
 
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		cm := sqlutil.NewConnectionManager(svc)
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
@@ -1073,9 +1098,9 @@ func TestUpgrade(t *testing.T) {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userapiV := userapi.NewInternalAPI(ctx, cfg, cm, qm, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userapiV := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		rsAPI.SetUserAPI(ctx, userapiV)
 
 		for _, tc := range testCases {
@@ -1123,11 +1148,15 @@ func TestStateReset(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(svc)
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
 		// create a new room
@@ -1231,12 +1260,16 @@ func TestNewServerACLs(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(svc)
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		// start JetStream listeners
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
 		// let the RS create the events
@@ -1268,6 +1301,10 @@ func TestRoomConsumerRecreation(t *testing.T) {
 
 	cm := sqlutil.NewConnectionManager(svc)
 	qm := queueutil.NewQueueManager(svc)
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
 
 	// Create the consumer with the old config
 
@@ -1276,7 +1313,7 @@ func TestRoomConsumerRecreation(t *testing.T) {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
 	// start JetStream listeners
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 
 	// let the RS create the events, this also recreates the Consumers
@@ -1301,12 +1338,16 @@ func TestRoomsWithACLs(t *testing.T) {
 
 		cm := sqlutil.NewConnectionManager(svc)
 		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		// start JetStream listeners
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, cacheutil.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
 		for _, room := range []*test.Room{noACLRoom, aclRoom} {

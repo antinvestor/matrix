@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -46,6 +47,12 @@ func (r *InboundPeeker) PerformInboundPeek(
 	request *api.PerformInboundPeekRequest,
 	response *api.PerformInboundPeekResponse,
 ) error {
+
+	roomID, err := spec.NewRoomID(request.RoomID)
+	if err != nil {
+		return err
+	}
+
 	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return err
@@ -113,7 +120,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 		response.AuthChainEvents = append(response.AuthChainEvents, &types.HeaderedEvent{PDU: event})
 	}
 
-	err = r.Inputer.OutputProducer.ProduceRoomEvents(ctx, request.RoomID, []api.OutputEvent{
+	err = r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeNewInboundPeek,
 			NewInboundPeek: &api.OutputNewInboundPeek{

@@ -26,6 +26,7 @@ import (
 	fedTypes "github.com/antinvestor/matrix/federationapi/types"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	syncTypes "github.com/antinvestor/matrix/syncapi/types"
 	"github.com/pitabwire/util"
 )
@@ -61,9 +62,9 @@ func NewOutputReceiptConsumer(
 func (t *OutputReceiptConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
 	receipt := syncTypes.OutputReceiptEvent{
-		UserID:  metadata[queueutil.UserID],
-		RoomID:  metadata[queueutil.RoomID],
-		EventID: metadata[queueutil.EventID],
+		UserID:  metadata[constants.UserID],
+		RoomID:  metadata[constants.RoomID],
+		EventID: metadata[constants.EventID],
 		Type:    metadata["type"],
 	}
 

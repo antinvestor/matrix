@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/pitabwire/util"
 	"gopkg.in/yaml.v3"
 )
@@ -444,7 +445,7 @@ type AppServiceQueues struct {
 }
 
 func (q *AppServiceQueues) Defaults(opts DefaultOpts) {
-	q.OutputAppserviceEvent = opts.defaultQ(OutputAppserviceEvent)
+	q.OutputAppserviceEvent = opts.defaultQ(constants.OutputAppserviceEvent)
 }
 
 func (q *AppServiceQueues) Verify(configErrs *Errors) {

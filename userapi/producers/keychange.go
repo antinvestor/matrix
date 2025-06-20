@@ -19,6 +19,7 @@ import (
 
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/pitabwire/util"
@@ -42,7 +43,7 @@ func (p *KeyChange) ProduceKeyChanges(ctx context.Context, keys []api.DeviceMess
 		key.DeviceChangeID = id
 
 		header := map[string]string{
-			queueutil.UserID: key.UserID,
+			constants.UserID: key.UserID,
 		}
 
 		err = p.Qm.Publish(ctx, p.Topic.Ref(), key, header)
@@ -76,7 +77,7 @@ func (p *KeyChange) ProduceSigningKeyUpdate(ctx context.Context, key api.CrossSi
 	output.DeviceChangeID = id
 
 	header := map[string]string{
-		queueutil.UserID: key.UserID,
+		constants.UserID: key.UserID,
 	}
 
 	err = p.Qm.Publish(ctx, p.Topic.Ref(), output, header)

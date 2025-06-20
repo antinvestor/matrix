@@ -25,6 +25,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedAPI "github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/federationapi/routing"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -56,10 +57,16 @@ func TestHandleSend(t *testing.T) {
 
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
 		qm := queueutil.NewQueueManager(svc)
+
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+
 		routers.Federation = fedMux
 		cfg.FederationAPI.Global.ServerName = testOrigin
 		cfg.FederationAPI.Global.Metrics.Enabled = false
-		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, qm, nil, nil, nil, nil, true, nil)
+		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, qm, am, nil, nil, nil, nil, true, nil)
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
 
@@ -72,7 +79,7 @@ func TestHandleSend(t *testing.T) {
 		serverName := spec.ServerName(hex.EncodeToString(pk))
 		req := fclient.NewFederationRequest("PUT", serverName, testOrigin, "/send/1234")
 		content := sendContent{}
-		err := req.SetContent(content)
+		err = req.SetContent(content)
 		if err != nil {
 			t.Fatalf("Error: %s", err.Error())
 		}

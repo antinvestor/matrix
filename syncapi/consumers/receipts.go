@@ -21,6 +21,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -58,9 +59,9 @@ func NewOutputReceiptEventConsumer(
 
 func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	output := types.OutputReceiptEvent{
-		UserID:  metadata[queueutil.UserID],
-		RoomID:  metadata[queueutil.RoomID],
-		EventID: metadata[queueutil.EventID],
+		UserID:  metadata[constants.UserID],
+		RoomID:  metadata[constants.RoomID],
+		EventID: metadata[constants.EventID],
 		Type:    metadata["type"],
 	}
 

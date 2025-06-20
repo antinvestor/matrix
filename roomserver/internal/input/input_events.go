@@ -480,7 +480,9 @@ func (r *Inputer) processRoomEvent(
 			return fmt.Errorf("r.updateLatestEvents: %w", err)
 		}
 	case api.KindOld:
-		err = r.OutputProducer.ProduceRoomEvents(ctx, event.RoomID().String(), []api.OutputEvent{
+
+		roomID := event.RoomID()
+		err = r.OutputProducer.ProduceRoomEvents(ctx, &roomID, []api.OutputEvent{
 			{
 				Type: api.OutputTypeOldRoomEvent,
 				OldRoomEvent: &api.OutputOldRoomEvent{
@@ -533,7 +535,8 @@ func (r *Inputer) processRoomEvent(
 	// so notify downstream components to redact this event - they should have it if they've
 	// been tracking our output log.
 	if redactedEventID != "" {
-		err = r.OutputProducer.ProduceRoomEvents(ctx, event.RoomID().String(), []api.OutputEvent{
+		roomID := event.RoomID()
+		err = r.OutputProducer.ProduceRoomEvents(ctx, &roomID, []api.OutputEvent{
 			{
 				Type: api.OutputTypeRedactedEvent,
 				RedactedEvent: &api.OutputRedactedEvent{

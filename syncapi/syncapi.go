@@ -17,6 +17,7 @@ package syncapi
 import (
 	"context"
 
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -42,6 +43,7 @@ func AddPublicRoutes(
 	cfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	qm queueutil.QueueManager,
+	am actorutil.ActorManager,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
 	caches cacheutil.LazyLoadCache,
@@ -111,7 +113,7 @@ func AddPublicRoutes(
 	}
 
 	err = consumers.NewOutputRoomEventConsumer(
-		ctx, &cfgSyncAPI, qm, syncDB, ntf, strms.PDUStreamProvider,
+		ctx, &cfgSyncAPI, qm, am, syncDB, ntf, strms.PDUStreamProvider,
 		strms.InviteStreamProvider, rsAPI, asProducer,
 	)
 	if err != nil {

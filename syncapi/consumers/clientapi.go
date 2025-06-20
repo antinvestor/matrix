@@ -22,6 +22,7 @@ import (
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
@@ -71,7 +72,7 @@ func (s *OutputClientDataConsumer) Handle(ctx context.Context, metadata map[stri
 
 	log := util.Log(ctx)
 	// Parse out the event JSON
-	userID := metadata[queueutil.UserID]
+	userID := metadata[constants.UserID]
 	var output eventutil.AccountData
 	if err := json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream

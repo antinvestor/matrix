@@ -22,6 +22,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/statistics"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
@@ -46,6 +47,7 @@ func NewInternalAPI(
 	cfg *config.Matrix,
 	cm sqlutil.ConnectionManager,
 	qm queueutil.QueueManager,
+	am actorutil.ActorManager,
 	rsAPI rsapi.UserRoomserverAPI,
 	fedClient fedsenderapi.KeyserverFederationAPI,
 	profileCli *profilev1.ProfileClient,
@@ -166,7 +168,7 @@ func NewInternalAPI(
 	}
 
 	err = consumers.NewOutputRoomEventConsumer(
-		ctx, &cfg.UserAPI, qm, db, pgClient, rsAPI, syncProducer,
+		ctx, &cfg.UserAPI, qm, am, db, pgClient, rsAPI, syncProducer,
 	)
 	if err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to start user API streamed event consumer")

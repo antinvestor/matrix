@@ -1,6 +1,9 @@
 package config
 
 import (
+	"fmt"
+
+	"github.com/antinvestor/matrix/setup/constants"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -65,10 +68,18 @@ type UserAPIQueues struct {
 }
 
 func (q *UserAPIQueues) Defaults(opts DefaultOpts) {
-	q.OutputReceiptEvent = opts.defaultQ(OutputReceiptEvent)
-	q.InputDeviceListUpdate = opts.defaultQ(InputDeviceListUpdate)
-	q.InputSigningKeyUpdate = opts.defaultQ(InputSigningKeyUpdate)
-	q.OutputRoomEvent = opts.defaultQ(OutputRoomEvent)
+	q.OutputReceiptEvent = opts.defaultQ(constants.OutputReceiptEvent)
+	q.InputDeviceListUpdate = opts.defaultQ(constants.InputDeviceListUpdate)
+	q.InputSigningKeyUpdate = opts.defaultQ(constants.InputSigningKeyUpdate)
+
+	q.OutputRoomEvent = opts.defaultQ(constants.OutputRoomEvent,
+		KVOpt{K: "stream_retention", V: "interest"},
+		KVOpt{K: "stream_subjects", V: fmt.Sprintf("%s.*", constants.OutputRoomEvent)},
+		KVOpt{K: "consumer_filter_subject", V: fmt.Sprintf("%s.*", constants.OutputRoomEvent)},
+		KVOpt{K: "consumer_durable_name", V: "CnsDurable_UserAPIOutputRoomEvent"},
+		KVOpt{K: "consumer_headers_only", V: "true"},
+		KVOpt{K: constants.QueueHeaderToExtendSubject, V: constants.RoomID})
+
 }
 
 func (q *UserAPIQueues) Verify(configErrs *Errors) {
