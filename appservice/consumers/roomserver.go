@@ -89,12 +89,23 @@ func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 func (s *OutputRoomEventConsumer) Handle(
 	ctx context.Context, metadata map[string]string, message []byte,
 ) error {
+
+	for _, state := range s.appServiceMap {
+		err := s.filterEventsForAppservice(ctx, state, metadata, message)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// filterEventsForAppservice is called when the appservice component receives a new event from
+// the room server output log.
+func (s *OutputRoomEventConsumer) filterEventsForAppservice(
+	ctx context.Context, state *appserviceState, metadata map[string]string, message []byte,
+) error {
 	logger := util.Log(ctx)
 
-	state, ok := s.appServiceMap[metadata[constants.AppServiceIDToken]]
-	if !ok {
-		return nil
-	}
 	logger.WithField("appservice", state.ID).Info("Appservice worker received %d message(s) from roomserver", 1)
 	events := make([]*types.HeaderedEvent, 0, 1)
 

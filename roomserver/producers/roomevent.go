@@ -16,8 +16,8 @@ package producers
 
 import (
 	"context"
-	"github.com/antinvestor/gomatrixserverlib/spec"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
@@ -36,7 +36,7 @@ var keyContentFields = map[string]string{
 type RoomEventProducer struct {
 	OutputTopicRef string
 	ACLs           *acls.ServerACLs
-	Qm    queueutil.QueueManager
+	Qm             queueutil.QueueManager
 }
 
 func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID *spec.RoomID, updates []api.OutputEvent) error {

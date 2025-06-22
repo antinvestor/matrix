@@ -120,18 +120,16 @@ func NewInputer(
 		EnableMetrics:   enableMetrics,
 	}
 
-	inputQOpts := &cfg.Queues.InputRoomEvent
-
-	am.EnableFunction(actorutil.ActorFunctionRoomServer, inputQOpts, c.HandleRoomEvent)
+	am.EnableFunction(actorutil.ActorFunctionRoomServer, &cfg.Queues.InputRoomEvent, c.HandleRoomEvent)
 	c.Am = am
 
-	err := c.Qm.EnsurePublisherOk(ctx, inputQOpts)
+	err := c.Qm.EnsurePublisherOk(ctx, &cfg.Queues.InputRoomEvent)
 	if err != nil {
 		return nil, err
 	}
-	c.inputRoomEventsTopicRef = inputQOpts.Ref()
+	c.inputRoomEventsTopicRef = cfg.Queues.InputRoomEvent.Ref()
 
-	replyPubOpts, err := replyQOpts(ctx, inputQOpts, "", false)
+	replyPubOpts, err := replyQOpts(ctx, &cfg.Queues.InputRoomEvent, "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -142,9 +140,10 @@ func NewInputer(
 	}
 	c.repliesTopicRef = replyPubOpts.Ref()
 
+	inputQOpts := cfg.Queues.InputRoomEvent
 	inputQOpts.DS = inputQOpts.DS.RemoveQuery("subject")
 
-	err = c.Qm.RegisterSubscriber(ctx, inputQOpts, c)
+	err = c.Qm.RegisterSubscriber(ctx, &inputQOpts, c)
 	return c, err
 }
 
@@ -155,12 +154,10 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, _ []by
 		return err
 	}
 
-	metrics, err := r.Am.Progress(ctx, actorutil.ActorFunctionRoomServer, roomId)
+	_, err = r.Am.Progress(ctx, actorutil.ActorFunctionRoomServer, roomId)
 	if err != nil {
 		return err
 	}
-
-	util.Log(ctx).WithField("metrics", metrics).Debug(" +++++++++++++  Inputer.Handle")
 
 	return nil
 }
@@ -172,17 +169,16 @@ func replyQOpts(_ context.Context, opts *config.QueueOptions, requestID string, 
 	ds := opts.DS
 	if ds.IsNats() {
 
-		ds = ds.RemoveQuery("subject", "consumer_headers_only").
+		ds = ds.RemoveQuery("subject", "consumer_headers_only", "consumer_durable_name", constants.QueueHeaderToExtendSubject).
 			ExtendQuery("stream_subjects", fmt.Sprintf("%s.*", suffixedReplySubject)).
 			ExtendQuery("stream_name", suffixedReplySubject).
 			ExtendQuery("stream_storage", "memory")
 
 		if isSubscriber {
 
-			durable := strings.ReplaceAll(fmt.Sprintf("Durable_%s_%s", suffixedReplySubject, requestID), ".", "_")
+			// durable := strings.ReplaceAll(fmt.Sprintf("Durable_%s_%s", suffixedReplySubject, requestID), ".", "_")
 
-			ds = ds.ExtendQuery("consumer_durable_name", durable).
-				ExtendQuery("consumer_filter_subject", fmt.Sprintf("%s.%s", suffixedReplySubject, requestID))
+			ds = ds.ExtendQuery("consumer_filter_subject", fmt.Sprintf("%s.%s", suffixedReplySubject, requestID))
 
 		} else {
 			ds = ds.ExtendQuery("subject", suffixedReplySubject).
@@ -273,7 +269,7 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 			WithField("sync_reply_msg_id", responseMsgID)
 
 		err0 := r.Qm.Publish(ctx, r.repliesTopicRef, errString, map[string]string{
-			constants.SynchronousReplyMsgID: metadata[constants.SynchronousReplyMsgID],
+			constants.SynchronousReplyMsgID: responseMsgID,
 		})
 		if err0 != nil {
 			log.WithError(err0).WithField("room_id", inputRoomEvent.Event.RoomID()).

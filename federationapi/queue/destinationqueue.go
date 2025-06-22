@@ -339,6 +339,8 @@ func (oq *destinationQueue) backgroundSend(ctx context.Context) {
 			// restarted automatically the next time we have an event to
 			// send.
 			return
+		case <- ctx.Done():
+			return
 		}
 
 		// Work out which PDUs/EDUs to include in the next transaction.

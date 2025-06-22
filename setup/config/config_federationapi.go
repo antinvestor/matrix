@@ -155,6 +155,7 @@ func (q *FederationAPIQueues) Defaults(opts DefaultOpts) {
 		KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputRoomEvent"},
 		KVOpt{K: "consumer_headers_only", V: "true"},
 		KVOpt{K: constants.QueueHeaderToExtendSubject, V: constants.RoomID})
+	q.OutputRoomEvent.QReference = fmt.Sprintf("FederationAPI_%s", q.OutputRoomEvent.QReference)
 
 	q.OutputSendToDeviceEvent = opts.defaultQ(constants.OutputSendToDeviceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputSendToDeviceEvent"})
 	q.OutputTypingEvent = opts.defaultQ(constants.OutputTypingEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputTypingEvent"})

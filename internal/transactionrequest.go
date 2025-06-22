@@ -179,7 +179,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		// pass the event to the roomserver which will do auth checks
 		// If the event fail auth checks, gmsl.NotAllowed error will be returned which we be silently
 		// discarded by the caller of this function
-		if err = api.SendEvents(
+		err = api.SendEvents(
 			ctx,
 			t.rsAPI,
 			api.KindNew,
@@ -191,7 +191,8 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			api.DoNotSendToOtherServers,
 			nil,
 			true,
-		); err != nil {
+		)
+		if err != nil {
 			util.Log(ctx).WithError(err).Error("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),

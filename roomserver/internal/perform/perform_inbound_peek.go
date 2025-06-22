@@ -16,9 +16,9 @@ package perform
 
 import (
 	"context"
-	"github.com/antinvestor/gomatrixserverlib/spec"
 
 	"github.com/antinvestor/gomatrixserverlib"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/internal/input"

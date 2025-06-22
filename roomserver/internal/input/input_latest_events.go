@@ -192,7 +192,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents(ctx context.Context) error {
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	err = u.api.OutputProducer.ProduceRoomEvents(ctx, &roomID , updates)
+	err = u.api.OutputProducer.ProduceRoomEvents(ctx, &roomID, updates)
 	if err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}

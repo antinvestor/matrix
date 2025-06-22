@@ -52,7 +52,6 @@ func (q *RoomServerQueues) Defaults(opts DefaultOpts) {
 		KVOpt{K: "consumer_filter_subject", V: fmt.Sprintf("%s.*", constants.InputRoomEvent)},
 		KVOpt{K: "consumer_headers_only", V: "true"},
 		KVOpt{K: constants.QueueHeaderToExtendSubject, V: constants.RoomID})
-
 }
 
 func (q *RoomServerQueues) Verify(configErrs *Errors) {

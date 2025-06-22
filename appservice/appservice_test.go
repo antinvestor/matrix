@@ -491,10 +491,6 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		// create a dummy AS url, handling the events
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			t.Logf("||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-			t.Logf("|||||||||||||||||||||||||||||||||||||||||    Received AS request |||||||||||||||||||||||||||||||||")
-			t.Logf("||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-
 			var txn consumers.ApplicationServiceTransaction
 			err = json.NewDecoder(r.Body).Decode(&txn)
 			if err != nil {
@@ -572,7 +568,8 @@ func TestOutputAppserviceEvent(t *testing.T) {
 
 		select {
 		// Pretty generous timeout duration...
-		case <-time.After(time.Second * 10): // wait for the AS to process the events
+		case <-time.After(time.Second * 10):
+			// wait for the AS to process the events
 			t.Errorf("Timed out waiting for join event")
 		case <-evChan:
 		}

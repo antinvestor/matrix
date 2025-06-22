@@ -155,6 +155,7 @@ func (ra *RoomActor) Init(gctx cluster.GrainContext) {
 
 	gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: roomID.String()})
 }
+
 func (ra *RoomActor) Terminate(gctx cluster.GrainContext) {
 	var err error
 	// First cancel any ongoing operations

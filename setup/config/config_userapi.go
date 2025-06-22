@@ -79,6 +79,7 @@ func (q *UserAPIQueues) Defaults(opts DefaultOpts) {
 		KVOpt{K: "consumer_durable_name", V: "CnsDurable_UserAPIOutputRoomEvent"},
 		KVOpt{K: "consumer_headers_only", V: "true"},
 		KVOpt{K: constants.QueueHeaderToExtendSubject, V: constants.RoomID})
+	q.OutputRoomEvent.QReference = fmt.Sprintf("UserAPI_%s", q.OutputRoomEvent.QReference)
 
 }
 

@@ -118,11 +118,12 @@ func TestQueueConnections(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				err := qm.RegisterSubscriber(ctx, tc.subscopts, tc.subscHandlers...)
-				tc.wantSubscError(t, err)
 
-				err = qm.RegisterPublisher(ctx, tc.pubcopts)
+				err := qm.RegisterPublisher(ctx, tc.pubcopts)
 				tc.wantPubError(t, err)
+
+				err = qm.RegisterSubscriber(ctx, tc.subscopts, tc.subscHandlers...)
+				tc.wantSubscError(t, err)
 
 				for _, msg := range tc.pubMessages {
 					err = qm.Publish(ctx, tc.pubcopts.Ref(), msg)

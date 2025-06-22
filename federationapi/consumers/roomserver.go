@@ -72,12 +72,10 @@ func NewOutputRoomEventConsumer(
 	am.EnableFunction(actorutil.ActorFunctionFederationAPIServer, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
 	c.am = am
 
-	outputQOpts := &cfg.Queues.OutputRoomEvent
+	outputQOpts := cfg.Queues.OutputRoomEvent
 	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject")
 
-	util.Log(ctx).WithField("url", outputQOpts.DSrc()).Info(" +++++++++++++++++++++++++  Federatiorn API consume output room events ")
-
-	return qm.RegisterSubscriber(ctx, outputQOpts, c)
+	return qm.RegisterSubscriber(ctx, &outputQOpts, c)
 }
 
 func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
@@ -89,7 +87,13 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 		return err
 	}
 
-	return s.am.EnsureRoomActorExists(ctx, actorutil.ActorFunctionFederationAPIServer, roomId)
+	_, err = s.am.Progress(ctx, actorutil.ActorFunctionFederationAPIServer, roomId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 // HandleRoomEvent is called when the federation server receives a new event from the room server output log.

@@ -82,24 +82,26 @@ func NewOutputRoomEventConsumer(
 	am.EnableFunction(actorutil.ActorFunctionSyncAPIServer, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
 	c.am = am
 
-	outputQOpts := &cfg.Queues.OutputRoomEvent
+	outputQOpts := cfg.Queues.OutputRoomEvent
 	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject")
 
-	util.Log(ctx).WithField("url", outputQOpts.DSrc()).Info(" +++++++++++++++++++++++++  Sync API consume output room events ")
-
-	return qm.RegisterSubscriber(ctx, outputQOpts, c)
+	return qm.RegisterSubscriber(ctx, &outputQOpts, c)
 }
 
 func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
-
-	util.Log(ctx).Info(" +++++++++++++++++++++++++  Sync api a new output room event ")
 
 	roomId, err := constants.DecodeRoomID(metadata[constants.RoomID])
 	if err != nil {
 		return err
 	}
 
-	return s.am.EnsureRoomActorExists(ctx, actorutil.ActorFunctionSyncAPIServer, roomId)
+	_, err = s.am.Progress(ctx, actorutil.ActorFunctionSyncAPIServer, roomId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 // HandleRoomEvent is called when the sync server receives a new event from the room server output log.
@@ -111,7 +113,6 @@ func (s *OutputRoomEventConsumer) HandleRoomEvent(ctx context.Context, metadata 
 	var output api.OutputEvent
 
 	log := util.Log(ctx)
-	log.Info("+++++++++++++++ SYNCAPI roomserver output log: new message")
 	if err = json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Error("roomserver output log: message parse failure")
@@ -132,7 +133,6 @@ func (s *OutputRoomEventConsumer) HandleRoomEvent(ctx context.Context, metadata 
 		}
 		err = s.onNewRoomEvent(ctx, *output.NewRoomEvent)
 		if err == nil && s.asProducer != nil {
-			log.Info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$  piping event to App Service")
 			if err = s.asProducer.ProduceRoomEvents(ctx, message, metadata); err != nil {
 				log.WithError(err).Warn("failed to produce OutputAppserviceEvent")
 			}

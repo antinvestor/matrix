@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
@@ -18,7 +19,7 @@ type QMsg struct {
 func MustPublishMsgs(ctx context.Context, t *testing.T, qopts *config.QueueOptions, qm queueutil.QueueManager, msgs ...*QMsg) error {
 	t.Helper()
 
-	err := qm.RegisterPublisher(ctx, qopts)
+	err := qm.EnsurePublisherOk(ctx, qopts)
 	if err != nil {
 		return err
 	}
@@ -33,13 +34,13 @@ func MustPublishMsgs(ctx context.Context, t *testing.T, qopts *config.QueueOptio
 	return nil
 }
 
-func NewOutputEventMsg(t *testing.T, roomID string, update api.OutputEvent) *QMsg {
+func NewOutputEventMsg(t *testing.T, roomID *spec.RoomID, update api.OutputEvent) *QMsg {
 	t.Helper()
 
 	msg := QMsg{
 		Header: map[string]string{
 			constants.RoomEventType: string(update.Type),
-			constants.RoomID:        roomID,
+			constants.RoomID:        constants.EncodeRoomID(roomID),
 		},
 		Data: update,
 	}

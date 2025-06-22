@@ -73,31 +73,32 @@ func NewOutputRoomEventConsumer(
 	am.EnableFunction(actorutil.ActorFunctionUserAPIServer, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
 	c.am = am
 
-	outputQOpts := &cfg.Queues.OutputRoomEvent
+	outputQOpts := cfg.Queues.OutputRoomEvent
 	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject")
 
-	util.Log(ctx).WithField("url", outputQOpts.DSrc()).Info(" +++++++++++++++++++++++++  User API consume output room events ")
-
-	return qm.RegisterSubscriber(ctx, outputQOpts, c)
+	return qm.RegisterSubscriber(ctx, &outputQOpts, c)
 }
 
 func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
-
-	util.Log(ctx).Info(" +++++++++++++++++++++++++  User api a new output room event ")
 
 	roomId, err := constants.DecodeRoomID(metadata[constants.RoomID])
 	if err != nil {
 		return err
 	}
 
-	return s.am.EnsureRoomActorExists(ctx, actorutil.ActorFunctionUserAPIServer, roomId)
+	_, err = s.am.Progress(ctx, actorutil.ActorFunctionUserAPIServer, roomId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 func (s *OutputRoomEventConsumer) HandleRoomEvent(ctx context.Context, metadata map[string]string, message []byte) error {
 	// Only handle events we care about
 
 	log := util.Log(ctx)
-	log.Info("++++++++++++++ USERAPI consumed outputRoomEvent")
 
 	var event *rstypes.HeaderedEvent
 	var isNewRoomEvent bool

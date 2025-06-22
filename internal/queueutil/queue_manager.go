@@ -25,13 +25,11 @@ func (q *queues) DiscardPublisher(ctx context.Context, ref string) error {
 }
 
 func (q *queues) EnsurePublisherOk(ctx context.Context, opts *config.QueueOptions) error {
-
 	_, err := q.GetPublisher(opts.Ref())
 	if err != nil {
 		return q.RegisterPublisher(ctx, opts)
 	}
 	return nil
-
 }
 
 func (q *queues) Publish(ctx context.Context, reference string, payload any, headers ...map[string]string) error {

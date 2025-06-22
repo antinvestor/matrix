@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/antinvestor/matrix/setup/constants"
 	"testing"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/stretchr/testify/assert"
@@ -83,7 +83,6 @@ func TestRoomActorIntegration(t *testing.T) {
 				am.EnableFunction(actorutil.ActorFunctionRoomServer, &roomCfg.Queues.InputRoomEvent, handlerFunc)
 				require.NoError(t, err, "Failed to enable actor system")
 
-
 				err = qm.EnsurePublisherOk(ctx, inputQOpts)
 				require.NoError(t, err, "Failed to ensure publisher is available")
 
@@ -108,10 +107,10 @@ func TestRoomActorIntegration(t *testing.T) {
 
 					metadata := map[string]string{
 						constants.RoomID: constants.EncodeRoomID(roomID),
-						"index": fmt.Sprintf("%d", i),
+						"index":          fmt.Sprintf("%d", i),
 					}
 
-					err = qm.Publish(ctx, inputRoomEventsTopicRef , message, metadata)
+					err = qm.Publish(ctx, inputRoomEventsTopicRef, message, metadata)
 					require.NoError(t, err, "Failed to publish message")
 
 					tc.sentMsgs = append(tc.sentMsgs, message)

@@ -19,6 +19,7 @@ package sync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -92,35 +93,72 @@ func NewRequestPool(
 	return rp
 }
 
+// cleanLastSeen periodically clears the last seen map to prevent unbounded growth.
+// This could be improved by only removing entries older than a certain threshold.
 func (rp *RequestPool) cleanLastSeen() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
 	for {
-		rp.lastseen.Range(func(key interface{}, _ interface{}) bool {
-			rp.lastseen.Delete(key)
-			return true
-		})
-		time.Sleep(time.Minute)
+		select {
+		case <-ticker.C:
+			// Count entries for logging
+			count := 0
+			rp.lastseen.Range(func(key interface{}, _ interface{}) bool {
+				rp.lastseen.Delete(key)
+				count++
+				return true
+			})
+		}
 	}
 }
 
+// cleanPresence periodically removes stale presence information for users
+// that haven't been active for longer than cleanupTime.
 func (rp *RequestPool) cleanPresence(ctx context.Context, db storage.Presence, cleanupTime time.Duration) {
 	if !rp.cfg.Global.Presence.EnableOutbound {
 		return
 	}
+
+	ticker := time.NewTicker(cleanupTime)
+	defer ticker.Stop()
+
 	for {
-		rp.presence.Range(func(key interface{}, v interface{}) bool {
-			p := v.(types.PresenceInternal)
-			if time.Since(p.LastActiveTS.Time()) > cleanupTime {
-				rp.updatePresence(ctx, db, types.PresenceUnavailable.String(), p.UserID)
-				rp.presence.Delete(key)
-			}
-			return true
-		})
-		time.Sleep(cleanupTime)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cleaned := 0
+			rp.presence.Range(func(key interface{}, v interface{}) bool {
+				p, ok := v.(types.PresenceInternal)
+				if !ok {
+					// Invalid type in map, just delete it
+					rp.presence.Delete(key)
+					cleaned++
+					return true
+				}
+
+				if time.Since(p.LastActiveTS.Time()) > cleanupTime {
+					// Use a new context for each update to avoid issues if the main context is cancelled
+					updateCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+					_ = rp.updatePresence(updateCtx, db, types.PresenceUnavailable.String(), p.UserID)
+					cancel()
+
+					rp.presence.Delete(key)
+					cleaned++
+				}
+				return true
+			})
+		}
 	}
 }
 
-// set a unix timestamp of when it last saw the types
-// this way it can filter based on time
+// updatePresence sends presence updates to the SyncAPI and FederationAPI
+func (rp *RequestPool) updatePresence(ctx context.Context, db storage.Presence, presence string, userID string) error {
+	// allow checking back on presence to set offline if needed
+	return rp.updatePresenceInternal(ctx, db, presence, userID, true)
+}
+
 type PresenceMap struct {
 	mu   sync.Mutex
 	seen map[string]map[types.Presence]time.Time
@@ -132,15 +170,10 @@ var lastPresence PresenceMap
 // should be long enough that any client will have another sync before expiring
 const presenceTimeout = time.Second * 10
 
-// updatePresence sends presence updates to the SyncAPI and FederationAPI
-func (rp *RequestPool) updatePresence(ctx context.Context, db storage.Presence, presence string, userID string) {
-	// allow checking back on presence to set offline if needed
-	rp.updatePresenceInternal(ctx, db, presence, userID, true)
-}
-
-func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Presence, presence string, userID string, checkAgain bool) {
+// updatePresenceInternal sends presence updates to the SyncAPI and FederationAPI
+func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Presence, presence string, userID string, checkAgain bool) error {
 	if !rp.cfg.Global.Presence.EnableOutbound {
-		return
+		return nil
 	}
 
 	// lock the map to this thread
@@ -153,7 +186,7 @@ func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Pr
 
 	presenceID, ok := types.PresenceFromString(presence)
 	if !ok { // this should almost never happen
-		return
+		return errors.New("invalid presence value")
 	}
 
 	newPresence := types.PresenceInternal{
@@ -192,7 +225,14 @@ func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Pr
 		if checkAgain {
 			// after a timeout, check presence again to make sure it gets set as offline sooner or later
 			time.AfterFunc(presenceTimeout, func() {
-				rp.updatePresenceInternal(ctx, db, types.PresenceOffline.String(), userID, false)
+				// Create a new context for the deferred check
+				checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+
+				if err := rp.updatePresenceInternal(checkCtx, db, types.PresenceOffline.String(), userID, false); err != nil {
+					util.Log(checkCtx).WithError(err).WithField("user_id", userID).
+						Warn("Failed to update presence in deferred check")
+				}
 			})
 		}
 	}
@@ -200,7 +240,7 @@ func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Pr
 	// ensure we also send the current status_msg to federated servers and not nil
 	dbPresence, err := db.GetPresences(ctx, []string{userID})
 	if err != nil && !sqlutil.ErrorIsNoRows(err) {
-		return
+		return fmt.Errorf("failed to get presence from database: %w", err)
 	}
 	if len(dbPresence) > 0 && dbPresence[0] != nil {
 		newPresence.ClientFields = dbPresence[0].ClientFields
@@ -211,16 +251,20 @@ func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Pr
 	// avoid spamming presence updates when syncing
 	existingPresence, ok := rp.presence.LoadOrStore(userID, newPresence)
 	if ok {
-		p := existingPresence.(types.PresenceInternal)
-		if p.ClientFields.Presence == newPresence.ClientFields.Presence {
-			return
+		p, ok := existingPresence.(types.PresenceInternal)
+		if !ok {
+			util.Log(ctx).WithField("user_id", userID).
+				Warn("Invalid presence data in presence map")
+		} else if p.ClientFields.Presence == newPresence.ClientFields.Presence {
+			return nil
 		}
 	}
 
 	err = rp.producer.SendPresence(ctx, userID, presenceToSet, newPresence.ClientFields.StatusMsg)
 	if err != nil {
-		util.Log(ctx).WithError(err).Error("Unable to publish presence message from sync")
-		return
+		util.Log(ctx).WithError(err).WithField("user_id", userID).
+			Error("Unable to publish presence message from sync")
+		return fmt.Errorf("failed to send presence update: %w", err)
 	}
 
 	// now synchronously update our view of the world. It's critical we do this before calculating
@@ -230,6 +274,7 @@ func (rp *RequestPool) updatePresenceInternal(ctx context.Context, db storage.Pr
 		spec.AsTimestamp(time.Now()), true,
 	)
 
+	return nil
 }
 
 func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device) {
@@ -313,7 +358,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	defer activeSyncRequests.Dec()
 
 	rp.updateLastSeen(req, device)
-	rp.updatePresence(ctx, rp.db, req.FormValue("set_presence"), device.UserID)
+	_ = rp.updatePresence(ctx, rp.db, req.FormValue("set_presence"), device.UserID)
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()

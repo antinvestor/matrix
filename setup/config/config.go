@@ -258,6 +258,15 @@ func (d DataSource) RemoveQuery(key ...string) DataSource {
 	return DataSource(nuUri.String())
 }
 
+func (d DataSource) GetQuery(key string) string {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return ""
+	}
+
+	return nuUri.Query().Get(key)
+}
+
 func (d DataSource) String() string {
 	return string(d)
 }

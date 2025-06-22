@@ -3,11 +3,11 @@ package actorutil
 import (
 	"context"
 	"fmt"
-	actorV1 "github.com/antinvestor/matrix/apis/actor/v1"
 	"strings"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	actorV1 "github.com/antinvestor/matrix/apis/actor/v1"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/constants"
 )
@@ -83,7 +83,7 @@ func roomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.Roo
 
 	if ds.IsNats() {
 
-		subject := fmt.Sprintf("%s.%s", constants.InputRoomEvent, encodedRoomID)
+		subject := fmt.Sprintf("%s.%s", ds.GetQuery("subject"), encodedRoomID)
 		ds = ds.ExtendQuery("consumer_filter_subject", subject)
 		durable := strings.ReplaceAll(fmt.Sprintf("CnsDurable_%s", subject), ".", "_")
 

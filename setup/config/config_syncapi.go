@@ -89,6 +89,7 @@ func (q *SyncQueues) Defaults(opts DefaultOpts) {
 		KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputRoomEvent"},
 		KVOpt{K: "consumer_headers_only", V: "true"},
 		KVOpt{K: constants.QueueHeaderToExtendSubject, V: constants.RoomID})
+	q.OutputRoomEvent.QReference = fmt.Sprintf("SyncAPI_%s", q.OutputRoomEvent.QReference)
 
 	q.OutputClientData = opts.defaultQ(constants.OutputClientData, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputClientDataEvent"})
 	q.OutputKeyChangeEvent = opts.defaultQ(constants.OutputKeyChangeEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputKeyChangeEvent"})

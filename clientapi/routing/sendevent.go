@@ -219,7 +219,7 @@ func SendEvent(
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	startedSubmittingEvent := time.Now()
-	if err := api.SendEvents(
+	err = api.SendEvents(
 		req.Context(), rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
@@ -230,7 +230,8 @@ func SendEvent(
 		domain,
 		txnAndSessionID,
 		false,
-	); err != nil {
+	)
+	if err != nil {
 		util.Log(req.Context()).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
