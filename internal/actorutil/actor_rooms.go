@@ -176,7 +176,6 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 			return
 		}
 
-
 		// Process the next message and determine whether there are more to process
 		eventWork := frame.NewJob(func(ctx context.Context, _ frame.JobResultPipe) error {
 			defer func() {
@@ -207,30 +206,30 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 // returns message ID if a message was processed, empty string if no message was available
 func (ra *RoomActor) pullNewMessage(ctx context.Context, req *actorV1.WorkRequest) error {
 
-		log := ra.log.WithContext(ctx)
+	log := ra.log.WithContext(ctx)
 
-		// Check if subscription is active
-		if ra.subscription == nil {
-			log.Error(" no subscription initialised for room")
-			return fmt.Errorf("subscription not initialised for room %s", req.GetRoomId())
-		}
+	// Check if subscription is active
+	if ra.subscription == nil {
+		log.Error(" no subscription initialised for room")
+		return fmt.Errorf("subscription not initialised for room %s", req.GetRoomId())
+	}
 
-		requestCtx, cancelFn := context.WithTimeout(ctx, maximumIdlingTime)
-		msg, err := ra.subscription.Receive(requestCtx)
-		cancelFn()
-		if err != nil {
-			return err
-		}
+	requestCtx, cancelFn := context.WithTimeout(ctx, maximumIdlingTime)
+	msg, err := ra.subscription.Receive(requestCtx)
+	cancelFn()
+	if err != nil {
+		return err
+	}
 
-		// Process the message
-		processor := ra.processors[ra.actorFunctionID]
-		err = processor.handlerFunc(ctx, msg.Metadata, msg.Body)
-		if err != nil {
-			log.WithError(err).Error(" failed to process event")
-			msg.Nack()
+	// Process the message
+	processor := ra.processors[ra.actorFunctionID]
+	err = processor.handlerFunc(ctx, msg.Metadata, msg.Body)
+	if err != nil {
+		log.WithError(err).Error(" failed to process event")
+		msg.Nack()
 
-			return nil
-		}
-		msg.Ack()
 		return nil
+	}
+	msg.Ack()
+	return nil
 }

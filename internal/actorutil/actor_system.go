@@ -42,7 +42,6 @@ func NewManager(ctx context.Context, config *config.ActorOptions, qm queueutil.Q
 
 			log := svc.SLog(ctx)
 
-
 			return log
 		}))
 
