@@ -78,6 +78,13 @@ jobs:
 
       - name: Install dependencies
         run: go mod tidy
+
+      # --- Build the test executables for all packages ---
+      - name: Build test executables
+        run: |
+          set -euo pipefail
+          go test -c ./...
+
       - name: Run unit tests
         env:
           TESTING_QUEUE_URI: nats://matrix:s3cr3t@localhost:4221

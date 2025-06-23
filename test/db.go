@@ -169,7 +169,7 @@ func PrepareDatabaseConnection(ctx context.Context, randomnesPrefix string, test
 
 	postgresUriStr = connectionUri.String()
 	return config.DataSource(postgresUriStr), func(ctx context.Context) {
-		// _ = clearDatabase(ctx, postgresUriStr)
+		_ = clearDatabase(ctx, postgresUriStr)
 	}, nil
 }
 
