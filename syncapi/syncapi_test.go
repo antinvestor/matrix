@@ -387,7 +387,6 @@ func TestSyncAPIEventFormatPowerLevels(t *testing.T) {
 // been sent to the syncapi
 func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
 
-	t.Skip("Skipped, possibly fixed")
 	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{

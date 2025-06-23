@@ -39,7 +39,11 @@ func NewManager(ctx context.Context, config *config.ActorOptions, qm queueutil.Q
 
 	actorSystem := actor.NewActorSystem(actor.WithLoggerFactory(
 		func(sys *actor.ActorSystem) *slog.Logger {
-			return svc.SLog(ctx)
+
+			log := svc.SLog(ctx)
+
+
+			return log
 		}))
 
 	managerOptn := &manager{

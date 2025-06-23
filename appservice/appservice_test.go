@@ -444,8 +444,6 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 // This makes syncAPI unhappy, as it is unable to write to the database.
 func TestOutputAppserviceEvent(t *testing.T) {
 
-	t.Skip("TODO: We will fix this later")
-
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 

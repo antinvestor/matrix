@@ -49,6 +49,7 @@ func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.
 	cfg.Defaults(defaultOpts)
 	cfg.FederationAPI.KeyPerspectives = nil
 
+	cfg.Global.LogLevel = "Warn"
 	cfg.Global.LogShowStackTrace = true
 
 	cfg.Global.Cache.MaxAge = time.Minute * 5
