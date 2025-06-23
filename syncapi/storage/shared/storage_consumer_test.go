@@ -80,7 +80,6 @@ func TestIgnores(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer tab.Rollback() // nolint: errcheck
 
 		ignoredUsers := &types.IgnoredUsers{List: map[string]interface{}{
 			bob.ID: "",

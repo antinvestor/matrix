@@ -23,7 +23,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -69,8 +68,6 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			JSON: spec.InternalServerError{},
 		}
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	// only search rooms the user is actually joined to
 	joinedRooms, err := snapshot.RoomIDsWithMembership(ctx, device.UserID, "join")
@@ -277,7 +274,6 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 
 	util.Log(ctx).Debug("Full search request took %v", time.Since(start))
 
-	succeeded = true
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,

@@ -16,7 +16,6 @@ package shared
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -57,42 +56,14 @@ type Database struct {
 }
 
 func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransaction, error) {
-
-	sqlOpt := []*sql.TxOptions{
-		{
-			// Set the isolation level so that we see a snapshot of the database.
-			// In PostgreSQL repeatable read transactions will see a snapshot taken
-			// at the first query, and since the transaction is read-only it can't
-			// run into any serialisation errors.
-			// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
-			Isolation: sql.LevelRepeatableRead,
-			ReadOnly:  true,
-		},
-	}
-	writerOpt := sqlutil.WriterOption{
-		SqlOpts: sqlOpt,
-	}
-
-	ctx, txn, err := d.Cm.BeginTx(ctx, &writerOpt)
-	if err != nil {
-		return nil, err
-	}
 	return &DatabaseTransaction{
 		Database: d,
-		ctx:      ctx,
-		txn:      txn,
 	}, nil
 }
 
 func (d *Database) NewDatabaseTransaction(ctx context.Context) (*DatabaseTransaction, error) {
-	ctx, txn, err := d.Cm.BeginTx(ctx)
-	if err != nil {
-		return nil, err
-	}
 	return &DatabaseTransaction{
 		Database: d,
-		ctx:      ctx,
-		txn:      txn,
 	}, nil
 }
 
@@ -511,9 +482,8 @@ func (d *Database) CleanSendToDeviceUpdates(
 	ctx context.Context,
 	userID, deviceID string, before types.StreamPosition,
 ) (err error) {
-	if err = d.Cm.Do(ctx, func(ctx context.Context) error {
-		return d.SendToDevice.DeleteSendToDeviceMessages(ctx, userID, deviceID, before)
-	}); err != nil {
+	err =  d.SendToDevice.DeleteSendToDeviceMessages(ctx, userID, deviceID, before)
+	if err != nil {
 		util.Log(ctx).WithError(err).Error("Failed to clean up old send-to-device messages for user %q device %q", userID, deviceID)
 		return err
 	}

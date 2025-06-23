@@ -53,7 +53,6 @@ func GetEvent(
 			JSON: spec.InternalServerError{},
 		}
 	}
-	defer db.Rollback() // nolint: errcheck
 
 	roomID, err := spec.NewRoomID(rawRoomID)
 	if err != nil {

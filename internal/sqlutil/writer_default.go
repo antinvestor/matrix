@@ -21,17 +21,17 @@ func NewDefaultWriter(cm ConnectionManager) Writer {
 }
 
 func (w *DefaultWriter) Do(ctx context.Context, f func(ctx context.Context) error, opts ...*WriterOption) error {
-	if w.cm != nil {
-
-		ctx0, txn, err := w.cm.BeginTx(ctx, opts...)
-		if err != nil {
-			return err
-		}
-
-		return WithTransaction(ctx0, txn, func(ctx context.Context) error {
-			return f(ctx)
-		})
-	} else {
+	// if w.cm != nil {
+	//
+	// 	ctx0, txn, err := w.cm.BeginTx(ctx, opts...)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	//
+	// 	return WithTransaction(ctx0, txn, func(ctx context.Context) error {
+	// 		return f(ctx)
+	// 	})
+	// } else {
 		return f(ctx)
-	}
+	// }
 }

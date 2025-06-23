@@ -1081,30 +1081,31 @@ func TestUpgrade(t *testing.T) {
 		},
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
 
-		ctx, svc, cfg := testrig.Init(t, testOpts)
-		defer svc.Stop(ctx)
+			test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		qm := queueutil.NewQueueManager(svc)
-		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
-		if err != nil {
-			t.Fatalf("failed to create an actor manager: %v", err)
-		}
+				ctx, svc, cfg := testrig.Init(t, testOpts)
+				defer svc.Stop(ctx)
 
-		cm := sqlutil.NewConnectionManager(svc)
-		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
-		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
-		}
+				qm := queueutil.NewQueueManager(svc)
+				am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+				if err != nil {
+					t.Fatalf("failed to create an actor manager: %v", err)
+				}
 
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
-		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userapiV := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
-		rsAPI.SetUserAPI(ctx, userapiV)
+				cm := sqlutil.NewConnectionManager(svc)
+				caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+				if err != nil {
+					t.Fatalf("failed to create a cache: %v", err)
+				}
 
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
+				rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
+				rsAPI.SetFederationAPI(ctx, nil, nil)
+				userapiV := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+				rsAPI.SetUserAPI(ctx, userapiV)
+
 				if tc.roomFunc == nil {
 					t.Fatalf("missing roomFunc")
 				}
@@ -1132,8 +1133,8 @@ func TestUpgrade(t *testing.T) {
 					tc.validateFunc(ctx, t, roomID, newRoomID, rsAPI)
 				}
 			})
-		}
-	})
+		})
+	}
 }
 
 func TestStateReset(t *testing.T) {
@@ -1167,7 +1168,8 @@ func TestStateReset(t *testing.T) {
 		charlieJoinEv := room.CreateAndInsert(t, charlie, spec.MRoomMember, map[string]any{"membership": "join"}, test.WithStateKey(charlie.ID))
 
 		// Send and create the room
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+		err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false)
+		if err != nil {
 			t.Errorf("failed to send events: %v", err)
 		}
 
@@ -1175,7 +1177,8 @@ func TestStateReset(t *testing.T) {
 		bobMsg := room.CreateAndInsert(t, bob, "m.room.message", map[string]any{"body": "hello world"})
 		charlieMsg := room.CreateAndInsert(t, charlie, "m.room.message", map[string]any{"body": "hello world"})
 
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobMsg, charlieMsg}, "test", "test", "test", nil, false); err != nil {
+		err = api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobMsg, charlieMsg}, "test", "test", "test", nil, false)
+		if err != nil {
 			t.Errorf("failed to send events: %v", err)
 		}
 
@@ -1183,13 +1186,15 @@ func TestStateReset(t *testing.T) {
 		expectedDisplayname := "Bob!"
 		bobDisplayname := room.CreateAndInsert(t, bob, spec.MRoomMember, map[string]any{"membership": "join", "displayname": expectedDisplayname}, test.WithStateKey(bob.ID))
 
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobDisplayname}, "test", "test", "test", nil, false); err != nil {
+		err = api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobDisplayname}, "test", "test", "test", nil, false)
+		if err != nil {
 			t.Errorf("failed to send events: %v", err)
 		}
 
 		// Change another state event
 		jrEv := room.CreateAndInsert(t, alice, spec.MRoomJoinRules, gomatrixserverlib.JoinRuleContent{JoinRule: "invite"}, test.WithStateKey(""))
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{jrEv}, "test", "test", "test", nil, false); err != nil {
+		err = api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{jrEv}, "test", "test", "test", nil, false)
+		if err != nil {
 			t.Errorf("failed to send events: %v", err)
 		}
 
@@ -1197,7 +1202,8 @@ func TestStateReset(t *testing.T) {
 		bobMsg = room.CreateAndInsert(t, bob, "m.room.message", map[string]any{"body": "hello world"})
 		charlieMsg = room.CreateAndInsert(t, charlie, "m.room.message", map[string]any{"body": "hello world"})
 
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobMsg, charlieMsg}, "test", "test", "test", nil, false); err != nil {
+		err = api.SendEvents(ctx, rsAPI, api.KindNew, []*types.HeaderedEvent{bobMsg, charlieMsg}, "test", "test", "test", nil, false)
+		if err != nil {
 			t.Errorf("failed to send events: %v", err)
 		}
 

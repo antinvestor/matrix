@@ -1099,7 +1099,8 @@ func TestSendToDevice(t *testing.T) {
 			for i := 0; i < tc.sendMessagesCount; i++ {
 				msgCounter++
 				msg := json.RawMessage(fmt.Sprintf(`{"dummy":"message %d"}`, msgCounter))
-				if err := producer.SendToDevice(ctx, user.ID, user.ID, alice.ID, "m.dendrite.test", msg); err != nil {
+				err = producer.SendToDevice(ctx, user.ID, user.ID, alice.ID, "m.dendrite.test", msg)
+				if err != nil {
 					t.Fatalf("unable to send to device message: %v", err)
 				}
 			}
@@ -1135,10 +1136,6 @@ func TestSendToDevice(t *testing.T) {
 }
 
 func TestContext(t *testing.T) {
-	test.WithAllDatabases(t, testContext)
-}
-
-func testContext(t *testing.T, testOpts test.DependancyOption) {
 
 	tests := []struct {
 		name             string
@@ -1228,88 +1225,91 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx, svc, cfg := testrig.Init(t, testOpts)
-	defer svc.Stop(ctx)
-
-	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(svc)
-	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
-
-	// Use an actual roomserver for this
-	qm := queueutil.NewQueueManager(svc)
-	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
-	if err != nil {
-		t.Fatalf("failed to create an actor manager: %v", err)
-	}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
-	rsAPI.SetFederationAPI(ctx, nil, nil)
-
-	AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches, cacheutil.DisableMetrics)
-
-	room := test.NewRoom(t, user)
-
-	room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world 1!"})
-	room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world 2!"})
-	thirdMsg := room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world3!"})
-	room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world4!"})
-
-	if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-		t.Fatalf("failed to send events: %v", err)
-	}
-
-	syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
-		// wait for the last sent eventID to come down sync
-		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, thirdMsg.EventID())
-		return gjson.Get(syncBody, path).Exists()
-	})
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			params := map[string]string{
-				"access_token": alice.AccessToken,
-			}
-			w := httptest.NewRecorder()
-			// test overrides
-			roomID := room.ID
-			if tc.roomID != "" {
-				roomID = tc.roomID
-			}
-			eventID := thirdMsg.EventID()
-			if tc.eventID != "" {
-				eventID = tc.eventID
-			}
-			requestPath := fmt.Sprintf("/_matrix/client/v3/rooms/%s/context/%s", roomID, eventID)
-			if tc.params != nil {
-				for k, v := range tc.params {
-					params[k] = v
+
+			test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+				ctx, svc, cfg := testrig.Init(t, testOpts)
+				defer svc.Stop(ctx)
+
+				routers := httputil.NewRouters()
+				cm := sqlutil.NewConnectionManager(svc)
+				caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+				if err != nil {
+					t.Fatalf("failed to create a cache: %v", err)
 				}
-			}
-			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", requestPath, test.WithQueryParams(params)))
 
-			if tc.wantError && w.Code == 200 {
-				t.Fatalf("Expected an error, but got none")
-			}
-			t.Log(w.Body.String())
-			resp := routing.ContextRespsonse{}
-			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-				t.Fatal(err)
-			}
-			if tc.wantStateLength > 0 && tc.wantStateLength != len(resp.State) {
-				t.Fatalf("expected %d state events, got %d", tc.wantStateLength, len(resp.State))
-			}
-			if tc.wantBeforeLength > 0 && tc.wantBeforeLength != len(resp.EventsBefore) {
-				t.Fatalf("expected %d before events, got %d", tc.wantBeforeLength, len(resp.EventsBefore))
-			}
-			if tc.wantAfterLength > 0 && tc.wantAfterLength != len(resp.EventsAfter) {
-				t.Fatalf("expected %d after events, got %d", tc.wantAfterLength, len(resp.EventsAfter))
-			}
+				// Use an actual roomserver for this
+				qm := queueutil.NewQueueManager(svc)
+				am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+				if err != nil {
+					t.Fatalf("failed to create an actor manager: %v", err)
+				}
+				rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
+				rsAPI.SetFederationAPI(ctx, nil, nil)
 
-			if !tc.wantError && resp.Event.EventID != eventID {
-				t.Fatalf("unexpected eventID %s, expected %s", resp.Event.EventID, eventID)
-			}
+				AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches, cacheutil.DisableMetrics)
+
+				room := test.NewRoom(t, user)
+
+				room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world 1!"})
+				room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world 2!"})
+				thirdMsg := room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world3!"})
+				room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world4!"})
+
+				if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Fatalf("failed to send events: %v", err)
+				}
+
+				syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
+					// wait for the last sent eventID to come down sync
+					path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, thirdMsg.EventID())
+					return gjson.Get(syncBody, path).Exists()
+				})
+
+				params := map[string]string{
+					"access_token": alice.AccessToken,
+				}
+				w := httptest.NewRecorder()
+				// test overrides
+				roomID := room.ID
+				if tc.roomID != "" {
+					roomID = tc.roomID
+				}
+				eventID := thirdMsg.EventID()
+				if tc.eventID != "" {
+					eventID = tc.eventID
+				}
+				requestPath := fmt.Sprintf("/_matrix/client/v3/rooms/%s/context/%s", roomID, eventID)
+				if tc.params != nil {
+					for k, v := range tc.params {
+						params[k] = v
+					}
+				}
+				routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", requestPath, test.WithQueryParams(params)))
+
+				if tc.wantError && w.Code == 200 {
+					t.Fatalf("Expected an error, but got none")
+				}
+				t.Log(w.Body.String())
+				resp := routing.ContextRespsonse{}
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				if tc.wantStateLength > 0 && tc.wantStateLength != len(resp.State) {
+					t.Fatalf("expected %d state events, got %d", tc.wantStateLength, len(resp.State))
+				}
+				if tc.wantBeforeLength > 0 && tc.wantBeforeLength != len(resp.EventsBefore) {
+					t.Fatalf("expected %d before events, got %d", tc.wantBeforeLength, len(resp.EventsBefore))
+				}
+				if tc.wantAfterLength > 0 && tc.wantAfterLength != len(resp.EventsAfter) {
+					t.Fatalf("expected %d after events, got %d", tc.wantAfterLength, len(resp.EventsAfter))
+				}
+
+				if !tc.wantError && resp.Event.EventID != eventID {
+					t.Fatalf("unexpected eventID %s, expected %s", resp.Event.EventID, eventID)
+				}
+			})
 		})
 	}
 }

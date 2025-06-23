@@ -41,14 +41,14 @@ type PDUStreamProvider struct {
 }
 
 func (p *PDUStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseTransaction,
+	ctx context.Context,
 ) {
-	p.DefaultStreamProvider.Setup(ctx, snapshot)
+	p.DefaultStreamProvider.Setup(ctx)
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := snapshot.MaxStreamPositionForPDUs(ctx)
+	id, err := p.DB.MaxStreamPositionForPDUs(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +57,6 @@ func (p *PDUStreamProvider) Setup(
 
 func (p *PDUStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
 
@@ -76,7 +75,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	}
 
 	// Extract room state and recent events for all rooms the user is joined to.
-	joinedRoomIDs, err := snapshot.RoomIDsWithMembership(ctx, req.Device.UserID, spec.Join)
+	joinedRoomIDs, err := p.DB.RoomIDsWithMembership(ctx, req.Device.UserID, spec.Join)
 	if err != nil {
 		log.WithError(err).Error("p.Cm.RoomIDsWithMembership failed")
 		return from
@@ -85,7 +84,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline
 
-	if err = p.addIgnoredUsersToFilter(ctx, snapshot, req, &eventFilter); err != nil {
+	if err = p.addIgnoredUsersToFilter(ctx, p.DB, req, &eventFilter); err != nil {
 		log.WithError(err).Error("unable to update event filter with ignored users")
 	}
 
@@ -94,7 +93,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		eventFormat = synctypes.FormatSyncFederation
 	}
 
-	recentEvents, err := snapshot.RecentEvents(ctx, joinedRoomIDs, r, &eventFilter, true, true)
+	recentEvents, err := p.DB.RecentEvents(ctx, joinedRoomIDs, r, &eventFilter, true, true)
 	if err != nil {
 		return from
 	}
@@ -110,7 +109,7 @@ func (p *PDUStreamProvider) CompleteSync(
 
 		// get the join response for each room
 		jr, jerr := p.getJoinResponseForCompleteSync(
-			ctx, snapshot, roomID, &stateFilter, req.WantFullState, req.Device, false,
+			ctx, p.DB, roomID, &stateFilter, req.WantFullState, req.Device, false,
 			events.Events, events.Limited, eventFormat,
 		)
 		if jerr != nil {
@@ -125,7 +124,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	}
 
 	// Add peeked rooms.
-	peeks, err := snapshot.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
+	peeks, err := p.DB.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
 	if err != nil {
 		log.WithError(err).Error("p.Cm.PeeksInRange failed")
 		return from
@@ -138,7 +137,7 @@ func (p *PDUStreamProvider) CompleteSync(
 			}
 		}
 
-		recentEvents, err = snapshot.RecentEvents(ctx, peekRooms, r, &eventFilter, true, true)
+		recentEvents, err = p.DB.RecentEvents(ctx, peekRooms, r, &eventFilter, true, true)
 		if err != nil {
 			return from
 		}
@@ -147,7 +146,7 @@ func (p *PDUStreamProvider) CompleteSync(
 			var jr *types.JoinResponse
 			events := recentEvents[roomID]
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, snapshot, roomID, &stateFilter, req.WantFullState, req.Device, true,
+				ctx, p.DB, roomID, &stateFilter, req.WantFullState, req.Device, true,
 				events.Events, events.Limited, eventFormat,
 			)
 			if err != nil {
@@ -166,7 +165,6 @@ func (p *PDUStreamProvider) CompleteSync(
 
 func (p *PDUStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) (newPos types.StreamPosition) {
@@ -187,12 +185,12 @@ func (p *PDUStreamProvider) IncrementalSync(
 	eventFilter := req.Filter.Room.Timeline
 
 	if req.WantFullState {
-		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
+		if stateDeltas, syncJoinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
 			log.WithError(err).Error("p.Cm.GetStateDeltasForFullStateSync failed")
 			return from
 		}
 	} else {
-		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
+		if stateDeltas, syncJoinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter, p.rsAPI); err != nil {
 			log.WithError(err).Error("p.Cm.GetStateDeltas failed")
 			return from
 		}
@@ -206,11 +204,11 @@ func (p *PDUStreamProvider) IncrementalSync(
 		return to
 	}
 
-	if err = p.addIgnoredUsersToFilter(ctx, snapshot, req, &eventFilter); err != nil {
+	if err = p.addIgnoredUsersToFilter(ctx, p.DB, req, &eventFilter); err != nil {
 		log.WithError(err).Error("unable to update event filter with ignored users")
 	}
 
-	dbEvents, err := p.getRecentEvents(ctx, stateDeltas, r, eventFilter, snapshot)
+	dbEvents, err := p.getRecentEvents(ctx, stateDeltas, r, eventFilter, p.DB)
 	if err != nil {
 		log.WithError(err).Error("unable to get recent events")
 		return r.From
@@ -231,7 +229,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 			}
 		}
 		var pos types.StreamPosition
-		if pos, err = p.addRoomDeltaToResponse(ctx, snapshot, req.Device, newRange, delta, &eventFilter, &stateFilter, req, dbEvents); err != nil {
+		if pos, err = p.addRoomDeltaToResponse(ctx, p.DB, req.Device, newRange, delta, &eventFilter, &stateFilter, req, dbEvents); err != nil {
 			log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || errors.Is(err, sql.ErrTxDone) {
 				return newPos

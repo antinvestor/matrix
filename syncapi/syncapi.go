@@ -65,6 +65,7 @@ func AddPublicRoutes(
 	ntf := notifier.NewNotifier(rsAPI)
 	strms := streams.NewSyncStreamProviders(ctx, syncDB, userAPI, rsAPI, eduCache, caches, ntf)
 	ntf.SetCurrentPosition(strms.Latest(ctx))
+
 	if err = ntf.Load(ctx, syncDB); err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to load notifier ")
 	}
@@ -89,7 +90,7 @@ func AddPublicRoutes(
 		Qm:    qm,
 	}
 
-	requestPool := sync.NewRequestPool(ctx, syncDB, &cfgSyncAPI, userAPI, rsAPI, strms, ntf, federationPresenceProducer, presenceConsumer, enableMetrics)
+	requestPool := sync.NewRequestPool(ctx, syncDB, qm, &cfgSyncAPI, userAPI, rsAPI, strms, ntf, federationPresenceProducer, presenceConsumer, enableMetrics)
 
 	err = consumers.NewOutputKeyChangeEventConsumer(
 		ctx, &cfgSyncAPI, qm, rsAPI, syncDB, ntf,

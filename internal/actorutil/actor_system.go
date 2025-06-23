@@ -77,8 +77,6 @@ func (m *manager) EnableFunction(functionID ActorFunctionID, qOpts *config.Queue
 func (m *manager) Start(ctx context.Context) error {
 	var err error
 
-	svc := frame.Svc(ctx)
-
 	// Configure the actor system for remote capability
 	remoteConfig := remote.Configure(m.config.Host, 0)
 
@@ -100,7 +98,7 @@ func (m *manager) Start(ctx context.Context) error {
 
 	// Create the room actor props for the cluster
 	roomProcessorKind := actorV1.NewRoomEventProcessorKind(func() actorV1.RoomEventProcessor {
-		return NewRoomActor(ctx, m.cluster, svc, m.qm, m.processors)
+		return NewRoomActor(ctx, m.cluster, m.qm, m.processors)
 	}, 0)
 
 	// Create the cluster configuration

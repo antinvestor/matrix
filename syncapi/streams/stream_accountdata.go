@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
@@ -17,14 +16,14 @@ type AccountDataStreamProvider struct {
 }
 
 func (p *AccountDataStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseTransaction,
+	ctx context.Context,
 ) {
-	p.DefaultStreamProvider.Setup(ctx, snapshot)
+	p.DefaultStreamProvider.Setup(ctx)
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := snapshot.MaxStreamPositionForAccountData(ctx)
+	id, err := p.DB.MaxStreamPositionForAccountData(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -33,15 +32,13 @@ func (p *AccountDataStreamProvider) Setup(
 
 func (p *AccountDataStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *AccountDataStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
@@ -53,7 +50,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 		To:   to,
 	}
 
-	dataTypes, pos, err := snapshot.GetAccountDataInRange(
+	dataTypes, pos, err := p.DB.GetAccountDataInRange(
 		ctx, req.Device.UserID, r, &req.Filter.AccountData,
 	)
 	if err != nil {

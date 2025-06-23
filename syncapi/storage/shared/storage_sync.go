@@ -20,22 +20,6 @@ import (
 
 type DatabaseTransaction struct {
 	*Database
-	ctx context.Context
-	txn sqlutil.Transaction
-}
-
-func (d *DatabaseTransaction) Commit() error {
-	if d.txn == nil {
-		return nil
-	}
-	return d.txn.Commit()
-}
-
-func (d *DatabaseTransaction) Rollback() error {
-	if d.txn == nil {
-		return nil
-	}
-	return d.txn.Rollback()
 }
 
 func (d *DatabaseTransaction) MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error) {

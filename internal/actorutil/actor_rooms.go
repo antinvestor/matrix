@@ -76,7 +76,7 @@ func (ra *RoomActor) Progress(_ *actorV1.ProgressRequest, _ cluster.GrainContext
 }
 
 // NewRoomActor creates a new room actor
-func NewRoomActor(ctx context.Context, cluster *cluster.Cluster, svc *frame.Service, qm queueutil.QueueManager, processorMap map[ActorFunctionID]*functionOpt) *RoomActor {
+func NewRoomActor(ctx context.Context, cluster *cluster.Cluster, qm queueutil.QueueManager, processorMap map[ActorFunctionID]*functionOpt) *RoomActor {
 
 	ictx, cancel := context.WithCancel(ctx)
 
@@ -89,7 +89,6 @@ func NewRoomActor(ctx context.Context, cluster *cluster.Cluster, svc *frame.Serv
 
 		qm: qm,
 
-		svc: svc,
 		log: util.Log(ictx),
 	}
 }
@@ -172,8 +171,6 @@ func (ra *RoomActor) Terminate(gctx cluster.GrainContext) {
 
 func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 
-	log := gctx.Logger()
-
 	msg := gctx.Message()
 
 	switch msgT := msg.(type) {
@@ -190,17 +187,7 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 		// Process the next message and determine whether there are more to process
 		eventWork := ra.nextEventJob(gctx, msgT)
 
-		err := frame.SubmitJob(ra.ctx, ra.svc, eventWork)
-		if err != nil {
-			ra.jobProcessing.Swap(false)
-
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				// Reset processing flag on error
-				return
-			}
-
-			log.With("error", err).Error("could not submit message for processing")
-		}
+		ra.qm.Submit(ra.ctx, eventWork)
 	}
 }
 
@@ -223,8 +210,8 @@ func (ra *RoomActor) nextEventJob(gctx cluster.GrainContext, req *actorV1.WorkRe
 		}
 
 		requestCtx, cancelFn := context.WithTimeout(ctx, maximumIdlingTime)
+		defer cancelFn()
 		msg, err := ra.subscription.Receive(requestCtx)
-		cancelFn()
 		if err != nil {
 
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {

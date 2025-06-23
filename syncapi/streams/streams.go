@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/antinvestor/matrix/internal/cacheutil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -29,63 +28,59 @@ func NewSyncStreamProviders(ctx context.Context,
 	rsAPI rsapi.SyncRoomserverAPI,
 	eduCache *cacheutil.EDUCache, lazyLoadCache cacheutil.LazyLoadCache, notifier *notifier.Notifier,
 ) *Streams {
+
+	dbTx, _ := d.NewDatabaseTransaction(ctx)
+
+
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{
-			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: dbTx},
 			lazyLoadCache:         lazyLoadCache,
 			rsAPI:                 rsAPI,
 			notifier:              notifier,
 		},
 		TypingStreamProvider: &TypingStreamProvider{
-			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: dbTx},
 			EDUCache:              eduCache,
 		},
 		ReceiptStreamProvider: &ReceiptStreamProvider{
-			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: dbTx},
 		},
 		InviteStreamProvider: &InviteStreamProvider{
-			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: dbTx},
 			rsAPI:                 rsAPI,
 		},
 		SendToDeviceStreamProvider: &SendToDeviceStreamProvider{
-			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: dbTx},
 		},
 		AccountDataStreamProvider: &AccountDataStreamProvider{
-			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: dbTx},
 			userAPI:               userAPI,
 		},
 		NotificationDataStreamProvider: &NotificationDataStreamProvider{
-			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: dbTx},
 		},
 		DeviceListStreamProvider: &DeviceListStreamProvider{
-			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: dbTx},
 			rsAPI:                 rsAPI,
 			userAPI:               userAPI,
 		},
 		PresenceStreamProvider: &PresenceStreamProvider{
-			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: dbTx},
 			notifier:              notifier,
 		},
 	}
 
-	snapshot, err := d.NewDatabaseSnapshot(ctx)
-	if err != nil {
-		panic(err)
-	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+	streams.PDUStreamProvider.Setup(ctx)
+	streams.TypingStreamProvider.Setup(ctx)
+	streams.ReceiptStreamProvider.Setup(ctx)
+	streams.InviteStreamProvider.Setup(ctx)
+	streams.SendToDeviceStreamProvider.Setup(ctx)
+	streams.AccountDataStreamProvider.Setup(ctx)
+	streams.NotificationDataStreamProvider.Setup(ctx)
+	streams.DeviceListStreamProvider.Setup(ctx)
+	streams.PresenceStreamProvider.Setup(ctx)
 
-	streams.PDUStreamProvider.Setup(ctx, snapshot)
-	streams.TypingStreamProvider.Setup(ctx, snapshot)
-	streams.ReceiptStreamProvider.Setup(ctx, snapshot)
-	streams.InviteStreamProvider.Setup(ctx, snapshot)
-	streams.SendToDeviceStreamProvider.Setup(ctx, snapshot)
-	streams.AccountDataStreamProvider.Setup(ctx, snapshot)
-	streams.NotificationDataStreamProvider.Setup(ctx, snapshot)
-	streams.DeviceListStreamProvider.Setup(ctx, snapshot)
-	streams.PresenceStreamProvider.Setup(ctx, snapshot)
-
-	succeeded = true
 	return streams
 }
 

@@ -73,9 +73,6 @@ func WithSnapshot(ctx context.Context, t *testing.T, db storage.Database, f func
 		t.Fatal(err)
 	}
 	f(snapshot)
-	if err := snapshot.Rollback(); err != nil {
-		t.Fatal(err)
-	}
 }
 
 // These tests assert basic functionality of RecentEvents for PDUs
@@ -334,14 +331,13 @@ func TestStreamToTopologicalPosition(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer txn.Rollback()
 		MustWriteEvents(ctx, t, db, r.Events())
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				token, err := txn.StreamToTopologicalPosition(ctx, tc.roomID, tc.streamPos, tc.backwardOrdering)
-				if err != nil {
-					t.Fatal(err)
+				token, err0 := txn.StreamToTopologicalPosition(ctx, tc.roomID, tc.streamPos, tc.backwardOrdering)
+				if err0 != nil {
+					t.Fatal(err0)
 				}
 				if tc.wantToken != token {
 					t.Fatalf("expected token %q, got %q", tc.wantToken, token)
@@ -970,7 +966,6 @@ func TestRoomSummary(t *testing.T) {
 
 				transaction, err := db.NewDatabaseTransaction(ctx)
 				assert.NoError(t, err)
-				defer transaction.Rollback()
 
 				summary, err := transaction.GetRoomSummary(ctx, r.ID, alice.ID)
 				assert.NoError(t, err)
@@ -1002,7 +997,6 @@ func TestRecentEvents(t *testing.T) {
 
 		transaction, err := db.NewDatabaseTransaction(ctx)
 		assert.NoError(t, err)
-		defer transaction.Rollback()
 
 		// get all recent events from 0 to 100 (we only created 5 events, so we should get 5 back)
 		roomEvs, err := transaction.RecentEvents(ctx, roomIDs, types.Range{From: 0, To: 100}, &filter, true, true)

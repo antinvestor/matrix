@@ -59,8 +59,6 @@ func Context(
 			JSON: spec.InternalServerError{},
 		}
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	filter, err := parseRoomEventFilter(req)
 	if err != nil {
@@ -246,7 +244,7 @@ func Context(
 		response.End = end.String()
 		response.Start = start.String()
 	}
-	succeeded = true
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: response,

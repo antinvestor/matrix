@@ -53,6 +53,14 @@ func (q *queues) DiscardSubscriber(ctx context.Context, ref string) error {
 	return q.service.DiscardSubscriber(ctx, ref)
 }
 
+func (q *queues) Submit(ctx context.Context, job frame.Job) {
+	err := frame.SubmitJob(ctx, q.service, job)
+	if err != nil {
+		_ = job.WriteError(ctx, err)
+		job.Close()
+	}
+}
+
 // NewQueueManager ensures a default internal Queue exists
 func NewQueueManager(service *frame.Service) QueueManager {
 	return &queues{

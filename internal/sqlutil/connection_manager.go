@@ -176,7 +176,14 @@ func NewConnectionManager(service *frame.Service) ConnectionManager {
 		cfg := service.Config().(frame.ConfigurationDatabase)
 		primaryUrl := cfg.GetDatabasePrimaryHostURL()
 		if len(primaryUrl) > 0 {
-			opts = &config.DatabaseOptions{DatabaseURI: config.DataSource(primaryUrl[0])}
+			opts = &config.DatabaseOptions{
+				Prefix:                 "",
+				Reference:              "",
+				DatabaseURI:            config.DataSource(primaryUrl[0]),
+				MaxOpenConnections:     cfg.GetMaxOpenConnections(),
+				MaxIdleConnections:     cfg.GetMaxIdleConnections(),
+				ConnMaxLifetimeSeconds: int(cfg.GetMaxConnectionLifeTimeInSeconds().Seconds()),
+			}
 		}
 
 		cfg.GetDatabaseMigrationPath()

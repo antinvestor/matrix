@@ -1,4 +1,29 @@
 services:
+  datastore_pool:
+    hostname: datastore_pool
+    image: ghcr.io/pgdogdev/pgdog:main
+    ports:
+      - "6432:6432"
+    depends_on:
+      datastore:
+        condition: service_healthy
+    networks:
+      - internal
+    environment:
+      RUST_LOG: debug
+    command:
+      - "/usr/local/bin/pgdog"
+      - "--config"
+      - "/etc/pgdog/pgdog.toml"
+      - "--users"
+      - "/etc/pgdog/users.toml"
+      - "run"
+      - "--min-pool-size=0"
+    configs:
+      - source: datastore_pool
+        target: /etc/pgdog/pgdog.toml
+      - source: datastore_pool_users
+        target: /etc/pgdog/users.toml
   datastore:
     hostname: datastore
     image: paradedb/paradedb:v0.15.26
@@ -91,6 +116,45 @@ services:
         target: /etc/matrix/config.yaml
 
 configs:
+  datastore_pool:
+    name: pgdog.toml
+    content: |
+      [general]
+      host = "0.0.0.0"
+      port = 6432
+      workers = 2
+      pooler_mode = "transaction"
+      default_pool_size = 100
+      min_pool_size = 10
+      load_balancing_strategy = "least_active_connections"
+      passthrough_auth = "enabled_plain"
+      auth_type = "scram"
+      checkout_timeout = 5000
+      healthcheck_interval = 30000
+      [admin]
+      user = "matrix"
+      password = "s3cr3t"
+      [tcp]
+      retries = 3
+      time = 1000
+      interval = 1000
+      user_timeout = 1000
+      [[ databases ]]
+      name = "matrix"
+      role = "primary" 
+      host = "datastore"
+      port = 5432
+  datastore_pool_users:
+    name: users.toml
+    content: |
+      # Catch-all user mapping; with passthrough_auth, actual credentials are used
+      [[users]]
+      name = "matrix"
+      database = "*"
+    
+      # Optionally, override pool size per user:
+      # pool_size = 50
+
   matrix_key:
     name: key.pem
     content: |

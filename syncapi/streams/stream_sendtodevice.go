@@ -3,7 +3,6 @@ package streams
 import (
 	"context"
 
-	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/pitabwire/util"
 )
@@ -13,14 +12,14 @@ type SendToDeviceStreamProvider struct {
 }
 
 func (p *SendToDeviceStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseTransaction,
+	ctx context.Context,
 ) {
-	p.DefaultStreamProvider.Setup(ctx, snapshot)
+	p.DefaultStreamProvider.Setup(ctx)
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := snapshot.MaxStreamPositionForSendToDeviceMessages(ctx)
+	id, err := p.DB.MaxStreamPositionForSendToDeviceMessages(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -29,20 +28,18 @@ func (p *SendToDeviceStreamProvider) Setup(
 
 func (p *SendToDeviceStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *SendToDeviceStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
 	// See if we have any new tasks to do for the send-to-device messaging.
-	lastPos, events, err := snapshot.SendToDeviceUpdatesForSync(req.Context, req.Device.UserID, req.Device.ID, from, to)
+	lastPos, events, err := p.DB.SendToDeviceUpdatesForSync(req.Context, req.Device.UserID, req.Device.ID, from, to)
 	if err != nil {
 		util.Log(ctx).WithError(err).Error("p.Cm.SendToDeviceUpdatesForSync failed")
 		return from

@@ -339,7 +339,7 @@ func (oq *destinationQueue) backgroundSend(ctx context.Context) {
 			// restarted automatically the next time we have an event to
 			// send.
 			return
-		case <- ctx.Done():
+		case <-ctx.Done():
 			return
 		}
 

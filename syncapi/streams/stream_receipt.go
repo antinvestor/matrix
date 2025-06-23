@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/pitabwire/util"
@@ -16,14 +15,14 @@ type ReceiptStreamProvider struct {
 }
 
 func (p *ReceiptStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseTransaction,
+	ctx context.Context,
 ) {
-	p.DefaultStreamProvider.Setup(ctx, snapshot)
+	p.DefaultStreamProvider.Setup(ctx)
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := snapshot.MaxStreamPositionForReceipts(ctx)
+	id, err := p.DB.MaxStreamPositionForReceipts(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -32,15 +31,13 @@ func (p *ReceiptStreamProvider) Setup(
 
 func (p *ReceiptStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *ReceiptStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
@@ -51,7 +48,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		}
 	}
 
-	lastPos, receipts, err := snapshot.RoomReceiptsAfter(ctx, joinedRooms, from)
+	lastPos, receipts, err := p.DB.RoomReceiptsAfter(ctx, joinedRooms, from)
 	if err != nil {
 		util.Log(ctx).WithError(err).Error("p.Cm.RoomReceiptsAfter failed")
 		return from

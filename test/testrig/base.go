@@ -42,7 +42,10 @@ func CreateConfig(ctx context.Context, testOpts test.DependancyOption) (*config.
 		return nil, nil, err
 	}
 
-	var cfg config.Matrix
+	cfg, err := frame.ConfigFromEnv[config.Matrix]()
+	if err != nil {
+		return nil, nil, err
+	}
 	cfg.Defaults(defaultOpts)
 	cfg.FederationAPI.KeyPerspectives = nil
 

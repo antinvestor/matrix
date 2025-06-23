@@ -568,8 +568,6 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 	if err != nil {
 		return nil, err
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	sKeyUser := ""
 	if stateKey != "" {
@@ -606,7 +604,6 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *rstypes.HeaderedEvent)
 	}
 
 	event.PDU, err = event.SetUnsigned(prev)
-	succeeded = true
 	return event, err
 }
 

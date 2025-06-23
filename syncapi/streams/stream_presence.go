@@ -22,7 +22,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/syncapi/notifier"
-	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/pitabwire/util"
@@ -37,14 +36,14 @@ type PresenceStreamProvider struct {
 }
 
 func (p *PresenceStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseTransaction,
+	ctx context.Context,
 ) {
-	p.DefaultStreamProvider.Setup(ctx, snapshot)
+	p.DefaultStreamProvider.Setup(ctx)
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := snapshot.MaxStreamPositionForPresence(ctx)
+	id, err := p.DB.MaxStreamPositionForPresence(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -53,15 +52,13 @@ func (p *PresenceStreamProvider) Setup(
 
 func (p *PresenceStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *PresenceStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
@@ -69,7 +66,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	log := util.Log(ctx)
 
 	// We pull out a larger number than the filter asks for, since we're filtering out events later
-	presences, err := snapshot.PresenceAfter(ctx, from, synctypes.EventFilter{Limit: 1000})
+	presences, err := p.DB.PresenceAfter(ctx, from, synctypes.EventFilter{Limit: 1000})
 	if err != nil {
 		log.WithError(err).Error("p.Cm.PresenceAfter failed")
 		return from
@@ -86,10 +83,9 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		return to
 	}
 
-	dbPresences, err := snapshot.GetPresences(ctx, getPresenceForUsers)
+	dbPresences, err := p.DB.GetPresences(ctx, getPresenceForUsers)
 	if err != nil {
 		log.WithError(err).Error("unable to query presence for user")
-		_ = snapshot.Rollback()
 		return from
 	}
 	for _, presence := range dbPresences {

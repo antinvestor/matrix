@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage"
@@ -334,48 +333,37 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	snapshot, err := db.NewDatabaseSnapshot(ctx)
+	txDB, err := db.NewDatabaseTransaction(ctx)
 	if err != nil {
 		return err
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
-	roomToUsers, err := snapshot.AllJoinedUsersInRooms(ctx)
+	roomToUsers, err := txDB.AllJoinedUsersInRooms(ctx)
 	if err != nil {
 		return err
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 
-	roomToPeekingDevices, err := snapshot.AllPeekingDevicesInRooms(ctx)
+	roomToPeekingDevices, err := txDB.AllPeekingDevicesInRooms(ctx)
 	if err != nil {
 		return err
 	}
 	n.setPeekingDevices(roomToPeekingDevices)
 
-	succeeded = true
 	return nil
 }
 
 // LoadRooms loads the membership states required to notify users correctly.
-func (n *Notifier) LoadRooms(ctx context.Context, db storage.Database, roomIDs []string) error {
+func (n *Notifier) LoadRooms(ctx context.Context, db storage.DatabaseTransaction, roomIDs []string) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	snapshot, err := db.NewDatabaseSnapshot(ctx)
-	if err != nil {
-		return err
-	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
-
-	roomToUsers, err := snapshot.AllJoinedUsersInRoom(ctx, roomIDs)
+	roomToUsers, err := db.AllJoinedUsersInRoom(ctx, roomIDs)
 	if err != nil {
 		return err
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 
-	succeeded = true
 	return nil
 }
 
