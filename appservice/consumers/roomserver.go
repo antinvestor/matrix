@@ -106,7 +106,7 @@ func (s *OutputRoomEventConsumer) filterEventsForAppservice(
 ) error {
 	logger := util.Log(ctx)
 
-	logger.WithField("appservice", state.ID).Info("Appservice worker received %d message(s) from roomserver", 1)
+	logger.WithField("appservice", state.ID).Info("Appservice worker received a message from roomserver")
 	events := make([]*types.HeaderedEvent, 0, 1)
 
 	// Only handle events we care about

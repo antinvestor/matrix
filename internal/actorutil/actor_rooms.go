@@ -176,22 +176,36 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 			return
 		}
 
+
 		// Process the next message and determine whether there are more to process
-		eventWork := ra.nextEventJob(gctx, msgT)
+		eventWork := frame.NewJob(func(ctx context.Context, _ frame.JobResultPipe) error {
+			defer func() {
+				// Reset processing flag when job completes
+				ra.jobProcessing.Swap(false)
+				gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: ra.roomID.String()})
+			}()
+
+			err := ra.pullNewMessage(ctx, msgT)
+
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				// Reset processing flag on error
+
+				if ra.subscription.IsIdle() {
+					gctx.Request(gctx.Self(), &actorV1.StopRoomActor{RoomId: ra.roomID.String()})
+					return nil
+				}
+			}
+
+			return nil
+		})
 
 		ra.qm.Submit(ra.ctx, eventWork)
 	}
 }
 
-// nextEventJob pulls a message from the queue and processes it
+// pullNewMessage pulls a message from the queue and processes it
 // returns message ID if a message was processed, empty string if no message was available
-func (ra *RoomActor) nextEventJob(gctx cluster.GrainContext, req *actorV1.WorkRequest) frame.Job {
-
-	return frame.NewJob(func(ctx context.Context, _ frame.JobResultPipe) error {
-		defer func() {
-			// Reset processing flag when job completes
-			ra.jobProcessing.Swap(false)
-		}()
+func (ra *RoomActor) pullNewMessage(ctx context.Context, req *actorV1.WorkRequest) error {
 
 		log := ra.log.WithContext(ctx)
 
@@ -205,18 +219,7 @@ func (ra *RoomActor) nextEventJob(gctx cluster.GrainContext, req *actorV1.WorkRe
 		msg, err := ra.subscription.Receive(requestCtx)
 		cancelFn()
 		if err != nil {
-
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				// Reset processing flag on error
-
-				if ra.subscription.IsIdle() {
-					gctx.Request(gctx.Self(), &actorV1.StopRoomActor{RoomId: ra.roomID.String()})
-					return nil
-				}
-			}
-
-			gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: ra.roomID.String()})
-			return nil
+			return err
 		}
 
 		// Process the message
@@ -229,10 +232,5 @@ func (ra *RoomActor) nextEventJob(gctx cluster.GrainContext, req *actorV1.WorkRe
 			return nil
 		}
 		msg.Ack()
-
-		// Process next message immediately without delay
-		gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: ra.roomID.String()})
-
 		return nil
-	})
 }
