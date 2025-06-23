@@ -17,14 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type actorHeaders struct {
-	t *testing.T
-}
-
-func (ah *actorHeaders) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
-	return nil
-}
-
 // TestRoomActorIntegration tests the integration between the actor system and room actors
 func TestRoomActorIntegration(t *testing.T) {
 

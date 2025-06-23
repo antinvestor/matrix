@@ -374,7 +374,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		// create a dummy AS url, handling the events
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var txn consumers.ApplicationServiceTransaction
-			err := json.NewDecoder(r.Body).Decode(&txn)
+			err = json.NewDecoder(r.Body).Decode(&txn)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -510,7 +510,8 @@ func TestOutputAppserviceEvent(t *testing.T) {
 							"membership": "join",
 						}, test.WithStateKey(bob.ID))
 
-						if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, []*types.HeaderedEvent{joinEv}, "test", "test", "test", nil, false); err != nil {
+						err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, []*types.HeaderedEvent{joinEv}, "test", "test", "test", nil, false)
+						if err != nil {
 							t.Fatalf("failed to send events: %v", err)
 						}
 					case spec.Join: // the AS has received the join event, now hit `/joined_members` to validate that

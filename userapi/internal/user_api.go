@@ -106,7 +106,8 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 	if req.DataType == "" {
 		return fmt.Errorf("data type must not be empty")
 	}
-	if err := a.DB.SaveAccountData(ctx, local, domain, req.RoomID, req.DataType, req.AccountData); err != nil {
+	err = a.DB.SaveAccountData(ctx, local, domain, req.RoomID, req.DataType, req.AccountData)
+	if err != nil {
 		util.Log(ctx).WithError(err).Error("a.Cm.SaveAccountData failed")
 		return fmt.Errorf("failed to save account data: %w", err)
 	}
@@ -116,7 +117,8 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 		_ = json.Unmarshal(req.AccountData, ignoredUsers)
 	}
 	if req.DataType == "m.fully_read" {
-		if err := a.setFullyRead(ctx, req); err != nil {
+		err = a.setFullyRead(ctx, req)
+		if err != nil {
 			return err
 		}
 	}

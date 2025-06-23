@@ -482,7 +482,7 @@ func (d *Database) CleanSendToDeviceUpdates(
 	ctx context.Context,
 	userID, deviceID string, before types.StreamPosition,
 ) (err error) {
-	err =  d.SendToDevice.DeleteSendToDeviceMessages(ctx, userID, deviceID, before)
+	err = d.SendToDevice.DeleteSendToDeviceMessages(ctx, userID, deviceID, before)
 	if err != nil {
 		util.Log(ctx).WithError(err).Error("Failed to clean up old send-to-device messages for user %q device %q", userID, deviceID)
 		return err

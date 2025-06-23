@@ -117,26 +117,17 @@ func (m *manager) Start(ctx context.Context) error {
 	return nil
 }
 
-// EnsureRoomActorExists creates or gets a room actor for the specified room
-func (m *manager) EnsureRoomActorExists(ctx context.Context, functionID ActorFunctionID, roomID *spec.RoomID) error {
-	_, err := m.createRoomActor(ctx, functionID, roomID)
-	return err
-}
-
-func (m *manager) createRoomActor(_ context.Context, functionID ActorFunctionID, roomID *spec.RoomID) (*actorV1.RoomEventProcessorGrainClient, error) {
+func (m *manager) createRoomActor(_ context.Context, functionID ActorFunctionID, roomID *spec.RoomID) *actorV1.RoomEventProcessorGrainClient {
 
 	actorID := prefixRoomIDWithFunc(functionID, roomID)
 	roomActor := actorV1.GetRoomEventProcessorGrainClient(m.cluster, actorID)
 
-	return roomActor, nil
+	return roomActor
 }
 
 // Progress obtains the subscription processing for a specific room
 func (m *manager) Progress(ctx context.Context, functionID ActorFunctionID, roomID *spec.RoomID) (*actorV1.ProgressResponse, error) {
-	roomActor, err := m.createRoomActor(ctx, functionID, roomID)
-	if err != nil {
-		return nil, err
-	}
+	roomActor := m.createRoomActor(ctx, functionID, roomID)
 
 	resp, err := roomActor.Progress(&actorV1.ProgressRequest{
 		RoomId: roomID.String(),

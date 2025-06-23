@@ -211,19 +211,19 @@ func OnIncomingStateTypeRequest(
 
 	// Translate user ID state keys to room keys in pseudo ID rooms
 	if roomVer == gomatrixserverlib.RoomVersionPseudoIDs {
-		parsedRoomID, err := spec.NewRoomID(roomID)
-		if err != nil {
+		parsedRoomID, err0 := spec.NewRoomID(roomID)
+		if err0 != nil {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.InvalidParam("invalid room ID"),
 			}
 		}
-		newStateKey, err := synctypes.FromClientStateKey(*parsedRoomID, stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
+		newStateKey, err0 := synctypes.FromClientStateKey(*parsedRoomID, stateKey, func(roomID spec.RoomID, userID spec.UserID) (*spec.SenderID, error) {
 			return rsAPI.QuerySenderIDForUser(ctx, roomID, userID)
 		})
-		if err != nil {
+		if err0 != nil {
 			// TODO: work out better logic for failure cases (e.g. sender ID not found)
-			util.Log(ctx).WithError(err).Error("synctypes.FromClientStateKey failed")
+			util.Log(ctx).WithError(err0).Error("synctypes.FromClientStateKey failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),

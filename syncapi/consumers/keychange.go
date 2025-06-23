@@ -32,7 +32,6 @@ import (
 // OutputKeyChangeEventConsumer consumes events that originated in the key server.
 type OutputKeyChangeEventConsumer struct {
 	qm       queueutil.QueueManager
-	topic    *config.QueueOptions
 	db       storage.Database
 	notifier *notifier.Notifier
 	stream   streams.StreamProvider

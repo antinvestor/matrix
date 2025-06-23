@@ -16,34 +16,12 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"path"
-	"runtime"
-	"strings"
 
 	"github.com/pitabwire/util"
 )
-
-// callerPrettyfier is a function that given a runtime.Frame object, will
-// extract the calling function's name and file, and return them in a nicely
-// formatted way
-func callerPrettyfier(f *runtime.Frame) (string, string) {
-	// Retrieve just the function name
-	s := strings.Split(f.Function, ".")
-	funcname := s[len(s)-1]
-
-	// Append a newline + tab to it to move the actual log content to its own line
-	funcname += "\n\t"
-
-	// Use a shortened file path which just has the filename to avoid having lots of redundant
-	// directories which contribute significantly to overall log sizes!
-	filename := fmt.Sprintf(" [%s:%d]", path.Base(f.File), f.Line)
-
-	return funcname, filename
-}
 
 // SetupPprof starts a pprof listener. We use the DefaultServeMux here because it is
 // simplest, and it gives us the freedom to run pprof on a separate port.

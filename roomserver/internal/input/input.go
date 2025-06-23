@@ -129,10 +129,7 @@ func NewInputer(
 	}
 	c.inputRoomEventsTopicRef = cfg.Queues.InputRoomEvent.Ref()
 
-	replyPubOpts, err := replyQOpts(ctx, &cfg.Queues.InputRoomEvent, "", false)
-	if err != nil {
-		return nil, err
-	}
+	replyPubOpts := replyQOpts(ctx, &cfg.Queues.InputRoomEvent, "", false)
 
 	err = c.Qm.EnsurePublisherOk(ctx, replyPubOpts)
 	if err != nil {
@@ -162,7 +159,7 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, _ []by
 	return nil
 }
 
-func replyQOpts(_ context.Context, opts *config.QueueOptions, requestID string, isSubscriber bool) (*config.QueueOptions, error) {
+func replyQOpts(_ context.Context, opts *config.QueueOptions, requestID string, isSubscriber bool) *config.QueueOptions {
 
 	suffixedReplySubject := fmt.Sprintf("%s_Reply", constants.InputRoomEvent)
 
@@ -192,7 +189,7 @@ func replyQOpts(_ context.Context, opts *config.QueueOptions, requestID string, 
 		QReference: fmt.Sprintf("%s_%s", suffixedReplySubject, requestID),
 		Prefix:     opts.Prefix,
 		DS:         ds,
-	}, nil
+	}
 }
 
 // HandleRoomEvent is called by the worker for the room. It must only be called
@@ -297,10 +294,8 @@ func (r *Inputer) queueInputRoomEvents(
 	var requestMsgID string
 	if !request.Asynchronous {
 		requestMsgID = frame.GenerateID(ctx)
-		replyToOpts, err = replyQOpts(ctx, &r.Cfg.Queues.InputRoomEvent, requestMsgID, true)
-		if err != nil {
-			return nil, err
-		}
+		replyToOpts = replyQOpts(ctx, &r.Cfg.Queues.InputRoomEvent, requestMsgID, true)
+
 		err = r.Qm.RegisterSubscriber(ctx, replyToOpts)
 		if err != nil {
 			return nil, err

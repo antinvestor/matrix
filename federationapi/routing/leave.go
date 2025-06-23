@@ -166,6 +166,211 @@ func MakeLeave(
 	}
 }
 
+// validateLeaveEvent validates the leave event from the request.
+// Returns the event and any error encountered during validation.
+func validateLeaveEvent(
+	_ *http.Request,
+	request *fclient.FederationRequest,
+	verImpl gomatrixserverlib.IRoomVersion,
+	roomID string,
+	eventID string,
+) (event gomatrixserverlib.PDU, respErr util.JSONResponse) {
+	// Decode the event JSON from the request.
+	event, err := verImpl.NewEventFromUntrustedJSON(request.Content())
+	switch err.(type) {
+	case gomatrixserverlib.BadJSONError:
+		return nil, util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON(err.Error()),
+		}
+	case nil:
+	default:
+		return nil, util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+		}
+	}
+
+	// Check that the room ID is correct.
+	if event.RoomID().String() != roomID {
+		return nil, util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("The room ID in the request path must match the room ID in the leave event JSON"),
+		}
+	}
+
+	// Check that the event ID is correct.
+	if event.EventID() != eventID {
+		return nil, util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("The event ID in the request path must match the event ID in the leave event JSON"),
+		}
+	}
+
+	if event.StateKey() == nil || event.StateKeyEquals("") {
+		return nil, util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("No state key was provided in the leave event."),
+		}
+	}
+	if !event.StateKeyEquals(string(event.SenderID())) {
+		return nil, util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("Event state key must match the event sender."),
+		}
+	}
+
+	return event, util.JSONResponse{}
+}
+
+// validateLeaveSender validates that the sender of the leave event belongs to the server that sent the request.
+func validateLeaveSender(
+	httpReq *http.Request,
+	request *fclient.FederationRequest,
+	rsAPI api.FederationRoomserverAPI,
+	event gomatrixserverlib.PDU,
+) (*spec.UserID, util.JSONResponse) {
+	// Check that the sender belongs to the server that is sending us
+	// the request. By this point we've already asserted that the sender
+	// and the state key are equal so we don't need to check both.
+	sender, err := rsAPI.QueryUserIDForSender(httpReq.Context(), event.RoomID(), event.SenderID())
+	if err != nil {
+		return nil, util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("The sender of the join is invalid"),
+		}
+	} else if sender.Domain() != request.Origin() {
+		return nil, util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("The sender does not match the server that originated the request"),
+		}
+	}
+
+	return sender, util.JSONResponse{}
+}
+
+// checkUserHasLeft checks if the user has already left the room.
+// Returns true if the user has already left, false otherwise.
+func checkUserHasLeft(
+	httpReq *http.Request,
+	rsAPI api.FederationRoomserverAPI,
+	roomID string,
+	event gomatrixserverlib.PDU,
+) (bool, util.JSONResponse) {
+	// Check if the user has already left. If so, no-op!
+	queryReq := &api.QueryLatestEventsAndStateRequest{
+		RoomID: roomID,
+		StateToFetch: []gomatrixserverlib.StateKeyTuple{
+			{
+				EventType: spec.MRoomMember,
+				StateKey:  *event.StateKey(),
+			},
+		},
+	}
+	queryRes := &api.QueryLatestEventsAndStateResponse{}
+	err := rsAPI.QueryLatestEventsAndState(httpReq.Context(), queryReq, queryRes)
+	if err != nil {
+		util.Log(httpReq.Context()).WithError(err).Error("rsAPI.QueryLatestEventsAndState failed")
+		return false, util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+
+	// The room doesn't exist or we weren't ever joined to it.
+	if !queryRes.RoomExists || len(queryRes.StateEvents) == 0 {
+		return true, util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: struct{}{},
+		}
+	}
+
+	// Check if we're recycling a previous leave event.
+	if event.EventID() == queryRes.StateEvents[0].EventID() {
+		return true, util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: struct{}{},
+		}
+	}
+
+	// We are/were joined/invited/banned or something. Check if we can no-op here.
+	if len(queryRes.StateEvents) == 1 {
+		if mem, merr := queryRes.StateEvents[0].Membership(); merr == nil && mem == spec.Leave {
+			return true, util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: struct{}{},
+			}
+		}
+	}
+
+	return false, util.JSONResponse{}
+}
+
+// verifyLeaveEventSignature verifies that the leave event is signed by the server sending the request.
+func verifyLeaveEventSignature(
+	httpReq *http.Request,
+	verImpl gomatrixserverlib.IRoomVersion,
+	keys gomatrixserverlib.JSONVerifier,
+	event gomatrixserverlib.PDU,
+	sender *spec.UserID,
+) util.JSONResponse {
+	// Check that the event is signed by the server sending the request.
+	redactedJSON, err := verImpl.RedactEventJSON(event.JSON())
+	if err != nil {
+		util.Log(httpReq.Context()).WithError(err).Error("XXX: leave.go")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("The event JSON could not be redacted"),
+		}
+	}
+	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
+		ServerName:           sender.Domain(),
+		Message:              redactedJSON,
+		AtTS:                 event.OriginServerTS(),
+		ValidityCheckingFunc: gomatrixserverlib.StrictValiditySignatureCheck,
+	}}
+	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
+	if err != nil {
+		util.Log(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: spec.InternalServerError{},
+		}
+	}
+	if verifyResults[0].Error != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: spec.Forbidden("The leave must be signed by the server it originated on"),
+		}
+	}
+
+	return util.JSONResponse{}
+}
+
+// checkMembershipIsLeave checks that the membership in the event is set to leave.
+func checkMembershipIsLeave(
+	httpReq *http.Request,
+	event gomatrixserverlib.PDU,
+) util.JSONResponse {
+	// check membership is set to leave
+	mem, err := event.Membership()
+	if err != nil {
+		util.Log(httpReq.Context()).WithError(err).Error("event.Membership failed")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("missing content.membership key"),
+		}
+	}
+	if mem != spec.Leave {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: spec.BadJSON("The membership in the event content must be set to leave"),
+		}
+	}
+
+	return util.JSONResponse{}
+}
+
 // SendLeave implements the /send_leave API
 func SendLeave(
 	httpReq *http.Request,
@@ -194,156 +399,37 @@ func SendLeave(
 		}
 	}
 
-	// Decode the event JSON from the request.
-	event, err := verImpl.NewEventFromUntrustedJSON(request.Content())
-	switch err.(type) {
-	case gomatrixserverlib.BadJSONError:
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON(err.Error()),
-		}
-	case nil:
-	default:
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
-		}
+	// Validate the leave event
+	event, jsonResp := validateLeaveEvent(httpReq, request, verImpl, roomID, eventID)
+	if jsonResp.Code != 0 {
+		return jsonResp
 	}
 
-	// Check that the room ID is correct.
-	if event.RoomID().String() != roomID {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The room ID in the request path must match the room ID in the leave event JSON"),
-		}
+	// Validate the leave sender
+	sender, jsonResp := validateLeaveSender(httpReq, request, rsAPI, event)
+	if jsonResp.Code != 0 {
+		return jsonResp
 	}
 
-	// Check that the event ID is correct.
-	if event.EventID() != eventID {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The event ID in the request path must match the event ID in the leave event JSON"),
-		}
+	// Check if the user has already left
+	hasLeft, jsonResp := checkUserHasLeft(httpReq, rsAPI, roomID, event)
+	if jsonResp.Code != 0 {
+		return jsonResp
+	}
+	if hasLeft {
+		return jsonResp
 	}
 
-	if event.StateKey() == nil || event.StateKeyEquals("") {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("No state key was provided in the leave event."),
-		}
-	}
-	if !event.StateKeyEquals(string(event.SenderID())) {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("Event state key must match the event sender."),
-		}
+	// Verify the leave event signature
+	jsonResp = verifyLeaveEventSignature(httpReq, verImpl, keys, event, sender)
+	if jsonResp.Code != 0 {
+		return jsonResp
 	}
 
-	// Check that the sender belongs to the server that is sending us
-	// the request. By this point we've already asserted that the sender
-	// and the state key are equal so we don't need to check both.
-	sender, err := rsAPI.QueryUserIDForSender(httpReq.Context(), event.RoomID(), event.SenderID())
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("The sender of the join is invalid"),
-		}
-	} else if sender.Domain() != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("The sender does not match the server that originated the request"),
-		}
-	}
-
-	// Check if the user has already left. If so, no-op!
-	queryReq := &api.QueryLatestEventsAndStateRequest{
-		RoomID: roomID,
-		StateToFetch: []gomatrixserverlib.StateKeyTuple{
-			{
-				EventType: spec.MRoomMember,
-				StateKey:  *event.StateKey(),
-			},
-		},
-	}
-	queryRes := &api.QueryLatestEventsAndStateResponse{}
-	err = rsAPI.QueryLatestEventsAndState(httpReq.Context(), queryReq, queryRes)
-	if err != nil {
-		util.Log(httpReq.Context()).WithError(err).Error("rsAPI.QueryLatestEventsAndState failed")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-	// The room doesn't exist or we weren't ever joined to it. Might as well
-	// no-op here.
-	if !queryRes.RoomExists || len(queryRes.StateEvents) == 0 {
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: struct{}{},
-		}
-	}
-	// Check if we're recycling a previous leave event.
-	if event.EventID() == queryRes.StateEvents[0].EventID() {
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: struct{}{},
-		}
-	}
-	// We are/were joined/invited/banned or something. Check if
-	// we can no-op here.
-	if len(queryRes.StateEvents) == 1 {
-		if mem, merr := queryRes.StateEvents[0].Membership(); merr == nil && mem == spec.Leave {
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: struct{}{},
-			}
-		}
-	}
-
-	// Check that the event is signed by the server sending the request.
-	redacted, err := verImpl.RedactEventJSON(event.JSON())
-	if err != nil {
-		util.Log(httpReq.Context()).WithError(err).Error("XXX: leave.go")
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The event JSON could not be redacted"),
-		}
-	}
-	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName:           sender.Domain(),
-		Message:              redacted,
-		AtTS:                 event.OriginServerTS(),
-		ValidityCheckingFunc: gomatrixserverlib.StrictValiditySignatureCheck,
-	}}
-	verifyResults, err := keys.VerifyJSONs(httpReq.Context(), verifyRequests)
-	if err != nil {
-		util.Log(httpReq.Context()).WithError(err).Error("keys.VerifyJSONs failed")
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
-	if verifyResults[0].Error != nil {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: spec.Forbidden("The leave must be signed by the server it originated on"),
-		}
-	}
-
-	// check membership is set to leave
-	mem, err := event.Membership()
-	if err != nil {
-		util.Log(httpReq.Context()).WithError(err).Error("event.Membership failed")
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("missing content.membership key"),
-		}
-	}
-	if mem != spec.Leave {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The membership in the event content must be set to leave"),
-		}
+	// Check membership is set to leave
+	jsonResp = checkMembershipIsLeave(httpReq, event)
+	if jsonResp.Code != 0 {
+		return jsonResp
 	}
 
 	// Send the events to the room server.

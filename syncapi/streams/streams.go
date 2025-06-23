@@ -31,7 +31,6 @@ func NewSyncStreamProviders(ctx context.Context,
 
 	dbTx, _ := d.NewDatabaseTransaction(ctx)
 
-
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{
 			DefaultStreamProvider: DefaultStreamProvider{DB: dbTx},

@@ -35,12 +35,10 @@ import (
 // OutputPresenceConsumer consumes events that originate in the clientapi.
 type OutputPresenceConsumer struct {
 	qm                      queueutil.QueueManager
-	durable                 string
 	db                      storage.Database
 	queues                  *queue.OutgoingQueues
 	isLocalServerName       func(spec.ServerName) bool
 	rsAPI                   roomserverAPI.FederationRoomserverAPI
-	topic                   string
 	outboundPresenceEnabled bool
 }
 

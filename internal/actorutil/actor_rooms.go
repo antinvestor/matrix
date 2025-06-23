@@ -33,13 +33,8 @@ type RoomActor struct {
 	cluster *cluster.Cluster
 	cli     *actorV1.RoomEventProcessorGrainClient
 
-	svc *frame.Service
-
 	// Flag to track if job processing is active
 	jobProcessing atomic.Bool
-
-	// Flag to track if setup is in progress
-	setupInProgress atomic.Bool
 
 	log *util.LogEntry
 }
@@ -98,13 +93,10 @@ func (ra *RoomActor) setupSubscriber(qOpts *config.QueueOptions, roomID *spec.Ro
 	ctx := ra.ctx
 	qm := ra.qm
 
-	opts, err := roomifyQOpts(ctx, qOpts, roomID)
-	if err != nil {
-		return err
-	}
+	opts := roomifyQOpts(ctx, qOpts, roomID)
 
 	// Register subscriber for this room
-	err = qm.RegisterSubscriber(ctx, opts)
+	err := qm.RegisterSubscriber(ctx, opts)
 	if err != nil {
 
 		return err

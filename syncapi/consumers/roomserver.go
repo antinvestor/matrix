@@ -46,7 +46,6 @@ type OutputRoomEventConsumer struct {
 	rsAPI        api.SyncRoomserverAPI
 	qm           queueutil.QueueManager
 	am           actorutil.ActorManager
-	topic        *config.QueueOptions
 	db           storage.Database
 	pduStream    streams.StreamProvider
 	inviteStream streams.StreamProvider

@@ -33,7 +33,6 @@ import (
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
 	qm           queueutil.QueueManager
-	topic        *config.QueueOptions
 	topicReIndex *config.QueueOptions
 	db           storage.Database
 	stream       streams.StreamProvider

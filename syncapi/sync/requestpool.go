@@ -20,8 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/antinvestor/matrix/internal/queueutil"
-	"github.com/pitabwire/frame"
 	"net"
 	"net/http"
 	"strings"
@@ -29,6 +27,7 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
@@ -38,6 +37,7 @@ import (
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -94,19 +94,21 @@ func NewRequestPool(
 		producer: producer,
 		consumer: consumer,
 	}
-	go rp.cleanLastSeen()
+	go rp.cleanLastSeen(ctx)
 	go rp.cleanPresence(ctx, db, time.Minute*5)
 	return rp
 }
 
 // cleanLastSeen periodically clears the last seen map to prevent unbounded growth.
 // This could be improved by only removing entries older than a certain threshold.
-func (rp *RequestPool) cleanLastSeen() {
+func (rp *RequestPool) cleanLastSeen(ctx context.Context) {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-ticker.C:
 			// Count entries for logging
 			count := 0
@@ -310,9 +312,9 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 	}
 	lsres := &userapi.PerformLastSeenUpdateResponse{}
 	go func(ctx context.Context) {
-		err := rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres)
+		err := rp.userAPI.PerformLastSeenUpdate(ctx, lsreq, lsres)
 		if err != nil {
-			util.Log(req.Context()).WithError(err).Error("PerformLastSeenUpdate failed")
+			util.Log(ctx).WithError(err).Error("PerformLastSeenUpdate failed")
 		}
 	}(req.Context())
 
@@ -337,11 +339,333 @@ var waitingSyncRequests = prometheus.NewGauge(
 	},
 )
 
+// handleInitialRequest processes a complete sync request with a nil/empty since token
+func (rp *RequestPool) handleInitialRequest(
+	ctx context.Context,
+	syncReq *types.SyncRequest,
+) types.StreamingToken {
+	token := types.StreamingToken{}
+
+	// Launch each stream operation concurrently
+	deviceListCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.DeviceListStreamProvider.CompleteSync(
+			ctx, syncReq,
+		)
+	})
+
+	pduCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.PDUStreamProvider.CompleteSync(
+			ctx, syncReq,
+		)
+	})
+
+	typingCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.TypingStreamProvider.CompleteSync(
+			ctx, syncReq,
+		)
+	})
+
+	receiptCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.ReceiptStreamProvider.CompleteSync(
+			ctx, syncReq,
+		)
+	})
+
+	inviteCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.InviteStreamProvider.CompleteSync(
+			ctx, syncReq,
+		)
+	})
+
+	sendToDeviceCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.SendToDeviceStreamProvider.CompleteSync(
+			ctx, syncReq,
+		)
+	})
+
+	accountDataCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.AccountDataStreamProvider.CompleteSync(
+			ctx, syncReq,
+		)
+	})
+
+	notificationDataCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.NotificationDataStreamProvider.CompleteSync(
+			ctx, syncReq,
+		)
+	})
+
+	presenceCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.PresenceStreamProvider.CompleteSync(
+			ctx, syncReq,
+		)
+	})
+
+	// Collect results from all channels
+	token = rp.collectStreamResults(ctx, syncReq, token, deviceListCh, pduCh, typingCh, receiptCh, inviteCh, sendToDeviceCh, accountDataCh, notificationDataCh, presenceCh)
+	syncReq.Response.NextBatch = token
+
+	return token
+}
+
+// handleIncrementalRequest processes an incremental sync request with a valid since token
+func (rp *RequestPool) handleIncrementalRequest(
+	ctx context.Context,
+	syncReq *types.SyncRequest,
+	currentPos types.StreamingToken,
+) types.StreamingToken {
+	token := syncReq.Since
+
+	// Launch each stream operation concurrently
+	deviceListCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.DeviceListStreamProvider.IncrementalSync(
+			ctx, syncReq,
+			syncReq.Since.DeviceListPosition, currentPos.DeviceListPosition,
+		)
+	})
+
+	pduCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.PDUStreamProvider.IncrementalSync(
+			ctx, syncReq,
+			syncReq.Since.PDUPosition, currentPos.PDUPosition,
+		)
+	})
+
+	typingCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.TypingStreamProvider.IncrementalSync(
+			ctx, syncReq,
+			syncReq.Since.TypingPosition, currentPos.TypingPosition,
+		)
+	})
+
+	receiptCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.ReceiptStreamProvider.IncrementalSync(
+			ctx, syncReq,
+			syncReq.Since.ReceiptPosition, currentPos.ReceiptPosition,
+		)
+	})
+
+	inviteCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.InviteStreamProvider.IncrementalSync(
+			ctx, syncReq,
+			syncReq.Since.InvitePosition, currentPos.InvitePosition,
+		)
+	})
+
+	sendToDeviceCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.SendToDeviceStreamProvider.IncrementalSync(
+			ctx, syncReq,
+			syncReq.Since.SendToDevicePosition, currentPos.SendToDevicePosition,
+		)
+	})
+
+	accountDataCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.AccountDataStreamProvider.IncrementalSync(
+			ctx, syncReq,
+			syncReq.Since.AccountDataPosition, currentPos.AccountDataPosition,
+		)
+	})
+
+	notificationDataCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.NotificationDataStreamProvider.IncrementalSync(
+			ctx, syncReq,
+			syncReq.Since.NotificationDataPosition, currentPos.NotificationDataPosition,
+		)
+	})
+
+	presenceCh := rp.executeWorkerPoolJob(ctx, func(ctx context.Context) types.StreamPosition {
+		return rp.streams.PresenceStreamProvider.IncrementalSync(
+			ctx, syncReq,
+			syncReq.Since.PresencePosition, currentPos.PresencePosition,
+		)
+	})
+
+	// Collect results from all channels
+	token = rp.collectStreamResults(ctx, syncReq, token, deviceListCh, pduCh, typingCh, receiptCh, inviteCh, sendToDeviceCh, accountDataCh, notificationDataCh, presenceCh)
+	syncReq.Response.NextBatch = token
+
+	return token
+}
+
+// executeWorkerPoolJob runs a function on a worker pool and returns the result through a channel
+func (rp *RequestPool) executeWorkerPoolJob(ctx context.Context, f func(ctx context.Context) types.StreamPosition) <-chan frame.JobResult {
+	poolRequestJob := frame.NewJob(func(ctx context.Context, result frame.JobResultPipe) error {
+		// Execute the function with the transaction
+		streamPos := f(ctx)
+		return result.WriteResult(ctx, streamPos)
+	})
+
+	rp.wp.Submit(ctx, poolRequestJob)
+	return poolRequestJob.ResultChan()
+}
+
+// collectStreamResults collects results from all stream providers and updates the token
+func (rp *RequestPool) collectStreamResults(ctx context.Context,
+	syncReq *types.SyncRequest,
+	token types.StreamingToken,
+	deviceListCh, pduCh, typingCh, receiptCh, inviteCh, sendToDeviceCh,
+	accountDataCh, notificationDataCh, presenceCh <-chan frame.JobResult,
+) types.StreamingToken {
+	log := util.Log(ctx)
+
+	// Collect results from all channels
+	deviceListResult := <-deviceListCh
+	if deviceListResult.IsError() {
+		log.WithError(deviceListResult.Error()).Error("Failed to get DeviceListPosition")
+		// If initial sync, use the since value
+		if syncReq.Since.IsEmpty() {
+			token.DeviceListPosition = syncReq.Since.DeviceListPosition
+		}
+	} else {
+		token.DeviceListPosition = deviceListResult.Item().(types.StreamPosition)
+	}
+
+	pduResult := <-pduCh
+	if pduResult.IsError() {
+		log.WithError(pduResult.Error()).Error("Failed to get PDUPosition")
+		if syncReq.Since.IsEmpty() {
+			token.PDUPosition = syncReq.Since.PDUPosition
+		}
+	} else {
+		token.PDUPosition = pduResult.Item().(types.StreamPosition)
+	}
+
+	typingResult := <-typingCh
+	if typingResult.IsError() {
+		log.WithError(typingResult.Error()).Error("Failed to get TypingPosition")
+		if syncReq.Since.IsEmpty() {
+			token.TypingPosition = syncReq.Since.TypingPosition
+		}
+	} else {
+		token.TypingPosition = typingResult.Item().(types.StreamPosition)
+	}
+
+	receiptResult := <-receiptCh
+	if receiptResult.IsError() {
+		log.WithError(receiptResult.Error()).Error("Failed to get ReceiptPosition")
+		if syncReq.Since.IsEmpty() {
+			token.ReceiptPosition = syncReq.Since.ReceiptPosition
+		}
+	} else {
+		token.ReceiptPosition = receiptResult.Item().(types.StreamPosition)
+	}
+
+	inviteResult := <-inviteCh
+	if inviteResult.IsError() {
+		log.WithError(inviteResult.Error()).Error("Failed to get InvitePosition")
+		if syncReq.Since.IsEmpty() {
+			token.InvitePosition = syncReq.Since.InvitePosition
+		}
+	} else {
+		token.InvitePosition = inviteResult.Item().(types.StreamPosition)
+	}
+
+	sendToDeviceResult := <-sendToDeviceCh
+	if sendToDeviceResult.IsError() {
+		log.WithError(sendToDeviceResult.Error()).Error("Failed to get SendToDevicePosition")
+		if syncReq.Since.IsEmpty() {
+			token.SendToDevicePosition = syncReq.Since.SendToDevicePosition
+		}
+	} else {
+		token.SendToDevicePosition = sendToDeviceResult.Item().(types.StreamPosition)
+	}
+
+	accountDataResult := <-accountDataCh
+	if accountDataResult.IsError() {
+		log.WithError(accountDataResult.Error()).Error("Failed to get AccountDataPosition")
+		if syncReq.Since.IsEmpty() {
+			token.AccountDataPosition = syncReq.Since.AccountDataPosition
+		}
+	} else {
+		token.AccountDataPosition = accountDataResult.Item().(types.StreamPosition)
+	}
+
+	notificationDataResult := <-notificationDataCh
+	if notificationDataResult.IsError() {
+		log.WithError(notificationDataResult.Error()).Error("Failed to get NotificationDataPosition")
+		if syncReq.Since.IsEmpty() {
+			token.NotificationDataPosition = syncReq.Since.NotificationDataPosition
+		}
+	} else {
+		token.NotificationDataPosition = notificationDataResult.Item().(types.StreamPosition)
+	}
+
+	presenceResult := <-presenceCh
+	if presenceResult.IsError() {
+		log.WithError(presenceResult.Error()).Error("Failed to get PresencePosition")
+		if syncReq.Since.IsEmpty() {
+			token.PresencePosition = syncReq.Since.PresencePosition
+		}
+	} else {
+		token.PresencePosition = presenceResult.Item().(types.StreamPosition)
+	}
+
+	return token
+}
+
+// waitForEvents waits for events using the notifier
+func (rp *RequestPool) waitForEvents(
+	ctx context.Context,
+	syncReq *types.SyncRequest,
+) (bool, types.StreamingToken) {
+	timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled in shouldReturnImmediately
+	userStreamListener := rp.Notifier.GetListener(*syncReq)
+	defer userStreamListener.Close()
+
+	select {
+	case <-ctx.Done(): // Caller gave up
+		timer.Stop()
+		return true, syncReq.Since
+	case <-timer.C: // Timeout reached
+		timer.Stop()
+		return true, syncReq.Since
+	case <-userStreamListener.GetNotifyChannel(syncReq.Since):
+		timer.Stop()
+		currentPos := rp.Notifier.CurrentPosition()
+		currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
+		return false, currentPos
+	}
+}
+
+// handleGiveup prepares the response when timing out or context is canceled
+func (rp *RequestPool) handleGiveup(
+	ctx context.Context,
+	syncReq *types.SyncRequest,
+) util.JSONResponse {
+	ilog := util.Log(ctx)
+	ilog.Debug("Responding to sync since client gave up or timeout was reached")
+	syncReq.Response.NextBatch = syncReq.Since
+	// We should always try to include OTKs in sync responses, otherwise clients might upload keys
+	// even if that's not required. See also:
+	// https://github.com/matrix-org/synapse/blob/29f06704b8871a44926f7c99e73cf4a978fb8e81/synapse/rest/client/sync.py#L276-L281
+	// Only try to get OTKs if the context isn't already done.
+	if ctx.Err() == nil {
+		err := internal.DeviceOTKCounts(ctx, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			ilog.WithError(err).Warn("failed to get OTK counts")
+		}
+	}
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: syncReq.Response,
+	}
+}
+
+// cleanSendToDeviceUpdates handles the cleanup of old send-to-device messages
+func (rp *RequestPool) cleanSendToDeviceUpdates(ctx context.Context, syncReq *types.SyncRequest) error {
+	// Create a new context with timeout to prevent indefinite waiting
+	cleanCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	// Clean up old send-to-device messages from before this stream position.
+	// This is needed to avoid sending the same message multiple times
+	return rp.db.CleanSendToDeviceUpdates(cleanCtx, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition)
+}
+
 // OnIncomingSyncRequest is called when a client makes a /sync request. This function MUST be
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
 func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.Device) util.JSONResponse {
-
 	ctx := req.Context()
 	log := util.Log(ctx)
 
@@ -371,8 +695,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	// Clean up old send-to-device messages from before this stream position.
 	// This is needed to avoid sending the same message multiple times
-	if err = rp.db.CleanSendToDeviceUpdates(ctx, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
-		log.WithError(err).Error("p.Cm.CleanSendToDeviceUpdates failed")
+	if err = rp.cleanSendToDeviceUpdates(ctx, syncReq); err != nil {
+		log.WithError(err).Error("Failed to clean send-to-device updates")
+		// Continue even if there's an error with cleaning up
 	}
 
 	// loop until we get some data
@@ -382,387 +707,21 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 		// if the since token matches the current positions, wait via the notifier
 		if !rp.shouldReturnImmediately(syncReq, currentPos) {
-
-			timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled above
-
-			userStreamListener := rp.Notifier.GetListener(*syncReq)
-			defer userStreamListener.Close()
-
-			giveup := func(ctx context.Context) util.JSONResponse {
-				ilog := util.Log(ctx)
-				ilog.Debug("Responding to sync since client gave up or timeout was reached")
-				syncReq.Response.NextBatch = syncReq.Since
-				// We should always try to include OTKs in sync responses, otherwise clients might upload keys
-				// even if that's not required. See also:
-				// https://github.com/matrix-org/synapse/blob/29f06704b8871a44926f7c99e73cf4a978fb8e81/synapse/rest/client/sync.py#L276-L281
-				// Only try to get OTKs if the context isn't already done.
-				if ctx.Err() == nil {
-					err = internal.DeviceOTKCounts(ctx, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
-					if err != nil && !errors.Is(context.Canceled, err) {
-						ilog.WithError(err).Warn("failed to get OTK counts")
-					}
-				}
-				return util.JSONResponse{
-					Code: http.StatusOK,
-					JSON: syncReq.Response,
-				}
+			timedOut, newPos := rp.waitForEvents(ctx, syncReq)
+			if timedOut {
+				return rp.handleGiveup(ctx, syncReq)
 			}
-
-			select {
-			case <-ctx.Done(): // Caller gave up
-
-				timer.Stop()
-				userStreamListener.Close()
-				return giveup(ctx)
-
-			case <-timer.C: // Timeout reached
-				timer.Stop()
-				userStreamListener.Close()
-				return giveup(ctx)
-
-			case <-userStreamListener.GetNotifyChannel(syncReq.Since):
-				timer.Stop()
-				currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
-				log.WithField("currentPos", currentPos).Debug("Responding to sync after wake-up")
-			}
+			currentPos = newPos
+			log.WithField("currentPos", currentPos).Debug("Responding to sync after wake-up")
 		}
 
-		// Run a function on a worker pool and return the result through a channel
-		withWorkerPoolExecution := func(from types.StreamPosition, f func(ctx context.Context) types.StreamPosition) <-chan frame.JobResult {
-
-			poolRequestJob := frame.NewJob(func(ctx context.Context, result frame.JobResultPipe) error {
-
-				// Execute the function with the transaction
-				streamPos := f(ctx)
-				return result.WriteResult(ctx, streamPos)
-			})
-
-			rp.wp.Submit(ctx, poolRequestJob)
-
-			return poolRequestJob.ResultChan()
-		}
-
+		// Process sync based on whether it's an initial or incremental sync
 		if syncReq.Since.IsEmpty() {
-			// Complete sync - execute all stream operations concurrently
-			token := types.StreamingToken{}
-
-			// Launch each stream operation concurrently
-			deviceListCh := withWorkerPoolExecution(
-				syncReq.Since.DeviceListPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.DeviceListStreamProvider.CompleteSync(
-						ctx, syncReq,
-					)
-				},
-			)
-
-			pduCh := withWorkerPoolExecution(
-				syncReq.Since.PDUPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.PDUStreamProvider.CompleteSync(
-						ctx, syncReq,
-					)
-				},
-			)
-
-			typingCh := withWorkerPoolExecution(
-				syncReq.Since.TypingPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.TypingStreamProvider.CompleteSync(
-						ctx, syncReq,
-					)
-				},
-			)
-
-			receiptCh := withWorkerPoolExecution(
-				syncReq.Since.ReceiptPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.ReceiptStreamProvider.CompleteSync(
-						ctx, syncReq,
-					)
-				},
-			)
-
-			inviteCh := withWorkerPoolExecution(
-				syncReq.Since.InvitePosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.InviteStreamProvider.CompleteSync(
-						ctx, syncReq,
-					)
-				},
-			)
-
-			sendToDeviceCh := withWorkerPoolExecution(
-				syncReq.Since.SendToDevicePosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.SendToDeviceStreamProvider.CompleteSync(
-						ctx, syncReq,
-					)
-				},
-			)
-
-			accountDataCh := withWorkerPoolExecution(
-				syncReq.Since.AccountDataPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.AccountDataStreamProvider.CompleteSync(
-						ctx, syncReq,
-					)
-				},
-			)
-
-			notificationDataCh := withWorkerPoolExecution(
-				syncReq.Since.NotificationDataPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.NotificationDataStreamProvider.CompleteSync(
-						ctx, syncReq,
-					)
-				},
-			)
-
-			presenceCh := withWorkerPoolExecution(
-				syncReq.Since.PresencePosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.PresenceStreamProvider.CompleteSync(
-						ctx, syncReq,
-					)
-				},
-			)
-
-			// Collect results from all channels
-			deviceListResult := <-deviceListCh
-			if deviceListResult.IsError() {
-				log.WithError(deviceListResult.Error()).Error("Failed to get DeviceListPosition")
-				token.DeviceListPosition = syncReq.Since.DeviceListPosition
-			} else {
-				token.DeviceListPosition = deviceListResult.Item().(types.StreamPosition)
-			}
-
-			pduResult := <-pduCh
-			if pduResult.IsError() {
-				log.WithError(pduResult.Error()).Error("Failed to get PDUPosition")
-				token.PDUPosition = syncReq.Since.PDUPosition
-			} else {
-				token.PDUPosition = pduResult.Item().(types.StreamPosition)
-			}
-
-			typingResult := <-typingCh
-			if typingResult.IsError() {
-				log.WithError(typingResult.Error()).Error("Failed to get TypingPosition")
-				token.TypingPosition = syncReq.Since.TypingPosition
-			} else {
-				token.TypingPosition = typingResult.Item().(types.StreamPosition)
-			}
-
-			receiptResult := <-receiptCh
-			if receiptResult.IsError() {
-				log.WithError(receiptResult.Error()).Error("Failed to get ReceiptPosition")
-				token.ReceiptPosition = syncReq.Since.ReceiptPosition
-			} else {
-				token.ReceiptPosition = receiptResult.Item().(types.StreamPosition)
-			}
-
-			inviteResult := <-inviteCh
-			if inviteResult.IsError() {
-				log.WithError(inviteResult.Error()).Error("Failed to get InvitePosition")
-				token.InvitePosition = syncReq.Since.InvitePosition
-			} else {
-				token.InvitePosition = inviteResult.Item().(types.StreamPosition)
-			}
-
-			sendToDeviceResult := <-sendToDeviceCh
-			if sendToDeviceResult.IsError() {
-				log.WithError(sendToDeviceResult.Error()).Error("Failed to get SendToDevicePosition")
-				token.SendToDevicePosition = syncReq.Since.SendToDevicePosition
-			} else {
-				token.SendToDevicePosition = sendToDeviceResult.Item().(types.StreamPosition)
-			}
-
-			accountDataResult := <-accountDataCh
-			if accountDataResult.IsError() {
-				log.WithError(accountDataResult.Error()).Error("Failed to get AccountDataPosition")
-				token.AccountDataPosition = syncReq.Since.AccountDataPosition
-			} else {
-				token.AccountDataPosition = accountDataResult.Item().(types.StreamPosition)
-			}
-
-			notificationDataResult := <-notificationDataCh
-			if notificationDataResult.IsError() {
-				log.WithError(notificationDataResult.Error()).Error("Failed to get NotificationDataPosition")
-				token.NotificationDataPosition = syncReq.Since.NotificationDataPosition
-			} else {
-				token.NotificationDataPosition = notificationDataResult.Item().(types.StreamPosition)
-			}
-
-			presenceResult := <-presenceCh
-			if presenceResult.IsError() {
-				log.WithError(presenceResult.Error()).Error("Failed to get PresencePosition")
-				token.PresencePosition = syncReq.Since.PresencePosition
-			} else {
-				token.PresencePosition = presenceResult.Item().(types.StreamPosition)
-			}
-
-			syncReq.Response.NextBatch = token
+			// Complete sync
+			syncReq.Response.NextBatch = rp.handleInitialRequest(ctx, syncReq)
 		} else {
-			// Incremental sync - also execute all stream operations concurrently
-			token := syncReq.Since
-			currentPos = rp.Notifier.CurrentPosition()
-
-			// Launch each stream operation concurrently
-			deviceListCh := withWorkerPoolExecution(
-				syncReq.Since.DeviceListPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.DeviceListStreamProvider.IncrementalSync(
-						ctx, syncReq,
-						syncReq.Since.DeviceListPosition, currentPos.DeviceListPosition,
-					)
-				},
-			)
-
-			pduCh := withWorkerPoolExecution(
-				syncReq.Since.PDUPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.PDUStreamProvider.IncrementalSync(
-						ctx, syncReq,
-						syncReq.Since.PDUPosition, currentPos.PDUPosition,
-					)
-				},
-			)
-
-			typingCh := withWorkerPoolExecution(
-				syncReq.Since.TypingPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.TypingStreamProvider.IncrementalSync(
-						ctx, syncReq,
-						syncReq.Since.TypingPosition, currentPos.TypingPosition,
-					)
-				},
-			)
-
-			receiptCh := withWorkerPoolExecution(
-				syncReq.Since.ReceiptPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.ReceiptStreamProvider.IncrementalSync(
-						ctx, syncReq,
-						syncReq.Since.ReceiptPosition, currentPos.ReceiptPosition,
-					)
-				},
-			)
-
-			inviteCh := withWorkerPoolExecution(
-				syncReq.Since.InvitePosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.InviteStreamProvider.IncrementalSync(
-						ctx, syncReq,
-						syncReq.Since.InvitePosition, currentPos.InvitePosition,
-					)
-				},
-			)
-
-			sendToDeviceCh := withWorkerPoolExecution(
-				syncReq.Since.SendToDevicePosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.SendToDeviceStreamProvider.IncrementalSync(
-						ctx, syncReq,
-						syncReq.Since.SendToDevicePosition, currentPos.SendToDevicePosition,
-					)
-				},
-			)
-
-			accountDataCh := withWorkerPoolExecution(
-				syncReq.Since.AccountDataPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.AccountDataStreamProvider.IncrementalSync(
-						ctx, syncReq,
-						syncReq.Since.AccountDataPosition, currentPos.AccountDataPosition,
-					)
-				},
-			)
-
-			notificationDataCh := withWorkerPoolExecution(
-				syncReq.Since.NotificationDataPosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.NotificationDataStreamProvider.IncrementalSync(
-						ctx, syncReq,
-						syncReq.Since.NotificationDataPosition, currentPos.NotificationDataPosition,
-					)
-				},
-			)
-
-			presenceCh := withWorkerPoolExecution(
-				syncReq.Since.PresencePosition,
-				func(ctx context.Context) types.StreamPosition {
-					return rp.streams.PresenceStreamProvider.IncrementalSync(
-						ctx, syncReq,
-						syncReq.Since.PresencePosition, currentPos.PresencePosition,
-					)
-				},
-			)
-
-			// Collect results from all channels
-			deviceListResult := <-deviceListCh
-			if deviceListResult.IsError() {
-				log.WithError(deviceListResult.Error()).Error("Failed to get DeviceListPosition")
-			} else {
-				token.DeviceListPosition = deviceListResult.Item().(types.StreamPosition)
-			}
-
-			pduResult := <-pduCh
-			if pduResult.IsError() {
-				log.WithError(pduResult.Error()).Error("Failed to get PDUPosition")
-			} else {
-				token.PDUPosition = pduResult.Item().(types.StreamPosition)
-			}
-
-			typingResult := <-typingCh
-			if typingResult.IsError() {
-				log.WithError(typingResult.Error()).Error("Failed to get TypingPosition")
-			} else {
-				token.TypingPosition = typingResult.Item().(types.StreamPosition)
-			}
-
-			receiptResult := <-receiptCh
-			if receiptResult.IsError() {
-				log.WithError(receiptResult.Error()).Error("Failed to get ReceiptPosition")
-			} else {
-				token.ReceiptPosition = receiptResult.Item().(types.StreamPosition)
-			}
-
-			inviteResult := <-inviteCh
-			if inviteResult.IsError() {
-				log.WithError(inviteResult.Error()).Error("Failed to get InvitePosition")
-			} else {
-				token.InvitePosition = inviteResult.Item().(types.StreamPosition)
-			}
-
-			sendToDeviceResult := <-sendToDeviceCh
-			if sendToDeviceResult.IsError() {
-				log.WithError(sendToDeviceResult.Error()).Error("Failed to get SendToDevicePosition")
-			} else {
-				token.SendToDevicePosition = sendToDeviceResult.Item().(types.StreamPosition)
-			}
-
-			accountDataResult := <-accountDataCh
-			if accountDataResult.IsError() {
-				log.WithError(accountDataResult.Error()).Error("Failed to get AccountDataPosition")
-			} else {
-				token.AccountDataPosition = accountDataResult.Item().(types.StreamPosition)
-			}
-
-			notificationDataResult := <-notificationDataCh
-			if notificationDataResult.IsError() {
-				log.WithError(notificationDataResult.Error()).Error("Failed to get NotificationDataPosition")
-			} else {
-				token.NotificationDataPosition = notificationDataResult.Item().(types.StreamPosition)
-			}
-
-			presenceResult := <-presenceCh
-			if presenceResult.IsError() {
-				log.WithError(presenceResult.Error()).Error("Failed to get PresencePosition")
-			} else {
-				token.PresencePosition = presenceResult.Item().(types.StreamPosition)
-			}
-
-			syncReq.Response.NextBatch = token
+			// Incremental sync
+			syncReq.Response.NextBatch = rp.handleIncrementalRequest(ctx, syncReq, currentPos)
 
 			// it's possible for there to be no updates for this user even though since < current pos,
 			// e.g busy servers with a quiet user. In this scenario, we don't want to return a no-op
@@ -787,6 +746,13 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			}
 		}
 
+		// Add One-Time Key counts if needed
+		if err = internal.DeviceOTKCounts(ctx, rp.userAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				log.WithError(err).Warn("failed to get OTK counts")
+			}
+		}
+
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: syncReq.Response,
@@ -794,6 +760,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	}
 }
 
+// OnIncomingKeyChangeRequest is called when a client makes a /keys/change request.
 func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *userapi.Device) util.JSONResponse {
 	from := req.URL.Query().Get("from")
 	to := req.URL.Query().Get("to")

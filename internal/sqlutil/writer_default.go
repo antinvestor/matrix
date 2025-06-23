@@ -32,6 +32,6 @@ func (w *DefaultWriter) Do(ctx context.Context, f func(ctx context.Context) erro
 	// 		return f(ctx)
 	// 	})
 	// } else {
-		return f(ctx)
+	return f(ctx)
 	// }
 }

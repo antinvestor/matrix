@@ -149,15 +149,15 @@ func SendServerNotice(
 	if len(commonRooms) == 0 {
 		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID.String())
 		powerLevelContent.Users[r.UserID] = -10 // taken from Synapse
-		pl, err := json.Marshal(powerLevelContent)
-		if err != nil {
-			return util.ErrorResponse(err)
+		pl, err0 := json.Marshal(powerLevelContent)
+		if err0 != nil {
+			return util.ErrorResponse(err0)
 		}
 		createContent := map[string]interface{}{}
 		createContent["m.federate"] = false
-		cc, err := json.Marshal(createContent)
-		if err != nil {
-			return util.ErrorResponse(err)
+		cc, err0 := json.Marshal(createContent)
+		if err0 != nil {
+			return util.ErrorResponse(err0)
 		}
 		crReq := createRoomRequest{
 			Invite:                    []string{r.UserID},
@@ -181,8 +181,8 @@ func SendServerNotice(
 					Order: 1.0,
 				},
 			}}
-			if err = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err != nil {
-				util.Log(ctx).WithError(err).Error("saveTagData failed")
+			if err0 = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err0 != nil {
+				util.Log(ctx).WithError(err0).Error("saveTagData failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -195,8 +195,8 @@ func SendServerNotice(
 		}
 	} else {
 		// we've found a room in common, check the membership
-		deviceUserID, err := spec.NewUserID(r.UserID, true)
-		if err != nil {
+		deviceUserID, err0 := spec.NewUserID(r.UserID, true)
+		if err0 != nil {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
@@ -205,17 +205,18 @@ func SendServerNotice(
 
 		roomID = commonRooms[0].String()
 		membershipRes := api.QueryMembershipForUserResponse{}
-		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
-		if err != nil {
-			util.Log(ctx).WithError(err).Error("unable to query membership for user")
+		err0 = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
+		if err0 != nil {
+			util.Log(ctx).WithError(err0).Error("unable to query membership for user")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
 			}
 		}
 		if !membershipRes.IsInRoom {
+			var res util.JSONResponse
 			// re-invite the user
-			res, err := sendInvite(ctx, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, time.Now())
+			res, err = sendInvite(ctx, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, time.Now())
 			if err != nil {
 				return res
 			}

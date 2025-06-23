@@ -25,7 +25,6 @@ const idPrefixSeparator = "___"
 
 type ActorManager interface {
 	EnableFunction(functionID ActorFunctionID, qOpts *config.QueueOptions, handlerFunc HandlerFunc)
-	EnsureRoomActorExists(_ context.Context, functionID ActorFunctionID, roomID *spec.RoomID) error
 	Progress(ctx context.Context, functionID ActorFunctionID, roomID *spec.RoomID) (*actorV1.ProgressResponse, error)
 }
 
@@ -75,7 +74,7 @@ const maximumProcessingTime = time.Second * 15
 // again then we'll recreate the actor anyway.
 const maximumIdlingTime = time.Minute * 1
 
-func roomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.RoomID) (*config.QueueOptions, error) {
+func roomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.RoomID) *config.QueueOptions {
 
 	ds := opts.DS
 
@@ -102,5 +101,5 @@ func roomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.Roo
 		QReference: fmt.Sprintf("%s%s", opts.QReference, encodedRoomID),
 		Prefix:     opts.Prefix,
 		DS:         ds,
-	}, nil
+	}
 }
