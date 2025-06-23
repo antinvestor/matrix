@@ -86,7 +86,15 @@ func Init(t *testing.T, testOpts ...test.DependancyOption) (context.Context, *fr
 	}
 	srv.AddCleanupMethod(clearConfig)
 
-	srvOpts := []frame.Option{frame.WithConfig(&cfg.Global), frame.WithDatastore(), frame.WithWorkerPoolOptions(frame.WithSinglePoolCapacity(40), frame.WithConcurrency(2), frame.WithPoolCount(1))}
+	srvOpts := []frame.Option{
+		frame.WithConfig(&cfg.Global),
+		frame.WithDatastore(),
+		frame.WithWorkerPoolOptions(
+			frame.WithSinglePoolCapacity(40),
+			frame.WithConcurrency(1),
+			frame.WithPoolCount(1),
+		),
+	}
 
 	srv.Init(ctx, srvOpts...)
 

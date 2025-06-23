@@ -202,8 +202,8 @@ func (ra *RoomActor) nextEventJob(gctx cluster.GrainContext, req *actorV1.WorkRe
 		}
 
 		requestCtx, cancelFn := context.WithTimeout(ctx, maximumIdlingTime)
-		defer cancelFn()
 		msg, err := ra.subscription.Receive(requestCtx)
+		cancelFn()
 		if err != nil {
 
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
