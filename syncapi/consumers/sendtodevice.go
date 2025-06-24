@@ -17,10 +17,10 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"github.com/antinvestor/matrix/internal/actorutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/constants"
@@ -35,8 +35,8 @@ import (
 
 // OutputSendToDeviceEventConsumer consumes events that originated in the EDU server.
 type OutputSendToDeviceEventConsumer struct {
-	qm                queueutil.QueueManager
-	db                storage.Database
+	qm queueutil.QueueManager
+	db storage.Database
 	am actorutil.ActorManager
 
 	userAPI           api.SyncKeyAPI
@@ -54,7 +54,7 @@ func NewOutputSendToDeviceEventConsumer(
 	store storage.Database,
 	am actorutil.ActorManager,
 
-userAPI api.SyncKeyAPI,
+	userAPI api.SyncKeyAPI,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
 ) error {

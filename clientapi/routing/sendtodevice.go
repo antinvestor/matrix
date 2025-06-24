@@ -57,7 +57,6 @@ func SendToDevice(
 			}
 		}
 
-
 		for deviceID, message := range byUser {
 			if err := syncProducer.SendToDevice(
 				req.Context(), device.UserID, userID, deviceID, eventType, message,
