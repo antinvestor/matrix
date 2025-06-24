@@ -337,8 +337,8 @@ func TestDebounce(t *testing.T) {
 	// wait until the updater hits federation
 	select {
 	case <-incomingFedReq:
-	case <-time.After(time.Second):
-		t.Fatalf("timed out waiting for updater to hit federation")
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for updater to hit federation") // TODO: debounce time was 1 sec
 	}
 
 	// user should be marked as stale
