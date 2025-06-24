@@ -21,16 +21,17 @@ import (
 	"github.com/antinvestor/matrix/clientapi/routing"
 	"github.com/antinvestor/matrix/clientapi/threepid"
 	"github.com/antinvestor/matrix/federationapi/statistics"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/pushrules"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/version"
 	"github.com/antinvestor/matrix/setup/base"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi"
@@ -117,24 +118,27 @@ func TestGetPutDevices(t *testing.T) {
 			},
 		}
 
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		cm := sqlutil.NewConnectionManager(svc)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice: {},
@@ -171,23 +175,26 @@ func TestDeleteDevice(t *testing.T) {
 	localpart, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the rsAPI/ for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice: {},
@@ -280,23 +287,26 @@ func TestDeleteDevices(t *testing.T) {
 	localpart, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the rsAPI/ for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice: {},
@@ -452,23 +462,27 @@ func TestSetDisplayname(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		natsInstance := &jetstream.NATSInstance{}
+		cm := sqlutil.NewConnectionManager(svc)
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-		asPI := appservice.NewInternalAPI(ctx, cfg, natsInstance, userAPI, rsAPI)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		asPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI)
 
-		AddPublicRoutes(ctx, routers, cfg, natsInstance, base.CreateFederationClient(cfg, nil), rsAPI, asPI, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, base.CreateFederationClient(cfg, nil), rsAPI, asPI, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice: {},
@@ -568,23 +582,27 @@ func TestSetAvatarURL(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		natsInstance := &jetstream.NATSInstance{}
+		cm := sqlutil.NewConnectionManager(svc)
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-		asPI := appservice.NewInternalAPI(ctx, cfg, natsInstance, userAPI, rsAPI)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		asPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI)
 
-		AddPublicRoutes(ctx, routers, cfg, natsInstance, base.CreateFederationClient(cfg, nil), rsAPI, asPI, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, base.CreateFederationClient(cfg, nil), rsAPI, asPI, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice: {},
@@ -648,23 +666,27 @@ func TestTyping(t *testing.T) {
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
-		natsInstance := jetstream.NATSInstance{}
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		// Needed to create accounts
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]userDevice{
@@ -734,26 +756,29 @@ func TestMembership(t *testing.T) {
 	bob := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		// Needed to create accounts
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		rsAPI.SetUserAPI(ctx, userAPI)
 		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]userDevice{
@@ -763,7 +788,8 @@ func TestMembership(t *testing.T) {
 		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
 		// Create the room
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+		err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false)
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -977,27 +1003,30 @@ func TestCapabilities(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 
 		// Needed to create accounts
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]userDevice{
@@ -1029,131 +1058,142 @@ func TestCapabilities(t *testing.T) {
 
 func TestTurnserver(t *testing.T) {
 	alice := test.NewUser(t)
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
 
-	cfg.ClientAPI.RateLimiting.Enabled = false
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-	natsInstance := jetstream.NATSInstance{}
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cfg.ClientAPI.RateLimiting.Enabled = false
 
-	// Needed to create accounts
-	caches, err := caching.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-	rsAPI.SetFederationAPI(ctx, nil, nil)
-	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
-	//rsAPI.SetUserAPI(userAPI)
-	// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
-	AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
-	// Create the users in the userapi and login
-	accessTokens := map[*test.User]userDevice{
-		alice: {},
-	}
-	createAccessTokens(t, accessTokens, userAPI, ctx, routers)
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(svc)
 
-	testCases := []struct {
-		name              string
-		turnConfig        config.TURN
-		wantEmptyResponse bool
-	}{
-		{
-			name:              "no turn server configured",
-			wantEmptyResponse: true,
-		},
-		{
-			name:              "servers configured but not userLifeTime",
-			wantEmptyResponse: true,
-			turnConfig:        config.TURN{URIs: []string{""}},
-		},
-		{
-			name:              "missing sharedSecret/username/password",
-			wantEmptyResponse: true,
-			turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m"},
-		},
-		{
-			name:       "with shared secret",
-			turnConfig: config.TURN{URIs: []string{""}, UserLifetime: "1m", SharedSecret: "iAmSecret"},
-		},
-		{
-			name:       "with username/password secret",
-			turnConfig: config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username", Password: "iAmSecret"},
-		},
-		{
-			name:              "only username set",
-			turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username"},
-			wantEmptyResponse: true,
-		},
-		{
-			name:              "only password set",
-			turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username"},
-			wantEmptyResponse: true,
-		},
-	}
+		// Needed to create accounts
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
+		rsAPI.SetFederationAPI(ctx, nil, nil)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		// rsAPI.SetUserAPI(userAPI)
+		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/voip/turnServer", strings.NewReader(""))
-			req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
-			cfg.ClientAPI.TURN = tc.turnConfig
-			routers.Client.ServeHTTP(rec, req)
-			assert.Equal(t, http.StatusOK, rec.Code)
+		// Create the users in the userapi and login
+		accessTokens := map[*test.User]userDevice{
+			alice: {},
+		}
+		createAccessTokens(t, accessTokens, userAPI, ctx, routers)
 
-			if tc.wantEmptyResponse && rec.Body.String() != "{}" {
-				t.Fatalf("expected an empty response, but got %s", rec.Body.String())
-			}
-			if !tc.wantEmptyResponse {
-				assert.NotEqual(t, "{}", rec.Body.String())
+		testCases := []struct {
+			name              string
+			turnConfig        config.TURN
+			wantEmptyResponse bool
+		}{
+			{
+				name:              "no turn server configured",
+				wantEmptyResponse: true,
+			},
+			{
+				name:              "servers configured but not userLifeTime",
+				wantEmptyResponse: true,
+				turnConfig:        config.TURN{URIs: []string{""}},
+			},
+			{
+				name:              "missing sharedSecret/username/password",
+				wantEmptyResponse: true,
+				turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m"},
+			},
+			{
+				name:       "with shared secret",
+				turnConfig: config.TURN{URIs: []string{""}, UserLifetime: "1m", SharedSecret: "iAmSecret"},
+			},
+			{
+				name:       "with username/password secret",
+				turnConfig: config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username", Password: "iAmSecret"},
+			},
+			{
+				name:              "only username set",
+				turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username"},
+				wantEmptyResponse: true,
+			},
+			{
+				name:              "only password set",
+				turnConfig:        config.TURN{URIs: []string{""}, UserLifetime: "1m", Username: "username"},
+				wantEmptyResponse: true,
+			},
+		}
 
-				resp := gomatrix.RespTurnServer{}
-				err := json.NewDecoder(rec.Body).Decode(&resp)
-				assert.NoError(t, err)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				rec := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodGet, "/_matrix/client/v3/voip/turnServer", strings.NewReader(""))
+				req.Header.Set("Authorization", "Bearer "+accessTokens[alice].accessToken)
+				cfg.ClientAPI.TURN = tc.turnConfig
+				routers.Client.ServeHTTP(rec, req)
+				assert.Equal(t, http.StatusOK, rec.Code)
 
-				duration, _ := time.ParseDuration(tc.turnConfig.UserLifetime)
-				assert.Equal(t, tc.turnConfig.URIs, resp.URIs)
-				assert.Equal(t, int(duration.Seconds()), resp.TTL)
-				if tc.turnConfig.Username != "" && tc.turnConfig.Password != "" {
-					assert.Equal(t, tc.turnConfig.Username, resp.Username)
-					assert.Equal(t, tc.turnConfig.Password, resp.Password)
+				if tc.wantEmptyResponse && rec.Body.String() != "{}" {
+					t.Fatalf("expected an empty response, but got %s", rec.Body.String())
 				}
-			}
-		})
-	}
+				if !tc.wantEmptyResponse {
+					assert.NotEqual(t, "{}", rec.Body.String())
+
+					resp := gomatrix.RespTurnServer{}
+					err := json.NewDecoder(rec.Body).Decode(&resp)
+					assert.NoError(t, err)
+
+					duration, _ := time.ParseDuration(tc.turnConfig.UserLifetime)
+					assert.Equal(t, tc.turnConfig.URIs, resp.URIs)
+					assert.Equal(t, int(duration.Seconds()), resp.TTL)
+					if tc.turnConfig.Username != "" && tc.turnConfig.Password != "" {
+						assert.Equal(t, tc.turnConfig.Username, resp.Username)
+						assert.Equal(t, tc.turnConfig.Password, resp.Password)
+					}
+				}
+			})
+		}
+
+	})
 }
 
 func Test3PID(t *testing.T) {
 	alice := test.NewUser(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
 		cfg.FederationAPI.DisableTLSValidation = true // needed to be able to connect to our identityServer below
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 
 		// Needed to create accounts
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the rsAPI/userAPI for this test, so nil for other APIs etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]userDevice{
@@ -1317,25 +1357,28 @@ func TestPushRules(t *testing.T) {
 	ruleID3 := "myrule3"
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		cm := sqlutil.NewConnectionManager(svc)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice: {},
@@ -1708,25 +1751,28 @@ func TestKeys(t *testing.T) {
 	alice := test.NewUser(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		cm := sqlutil.NewConnectionManager(svc)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice: {},
@@ -2186,25 +2232,28 @@ func TestKeyBackup(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		cm := sqlutil.NewConnectionManager(svc)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice: {},
@@ -2294,27 +2343,29 @@ func TestGetMembership(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
 
-		natsInstance := jetstream.NATSInstance{}
-		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		// Use an actual roomserver for this
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice: {},
@@ -2362,26 +2413,28 @@ func TestCreateRoomInvite(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
-		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		// Use an actual roomserver for this
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice: {},
@@ -2415,12 +2468,12 @@ func TestCreateRoomInvite(t *testing.T) {
 		}
 
 		if ev == nil {
-			t.Fatal("Membership event for Bob does not exist")
+			t.Fatalf("Membership event for Bob does not exist")
 		}
 
 		// Validate that there is NO displayname in content
 		if gjson.GetBytes(ev.Content(), "displayname").Exists() {
-			t.Fatal("Found displayname in invite")
+			t.Fatalf("Found displayname in invite")
 		}
 	})
 }
@@ -2436,31 +2489,32 @@ func TestReportEvent(t *testing.T) {
 	eventToReport := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hello world"})
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
-		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		// Use an actual roomserver for this
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		if err = api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 
 		// We mostly need the rsAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		accessTokens := map[*test.User]userDevice{
 			alice:   {},

@@ -35,7 +35,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 )
 
 // uploadRequest metadata included in or derivable from an upload request
@@ -43,7 +42,7 @@ import (
 // NOTE: The members come from HTTP request metadata such as headers, query parameters or can be derived from such
 type uploadRequest struct {
 	MediaMetadata *types.MediaMetadata
-	Logger        *log.Entry
+	Logger        *util.LogEntry
 }
 
 // uploadResponse defines the format of the JSON response
@@ -70,7 +69,7 @@ func Upload(req *http.Request, cfg *config.MediaAPI, dev *userapi.Device, db sto
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: uploadResponse{
-			ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.Matrix.ServerName, r.MediaMetadata.MediaID),
+			ContentURI: fmt.Sprintf("mxc://%s/%s", cfg.Global.ServerName, r.MediaMetadata.MediaID),
 		},
 	}
 }
@@ -81,13 +80,13 @@ func Upload(req *http.Request, cfg *config.MediaAPI, dev *userapi.Device, db sto
 func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI, dev *userapi.Device) (*uploadRequest, *util.JSONResponse) {
 	r := &uploadRequest{
 		MediaMetadata: &types.MediaMetadata{
-			Origin:        cfg.Matrix.ServerName,
+			Origin:        cfg.Global.ServerName,
 			FileSizeBytes: types.FileSizeBytes(req.ContentLength),
 			ContentType:   types.ContentType(req.Header.Get("Content-Type")),
 			UploadName:    types.Filename(url.PathEscape(req.FormValue("filename"))),
 			UserID:        types.MatrixUserID(dev.UserID),
 		},
-		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Matrix.ServerName),
+		Logger: util.Log(req.Context()).WithField("Origin", cfg.Global.ServerName),
 	}
 
 	if resErr := r.Validate(cfg.MaxFileSizeBytes); resErr != nil {
@@ -131,11 +130,11 @@ func (r *uploadRequest) doUpload(
 	db storage.Database,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) *util.JSONResponse {
-	r.Logger.WithFields(log.Fields{
-		"UploadName":    r.MediaMetadata.UploadName,
-		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
-		"ContentType":   r.MediaMetadata.ContentType,
-	}).Info("Uploading file")
+	r.Logger.
+		WithField("UploadName", r.MediaMetadata.UploadName).
+		WithField("FileSizeBytes", r.MediaMetadata.FileSizeBytes).
+		WithField("ContentType", r.MediaMetadata.ContentType).
+		Info("Uploading file")
 
 	// The file data is hashed and the hash is used as the MediaID. The hash is useful as a
 	// method of deduplicating files to save storage, as well as a way to conduct
@@ -150,9 +149,9 @@ func (r *uploadRequest) doUpload(
 	// nested function to guarantee either storage or cleanup.
 	if cfg.MaxFileSizeBytes > 0 {
 		if cfg.MaxFileSizeBytes+1 <= 0 {
-			r.Logger.WithFields(log.Fields{
-				"MaxFileSizeBytes": cfg.MaxFileSizeBytes,
-			}).Warnf("Configured MaxFileSizeBytes overflows int64, defaulting to %d bytes", config.DefaultMaxFileSizeBytes)
+			r.Logger.
+				WithField("MaxFileSizeBytes", cfg.MaxFileSizeBytes).
+				Warn("Configured MaxFileSizeBytes overflows int64, defaulting to %d bytes", config.DefaultMaxFileSizeBytes)
 			cfg.MaxFileSizeBytes = config.DefaultMaxFileSizeBytes
 		}
 		reqReader = io.LimitReader(reqReader, int64(cfg.MaxFileSizeBytes)+1)
@@ -160,9 +159,9 @@ func (r *uploadRequest) doUpload(
 
 	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reqReader, cfg.AbsBasePath)
 	if err != nil {
-		r.Logger.WithError(err).WithFields(log.Fields{
-			"MaxFileSizeBytes": cfg.MaxFileSizeBytes,
-		}).Warn("Error while transferring file")
+		r.Logger.WithError(err).
+			WithField("MaxFileSizeBytes", cfg.MaxFileSizeBytes).
+			Warn("Error while transferring file")
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("Failed to upload"),
@@ -229,12 +228,12 @@ func (r *uploadRequest) doUpload(
 	}
 
 	r.Logger = r.Logger.WithField("media_id", r.MediaMetadata.MediaID)
-	r.Logger.WithFields(log.Fields{
-		"Base64Hash":    r.MediaMetadata.Base64Hash,
-		"UploadName":    r.MediaMetadata.UploadName,
-		"FileSizeBytes": r.MediaMetadata.FileSizeBytes,
-		"ContentType":   r.MediaMetadata.ContentType,
-	}).Info("File uploaded")
+	r.Logger.
+		WithField("Base64Hash", r.MediaMetadata.Base64Hash).
+		WithField("UploadName", r.MediaMetadata.UploadName).
+		WithField("FileSizeBytes", r.MediaMetadata.FileSizeBytes).
+		WithField("ContentType", r.MediaMetadata.ContentType).
+		Info("File uploaded")
 
 	return r.storeFileAndMetadata(
 		ctx, tmpDir, cfg.AbsBasePath, db, cfg.ThumbnailSizes,
@@ -334,7 +333,7 @@ func (r *uploadRequest) storeFileAndMetadata(
 		// Check if we need to generate thumbnails
 		fileType := http.DetectContentType(buf)
 		if !strings.HasPrefix(fileType, "image") {
-			r.Logger.WithField("contentType", fileType).Debugf("uploaded file is not an image or can not be thumbnailed, not generating thumbnails")
+			r.Logger.WithField("contentType", fileType).Debug("uploaded file is not an image or can not be thumbnailed, not generating thumbnails")
 			return
 		}
 

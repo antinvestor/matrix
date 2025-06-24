@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,16 +15,16 @@
 package producers
 
 import (
-	"encoding/json"
+	"context"
 
-	"github.com/antinvestor/matrix/roomserver/storage/tables"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
-
+	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
+	"github.com/antinvestor/matrix/setup/constants"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 var keyContentFields = map[string]string{
@@ -34,35 +34,29 @@ var keyContentFields = map[string]string{
 }
 
 type RoomEventProducer struct {
-	Topic     string
-	ACLs      *acls.ServerACLs
-	JetStream nats.JetStreamContext
+	OutputTopicRef string
+	ACLs           *acls.ServerACLs
+	Qm             queueutil.QueueManager
 }
 
-func (r *RoomEventProducer) ProduceRoomEvents(roomID string, updates []api.OutputEvent) error {
+func (r *RoomEventProducer) ProduceRoomEvents(ctx context.Context, roomID *spec.RoomID, updates []api.OutputEvent) error {
 	var err error
+
+	log := util.Log(ctx)
+
 	for _, update := range updates {
-		msg := nats.NewMsg(r.Topic)
-		msg.Header.Set(jetstream.RoomEventType, string(update.Type))
-		msg.Header.Set(jetstream.RoomID, roomID)
-		msg.Data, err = json.Marshal(update)
-		if err != nil {
-			return err
-		}
-		logger := log.WithFields(log.Fields{
-			"room_id": roomID,
-			"type":    update.Type,
-		})
+
+		logger := log.WithField("room_id", roomID).
+			WithField("type", update.Type)
 		if update.NewRoomEvent != nil {
 			eventType := update.NewRoomEvent.Event.Type()
-			logger = logger.WithFields(log.Fields{
-				"event_type":     eventType,
-				"event_id":       update.NewRoomEvent.Event.EventID(),
-				"adds_state":     len(update.NewRoomEvent.AddsStateEventIDs),
-				"removes_state":  len(update.NewRoomEvent.RemovesStateEventIDs),
-				"send_as_server": update.NewRoomEvent.SendAsServer,
-				"sender":         update.NewRoomEvent.Event.SenderID(),
-			})
+			logger = logger.
+				WithField("event_type", eventType).
+				WithField("event_id", update.NewRoomEvent.Event.EventID()).
+				WithField("adds_state", len(update.NewRoomEvent.AddsStateEventIDs)).
+				WithField("removes_state", len(update.NewRoomEvent.RemovesStateEventIDs)).
+				WithField("send_as_server", update.NewRoomEvent.SendAsServer).
+				WithField("sender", update.NewRoomEvent.Event.SenderID())
 			if update.NewRoomEvent.Event.StateKey() != nil {
 				logger = logger.WithField("state_key", *update.NewRoomEvent.Event.StateKey())
 			}
@@ -82,12 +76,18 @@ func (r *RoomEventProducer) ProduceRoomEvents(roomID string, updates []api.Outpu
 					StateKey:     *ev.StateKey(),
 					ContentValue: string(ev.Content()),
 				}
-				defer r.ACLs.OnServerACLUpdate(strippedEvent)
+				defer r.ACLs.OnServerACLUpdate(ctx, strippedEvent)
 			}
 		}
-		logger.Tracef("Producing to topic '%s'", r.Topic)
-		if _, err := r.JetStream.PublishMsg(msg); err != nil {
-			logger.WithError(err).Errorf("Failed to produce to topic '%s': %s", r.Topic, err)
+
+		h := map[string]string{
+			constants.RoomEventType: string(update.Type),
+			constants.RoomID:        constants.EncodeRoomID(roomID),
+		}
+
+		err = r.Qm.Publish(ctx, r.OutputTopicRef, update, h)
+		if err != nil {
+			logger.WithError(err).WithField("topic", r.OutputTopicRef).Error("Failed to produce to topic ")
 			return err
 		}
 	}

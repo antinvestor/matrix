@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 type Upgrader struct {
@@ -60,10 +59,10 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 	senderID, err := r.URSAPI.QuerySenderIDForUser(ctx, *fullRoomID, userID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed getting senderID for user")
+		util.Log(ctx).WithError(err).Error("Failed getting senderID for user")
 		return "", err
 	} else if senderID == nil {
-		util.GetLogger(ctx).WithField("userID", userID).WithField("roomID", *fullRoomID).Error("No senderID for user")
+		util.Log(ctx).WithField("userID", userID).WithField("roomID", *fullRoomID).Error("No senderID for user")
 		return "", fmt.Errorf("no sender ID for %s in %s", userID, *fullRoomID)
 	}
 
@@ -164,7 +163,7 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 
 	switch resErr.(type) {
 	case api.ErrNotAllowed:
-		util.GetLogger(ctx).WithField(logrus.ErrorKey, resErr).Warn("UpgradeRoom: Could not restrict power levels in old room")
+		util.Log(ctx).WithError(resErr).Warn("UpgradeRoom: Could not restrict power levels in old room")
 	case nil:
 		return r.sendHeaderedEvent(ctx, userDomain, restrictedPowerLevelsHeadered, api.DoNotSendToOtherServers)
 	default:
@@ -234,7 +233,7 @@ func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api
 	})
 	switch resErr.(type) {
 	case api.ErrNotAllowed:
-		util.GetLogger(ctx).WithField(logrus.ErrorKey, resErr).Warn("UpgradeRoom: Could not set empty canonical alias event in old room")
+		util.Log(ctx).WithError(resErr).Warn("UpgradeRoom: Could not set empty canonical alias event in old room")
 	case nil:
 		return r.sendHeaderedEvent(ctx, userDomain, emptyCanonicalAliasEvent, api.DoNotSendToOtherServers)
 	default:
@@ -271,7 +270,7 @@ func publishNewRoomAndUnpublishOldRoom(
 		Visibility: spec.Public,
 	}); err != nil {
 		// treat as non-fatal since the room is already made by this point
-		util.GetLogger(ctx).WithError(err).Error("failed to publish room")
+		util.Log(ctx).WithError(err).Error("failed to publish room")
 	}
 
 	// remove the old room from the published room list
@@ -280,7 +279,7 @@ func publishNewRoomAndUnpublishOldRoom(
 		Visibility: "private",
 	}); err != nil {
 		// treat as non-fatal since the room is already made by this point
-		util.GetLogger(ctx).WithError(err).Error("failed to un-publish room")
+		util.Log(ctx).WithError(err).Error("failed to un-publish room")
 	}
 }
 
@@ -409,7 +408,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// need to send the original power levels again later on.
 	powerLevelContent, err := oldPowerLevelsEvent.PowerLevels()
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error()
+		util.Log(ctx).WithError(err).Error("could not get power level")
 		return nil, fmt.Errorf("power level event content was invalid")
 	}
 
@@ -458,7 +457,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 			StateKey: tuple.StateKey,
 		}
 		if err = json.Unmarshal(event.Content(), &newEvent.Content); err != nil {
-			logrus.WithError(err).Error("Failed to unmarshal old event")
+			util.Log(ctx).WithError(err).Error("Failed to unmarshal old event")
 			continue
 		}
 		eventsToMake = append(eventsToMake, newEvent)
@@ -512,7 +511,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, send
 		}
 
 		var event gomatrixserverlib.PDU
-		event, err = builder.Build(evTime, userDomain, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey)
+		event, err = builder.Build(evTime, userDomain, r.Cfg.Global.KeyID, r.Cfg.Global.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed to build new %q event: %w", builder.Type, err)
 
@@ -575,7 +574,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, send
 		return nil, fmt.Errorf("failed to set new %q event content: %w", proto.Type, err)
 	}
 	// Get the sender domain.
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+	identity, err := r.Cfg.Global.SigningIdentityFor(senderDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing identity for %q: %w", senderDomain, err)
 	}

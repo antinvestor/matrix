@@ -25,11 +25,10 @@ import (
 	"net/url"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI
@@ -49,6 +48,7 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 	trace, ctx := internal.StartRegion(ctx, "ApplicationServiceRoomAlias")
 	defer trace.EndRegion()
 
+	log := util.Log(ctx).WithField("room_alias", request.Alias)
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
 		if appservice.URL != "" && appservice.IsInterestedInRoomAlias(request.Alias) {
@@ -84,15 +84,15 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 				defer func() {
 					err = resp.Body.Close()
 					if err != nil {
-						log.WithFields(log.Fields{
-							"appservice_id": appservice.ID,
-							"status_code":   resp.StatusCode,
-						}).WithError(err).Error("Unable to close application service response body")
+						log.
+							WithField("appservice_id", appservice.ID).
+							WithField("status_code", resp.StatusCode).
+							Error("Unable to close application service response body")
 					}
 				}()
 			}
 			if err != nil {
-				log.WithError(err).Errorf("Issue querying room alias on application service %s", appservice.ID)
+				log.WithField("appservice_id", appservice.ID).WithError(err).Error("Issue querying room alias on application service %s", appservice.ID)
 				return err
 			}
 			switch resp.StatusCode {
@@ -104,10 +104,10 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 				// Room does not exist
 			default:
 				// Application service reported an error. Warn
-				log.WithFields(log.Fields{
-					"appservice_id": appservice.ID,
-					"status_code":   resp.StatusCode,
-				}).Warn("Application service responded with non-OK status code")
+				log.
+					WithField("appservice_id", appservice.ID).
+					WithField("status_code", resp.StatusCode).
+					Warn("Application service responded with non-OK status code")
 			}
 		}
 	}
@@ -126,6 +126,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 	trace, ctx := internal.StartRegion(ctx, "ApplicationServiceUserID")
 	defer trace.EndRegion()
 
+	log := util.Log(ctx)
 	// Determine which application service should handle this request
 	for _, appservice := range a.Cfg.Derived.ApplicationServices {
 		if appservice.URL != "" && appservice.IsInterestedInUserID(request.UserID) {
@@ -158,17 +159,17 @@ func (a *AppServiceQueryAPI) UserIDExists(
 				defer func() {
 					err = resp.Body.Close()
 					if err != nil {
-						log.WithFields(log.Fields{
-							"appservice_id": appservice.ID,
-							"status_code":   resp.StatusCode,
-						}).Error("Unable to close application service response body")
+						log.
+							WithField("appservice_id", appservice.ID).
+							WithField("status_code", resp.StatusCode).
+							Error("Unable to close application service response body")
 					}
 				}()
 			}
 			if err != nil {
-				log.WithFields(log.Fields{
-					"appservice_id": appservice.ID,
-				}).WithError(err).Error("issue querying user ID on application service")
+				log.
+					WithField("appservice_id", appservice.ID).
+					WithError(err).Error("issue querying user ID on application service")
 				return err
 			}
 			if resp.StatusCode == http.StatusOK {
@@ -178,10 +179,10 @@ func (a *AppServiceQueryAPI) UserIDExists(
 			}
 
 			// Log non OK
-			log.WithFields(log.Fields{
-				"appservice_id": appservice.ID,
-				"status_code":   resp.StatusCode,
-			}).Warn("application service responded with non-OK status code")
+			log.
+				WithField("appservice_id", appservice.ID).
+				WithField("status_code", resp.StatusCode).
+				Warn("application service responded with non-OK status code")
 		}
 	}
 
@@ -216,6 +217,8 @@ func (a *AppServiceQueryAPI) Locations(
 	req *api.LocationRequest,
 	resp *api.LocationResponse,
 ) error {
+
+	log := util.Log(ctx)
 	params, err := url.ParseQuery(req.Params)
 	if err != nil {
 		return err
@@ -257,6 +260,9 @@ func (a *AppServiceQueryAPI) User(
 	req *api.UserRequest,
 	resp *api.UserResponse,
 ) error {
+
+	log := util.Log(ctx)
+
 	params, err := url.ParseQuery(req.Params)
 	if err != nil {
 		return err
@@ -298,6 +304,8 @@ func (a *AppServiceQueryAPI) Protocols(
 	req *api.ProtocolRequest,
 	resp *api.ProtocolResponse,
 ) error {
+	log := util.Log(ctx)
+
 	protocolPath := api.ASProtocolPath
 	if a.Cfg.LegacyPaths {
 		protocolPath = api.ASProtocolLegacyPath

@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,14 +17,14 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/roomserver/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/frame"
 )
 
+// Schema for the previous events table
 const previousEventSchema = `
 -- The previous events table stores the event_ids referenced by the events
 -- stored in the events table.
@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS roomserver_previous_events (
     CONSTRAINT roomserver_previous_event_id_unique UNIQUE (previous_event_id)
 );
 `
+
+// Schema revert script for migration purposes
+const previousEventSchemaRevert = `DROP TABLE IF EXISTS roomserver_previous_events;`
 
 // Insert an entry into the previous_events table.
 // If there is already an entry indicating that an event references that previous event then
@@ -58,55 +61,61 @@ const selectPreviousEventExistsSQL = "" +
 	"SELECT 1 FROM roomserver_previous_events" +
 	" WHERE previous_event_id = $1"
 
-type previousEventStatements struct {
-	insertPreviousEventStmt       *sql.Stmt
-	selectPreviousEventExistsStmt *sql.Stmt
+// previousEventsTable implements the tables.PreviousEvents interface using GORM
+type previousEventsTable struct {
+	cm sqlutil.ConnectionManager
+
+	// SQL query strings loaded from constants
+	insertPreviousEventSQL       string
+	selectPreviousEventExistsSQL string
 }
 
-func CreatePrevEventsTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(previousEventSchema)
+// NewPostgresPreviousEventsTable creates a new previous events table
+func NewPostgresPreviousEventsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.PreviousEvents, error) {
+	// Create the table if it doesn't exist using migration
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "roomserver_previous_events_table_schema_001",
+		Patch:       previousEventSchema,
+		RevertPatch: previousEventSchemaRevert,
+	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations([]sqlutil.Migration{
-		{
-			Version: "roomserver: drop column reference_sha from roomserver_prev_events",
-			Up:      deltas.UpDropEventReferenceSHAPrevEvents,
-		},
-	}...)
-	return m.Up(ctx)
+	// Initialise the table struct with just the connection manager
+	t := &previousEventsTable{
+		cm: cm,
+
+		// Initialise SQL query strings from constants
+		insertPreviousEventSQL:       insertPreviousEventSQL,
+		selectPreviousEventExistsSQL: selectPreviousEventExistsSQL,
+	}
+
+	return t, nil
 }
 
-func PreparePrevEventsTable(ctx context.Context, db *sql.DB) (tables.PreviousEvents, error) {
-	s := &previousEventStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertPreviousEventStmt, insertPreviousEventSQL},
-		{&s.selectPreviousEventExistsStmt, selectPreviousEventExistsSQL},
-	}.Prepare(db)
-}
-
-func (s *previousEventStatements) InsertPreviousEvent(
+func (t *previousEventsTable) InsertPreviousEvent(
 	ctx context.Context,
-	txn *sql.Tx,
 	previousEventID string,
 	eventNID types.EventNID,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertPreviousEventStmt)
-	_, err := stmt.ExecContext(
-		ctx, previousEventID, int64(eventNID),
+	db := t.cm.Connection(ctx, false)
+
+	result := db.Exec(
+		t.insertPreviousEventSQL, previousEventID, int64(eventNID),
 	)
-	return err
+	return result.Error
 }
 
-// Check if the event reference exists
-// Returns sql.ErrNoRows if the event reference doesn't exist.
-func (s *previousEventStatements) SelectPreviousEventExists(
-	ctx context.Context, txn *sql.Tx, eventID string,
+// SelectPreviousEventExists checks if the event reference exists
+// Returns an error if the event reference doesn't exist.
+func (t *previousEventsTable) SelectPreviousEventExists(
+	ctx context.Context, eventID string,
 ) error {
+	db := t.cm.Connection(ctx, true)
+
 	var ok int64
-	stmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
-	return stmt.QueryRowContext(ctx, eventID).Scan(&ok)
+	row := db.Raw(t.selectPreviousEventExistsSQL, eventID).Row()
+	err := row.Scan(&ok)
+	return err
 }

@@ -15,13 +15,12 @@ package routing
 import (
 	"net/http"
 
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 type typingContentJSON struct {
@@ -64,8 +63,9 @@ func SendTyping(
 		return *resErr
 	}
 
-	if err := syncProducer.SendTyping(req.Context(), userID, roomID, r.Typing, r.Timeout); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("eduProducer.Send failed")
+	err = syncProducer.SendTyping(req.Context(), userID, roomID, r.Typing, r.Timeout)
+	if err != nil {
+		util.Log(req.Context()).WithError(err).Error("eduProducer.Send failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

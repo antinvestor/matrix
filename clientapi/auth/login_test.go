@@ -1,4 +1,4 @@
-// Copyright 2021 The Matrix.org Foundation C.I.C.
+// Copyright 2021 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,18 +23,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/userutil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/test/testrig"
 	uapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
 )
 
 func TestLoginFromJSONReader(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	tsts := []struct {
 		Name  string
@@ -96,7 +96,7 @@ func TestLoginFromJSONReader(t *testing.T) {
 		t.Run(tst.Name, func(t *testing.T) {
 			var userAPI fakeUserInternalAPI
 			cfg := &config.ClientAPI{
-				Matrix: &config.Global{
+				Global: &config.Global{
 					SigningIdentity: fclient.SigningIdentity{
 						ServerName: serverName,
 					},
@@ -154,7 +154,8 @@ func TestLoginFromJSONReader(t *testing.T) {
 }
 
 func TestBadLoginFromJSONReader(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	tsts := []struct {
 		Name  string
@@ -240,7 +241,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 		t.Run(tst.Name, func(t *testing.T) {
 			var userAPI fakeUserInternalAPI
 			cfg := &config.ClientAPI{
-				Matrix: &config.Global{
+				Global: &config.Global{
 					SigningIdentity: fclient.SigningIdentity{
 						ServerName: serverName,
 					},

@@ -19,75 +19,65 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 // OutputTypingEventConsumer consumes events that originated in the EDU server.
 type OutputTypingEventConsumer struct {
-	jetstream nats.JetStreamContext
-	durable   string
-	topic     string
-	eduCache  *caching.EDUCache
-	stream    streams.StreamProvider
-	notifier  *notifier.Notifier
+	qm       queueutil.QueueManager
+	eduCache *cacheutil.EDUCache
+	stream   streams.StreamProvider
+	notifier *notifier.Notifier
 }
 
 // NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputTypingEventConsumer(
-	_ context.Context,
+	ctx context.Context,
 	cfg *config.SyncAPI,
-	js nats.JetStreamContext,
-	eduCache *caching.EDUCache,
+	qm queueutil.QueueManager,
+	eduCache *cacheutil.EDUCache,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
-) *OutputTypingEventConsumer {
-	return &OutputTypingEventConsumer{
-		jetstream: js,
-		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		durable:   cfg.Matrix.JetStream.Durable("SyncAPITypingConsumer"),
-		eduCache:  eduCache,
-		notifier:  notifier,
-		stream:    stream,
+) error {
+	c := &OutputTypingEventConsumer{
+		qm:       qm,
+		eduCache: eduCache,
+		notifier: notifier,
+		stream:   stream,
 	}
+
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputTypingEvent, c)
 }
 
-// Start consuming typing events.
-func (s *OutputTypingEventConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
+func (s *OutputTypingEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 
-func (s *OutputTypingEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
-	roomID := msg.Header.Get(jetstream.RoomID)
-	userID := msg.Header.Get(jetstream.UserID)
-	typing, err := strconv.ParseBool(msg.Header.Get("typing"))
+	log := util.Log(ctx)
+
+	roomID := metadata[constants.RoomID]
+	userID := metadata[constants.UserID]
+	typing, err := strconv.ParseBool(metadata["typing"])
 	if err != nil {
-		log.WithError(err).Errorf("output log: typing parse failure")
-		return true
+		log.WithError(err).Error("output log: typing parse failure")
+		return nil
 	}
-	timeout, err := strconv.Atoi(msg.Header.Get("timeout_ms"))
+	timeout, err := strconv.Atoi(metadata["timeout_ms"])
 	if err != nil {
-		log.WithError(err).Errorf("output log: timeout_ms parse failure")
-		return true
+		log.WithError(err).Error("output log: timeout_ms parse failure")
+		return nil
 	}
 
-	log.WithFields(log.Fields{
-		"room_id": roomID,
-		"user_id": userID,
-		"typing":  typing,
-		"timeout": timeout,
-	}).Debug("syncapi received EDU data from client api")
+	log.WithField("room_id", roomID).
+		WithField("user_id", userID).
+		WithField("typing", typing).
+		WithField("timeout", timeout).Debug("syncapi received EDU data from client api")
 
 	var typingPos types.StreamPosition
 	if typing {
@@ -104,5 +94,5 @@ func (s *OutputTypingEventConsumer) onMessage(ctx context.Context, msgs []*nats.
 	s.stream.Advance(typingPos)
 	s.notifier.OnNewTyping(roomID, types.StreamingToken{TypingPosition: typingPos})
 
-	return true
+	return nil
 }

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,14 +24,12 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth"
-
 	"github.com/antinvestor/matrix/setup/config"
 	uapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
+	"golang.org/x/oauth2"
 )
 
 // SSORedirect implements /login/sso/redirect
@@ -43,7 +41,7 @@ func SSORedirect(
 	cfg *config.LoginSSO,
 ) util.JSONResponse {
 	ctx := req.Context()
-	logger := util.GetLogger(ctx)
+	logger := util.Log(ctx)
 
 	if auth == nil {
 		return util.JSONResponse{
@@ -82,7 +80,7 @@ func SSORedirect(
 
 	callbackURL, err := syncCallbackURLWithConfig(cfg, req, "/login/sso/redirect")
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
+		util.Log(ctx).WithError(err).Error("Failed to build callback URL")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
@@ -106,7 +104,7 @@ func SSORedirect(
 		}
 	}
 
-	util.GetLogger(ctx).Infof("LoginSSO redirect to %s.", u)
+	util.Log(ctx).WithField("redirect_url", u).Info("LoginSSO redirect")
 
 	resp := util.RedirectResponse(u)
 	nonceCookie := &http.Cookie{
@@ -154,7 +152,7 @@ func syncCallbackURLWithConfig(cfg *config.LoginSSO, req *http.Request, expected
 	}
 
 	// Find the v3mux base, handling both `redirect` and
-	// `redirect/{idp}` and not hard-coding the Matrix version.
+	// `redirect/{idp}` and not hard-coding the Global version.
 	i := strings.Index(u.Path, expectedPath)
 	if i < 0 {
 		return nil, fmt.Errorf("cannot find %q to replace in URL %q", expectedPath, u.Path)
@@ -186,7 +184,7 @@ func SSOCallback(
 	}
 
 	ctx := req.Context()
-	logger := util.GetLogger(ctx)
+	logger := util.Log(ctx)
 
 	query := req.URL.Query()
 	idpID := query.Get("partition_id")
@@ -232,7 +230,7 @@ func SSOCallback(
 
 	callbackURL, err := syncCallbackURLWithConfig(cfg, req, "/login/sso/callback")
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
+		util.Log(ctx).WithError(err).Error("Failed to build callback URL")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
@@ -260,7 +258,7 @@ func SSOCallback(
 
 	account, err := verifyUserExits(ctx, serverName, userAPI, result)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Error("failed to find user")
+		util.Log(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Error("failed to find user")
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: spec.Forbidden("ID not associated with a local account"),
@@ -269,13 +267,13 @@ func SSOCallback(
 
 	token, err := createLoginToken(ctx, userAPI, account.UserID, result.Token)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("PerformLoginTokenCreation failed")
+		util.Log(ctx).WithError(err).Error("PerformLoginTokenCreation failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	util.GetLogger(ctx).WithField("account", account).WithField("ssoIdentifier", result.Identifier).Info("LoginSSO created token")
+	util.Log(ctx).WithField("user_id", account.UserID).WithField("token", token.Token).Info("LoginSSO created token")
 
 	rquery := clientRedirectURL.Query()
 	rquery.Set("loginToken", token.Token)

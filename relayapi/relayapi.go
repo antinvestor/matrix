@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/federationapi/producers"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/api"
@@ -29,13 +29,14 @@ import (
 	"github.com/antinvestor/matrix/relayapi/storage"
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
+	ctx context.Context,
 	routers httputil.Routers,
-	dendriteCfg *config.Dendrite,
+	cfg *config.Matrix,
 	keyRing gomatrixserverlib.JSONVerifier,
 	relayAPI api.RelayInternalAPI,
 ) {
@@ -46,8 +47,9 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
+		ctx,
 		routers.Federation,
-		&dendriteCfg.FederationAPI,
+		&cfg.FederationAPI,
 		relay,
 		keyRing,
 	)
@@ -55,18 +57,23 @@ func AddPublicRoutes(
 
 func NewRelayInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Dendrite,
-	cm *sqlutil.Connections,
+	cfg *config.Matrix,
+	cm sqlutil.ConnectionManager,
 	fedClient fclient.FederationClient,
 	rsAPI rsAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,
 	relayingEnabled bool,
-	caches caching.FederationCache,
+	caches cacheutil.FederationCache,
 ) api.RelayInternalAPI {
-	relayDB, err := storage.NewDatabase(ctx, cm, &dendriteCfg.RelayAPI.Database, caches, dendriteCfg.Global.IsLocalServerName)
+
+	relayCm, err := cm.FromOptions(ctx, &cfg.RelayAPI.Database)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to relay db")
+		util.Log(ctx).WithError(err).Panic("failed to obtain relay db connection manager :%v", err)
+	}
+	relayDB, err := storage.NewDatabase(ctx, relayCm, caches, cfg.Global.IsLocalServerName)
+	if err != nil {
+		util.Log(ctx).WithError(err).Panic("failed to connect to relay db")
 	}
 
 	return internal.NewRelayInternalAPI(
@@ -75,8 +82,8 @@ func NewRelayInternalAPI(
 		rsAPI,
 		keyRing,
 		producer,
-		dendriteCfg.Global.Presence.EnableInbound,
-		dendriteCfg.Global.ServerName,
+		cfg.Global.Presence.EnableInbound,
+		cfg.Global.ServerName,
 		relayingEnabled,
 	)
 }

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,17 +28,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pitabwire/frame"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/setup/config"
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/gorilla/mux"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
-
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 //go:embed static/*.gotmpl
@@ -52,7 +50,7 @@ const HTTPServerTimeout = time.Minute * 5
 
 // CreateClient creates a new client (normally used for media fetch requests).
 // Should only be called once per component.
-func CreateClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) *fclient.Client {
+func CreateClient(cfg *config.Matrix, dnsCache *fclient.DNSCache) *fclient.Client {
 	if cfg.Global.DisableFederation {
 		return fclient.NewClient(
 			fclient.WithTransport(noOpHTTPTransport),
@@ -66,13 +64,13 @@ func CreateClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) *fclient.Cli
 		opts = append(opts, fclient.WithDNSCache(dnsCache))
 	}
 	client := fclient.NewClient(opts...)
-	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
+	client.SetUserAgent(fmt.Sprintf("Matrix/%s", internal.VersionString()))
 	return client
 }
 
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
-func CreateFederationClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) fclient.FederationClient {
+func CreateFederationClient(cfg *config.Matrix, dnsCache *fclient.DNSCache) fclient.FederationClient {
 	identities := cfg.Global.SigningIdentities()
 	if cfg.Global.DisableFederation {
 		return fclient.NewFederationClient(
@@ -83,7 +81,7 @@ func CreateFederationClient(cfg *config.Dendrite, dnsCache *fclient.DNSCache) fc
 		fclient.WithTimeout(time.Minute * 5),
 		fclient.WithSkipVerify(cfg.FederationAPI.DisableTLSValidation),
 		fclient.WithKeepAlives(!cfg.FederationAPI.DisableHTTPKeepalives),
-		fclient.WithUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString())),
+		fclient.WithUserAgent(fmt.Sprintf("Matrix/%s", internal.VersionString())),
 	}
 	if cfg.Global.DNSCache.Enabled {
 		opts = append(opts, fclient.WithDNSCache(dnsCache))
@@ -108,13 +106,16 @@ func ConfigureAdminEndpoints(ctx context.Context, routers httputil.Routers) {
 // and adds a prometheus handler under /_dendrite/metrics.
 func SetupHTTPOption(
 	ctx context.Context,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	routers httputil.Routers,
 
 ) (frame.Option, error) {
+
+	log := util.Log(ctx)
+
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 
-	//Redirect for Landing Page
+	// Redirect for Landing Page
 	externalRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
 	})
@@ -131,7 +132,7 @@ func SetupHTTPOption(
 	if err := tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
 		"Version": internal.VersionString(),
 	}); err != nil {
-		logrus.WithError(err).Error("failed to execute landing page template")
+		util.Log(ctx).WithError(err).Error("failed to execute landing page template")
 		return nil, err
 	}
 
@@ -142,7 +143,7 @@ func SetupHTTPOption(
 	// We only need the files beneath the static/client/login folder.
 	sub, err := fs.Sub(loginFallback, "static/client/login")
 	if err != nil {
-		logrus.Panicf("unable to read embedded files, this should never happen: %s", err)
+		log.WithError(err).Panic("unable to read embedded files, this should never happen")
 	}
 	// Serve a static page for login fallback
 	routers.Static.PathPrefix("/client/login/").Handler(http.StripPrefix("/_matrix/static/client/login/", http.FileServer(http.FS(sub))))
@@ -177,7 +178,7 @@ func SetupHTTPOption(
 	externalRouter.NotFoundHandler = httputil.NotFoundCORSHandler
 	externalRouter.MethodNotAllowedHandler = httputil.NotAllowedHandler
 
-	return frame.HttpHandler(externalRouter), nil
+	return frame.WithHTTPHandler(externalRouter), nil
 
 }
 
@@ -190,8 +191,8 @@ func WaitForShutdown(ctx context.Context) {
 	}
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
 
-	logrus.Warnf("Shutdown signal received")
+	util.Log(ctx).Warn("Shutdown signal received")
 
 	// ShutdownDendrite and WaitForComponentsToFinish are not used in this function, so we don't need to call them
-	logrus.Warnf("Dendrite is exiting now")
+	util.Log(ctx).Warn("Matrix is exiting now")
 }

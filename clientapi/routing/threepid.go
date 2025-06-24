@@ -17,6 +17,7 @@ package routing
 import (
 	"net/http"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
@@ -25,8 +26,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 	userdb "github.com/antinvestor/matrix/userapi/storage"
-
-	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/pitabwire/util"
 )
 
@@ -59,7 +58,7 @@ func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *co
 	}, res)
 
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("threePIDAPI.QueryLocalpartForThreePID failed")
+		util.Log(req.Context()).WithError(err).Error("threePIDAPI.QueryLocalpartForThreePID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -80,13 +79,13 @@ func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *co
 	switch err.(type) {
 	case nil:
 	case threepid.ErrNotTrusted:
-		util.GetLogger(req.Context()).WithError(err).Error("threepid.CreateSession failed")
+		util.Log(req.Context()).WithError(err).Error("threepid.CreateSession failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotTrusted(body.IDServer),
 		}
 	default:
-		util.GetLogger(req.Context()).WithError(err).Error("threepid.CreateSession failed")
+		util.Log(req.Context()).WithError(err).Error("threepid.CreateSession failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -114,13 +113,13 @@ func CheckAndSave3PIDAssociation(
 	switch err.(type) {
 	case nil:
 	case threepid.ErrNotTrusted:
-		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
+		util.Log(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotTrusted(body.Creds.IDServer),
 		}
 	default:
-		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
+		util.Log(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -141,7 +140,7 @@ func CheckAndSave3PIDAssociation(
 		// Publish the association on the identity server if requested
 		err = threepid.PublishAssociation(req.Context(), body.Creds, device.UserID, cfg, client)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("threepid.PublishAssociation failed")
+			util.Log(req.Context()).WithError(err).Error("threepid.PublishAssociation failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -152,7 +151,7 @@ func CheckAndSave3PIDAssociation(
 	// Save the association in the database
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -165,7 +164,7 @@ func CheckAndSave3PIDAssociation(
 		ServerName: domain,
 		Medium:     medium,
 	}, &struct{}{}); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("threePIDAPI.PerformSaveThreePIDAssociation failed")
+		util.Log(req.Context()).WithError(err).Error("threePIDAPI.PerformSaveThreePIDAssociation failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -184,7 +183,7 @@ func GetAssociated3PIDs(
 ) util.JSONResponse {
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -197,7 +196,7 @@ func GetAssociated3PIDs(
 		ServerName: domain,
 	}, res)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("threepidAPI.QueryThreePIDsForLocalpart failed")
+		util.Log(req.Context()).WithError(err).Error("threepidAPI.QueryThreePIDsForLocalpart failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -221,7 +220,7 @@ func Forget3PID(req *http.Request, threepidAPI api.ClientUserAPI) util.JSONRespo
 		ThreePID: body.Address,
 		Medium:   body.Medium,
 	}, &struct{}{}); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("threepidAPI.PerformForgetThreePID failed")
+		util.Log(req.Context()).WithError(err).Error("threepidAPI.PerformForgetThreePID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

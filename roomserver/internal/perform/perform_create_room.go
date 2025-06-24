@@ -1,4 +1,4 @@
-// Copyright 2023 The Matrix.org Foundation C.I.C.
+// Copyright 2023 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,9 +29,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/getsentry/sentry-go"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -58,7 +56,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	createContent := map[string]interface{}{}
 	if len(createRequest.CreationContent) > 0 {
 		if err = json.Unmarshal(createRequest.CreationContent, &createContent); err != nil {
-			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for creation_content failed")
+			util.Log(ctx).WithError(err).Error("json.Unmarshal for creation_content failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("invalid create content"),
@@ -68,7 +66,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	_, err = c.DB.AssignRoomNID(ctx, roomID, createRequest.RoomVersion)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to assign roomNID")
+		util.Log(ctx).WithError(err).Error("failed to assign roomNID")
 		return "", &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -80,7 +78,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		// create user room key if needed
 		key, keyErr := c.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
 		if keyErr != nil {
-			util.GetLogger(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
+			util.Log(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -113,7 +111,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
 		err = json.Unmarshal(createRequest.PowerLevelContentOverride, &powerLevelContent)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for power_level_content_override failed")
+			util.Log(ctx).WithError(err).Error("json.Unmarshal for power_level_content_override failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.BadJSON("malformed power_level_content_override"),
@@ -167,9 +165,9 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	}
 
 	// get the signing identity
-	identity, err := c.Cfg.Matrix.SigningIdentityFor(userID.Domain()) // we MUST use the server signing mxid_mapping
+	identity, err := c.Cfg.Global.SigningIdentityFor(userID.Domain()) // we MUST use the server signing mxid_mapping
 	if err != nil {
-		logrus.WithError(err).WithField("domain", userID.Domain()).Error("unable to find signing identity for domain")
+		util.Log(ctx).WithError(err).WithField("domain", userID.Domain()).Error("unable to find signing identity for domain")
 		return "", &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -181,7 +179,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		var pseudoIDKey ed25519.PrivateKey
 		pseudoIDKey, err = c.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, userID, roomID)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
+			util.Log(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -256,7 +254,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		var aliasResp api.GetRoomIDForAliasResponse
 		err = c.RSAPI.GetRoomIDForAlias(ctx, &hasAliasReq, &aliasResp)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
+			util.Log(ctx).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -353,7 +351,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	var builtEvents []*types.HeaderedEvent
 	authEvents, err := gomatrixserverlib.NewAuthEvents(nil)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("rsapi.QuerySenderIDForUser failed")
+		util.Log(ctx).WithError(err).Error("rsapi.QuerySenderIDForUser failed")
 		return "", &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -371,7 +369,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		})
 		err = builder.SetContent(e.Content)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("builder.SetContent failed")
+			util.Log(ctx).WithError(err).Error("builder.SetContent failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -382,7 +380,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		}
 		var ev gomatrixserverlib.PDU
 		if err = builder.AddAuthEvents(authEvents); err != nil {
-			util.GetLogger(ctx).WithError(err).Error("AddAuthEvents failed")
+			util.Log(ctx).WithError(err).Error("AddAuthEvents failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -390,7 +388,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		}
 		ev, err = builder.Build(createRequest.EventTime, identity.ServerName, identity.KeyID, identity.PrivateKey)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
+			util.Log(ctx).WithError(err).Error("buildEvent failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -400,7 +398,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		if err = gomatrixserverlib.Allowed(ev, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return c.RSAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
-			util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.Allowed failed")
+			util.Log(ctx).WithError(err).Error("gomatrixserverlib.Allowed failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -411,7 +409,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		builtEvents = append(builtEvents, &types.HeaderedEvent{PDU: ev})
 		err = authEvents.AddEvent(ev)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("authEvents.AddEvent failed")
+			util.Log(ctx).WithError(err).Error("authEvents.AddEvent failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -431,7 +429,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 
 	// send the events to the roomserver
 	if err = api.SendInputRoomEvents(ctx, c.RSAPI, userID.Domain(), inputs, false); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
+		util.Log(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
 		return "", &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -444,7 +442,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	if roomAlias != "" {
 		aliasAlreadyExists, aliasErr := c.RSAPI.SetRoomAlias(ctx, senderID, roomID, roomAlias)
 		if aliasErr != nil {
-			util.GetLogger(ctx).WithError(aliasErr).Error("aliasAPI.SetRoomAlias failed")
+			util.Log(ctx).WithError(aliasErr).Error("aliasAPI.SetRoomAlias failed")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -494,7 +492,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 		for _, invitee := range createRequest.InvitedUsers {
 			inviteeUserID, userIDErr := spec.NewUserID(invitee, true)
 			if userIDErr != nil {
-				util.GetLogger(ctx).WithError(userIDErr).Error("invalid UserID")
+				util.Log(ctx).WithError(userIDErr).Error("invalid UserID")
 				return "", &util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -528,8 +526,8 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 				}
 			case nil:
 			default:
-				util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
-				sentry.CaptureException(err)
+				util.Log(ctx).WithError(err).Error("PerformInvite failed")
+
 				return "", &util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -544,7 +542,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			RoomID:     roomID.String(),
 			Visibility: spec.Public,
 		}); err != nil {
-			util.GetLogger(ctx).WithError(err).Error("failed to publish room")
+			util.Log(ctx).WithError(err).Error("failed to publish room")
 			return "", &util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,20 +19,10 @@ import (
 	"net/http"
 	"strings"
 
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/gorilla/mux"
-	"github.com/nats-io/nats.go"
-	"github.com/pitabwire/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/singleflight"
-
-	"github.com/antinvestor/matrix/setup/base"
-	userapi "github.com/antinvestor/matrix/userapi/api"
-
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/clientapi/auth"
@@ -42,8 +32,13 @@ import (
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/internal/transactions"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/setup/base"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/gorilla/mux"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/singleflight"
 )
 
 type WellKnownClientHomeserver struct {
@@ -68,7 +63,7 @@ type WellKnownClientResponse struct {
 func Setup(
 	ctx context.Context,
 	routers httputil.Routers,
-	dendriteCfg *config.Dendrite,
+	mcfg *config.Matrix,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	userAPI userapi.ClientUserAPI,
@@ -78,12 +73,12 @@ func Setup(
 	transactionsCache *transactions.Cache,
 	federationSender federationAPI.ClientFederationAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	natsClient *nats.Conn,
 	partitionCli *partitionv1.PartitionClient,
+	presenceCli presencev1connect.PresenceServiceClient,
 	enableMetrics bool,
 ) {
-	cfg := &dendriteCfg.ClientAPI
-	mscCfg := &dendriteCfg.MSCs
+	cfg := &mcfg.ClientAPI
+	mscCfg := &cfg.MSCs
 	publicAPIMux := routers.Client
 	wkMux := routers.WellKnown
 	synapseAdminRouter := routers.SynapseAdmin
@@ -96,6 +91,12 @@ func Setup(
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
 	ssoAuth := auth.NewAuthenticator(&cfg.LoginSSO, partitionCli)
+
+	if presenceCli == nil {
+		presenceCli = presencev1connect.NewPresenceServiceClient(
+			http.DefaultClient, cfg.Global.SyncAPIPresenceURI,
+		)
+	}
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
@@ -114,18 +115,19 @@ func Setup(
 	// 		 possibly other ways that can result in a stat reset.
 	sf := singleflight.Group{}
 
-	if cfg.Matrix.WellKnownClientName != "" {
-		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
-		if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
-			logrus.Infof("Setting org.matrix.msc3575.proxy url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownSlidingSyncProxy)
+	if cfg.Global.WellKnownClientName != "" {
+		log := util.Log(ctx)
+		log.WithField("base_url", cfg.Global.WellKnownClientName).Info("Setting m.homeserver base_url at /.well-known/matrix/client")
+		if cfg.Global.WellKnownSlidingSyncProxy != "" {
+			log.WithField("proxy_url", cfg.Global.WellKnownSlidingSyncProxy).Info("Setting org.matrix.msc3575.proxy url at /.well-known/matrix/client")
 		}
 		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
 			response := WellKnownClientResponse{
-				Homeserver: WellKnownClientHomeserver{cfg.Matrix.WellKnownClientName},
+				Homeserver: WellKnownClientHomeserver{cfg.Global.WellKnownClientName},
 			}
-			if cfg.Matrix.WellKnownSlidingSyncProxy != "" {
+			if cfg.Global.WellKnownSlidingSyncProxy != "" {
 				response.SlidingSyncProxy = &WellKnownSlidingSyncProxy{
-					Url: cfg.Matrix.WellKnownSlidingSyncProxy,
+					Url: cfg.Global.WellKnownSlidingSyncProxy,
 				}
 			}
 
@@ -160,7 +162,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	if cfg.RegistrationSharedSecret != "" {
-		logrus.Info("Enabling shared secret registration at /_synapse/admin/v1/register")
+		util.Log(ctx).Info("Enabling shared secret registration at /_synapse/admin/v1/register")
 		sr := NewSharedSecretRegistration(cfg.RegistrationSharedSecret)
 		synapseAdminRouter.Handle("/admin/v1/register",
 			httputil.MakeExternalAPI("shared_secret_registration", func(req *http.Request) util.JSONResponse {
@@ -247,7 +249,7 @@ func Setup(
 
 	dendriteAdminRouter.Handle("/admin/fulltext/reindex",
 		httputil.MakeAdminAPI("admin_fultext_reindex", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminReindex(req, cfg, device, natsClient)
+			return AdminReindex(req, cfg, device, syncProducer.Qm)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -258,11 +260,11 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	// server notifications
-	if cfg.Matrix.ServerNotices.Enabled {
-		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
+	if cfg.Global.ServerNotices.Enabled {
+		util.Log(ctx).Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
 		serverNotificationSender, err := getSenderDevice(ctx, rsAPI, userAPI, cfg)
 		if err != nil {
-			logrus.WithError(err).Fatal("unable to get account for sending server notices")
+			util.Log(ctx).WithError(err).Fatal("unable to get account for sending server notices")
 		}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
@@ -278,7 +280,7 @@ func Setup(
 				}
 				txnID := vars["txnID"]
 				return SendServerNotice(
-					req, &cfg.Matrix.ServerNotices,
+					req, &cfg.Global.ServerNotices,
 					cfg, userAPI, rsAPI, asAPI,
 					device, serverNotificationSender,
 					&txnID, transactionsCache,
@@ -293,7 +295,7 @@ func Setup(
 					return *r
 				}
 				return SendServerNotice(
-					req, &cfg.Matrix.ServerNotices,
+					req, &cfg.Global.ServerNotices,
 					cfg, userAPI, rsAPI, asAPI,
 					device, serverNotificationSender,
 					nil, transactionsCache,
@@ -342,7 +344,7 @@ func Setup(
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	if mscCfg.Enabled("msc2753") {
+	if (*mscCfg).Enabled("msc2753") {
 		v3mux.Handle("/peek/{roomIDOrAlias}",
 			httputil.MakeAuthAPI(spec.Peek, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 				if r := rateLimits.Limit(req, device); r != nil {
@@ -740,7 +742,7 @@ func Setup(
 
 	v3mux.Handle("/login/sso/callback",
 		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
-			return SSOCallback(req, userAPI, ssoAuth, &cfg.LoginSSO, cfg.Matrix.ServerName)
+			return SSOCallback(req, userAPI, ssoAuth, &cfg.LoginSSO, cfg.Global.ServerName)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -962,7 +964,7 @@ func Setup(
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
 	// PUT requests, so we need to allow this method
 
-	threePIDClient := base.CreateClient(dendriteCfg, nil) // TODO: Move this somewhere else, e.g. pass in as parameter
+	threePIDClient := base.CreateClient(mcfg, nil) // TODO: Move this somewhere else, e.g. pass in as parameter
 
 	v3mux.Handle("/account/3pid",
 		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -1139,7 +1141,7 @@ func Setup(
 				postContent.SearchString,
 				postContent.Limit,
 				federation,
-				cfg.Matrix.ServerName,
+				cfg.Global.ServerName,
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
@@ -1301,7 +1303,7 @@ func Setup(
 		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	// Key Backup Versions (Metadata)
+	// K Backup Versions (Metadata)
 
 	getBackupKeysVersion := httputil.MakeAuthAPI("get_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -1536,7 +1538,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetPresence(req, device, natsClient, cfg.Matrix.JetStream.Prefixed(jetstream.RequestPresence), vars["userId"])
+			return GetPresence(req, device, presenceCli, vars["userId"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

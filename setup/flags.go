@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,13 +15,14 @@
 package setup
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 var (
@@ -31,7 +32,7 @@ var (
 )
 
 // ParseFlags parses the commandline flags and uses them to create a config.
-func ParseFlags(monolith bool) *config.Dendrite {
+func ParseFlags(monolith bool) *config.Matrix {
 	flag.Parse()
 
 	if *version {
@@ -39,14 +40,16 @@ func ParseFlags(monolith bool) *config.Dendrite {
 		os.Exit(0)
 	}
 
+	ctx := context.Background()
+	log := util.Log(ctx)
 	if *configPath == "" {
-		logrus.Fatal("--config must be supplied")
+		log.Fatal("--config must be supplied")
 	}
 
 	cfg, err := config.Load(*configPath)
 
 	if err != nil {
-		logrus.Fatalf("Invalid config file: %s", err)
+		log.WithError(err).Fatal("Invalid config file")
 	}
 
 	if *enableRegistrationWithoutVerification {

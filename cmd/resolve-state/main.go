@@ -9,17 +9,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
 // This is a utility for inspecting state snapshots and running state resolution
@@ -49,12 +49,11 @@ func (d dummyQuerier) QueryUserIDForSender(ctx context.Context, roomID spec.Room
 
 // nolint:gocyclo
 func main() {
-	ctx := context.Background()
+
+	ctx, svc := frame.NewService("resolve-state")
+
 	cfg := setup.ParseFlags(true)
-	cfg.Logging = append(cfg.Logging[:0], config.LogrusHook{
-		Type:  "std",
-		Level: "error",
-	})
+
 	cfg.ClientAPI.RegistrationDisabled = true
 
 	args := flag.Args()
@@ -68,21 +67,24 @@ func main() {
 		}
 	}
 
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-
 	dbOpts := cfg.RoomServer.Database
-	if dbOpts.ConnectionString == "" {
-		dbOpts = cfg.Global.DatabaseOptions
+	if dbOpts.DatabaseURI == "" {
+		dbOpts.DatabaseURI = config.DataSource(strings.Join(cfg.Global.DatabasePrimaryURL, ","))
+	}
+
+	cm, err := sqlutil.NewConnectionManagerWithOptions(ctx, svc, &dbOpts)
+	if err != nil {
+		panic(err)
 	}
 
 	cfg.Global.Cache.MaxAge = time.Minute * 5
-	caches, err := caching.NewCache(&cfg.Global.Cache)
+	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to create cache")
+		util.Log(ctx).WithError(err).Panic("failed to create cache")
 	}
 
 	fmt.Println("Opening database")
-	roomserverDB, err := storage.Open(ctx, cm, &dbOpts, caches)
+	roomserverDB, err := storage.NewDatabase(ctx, cm, caches)
 	if err != nil {
 		panic(err)
 	}

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,21 +22,20 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/producers"
-
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 func SetReceipt(req *http.Request, userAPI userapi.ClientUserAPI, syncProducer *producers.SyncAPIProducer, device *userapi.Device, roomID, receiptType, eventID string) util.JSONResponse {
+	ctx := req.Context()
 	timestamp := spec.AsTimestamp(time.Now())
-	logrus.WithFields(logrus.Fields{
-		"roomID":      roomID,
-		"receiptType": receiptType,
-		"eventID":     eventID,
-		"userId":      device.UserID,
-		"timestamp":   timestamp,
-	}).Debug("Setting receipt")
+	util.Log(ctx).
+		WithField("roomID", roomID).
+		WithField("receiptType", receiptType).
+		WithField("eventID", eventID).
+		WithField("userId", device.UserID).
+		WithField("timestamp", timestamp).
+		Debug("Setting receipt")
 
 	switch receiptType {
 	case "m.read", "m.read.private":
@@ -61,7 +60,7 @@ func SetReceipt(req *http.Request, userAPI userapi.ClientUserAPI, syncProducer *
 		}
 		dataRes := userapi.InputAccountDataResponse{}
 		if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
+			util.Log(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
 			return util.ErrorResponse(err)
 		}
 

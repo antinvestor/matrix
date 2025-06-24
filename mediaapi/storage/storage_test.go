@@ -5,35 +5,30 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 )
 
-func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewMediaAPIDatasource(ctx, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	})
+func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.Database {
+
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewMediaAPIDatasource(ctx, cm)
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
-	return db, closeDb
+	return db
 }
 func TestMediaRepository(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
 		t.Run("can insert media & query media", func(t *testing.T) {
 			metadata := &types.MediaMetadata{
 				MediaID:       "testing",
@@ -69,9 +64,10 @@ func TestMediaRepository(t *testing.T) {
 
 func TestThumbnailsStorage(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
 		t.Run("can insert thumbnails & query media", func(t *testing.T) {
 			thumbnails := []*types.ThumbnailMetadata{
 				{

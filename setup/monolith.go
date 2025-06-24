@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,7 @@ package setup
 import (
 	"context"
 
-	"github.com/antinvestor/matrix/syncapi"
-	userAPI "github.com/antinvestor/matrix/userapi/api"
-
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/gomatrixserverlib"
@@ -29,8 +27,10 @@ import (
 	"github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/federationapi"
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/internal/transactions"
 	"github.com/antinvestor/matrix/mediaapi"
@@ -38,14 +38,15 @@ import (
 	relayAPI "github.com/antinvestor/matrix/relayapi/api"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/syncapi"
+	userAPI "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/frame"
 )
 
 // Monolith represents an instantiation of all dependencies required to build
-// all components of Dendrite, for use in monolith mode.
+// all components of Matrix, for use in monolith mode.
 type Monolith struct {
-	Config    *config.Dendrite
+	Config    *config.Matrix
 	Service   *frame.Service
 	KeyRing   *gomatrixserverlib.KeyRing
 	Client    *fclient.Client
@@ -59,6 +60,8 @@ type Monolith struct {
 
 	PartitionCli *partitionv1.PartitionClient
 	ProfileCli   *profilev1.ProfileClient
+
+	PresenceCli presencev1connect.PresenceServiceClient
 	// Optional
 	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
 	ExtUserDirectoryProvider userAPI.QuerySearchProfilesAPI
@@ -67,12 +70,12 @@ type Monolith struct {
 // AddAllPublicRoutes attaches all public paths to the given router
 func (m *Monolith) AddAllPublicRoutes(
 	ctx context.Context,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	routers httputil.Routers,
-	cm *sqlutil.Connections,
-	natsInstance *jetstream.NATSInstance,
-	caches *caching.Caches,
-
+	cm sqlutil.ConnectionManager,
+	qm queueutil.QueueManager,
+	caches *cacheutil.Caches,
+	am actorutil.ActorManager,
 	enableMetrics bool,
 ) {
 	userDirectoryProvider := m.ExtUserDirectoryProvider
@@ -80,17 +83,17 @@ func (m *Monolith) AddAllPublicRoutes(
 		userDirectoryProvider = m.UserAPI
 	}
 	clientapi.AddPublicRoutes(
-		ctx, routers, cfg, natsInstance, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
+		ctx, routers, cfg, qm, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationAPI, m.UserAPI, userDirectoryProvider,
-		m.ExtPublicRoomsProvider, m.PartitionCli, enableMetrics,
+		m.ExtPublicRoomsProvider, m.PartitionCli, m.PresenceCli, enableMetrics,
 	)
 	federationapi.AddPublicRoutes(
-		ctx, routers, cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
+		ctx, routers, cfg, qm, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
 	)
 	mediaapi.AddPublicRoutes(ctx, routers, cm, cfg, m.UserAPI, m.Client, m.FedClient, m.KeyRing)
-	syncapi.AddPublicRoutes(ctx, routers, cfg, cm, natsInstance, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
+	syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, am, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
 
 	if m.RelayAPI != nil {
-		relayapi.AddPublicRoutes(routers, cfg, m.KeyRing, m.RelayAPI)
+		relayapi.AddPublicRoutes(ctx, routers, cfg, m.KeyRing, m.RelayAPI)
 	}
 }

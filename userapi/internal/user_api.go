@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,17 +26,13 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
-	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
-	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
-	"github.com/antinvestor/matrix/internal/pushrules"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/bcrypt"
-
 	clientapi "github.com/antinvestor/matrix/clientapi/api"
+	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/clientapi/userutil"
+	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/pushgateway"
+	"github.com/antinvestor/matrix/internal/pushrules"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
@@ -46,6 +42,8 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	userapiUtil "github.com/antinvestor/matrix/userapi/util"
+	"github.com/pitabwire/util"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserInternalAPI struct {
@@ -102,14 +100,15 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot update account data of remote users (server name %s)", domain)
 	}
 	if req.DataType == "" {
 		return fmt.Errorf("data type must not be empty")
 	}
-	if err := a.DB.SaveAccountData(ctx, local, domain, req.RoomID, req.DataType, req.AccountData); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("a.DB.SaveAccountData failed")
+	err = a.DB.SaveAccountData(ctx, local, domain, req.RoomID, req.DataType, req.AccountData)
+	if err != nil {
+		util.Log(ctx).WithError(err).Error("a.Cm.SaveAccountData failed")
 		return fmt.Errorf("failed to save account data: %w", err)
 	}
 	var ignoredUsers *synctypes.IgnoredUsers
@@ -118,16 +117,17 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 		_ = json.Unmarshal(req.AccountData, ignoredUsers)
 	}
 	if req.DataType == "m.fully_read" {
-		if err := a.setFullyRead(ctx, req); err != nil {
+		err = a.setFullyRead(ctx, req)
+		if err != nil {
 			return err
 		}
 	}
-	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
+	if err = a.SyncProducer.SendAccountData(ctx, req.UserID, eventutil.AccountData{
 		RoomID:       req.RoomID,
 		Type:         req.DataType,
 		IgnoredUsers: ignoredUsers,
 	}); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("a.SyncProducer.SendAccountData failed")
+		util.Log(ctx).WithError(err).Error("a.SyncProducer.SendAccountData failed")
 		return fmt.Errorf("failed to send account data to output: %w", err)
 	}
 	return nil
@@ -141,21 +141,21 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 	}
 	localpart, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
-		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: SplitID failure")
+		util.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: SplitID failure")
 		return nil
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return nil
 	}
 
 	deleted, err := a.DB.DeleteNotificationsUpTo(ctx, localpart, domain, req.RoomID, uint64(spec.AsTimestamp(time.Now())))
 	if err != nil {
-		logrus.WithError(err).Errorf("UserInternalAPI.setFullyRead: DeleteNotificationsUpTo failed")
+		util.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: DeleteNotificationsUpTo failed")
 		return err
 	}
 
 	if err = a.SyncProducer.GetAndSendNotificationData(ctx, req.UserID, req.RoomID); err != nil {
-		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: GetAndSendNotificationData failed")
+		util.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: GetAndSendNotificationData failed")
 		return err
 	}
 
@@ -165,7 +165,7 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 	}
 
 	if err = userapiUtil.NotifyUserCountsAsync(ctx, a.PgClient, localpart, domain, a.DB); err != nil {
-		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: NotifyUserCounts failed")
+		util.Log(ctx).WithError(err).Error("UserInternalAPI.setFullyRead: NotifyUserCounts failed")
 		return err
 	}
 	return nil
@@ -176,13 +176,10 @@ func postRegisterJoinRooms(ctx context.Context, cfg *config.UserAPI, acc *api.Ac
 	// If the user is a normal user, add user to room specified in the configuration "auto_join_rooms".
 	if acc.AccountType != api.AccountTypeAppService && acc.AppServiceID == "" {
 		for room := range cfg.AutoJoinRooms {
-			userID := userutil.MakeUserID(acc.Localpart, cfg.Matrix.ServerName)
+			userID := userutil.MakeUserID(acc.Localpart, cfg.Global.ServerName)
 			err := addUserToRoom(ctx, rsAPI, cfg.AutoJoinRooms[room], acc.Localpart, userID)
 			if err != nil {
-				logrus.WithFields(logrus.Fields{
-					"user_id": userID,
-					"room":    cfg.AutoJoinRooms[room],
-				}).WithError(err).Errorf("user failed to auto-join room")
+				util.Log(ctx).WithField("user_id", userID).WithField("room", cfg.AutoJoinRooms[room]).WithError(err).Error("user failed to auto-join room")
 			}
 		}
 	}
@@ -213,9 +210,9 @@ func addUserToRoom(
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
 	serverName := req.ServerName
 	if serverName == "" {
-		serverName = a.Config.Matrix.ServerName
+		serverName = a.Config.Global.ServerName
 	}
-	if !a.Config.Matrix.IsLocalServerName(serverName) {
+	if !a.Config.Global.IsLocalServerName(serverName) {
 		return fmt.Errorf("server name %s is not local", serverName)
 	}
 	acc, err := a.DB.CreateAccount(ctx, req.Localpart, serverName, req.Password, req.AppServiceID, req.AccountType)
@@ -243,12 +240,10 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	}
 
 	// Inform the SyncAPI about the newly created push_rules
-	if err = a.SyncProducer.SendAccountData(acc.UserID, eventutil.AccountData{
+	if err = a.SyncProducer.SendAccountData(ctx, acc.UserID, eventutil.AccountData{
 		Type: "m.push_rules",
 	}); err != nil {
-		util.GetLogger(ctx).WithFields(logrus.Fields{
-			"user_id": acc.UserID,
-		}).WithError(err).Warn("failed to send account data to the SyncAPI")
+		util.Log(ctx).WithError(err).WithField("account_type", req.AccountType).WithField("localpart", req.Localpart).WithField("user_id", acc.UserID).Warn("failed to send account data to the SyncAPI")
 	}
 
 	if req.AccountType == api.AccountTypeGuest {
@@ -258,7 +253,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	}
 
 	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, serverName, req.DisplayName); err != nil {
-		return fmt.Errorf("a.DB.SetDisplayName: %w", err)
+		return fmt.Errorf("a.Cm.SetDisplayName: %w", err)
 	}
 
 	postRegisterJoinRooms(ctx, a.Config, acc, a.RSAPI)
@@ -269,7 +264,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 }
 
 func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
-	if !a.Config.Matrix.IsLocalServerName(req.ServerName) {
+	if !a.Config.Global.IsLocalServerName(req.ServerName) {
 		return fmt.Errorf("server name %s is not local", req.ServerName)
 	}
 	if err := a.DB.SetPassword(ctx, req.Localpart, req.ServerName, req.Password); err != nil {
@@ -287,9 +282,9 @@ func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.Pe
 func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.PerformDeviceCreationRequest, res *api.PerformDeviceCreationResponse) error {
 	serverName := req.ServerName
 	if serverName == "" {
-		serverName = a.Config.Matrix.ServerName
+		serverName = a.Config.Global.ServerName
 	}
-	if !a.Config.Matrix.IsLocalServerName(serverName) {
+	if !a.Config.Global.IsLocalServerName(serverName) {
 		return fmt.Errorf("server name %s is not local", serverName)
 	}
 	// If a device ID was specified, check if it already exists and
@@ -298,16 +293,12 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	isExisting := false
 	if req.DeviceID != nil && *req.DeviceID != "" {
 		existingDev, err := a.DB.GetDeviceByID(ctx, req.Localpart, req.ServerName, *req.DeviceID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if err != nil && !sqlutil.ErrorIsNoRows(err) {
 			return err
 		}
 		isExisting = existingDev.ID == *req.DeviceID
 	}
-	util.GetLogger(ctx).WithFields(logrus.Fields{
-		"localpart":    req.Localpart,
-		"device_id":    req.DeviceID,
-		"display_name": req.DeviceDisplayName,
-	}).Info("PerformDeviceCreation")
+	util.Log(ctx).WithField("localpart", req.Localpart).WithField("device_id", req.DeviceID).WithField("display_name", req.DeviceDisplayName).Info("PerformDeviceCreation")
 	dev, err := a.DB.CreateDevice(ctx, req.Localpart, serverName, req.DeviceID, req.AccessToken, req.ExtraData, req.DeviceDisplayName, req.IPAddr, req.UserAgent)
 	if err != nil {
 		return err
@@ -322,12 +313,12 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 }
 
 func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.PerformDeviceDeletionRequest, res *api.PerformDeviceDeletionResponse) error {
-	util.GetLogger(ctx).WithField("user_id", req.UserID).WithField("devices", req.DeviceIDs).Info("PerformDeviceDeletion")
+	util.Log(ctx).WithField("user_id", req.UserID).WithField("devices", req.DeviceIDs).Info("PerformDeviceDeletion")
 	local, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot PerformDeviceDeletion of remote users (server name %s)", domain)
 	}
 	deletedDeviceIDs := req.DeviceIDs
@@ -397,7 +388,7 @@ func (a *UserInternalAPI) PerformLastSeenUpdate(
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("server name %s is not local", domain)
 	}
 	if err := a.DB.UpdateDeviceLastSeen(ctx, localpart, domain, req.DeviceID, req.RemoteAddr, req.UserAgent); err != nil {
@@ -409,25 +400,25 @@ func (a *UserInternalAPI) PerformLastSeenUpdate(
 func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.PerformDeviceUpdateRequest, res *api.PerformDeviceUpdateResponse) error {
 	localpart, domain, err := gomatrixserverlib.SplitID('@', req.RequestingUserID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("server name %s is not local", domain)
 	}
 	dev, err := a.DB.GetDeviceByID(ctx, localpart, domain, req.DeviceID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if sqlutil.ErrorIsNoRows(err) {
 		res.DeviceExists = false
 		return nil
 	} else if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("deviceDB.GetDeviceByID failed")
+		util.Log(ctx).WithError(err).Error("deviceDB.GetDeviceByID failed")
 		return err
 	}
 	res.DeviceExists = true
 
 	err = a.DB.UpdateDevice(ctx, localpart, domain, req.DeviceID, req.DisplayName)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("deviceDB.UpdateDevice failed")
+		util.Log(ctx).WithError(err).Error("deviceDB.UpdateDevice failed")
 		return err
 	}
 	if req.DisplayName != nil && dev.DisplayName != *req.DisplayName {
@@ -466,12 +457,12 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, userID string) (*aut
 	if err != nil {
 		return nil, err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return nil, ErrIsRemoteServer
 	}
 	prof, err := a.DB.GetProfileByLocalpart(ctx, local, domain)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, appserviceAPI.ErrProfileNotExists
 		}
 		return nil, err
@@ -514,7 +505,7 @@ func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevice
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot query devices of remote users (server name %s)", domain)
 	}
 	devs, err := a.DB.GetDevicesByLocalpart(ctx, local, domain)
@@ -531,7 +522,7 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot query account data of remote users (server name %s)", domain)
 	}
 	if req.DataType != "" {
@@ -578,7 +569,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 	}
 	device, err := a.DB.GetDeviceByAccessToken(ctx, req.AccessToken)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil
 		}
 		return err
@@ -587,7 +578,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 	if err != nil {
 		return err
 	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
+	if !a.Config.Global.IsLocalServerName(domain) {
 		return nil
 	}
 	acc, err := a.DB.GetAccountByLocalpart(ctx, localPart, domain)
@@ -629,7 +620,7 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 		AccountType:  api.AccountTypeAppService,
 	}
 
-	localpart, domain, err := userutil.ParseUsernameParam(appServiceUserID, a.Config.Matrix)
+	localpart, domain, err := userutil.ParseUsernameParam(appServiceUserID, a.Config.Global)
 	if err != nil {
 		return nil, err
 	}
@@ -656,16 +647,16 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *api.PerformAccountDeactivationRequest, res *api.PerformAccountDeactivationResponse) error {
 	serverName := req.ServerName
 	if serverName == "" {
-		serverName = a.Config.Matrix.ServerName
+		serverName = a.Config.Global.ServerName
 	}
-	if !a.Config.Matrix.IsLocalServerName(serverName) {
+	if !a.Config.Global.IsLocalServerName(serverName) {
 		return fmt.Errorf("server name %q not locally configured", serverName)
 	}
 
 	userID := fmt.Sprintf("@%s:%s", req.Localpart, serverName)
 	_, err := a.RSAPI.PerformAdminEvacuateUser(ctx, userID)
 	if err != nil {
-		logrus.WithError(err).WithField("userID", userID).Errorf("Failed to evacuate user after account deactivation")
+		util.Log(ctx).WithError(err).WithField("userID", userID).Error("Failed to evacuate user after account deactivation")
 	}
 
 	deviceReq := &api.PerformDeviceDeletionRequest{
@@ -782,7 +773,7 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 	version, algorithm, authData, etag, deleted, err := a.DB.GetKeyBackup(ctx, req.UserID, req.Version)
 	res.Version = version
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return res, nil
 		}
 		if errors.Is(err, strconv.ErrSyntax) {
@@ -844,11 +835,7 @@ func (a *UserInternalAPI) QueryNotifications(ctx context.Context, req *api.Query
 }
 
 func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.PerformPusherSetRequest, res *struct{}) error {
-	util.GetLogger(ctx).WithFields(logrus.Fields{
-		"localpart":    req.Localpart,
-		"pushkey":      req.Pusher.PushKey,
-		"display_name": req.Pusher.AppDisplayName,
-	}).Info("PerformPusherCreation")
+	util.Log(ctx).WithField("localpart", req.Localpart).WithField("pushkey", req.Pusher.PushKey).WithField("display_name", req.Pusher.AppDisplayName).Info("PerformPusherCreation")
 	if !req.Append {
 		err := a.DB.RemovePushers(ctx, req.AppID, req.PushKey)
 		if err != nil {
@@ -865,12 +852,13 @@ func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.Perform
 }
 
 func (a *UserInternalAPI) PerformPusherDeletion(ctx context.Context, req *api.PerformPusherDeletionRequest, res *struct{}) error {
+	log := util.Log(ctx)
 	pushers, err := a.DB.GetPushers(ctx, req.Localpart, req.ServerName)
 	if err != nil {
 		return err
 	}
 	for i := range pushers {
-		logrus.Warnf("pusher session: %d, req session: %d", pushers[i].SessionID, req.SessionID)
+		log.WithField("pusher_session_id", pushers[i].SessionID).WithField("request_session_id", req.SessionID).Warn("pusher session details")
 		if pushers[i].SessionID != req.SessionID {
 			err := a.DB.RemovePusher(ctx, pushers[i].AppID, pushers[i].PushKey, req.Localpart, req.ServerName)
 			if err != nil {

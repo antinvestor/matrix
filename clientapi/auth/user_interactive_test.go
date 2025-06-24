@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
 )
@@ -48,7 +47,7 @@ func (d *fakeAccountDatabase) QueryAccountByPassword(ctx context.Context, req *a
 
 func setup() *UserInteractive {
 	cfg := &config.ClientAPI{
-		Matrix: &config.Global{
+		Global: &config.Global{
 			SigningIdentity: fclient.SigningIdentity{
 				ServerName: serverName,
 			},
@@ -59,7 +58,8 @@ func setup() *UserInteractive {
 
 func TestUserInteractiveChallenge(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	uia := setup()
 	// no auth key results in a challenge
 	_, errRes := uia.Verify(ctx, []byte(`{}`), device)
@@ -74,7 +74,8 @@ func TestUserInteractiveChallenge(t *testing.T) {
 
 func TestUserInteractivePasswordLogin(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	uia := setup()
 	// valid password login succeeds when an account exists
 	lookup["alice herpassword"] = &api.Account{
@@ -114,7 +115,8 @@ func TestUserInteractivePasswordLogin(t *testing.T) {
 
 func TestUserInteractivePasswordBadLogin(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	uia := setup()
 	// password login fails when an account exists but is specced wrong
 	lookup["bob hispassword"] = &api.Account{
@@ -201,7 +203,8 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 
 func TestUserInteractive_AddCompletedStage(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	tests := []struct {
 		name      string
 		sessionID string

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package routing
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -27,6 +26,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
@@ -63,7 +63,7 @@ func SearchUserDirectory(
 		Limit:  limit,
 	}
 	knownUsersRes := &api.QueryKnownUsersResponse{}
-	if err := rsAPI.QueryKnownUsers(ctx, knownUsersReq, knownUsersRes); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := rsAPI.QueryKnownUsers(ctx, knownUsersReq, knownUsersRes); err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
 	}
 

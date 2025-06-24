@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,11 +19,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 type uploadKeysRequest struct {
@@ -66,14 +65,14 @@ func UploadKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *api.Device) 
 		return util.ErrorResponse(err)
 	}
 	if uploadRes.Error != nil {
-		util.GetLogger(req.Context()).WithError(uploadRes.Error).Error("Failed to PerformUploadKeys")
+		util.Log(req.Context()).WithError(uploadRes.Error).Error("Failed to PerformUploadKeys")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 	if len(uploadRes.KeyErrors) > 0 {
-		util.GetLogger(req.Context()).WithField("key_errors", uploadRes.KeyErrors).Error("Failed to upload one or more keys")
+		util.Log(req.Context()).WithField("key_errors", uploadRes.KeyErrors).Error("Failed to upload one or more keys")
 		return util.JSONResponse{
 			Code: 400,
 			JSON: uploadRes.KeyErrors,
@@ -156,7 +155,7 @@ func ClaimKeys(req *http.Request, keyAPI api.ClientKeyAPI) util.JSONResponse {
 		Timeout:     r.GetTimeout(),
 	}, &claimRes)
 	if claimRes.Error != nil {
-		util.GetLogger(req.Context()).WithError(claimRes.Error).Error("failed to PerformClaimKeys")
+		util.Log(req.Context()).WithError(claimRes.Error).Error("failed to PerformClaimKeys")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

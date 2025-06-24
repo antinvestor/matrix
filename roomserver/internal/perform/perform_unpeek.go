@@ -37,28 +37,32 @@ type Unpeeker struct {
 // PerformUnpeek handles un-peeking matrix rooms, including over federation by talking to the federationapi.
 func (r *Unpeeker) PerformUnpeek(
 	ctx context.Context,
-	roomID, userID, deviceID string,
+	roomIDStr string, userID, deviceID string,
 ) error {
+	roomID, err := spec.NewRoomID(roomIDStr)
+	if err != nil {
+		return api.ErrInvalidID{Err: err}
+	}
 	// FIXME: there's way too much duplication with performJoin
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return api.ErrInvalidID{Err: fmt.Errorf("supplied user ID %q in incorrect format", userID)}
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		return api.ErrInvalidID{Err: fmt.Errorf("user %q does not belong to this homeserver", userID)}
 	}
-	if strings.HasPrefix(roomID, "!") {
+	if strings.HasPrefix(roomID.String(), "!") {
 		return r.performUnpeekRoomByID(ctx, roomID, userID, deviceID)
 	}
 	return api.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid", roomID)}
 }
 
 func (r *Unpeeker) performUnpeekRoomByID(
-	_ context.Context,
-	roomID, userID, deviceID string,
+	ctx context.Context,
+	roomID *spec.RoomID, userID, deviceID string,
 ) (err error) {
 	// Get the domain part of the room ID.
-	_, _, err = gomatrixserverlib.SplitID('!', roomID)
+	_, _, err = gomatrixserverlib.SplitID('!', roomID.String())
 	if err != nil {
 		return api.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", roomID, err)}
 	}
@@ -68,11 +72,11 @@ func (r *Unpeeker) performUnpeekRoomByID(
 	// it will have been overwritten with a room ID by performPeekRoomByAlias.
 	// We should now include this in the response so that the CS API can
 	// return the right room ID.
-	return r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
+	return r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeRetirePeek,
 			RetirePeek: &api.OutputRetirePeek{
-				RoomID:   roomID,
+				RoomID:   roomID.String(),
 				UserID:   userID,
 				DeviceID: deviceID,
 			},

@@ -16,13 +16,12 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"
 	"github.com/antinvestor/matrix/internal/transactions"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // SendToDevice handles PUT /_matrix/client/r0/sendToDevice/{eventType}/{txnId}
@@ -47,12 +46,22 @@ func SendToDevice(
 		return *resErr
 	}
 
-	for userID, byUser := range httpReq.Messages {
+	for userIDStr, byUser := range httpReq.Messages {
+
+		userID, err0 := spec.NewUserID(userIDStr, false)
+		if err0 != nil {
+			util.Log(req.Context()).WithError(err0).Error("eduProducer.NewUserID invalid userID")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+
 		for deviceID, message := range byUser {
 			if err := syncProducer.SendToDevice(
 				req.Context(), device.UserID, userID, deviceID, eventType, message,
 			); err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
+				util.Log(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},

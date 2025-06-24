@@ -10,18 +10,18 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi"
 	uapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 func TestLogin(t *testing.T) {
@@ -31,30 +31,33 @@ func TestLogin(t *testing.T) {
 	vhUser := &test.User{ID: "@vhuser:vh1"}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 		// add a vhost
 		cfg.Global.VirtualHosts = append(cfg.Global.VirtualHosts, &config.VirtualHost{
 			SigningIdentity: fclient.SigningIdentity{ServerName: "vh1"},
 		})
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 		routers := httputil.NewRouters()
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		// Needed for /login
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		Setup(ctx, routers, cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, nil, caching.DisableMetrics)
+		Setup(ctx, routers, cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
 		// Create password
 		password := util.RandomString(8)
@@ -149,13 +152,13 @@ func TestLogin(t *testing.T) {
 				}
 			}
 			if !appServiceFound {
-				t.Fatal("m.login.application_service missing from login flows")
+				t.Fatalf("m.login.application_service missing from login flows")
 			}
 			if !passwordFound {
-				t.Fatal("m.login.password missing from login flows")
+				t.Fatalf("m.login.password missing from login flows")
 			}
 			if !ssoFound {
-				t.Fatal("m.login.sso missing from login flows")
+				t.Fatalf("m.login.sso missing from login flows")
 			}
 
 		})

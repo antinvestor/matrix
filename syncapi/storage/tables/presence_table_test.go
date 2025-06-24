@@ -1,62 +1,55 @@
 package tables_test
 
 import (
-	"database/sql"
+	"context"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 )
 
-func mustPresenceTable(t *testing.T, _ test.DependancyOption) (tables.Presence, func()) {
+func mustPresenceTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) tables.Presence {
 	t.Helper()
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
 
+	cm := sqlutil.NewConnectionManager(svc)
 	var tab tables.Presence
-	tab, err = postgres.NewPostgresPresenceTable(ctx, db)
+	tab, err := postgres.NewPostgresPresenceTable(ctx, cm)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
-	return tab, closeDb
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate table: %s", err)
+	}
+	return tab
 }
 
 func TestPresence(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
-	ctx := testrig.NewContext(t)
 
 	statusMsg := "Hello World!"
 	timestamp := spec.AsTimestamp(time.Now())
 
-	var txn *sql.Tx
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDB := mustPresenceTable(t, testOpts)
-		defer closeDB()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		tab := mustPresenceTable(ctx, svc, t, testOpts)
 
 		// Insert some presences
-		pos, err := tab.UpsertPresence(ctx, txn, alice.ID, &statusMsg, types.PresenceOnline, timestamp, false)
+		pos, err := tab.UpsertPresence(ctx, alice.ID, &statusMsg, types.PresenceOnline, timestamp, false)
 		if err != nil {
 			t.Error(err)
 		}
@@ -64,7 +57,7 @@ func TestPresence(t *testing.T) {
 		if pos != wantPos {
 			t.Errorf("expected pos to be %d, got %d", wantPos, pos)
 		}
-		pos, err = tab.UpsertPresence(ctx, txn, bob.ID, &statusMsg, types.PresenceOnline, timestamp, false)
+		pos, err = tab.UpsertPresence(ctx, bob.ID, &statusMsg, types.PresenceOnline, timestamp, false)
 		if err != nil {
 			t.Error(err)
 		}
@@ -74,7 +67,7 @@ func TestPresence(t *testing.T) {
 		}
 
 		// verify the expected max presence ID
-		maxPos, err := tab.GetMaxPresenceID(ctx, txn)
+		maxPos, err := tab.GetMaxPresenceID(ctx)
 		if err != nil {
 			t.Error(err)
 		}
@@ -83,7 +76,7 @@ func TestPresence(t *testing.T) {
 		}
 
 		// This should increment the position
-		pos, err = tab.UpsertPresence(ctx, txn, bob.ID, &statusMsg, types.PresenceOnline, timestamp, true)
+		pos, err = tab.UpsertPresence(ctx, bob.ID, &statusMsg, types.PresenceOnline, timestamp, true)
 		if err != nil {
 			t.Error(err)
 		}
@@ -93,7 +86,7 @@ func TestPresence(t *testing.T) {
 		}
 
 		// This should return only Bobs status
-		presences, err := tab.GetPresenceAfter(ctx, txn, maxPos, synctypes.EventFilter{Limit: 10})
+		presences, err := tab.GetPresenceAfter(ctx, maxPos, synctypes.EventFilter{Limit: 10})
 		if err != nil {
 			t.Error(err)
 		}
@@ -120,7 +113,7 @@ func TestPresence(t *testing.T) {
 
 		// Try getting presences for existing and non-existing users
 		getUsers := []string{alice.ID, bob.ID, "@doesntexist:test"}
-		presencesForUsers, err := tab.GetPresenceForUsers(ctx, nil, getUsers)
+		presencesForUsers, err := tab.GetPresenceForUsers(ctx, getUsers)
 		if err != nil {
 			t.Error(err)
 		}

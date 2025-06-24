@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,7 @@ package perform
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -26,13 +24,14 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/eventutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/input"
 	"github.com/antinvestor/matrix/roomserver/internal/query"
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 type Admin struct {
@@ -120,7 +119,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			return nil, err
 		}
 
-		identity, err = r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+		identity, err = r.Cfg.Global.SigningIdentityFor(senderDomain)
 		if err != nil {
 			continue
 		}
@@ -158,7 +157,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 	if err != nil {
 		return nil, err
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(fullUserID.Domain()) {
+	if !r.Cfg.Global.IsLocalServerName(fullUserID.Domain()) {
 		return nil, fmt.Errorf("can only evacuate local users using this endpoint")
 	}
 
@@ -168,28 +167,35 @@ func (r *Admin) PerformAdminEvacuateUser(
 	}
 
 	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, *fullUserID, spec.Invite)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return nil, err
 	}
 
 	allRooms := append(roomIDs, inviteRoomIDs...)
 	affected = make([]string, 0, len(allRooms))
-	for _, roomID := range allRooms {
+	for _, roomIDStr := range allRooms {
 		leaveReq := &api.PerformLeaveRequest{
-			RoomID: roomID,
+			RoomID: roomIDStr,
 			Leaver: *fullUserID,
 		}
 		leaveRes := &api.PerformLeaveResponse{}
-		outputEvents, err := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)
-		if err != nil {
-			return nil, err
+		outputEvents, err0 := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)
+		if err0 != nil {
+			return nil, err0
 		}
-		affected = append(affected, roomID)
+		affected = append(affected, roomIDStr)
 		if len(outputEvents) == 0 {
 			continue
 		}
-		if err := r.Inputer.OutputProducer.ProduceRoomEvents(roomID, outputEvents); err != nil {
-			return nil, err
+
+		roomID, err0 := spec.NewRoomID(roomIDStr)
+		if err0 != nil {
+			continue
+		}
+
+		err0 = r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, outputEvents)
+		if err0 != nil {
+			return nil, err0
 		}
 	}
 	return affected, nil
@@ -198,26 +204,30 @@ func (r *Admin) PerformAdminEvacuateUser(
 // PerformAdminPurgeRoom removes all traces for the given room from the database.
 func (r *Admin) PerformAdminPurgeRoom(
 	ctx context.Context,
-	roomID string,
+	roomIDStr string,
 ) error {
-	// Validate we actually got a room ID and nothing else
-	if _, _, err := gomatrixserverlib.SplitID('!', roomID); err != nil {
+
+	log := util.Log(ctx).WithField("room_id", roomIDStr)
+	roomID, err := spec.NewRoomID(roomIDStr)
+	if err != nil {
+		log.WithError(err).Warn("Could not parse room id")
 		return err
 	}
 
-	logrus.WithField("room_id", roomID).Warn("Purging room from roomserver")
-	if err := r.DB.PurgeRoom(ctx, roomID); err != nil {
-		logrus.WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
+	log.Warn("Purging room from roomserver")
+	err = r.DB.PurgeRoom(ctx, roomID.String())
+	if err != nil {
+		log.WithField("room_id", roomID).WithError(err).Warn("Failed to purge room from roomserver")
 		return err
 	}
 
-	logrus.WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
+	log.WithField("room_id", roomID).Warn("Room purged from roomserver, informing other components")
 
-	return r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
+	return r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypePurgeRoom,
 			PurgeRoom: &api.OutputPurgeRoom{
-				RoomID: roomID,
+				RoomID: roomID.String(),
 			},
 		},
 	})
@@ -300,7 +310,7 @@ func (r *Admin) PerformAdminDownloadState(
 		Type:     "org.matrix.dendrite.state_download",
 		SenderID: string(*senderID),
 		RoomID:   roomID,
-		Content:  spec.RawJSON("{}"),
+		Content:  json.RawMessage("{}"),
 	}
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForProtoEvent(proto)
@@ -316,7 +326,7 @@ func (r *Admin) PerformAdminDownloadState(
 		Depth:        depth,
 	}
 
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+	identity, err := r.Cfg.Global.SigningIdentityFor(senderDomain)
 	if err != nil {
 		return err
 	}
@@ -341,10 +351,10 @@ func (r *Admin) PerformAdminDownloadState(
 	inputReq.InputRoomEvents = append(inputReq.InputRoomEvents, api.InputRoomEvent{
 		Kind:          api.KindNew,
 		Event:         ev,
-		Origin:        r.Cfg.Matrix.ServerName,
+		Origin:        r.Cfg.Global.ServerName,
 		HasState:      true,
 		StateEventIDs: stateIDs,
-		SendAsServer:  string(r.Cfg.Matrix.ServerName),
+		SendAsServer:  string(r.Cfg.Global.ServerName),
 	})
 
 	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,16 +19,14 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/internal"
 	"github.com/antinvestor/matrix/relayapi/routing"
 	"github.com/antinvestor/matrix/relayapi/storage/shared"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -62,8 +60,9 @@ func createFederationRequest(
 
 func TestForwardEmptyReturnsOk(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -85,8 +84,9 @@ func TestForwardEmptyReturnsOk(t *testing.T) {
 
 func TestForwardBadJSONReturnsError(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -114,8 +114,9 @@ func TestForwardBadJSONReturnsError(t *testing.T) {
 
 func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -148,8 +149,9 @@ func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 
 func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -182,10 +184,12 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 
 func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}

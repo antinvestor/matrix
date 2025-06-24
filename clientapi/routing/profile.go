@@ -20,11 +20,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/antinvestor/gomatrix"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-
-	"github.com/antinvestor/gomatrix"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/clientapi/httputil"
@@ -52,7 +51,7 @@ func GetProfile(
 			}
 		}
 
-		util.GetLogger(req.Context()).WithError(err).Error("getProfile failed")
+		util.Log(req.Context()).WithError(err).Error("getProfile failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -108,14 +107,14 @@ func SetAvatarURL(
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 
-	if !cfg.Matrix.IsLocalServerName(domain) {
+	if !cfg.Global.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("userID does not belong to a locally configured domain"),
@@ -132,7 +131,7 @@ func SetAvatarURL(
 
 	profile, changed, err := profileAPI.SetAvatarURL(req.Context(), localpart, domain, r.AvatarURL)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
+		util.Log(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -197,14 +196,14 @@ func SetDisplayName(
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 
-	if !cfg.Matrix.IsLocalServerName(domain) {
+	if !cfg.Global.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden("userID does not belong to a locally configured domain"),
@@ -221,7 +220,7 @@ func SetDisplayName(
 
 	profile, changed, err := profileAPI.SetDisplayName(req.Context(), localpart, domain, r.DisplayName)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
+		util.Log(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -261,7 +260,7 @@ func updateProfile(
 
 	rooms, err := rsAPI.QueryRoomsForUser(ctx, *deviceUserID, "join")
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("QueryRoomsForUser failed")
+		util.Log(ctx).WithError(err).Error("QueryRoomsForUser failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -275,7 +274,7 @@ func updateProfile(
 
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -293,7 +292,7 @@ func updateProfile(
 			JSON: spec.BadJSON(e.Error()),
 		}, e
 	default:
-		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvents failed")
+		util.Log(ctx).WithError(err).Error("buildMembershipEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -301,7 +300,7 @@ func updateProfile(
 	}
 
 	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, device.UserDomain(), domain, domain, nil, false); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
+		util.Log(ctx).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -325,8 +324,8 @@ func getProfile(
 		return nil, err
 	}
 
-	if !cfg.Matrix.IsLocalServerName(domain) {
-		profile, fedErr := federation.LookupProfile(ctx, cfg.Matrix.ServerName, domain, userID, "")
+	if !cfg.Global.IsLocalServerName(domain) {
+		profile, fedErr := federation.LookupProfile(ctx, cfg.Global.ServerName, domain, userID, "")
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {
 				if x.Code == http.StatusNotFound {

@@ -30,7 +30,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 type invite struct {
@@ -79,7 +78,7 @@ func CreateInvitesFrom3PIDInvites(
 			req.Context(), rsAPI, cfg, inv, federation, userAPI,
 		)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("createInviteFrom3PIDInvite failed")
+			util.Log(req.Context()).WithError(err).Error("createInviteFrom3PIDInvite failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -96,13 +95,13 @@ func CreateInvitesFrom3PIDInvites(
 		rsAPI,
 		api.KindNew,
 		evs,
-		cfg.Matrix.ServerName, // TODO: which virtual host?
+		cfg.Global.ServerName, // TODO: which virtual host?
 		"TODO",
-		cfg.Matrix.ServerName,
+		cfg.Global.ServerName,
 		nil,
 		false,
 	); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
+		util.Log(req.Context()).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -161,7 +160,7 @@ func ExchangeThirdPartyInvite(
 	if err != nil || targetUserID == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: spec.BadJSON("The event's state key isn't a Matrix user ID"),
+			JSON: spec.BadJSON("The event's state key isn't a Global user ID"),
 		}
 	}
 	targetDomain := targetUserID.Domain()
@@ -190,7 +189,7 @@ func ExchangeThirdPartyInvite(
 			JSON: spec.NotFound("Unknown room " + roomID),
 		}
 	} else if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("buildMembershipEvent failed")
+		util.Log(httpReq.Context()).WithError(err).Error("buildMembershipEvent failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -201,7 +200,7 @@ func ExchangeThirdPartyInvite(
 	// acknowledged it
 	inviteReq, err := fclient.NewInviteV2Request(event, nil)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("failed to make invite v2 request")
+		util.Log(httpReq.Context()).WithError(err).Error("failed to make invite v2 request")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -209,7 +208,7 @@ func ExchangeThirdPartyInvite(
 	}
 	signedEvent, err := federation.SendInviteV2(httpReq.Context(), senderDomain, request.Origin(), inviteReq)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
+		util.Log(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -217,7 +216,7 @@ func ExchangeThirdPartyInvite(
 	}
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Errorf("unknown room version: %s", roomVersion)
+		util.Log(httpReq.Context()).WithError(err).WithField("room_version", roomVersion).Error("Unknown room version")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -225,7 +224,7 @@ func ExchangeThirdPartyInvite(
 	}
 	inviteEvent, err := verImpl.NewEventFromUntrustedJSON(signedEvent.Event)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
+		util.Log(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -241,11 +240,11 @@ func ExchangeThirdPartyInvite(
 		},
 		request.Destination(),
 		request.Origin(),
-		cfg.Matrix.ServerName,
+		cfg.Global.ServerName,
 		nil,
 		false,
 	); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("SendEvents failed")
+		util.Log(httpReq.Context()).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -273,7 +272,7 @@ func createInviteFrom3PIDInvite(
 		return nil, err
 	}
 
-	if server != cfg.Matrix.ServerName {
+	if server != cfg.Global.ServerName {
 		return nil, errNotLocalUser
 	}
 
@@ -381,8 +380,8 @@ func buildMembershipEvent(
 	builder := verImpl.NewEventBuilderFromProtoEvent(protoEvent)
 
 	event, err := builder.Build(
-		time.Now(), cfg.Matrix.ServerName, cfg.Matrix.KeyID,
-		cfg.Matrix.PrivateKey,
+		time.Now(), cfg.Global.ServerName, cfg.Global.KeyID,
+		cfg.Global.PrivateKey,
 	)
 
 	return event, err
@@ -398,6 +397,8 @@ func sendToRemoteServer(
 	federation fclient.FederationClient, cfg *config.FederationAPI,
 	proto gomatrixserverlib.ProtoEvent,
 ) (err error) {
+
+	log := util.Log(ctx)
 	remoteServers := make([]spec.ServerName, 2)
 	_, remoteServers[0], err = gomatrixserverlib.SplitID('@', inv.Sender)
 	if err != nil {
@@ -411,11 +412,11 @@ func sendToRemoteServer(
 	}
 
 	for _, server := range remoteServers {
-		err = federation.ExchangeThirdPartyInvite(ctx, cfg.Matrix.ServerName, server, proto)
+		err = federation.ExchangeThirdPartyInvite(ctx, cfg.Global.ServerName, server, proto)
 		if err == nil {
 			return
 		}
-		logrus.WithError(err).Warnf("failed to send 3PID invite via %s", server)
+		log.WithError(err).WithField("server", server).Warn("Failed to send 3PID invite via server")
 	}
 
 	return errors.New("failed to send 3PID invite via any server")

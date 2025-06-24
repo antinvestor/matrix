@@ -13,28 +13,26 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/clientapi/producers"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/gorilla/mux"
-	"github.com/nats-io/nats.go"
-	"github.com/stretchr/testify/assert"
-	"github.com/tidwall/gjson"
-
+	"github.com/antinvestor/matrix/roomserver"
+	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/routing"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
-
-	"github.com/antinvestor/matrix/clientapi/producers"
-	"github.com/antinvestor/matrix/roomserver"
-	rsapi "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/gjson"
 )
 
 type syncRoomserverAPI struct {
@@ -119,12 +117,7 @@ func (s *syncUserAPI) PerformLastSeenUpdate(ctx context.Context, req *userapi.Pe
 }
 
 func TestSyncAPIAccessTokens(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		testSyncAccessTokens(t, testOpts)
-	})
-}
 
-func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
@@ -135,94 +128,99 @@ func testSyncAccessTokens(t *testing.T, testOpts test.DependancyOption) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	caches, err := caching.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
-	natsInstance := jetstream.NATSInstance{}
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
+		qm := queueutil.NewQueueManager(svc)
 
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
-	msgs := toNATSMsgs(t, cfg, room.Events()...)
-	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
-	testrig.MustPublishMsgs(t, jsctx, msgs...)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
-	testCases := []struct {
-		name            string
-		req             *http.Request
-		wantCode        int
-		wantJoinedRooms []string
-	}{
-		{
-			name: "missing access token",
-			req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-				"timeout": "0",
-			})),
-			wantCode: 401,
-		},
-		{
-			name: "unknown access token",
-			req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-				"access_token": "foo",
-				"timeout":      "0",
-			})),
-			wantCode: 401,
-		},
-		{
-			name: "valid access token",
-			req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-				"access_token": alice.AccessToken,
-				"timeout":      "0",
-			})),
-			wantCode:        200,
-			wantJoinedRooms: []string{room.ID},
-		},
-	}
+		msgs := toQueueMsgs(t, room.Events()...)
 
-	syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
-		// wait for the last sent eventID to come down sync
-		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
-		return gjson.Get(syncBody, path).Exists()
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+
+		err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
+		if err != nil {
+			t.Fatalf("failed to publish events: %v", err)
+		}
+
+		testCases := []struct {
+			name            string
+			req             *http.Request
+			wantCode        int
+			wantJoinedRooms []string
+		}{
+			{
+				name: "missing access token",
+				req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+					"timeout": "0",
+				})),
+				wantCode: 401,
+			},
+			{
+				name: "unknown access token",
+				req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+					"access_token": "foo",
+					"timeout":      "0",
+				})),
+				wantCode: 401,
+			},
+			{
+				name: "valid access token",
+				req: test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+					"access_token": alice.AccessToken,
+					"timeout":      "0",
+				})),
+				wantCode:        200,
+				wantJoinedRooms: []string{room.ID},
+			},
+		}
+
+		syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
+			// wait for the last sent eventID to come down sync
+			path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
+			return gjson.Get(syncBody, path).Exists()
+		})
+
+		for _, tc := range testCases {
+			w := httptest.NewRecorder()
+			routers.Client.ServeHTTP(w, tc.req)
+			if w.Code != tc.wantCode {
+				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+			}
+			if tc.wantJoinedRooms != nil {
+				var res types.Response
+				err = json.NewDecoder(w.Body).Decode(&res)
+				if err != nil {
+					t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
+				}
+				if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
+					t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
+				}
+				t.Logf("res: %+v", res.Rooms.Join[room.ID])
+
+				gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+				for i, ev := range res.Rooms.Join[room.ID].Timeline.Events {
+					gotEventIDs[i] = ev.EventID
+				}
+				test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
+			}
+		}
 	})
-
-	for _, tc := range testCases {
-		w := httptest.NewRecorder()
-		routers.Client.ServeHTTP(w, tc.req)
-		if w.Code != tc.wantCode {
-			t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
-		}
-		if tc.wantJoinedRooms != nil {
-			var res types.Response
-			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-				t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
-			}
-			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
-				t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
-			}
-			t.Logf("res: %+v", res.Rooms.Join[room.ID])
-
-			gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
-			for i, ev := range res.Rooms.Join[room.ID].Timeline.Events {
-				gotEventIDs[i] = ev.EventID
-			}
-			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
-		}
-	}
 }
 
 func TestSyncAPIEventFormatPowerLevels(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		testSyncEventFormatPowerLevels(t, testOpts)
-	})
-}
 
-func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption) {
 	user := test.NewUser(t)
 	setRoomVersion := func(t *testing.T, r *test.Room) { r.Version = gomatrixserverlib.RoomVersionPseudoIDs }
 	room := test.NewRoom(t, user, setRoomVersion)
@@ -240,147 +238,155 @@ func testSyncEventFormatPowerLevels(t *testing.T, testOpts test.DependancyOption
 		},
 	}, test.WithStateKey(""))
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
-
 	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	caches, err := caching.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
-	natsInstance := jetstream.NATSInstance{}
 
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
-	msgs := toNATSMsgs(t, cfg, room.Events()...)
-	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
-	testrig.MustPublishMsgs(t, jsctx, msgs...)
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-	testCases := []struct {
-		name            string
-		wantCode        int
-		wantJoinedRooms []string
-		eventFormat     synctypes.ClientEventFormat
-	}{
-		{
-			name:            "Client format",
-			wantCode:        200,
-			wantJoinedRooms: []string{room.ID},
-			eventFormat:     synctypes.FormatSync,
-		},
-		{
-			name:            "Federation format",
-			wantCode:        200,
-			wantJoinedRooms: []string{room.ID},
-			eventFormat:     synctypes.FormatSyncFederation,
-		},
-	}
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-	syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
-		// wait for the last sent eventID to come down sync
-		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
-		return gjson.Get(syncBody, path).Exists()
-	})
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
+		qm := queueutil.NewQueueManager(svc)
 
-	for _, tc := range testCases {
-		format := ""
-		if tc.eventFormat == synctypes.FormatSyncFederation {
-			format = "federation"
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
 		}
 
-		w := httptest.NewRecorder()
-		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-			"access_token": alice.AccessToken,
-			"timeout":      "0",
-			"filter":       fmt.Sprintf(`{"event_format":"%s"}`, format),
-		})))
-		if w.Code != tc.wantCode {
-			t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+		msgs := toQueueMsgs(t, room.Events()...)
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+
+		err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
+		if err != nil {
+			t.Fatalf("failed to publish events: %v", err)
 		}
-		if tc.wantJoinedRooms != nil {
-			var res types.Response
-			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-				t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
+
+		testCases := []struct {
+			name            string
+			wantCode        int
+			wantJoinedRooms []string
+			eventFormat     synctypes.ClientEventFormat
+		}{
+			{
+				name:            "Client format",
+				wantCode:        200,
+				wantJoinedRooms: []string{room.ID},
+				eventFormat:     synctypes.FormatSync,
+			},
+			{
+				name:            "Federation format",
+				wantCode:        200,
+				wantJoinedRooms: []string{room.ID},
+				eventFormat:     synctypes.FormatSyncFederation,
+			},
+		}
+
+		syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
+			// wait for the last sent eventID to come down sync
+			path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
+			return gjson.Get(syncBody, path).Exists()
+		})
+
+		for _, tc := range testCases {
+			format := ""
+			if tc.eventFormat == synctypes.FormatSyncFederation {
+				format = "federation"
 			}
-			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
-				t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
-			}
-			t.Logf("res: %+v", res.Rooms.Join[room.ID])
 
-			gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
-			for i, ev := range res.Rooms.Join[room.ID].Timeline.Events {
-				gotEventIDs[i] = ev.EventID
-			}
-			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
-
-			event := room.CreateAndInsert(t, user, spec.MRoomPowerLevels, gomatrixserverlib.PowerLevelContent{
-				Users: map[string]int64{
-					user.ID:                100,
-					"@otheruser:localhost": 50,
-				},
-			}, test.WithStateKey(""))
-
-			msgs := toNATSMsgs(t, cfg, event)
-			testrig.MustPublishMsgs(t, jsctx, msgs...)
-
-			syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
-				// wait for the last sent eventID to come down sync
-				path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
-				return gjson.Get(syncBody, path).Exists()
-			})
-
-			since := res.NextBatch.String()
 			w := httptest.NewRecorder()
 			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 				"access_token": alice.AccessToken,
 				"timeout":      "0",
 				"filter":       fmt.Sprintf(`{"event_format":"%s"}`, format),
-				"since":        since,
 			})))
-			if w.Code != 200 {
-				t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+			if w.Code != tc.wantCode {
+				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
 			}
+			if tc.wantJoinedRooms != nil {
+				var res types.Response
+				if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
+					t.Fatalf("%s: failed to decode response body: %s", tc.name, err)
+				}
+				if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
+					t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
+				}
+				t.Logf("res: %+v", res.Rooms.Join[room.ID])
 
-			res = *types.NewResponse()
-			if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-				t.Errorf("failed to decode response body: %s", err)
-			}
-			if len(res.Rooms.Join) != 1 {
-				t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
-			}
-			gotEventIDs = make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
-			for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
-				gotEventIDs[j] = ev.EventID
-				if ev.Type == spec.MRoomPowerLevels {
-					content := gomatrixserverlib.PowerLevelContent{}
-					err := json.Unmarshal(ev.Content, &content)
-					if err != nil {
-						t.Errorf("failed to unmarshal power level content: %s", err)
-					}
-					otherUserLevel := content.UserLevel("@otheruser:localhost")
-					if otherUserLevel != 50 {
-						t.Errorf("Expected user PL of %d but got %d", 50, otherUserLevel)
+				gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+				for i, ev := range res.Rooms.Join[room.ID].Timeline.Events {
+					gotEventIDs[i] = ev.EventID
+				}
+				test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
+
+				event := room.CreateAndInsert(t, user, spec.MRoomPowerLevels, gomatrixserverlib.PowerLevelContent{
+					Users: map[string]int64{
+						user.ID:                100,
+						"@otheruser:localhost": 50,
+					},
+				}, test.WithStateKey(""))
+
+				msgs = toQueueMsgs(t, event)
+				err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msgs...)
+				if err != nil {
+					t.Fatalf("failed to publish events: %v", err)
+				}
+
+				syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
+					// wait for the last sent eventID to come down sync
+					path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
+					return gjson.Get(syncBody, path).Exists()
+				})
+
+				since := res.NextBatch.String()
+				w := httptest.NewRecorder()
+				routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+					"access_token": alice.AccessToken,
+					"timeout":      "0",
+					"filter":       fmt.Sprintf(`{"event_format":"%s"}`, format),
+					"since":        since,
+				})))
+				if w.Code != 200 {
+					t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+				}
+
+				res = *types.NewResponse()
+				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+					t.Errorf("failed to decode response body: %s", err)
+				}
+				if len(res.Rooms.Join) != 1 {
+					t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
+				}
+				gotEventIDs = make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+				for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
+					gotEventIDs[j] = ev.EventID
+					if ev.Type == spec.MRoomPowerLevels {
+						content := gomatrixserverlib.PowerLevelContent{}
+						err := json.Unmarshal(ev.Content, &content)
+						if err != nil {
+							t.Errorf("failed to unmarshal power level content: %s", err)
+						}
+						otherUserLevel := content.UserLevel("@otheruser:localhost")
+						if otherUserLevel != 50 {
+							t.Errorf("Expected user PL of %d but got %d", 50, otherUserLevel)
+						}
 					}
 				}
+				events := []*rstypes.HeaderedEvent{room.Events()[len(room.Events())-1]}
+				test.AssertEventIDsEqual(t, gotEventIDs, events)
 			}
-			events := []*rstypes.HeaderedEvent{room.Events()[len(room.Events())-1]}
-			test.AssertEventIDsEqual(t, gotEventIDs, events)
 		}
-	}
+
+	})
 }
 
 // Tests what happens when we create a room and then /sync before all events from /createRoom have
 // been sent to the syncapi
 func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		testSyncAPICreateRoomSyncEarly(t, testOpts)
-	})
-}
 
-func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption) {
-	t.Skip("Skipped, possibly fixed")
 	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
@@ -391,85 +397,103 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, testOpts test.DependancyOption
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	caches, err := caching.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
-	natsInstance := jetstream.NATSInstance{}
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
-	// order is:
-	// m.room.create
-	// m.room.member
-	// m.room.power_levels
-	// m.room.join_rules
-	// m.room.history_visibility
-	msgs := toNATSMsgs(t, cfg, room.Events()...)
-	sinceTokens := make([]string, len(msgs))
-	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
-	for i, msg := range msgs {
-		testrig.MustPublishMsgs(t, jsctx, msg)
-		time.Sleep(100 * time.Millisecond)
-		w := httptest.NewRecorder()
-		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-			"access_token": alice.AccessToken,
-			"timeout":      "0",
-		})))
-		if w.Code != 200 {
-			t.Errorf("got HTTP %d want 200", w.Code)
-			continue
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
 		}
-		var res types.Response
-		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-			t.Errorf("failed to decode response body: %s", err)
+		qm := queueutil.NewQueueManager(svc)
+
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
 		}
-		sinceTokens[i] = res.NextBatch.String()
-		if i == 0 { // create event does not produce a room section
-			if len(res.Rooms.Join) != 0 {
-				t.Fatalf("i=%v got %d joined rooms, want 0", i, len(res.Rooms.Join))
+
+		// order is:
+		// m.room.create
+		// m.room.member
+		// m.room.power_levels
+		// m.room.join_rules
+		// m.room.history_visibility
+		msgs := toQueueMsgs(t, room.Events()...)
+		sinceTokens := make([]string, len(msgs))
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
+
+		for i, msg := range msgs {
+
+			err = testrig.MustPublishMsgs(ctx, t, &cfg.SyncAPI.Queues.OutputRoomEvent, qm, msg)
+			if err != nil {
+				t.Fatalf("failed to publish events: %v", err)
 			}
-		} else { // we should have that room somewhere
+
+			time.Sleep(100 * time.Millisecond)
+			w := httptest.NewRecorder()
+			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+				"access_token": alice.AccessToken,
+				"timeout":      "0",
+			})))
+			if w.Code != 200 {
+				t.Errorf("got HTTP %d want 200", w.Code)
+				continue
+			}
+			var res types.Response
+			if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
+				t.Errorf("failed to decode response body: %s", err)
+			}
+			sinceTokens[i] = res.NextBatch.String()
+			if i == 0 { // create event does not produce a room section
+				if res.Rooms != nil && len(res.Rooms.Join) != 0 {
+					t.Fatalf("i=%v got %d joined rooms, want 0", i, len(res.Rooms.Join))
+				}
+			} else { // we should have that room somewhere
+				if res.Rooms != nil && len(res.Rooms.Join) != 1 {
+					t.Fatalf("i=%v got %d joined rooms, want 1", i, len(res.Rooms.Join))
+				}
+			}
+		}
+
+		// sync with no token "" and with the penultimate token and this should neatly return room events in the timeline block
+		sinceTokens = append([]string{""}, sinceTokens[:len(sinceTokens)-1]...)
+
+		for i, since := range sinceTokens {
+			w := httptest.NewRecorder()
+			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+				"access_token": alice.AccessToken,
+				"timeout":      "0",
+				"since":        since,
+			})))
+			if w.Code != 200 {
+				t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
+			}
+			var res types.Response
+			if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
+				t.Errorf("failed to decode response body: %s", err)
+			}
 			if len(res.Rooms.Join) != 1 {
-				t.Fatalf("i=%v got %d joined rooms, want 1", i, len(res.Rooms.Join))
+				t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
 			}
-		}
-	}
+			// t.Logf("since=%s res state:%+v res timeline:%+v", since, res.Rooms.Join[room.ID].State.Events, res.Rooms.Join[room.ID].Timeline.Events)
+			gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+			for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
+				gotEventIDs[j] = ev.EventID
+			}
 
-	// sync with no token "" and with the penultimate token and this should neatly return room events in the timeline block
-	sinceTokens = append([]string{""}, sinceTokens[:len(sinceTokens)-1]...)
+			if i < 2 {
+				t.Logf("since; matching %v for got : %v and want : %v", since, len(gotEventIDs), len(room.Events()))
+				test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
+			} else {
+				t.Logf("since; matching %v for got : %v and want : %v", since, len(gotEventIDs), len(room.Events()[i:]))
+				test.AssertEventIDsEqual(t, gotEventIDs, room.Events()[i:])
+			}
 
-	t.Logf("waited for events to be consumed; syncing with %v", sinceTokens)
-	for i, since := range sinceTokens {
-		w := httptest.NewRecorder()
-		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-			"access_token": alice.AccessToken,
-			"timeout":      "0",
-			"since":        since,
-		})))
-		if w.Code != 200 {
-			t.Errorf("since=%s got HTTP %d want 200", since, w.Code)
 		}
-		var res types.Response
-		if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-			t.Errorf("failed to decode response body: %s", err)
-		}
-		if len(res.Rooms.Join) != 1 {
-			t.Fatalf("since=%s got %d joined rooms, want 1", since, len(res.Rooms.Join))
-		}
-		t.Logf("since=%s res state:%+v res timeline:%+v", since, res.Rooms.Join[room.ID].State.Events, res.Rooms.Join[room.ID].Timeline.Events)
-		gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
-		for j, ev := range res.Rooms.Join[room.ID].Timeline.Events {
-			gotEventIDs[j] = ev.EventID
-		}
-		test.AssertEventIDsEqual(t, gotEventIDs, room.Events()[i:])
-	}
+	})
 }
 
 // Test that if we hit /sync we get back presence: online, regardless of whether messages get delivered
@@ -490,23 +514,25 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
 
 	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	caches, err := caching.NewCache(&cfg.Global.Cache)
+	cm := sqlutil.NewConnectionManager(svc)
+	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
 	cfg.Global.Presence.EnableOutbound = true
 	cfg.Global.Presence.EnableInbound = true
-	natsInstance := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
-	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, caching.DisableMetrics)
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
+
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
 	w := httptest.NewRecorder()
 	routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 		"access_token": alice.AccessToken,
@@ -537,12 +563,7 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, testOpts test.Dependancy
 
 // This is mainly what Sytest is doing in "test_history_visibility"
 func TestMessageHistoryVisibility(t *testing.T) {
-	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		testHistoryVisibility(t, testOpts)
-	})
-}
 
-func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 	type result struct {
 		seeWithoutJoin bool
 		seeBeforeJoin  bool
@@ -613,105 +634,109 @@ func testHistoryVisibility(t *testing.T, testOpts test.DependancyOption) {
 			userType = "real user"
 		}
 
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
-
-		cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
-		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
-		if err != nil {
-			t.Fatalf("failed to create a cache: %v", err)
-		}
-		natsInstance := jetstream.NATSInstance{}
-
-		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
-
-		// Use the actual internal roomserver API
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-		rsAPI.SetFederationAPI(ctx, nil, nil)
-		AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, caching.DisableMetrics)
-
 		for _, tc := range testCases {
 			testname := fmt.Sprintf("%s - %s", tc.historyVisibility, userType)
 			t.Run(testname, func(t *testing.T) {
-				// create a room with the given visibility
-				room := test.NewRoom(t, alice, test.RoomHistoryVisibility(tc.historyVisibility))
 
-				// send the events/messages to NATS to create the rooms
-				beforeJoinBody := fmt.Sprintf("Before invite in a %s room", tc.historyVisibility)
-				beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": beforeJoinBody})
-				eventsToSend := append(room.Events(), beforeJoinEv)
-				if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
-					t.Fatalf("failed to send events: %v", err)
-				}
-				syncUntil(t, routers, aliceDev.AccessToken, false,
-					func(syncBody string) bool {
-						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, beforeJoinBody)
-						return gjson.Get(syncBody, path).Exists()
-					},
-				)
+				test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+					ctx, svc, cfg := testrig.Init(t, testOpts)
+					defer svc.Stop(ctx)
 
-				// There is only one event, we expect only to be able to see this, if the room is world_readable
-				w := httptest.NewRecorder()
-				routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": bobDev.AccessToken,
-					"dir":          "b",
-					"filter":       `{"lazy_load_members":true}`, // check that lazy loading doesn't break history visibility
-				})))
-				if w.Code != 200 {
-					t.Logf("%s", w.Body.String())
-					t.Fatalf("got HTTP %d want %d", w.Code, 200)
-				}
-				// We only care about the returned events at this point
-				var res struct {
-					Chunk []synctypes.ClientEvent `json:"chunk"`
-				}
-				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-					t.Errorf("failed to decode response body: %s", err)
-				}
+					cfg.ClientAPI.RateLimiting = config.RateLimiting{Enabled: false}
+					routers := httputil.NewRouters()
+					cm := sqlutil.NewConnectionManager(svc)
+					caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+					if err != nil {
+						t.Fatalf("failed to create a cache: %v", err)
+					}
+					qm := queueutil.NewQueueManager(svc)
+					am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+					if err != nil {
+						t.Fatalf("failed to create an actor manager: %v", err)
+					}
 
-				verifyEventVisible(t, tc.wantResult.seeWithoutJoin, beforeJoinEv, res.Chunk)
+					// Use the actual internal roomserver API
+					rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
+					rsAPI.SetFederationAPI(ctx, nil, nil)
+					AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
 
-				// Create invite, a message, join the room and create another message.
-				inviteEv := room.CreateAndInsert(t, alice, "m.room.member", map[string]interface{}{"membership": "invite"}, test.WithStateKey(bob.ID))
-				afterInviteEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After invite in a %s room", tc.historyVisibility)})
-				joinEv := room.CreateAndInsert(t, bob, "m.room.member", map[string]interface{}{"membership": "join"}, test.WithStateKey(bob.ID))
-				afterJoinBody := fmt.Sprintf("After join in a %s room", tc.historyVisibility)
-				msgEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": afterJoinBody})
+					// create a room with the given visibility
+					room := test.NewRoom(t, alice, test.RoomHistoryVisibility(tc.historyVisibility))
 
-				eventsToSend = append([]*rstypes.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
+					// send the events/messages to NATS to create the rooms
+					beforeJoinBody := fmt.Sprintf("Before invite in a %s room", tc.historyVisibility)
+					beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": beforeJoinBody})
+					eventsToSend := append(room.Events(), beforeJoinEv)
+					if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
+						t.Fatalf("failed to send events: %v", err)
+					}
+					syncUntil(ctx, t, routers, aliceDev.AccessToken, false,
+						func(syncBody string) bool {
+							path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, beforeJoinBody)
+							return gjson.Get(syncBody, path).Exists()
+						},
+					)
 
-				if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
-					t.Fatalf("failed to send events: %v", err)
-				}
-				syncUntil(t, routers, aliceDev.AccessToken, false,
-					func(syncBody string) bool {
-						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, afterJoinBody)
-						return gjson.Get(syncBody, path).Exists()
-					},
-				)
+					// There is only one event, we expect only to be able to see this, if the room is world_readable
+					w := httptest.NewRecorder()
+					routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
+						"access_token": bobDev.AccessToken,
+						"dir":          "b",
+						"filter":       `{"lazy_load_members":true}`, // check that lazy loading doesn't break history visibility
+					})))
+					if w.Code != 200 {
+						t.Logf("%s", w.Body.String())
+						t.Fatalf("got HTTP %d want %d", w.Code, 200)
+					}
+					// We only care about the returned events at this point
+					var res struct {
+						Chunk []synctypes.ClientEvent `json:"chunk"`
+					}
+					if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
+						t.Errorf("failed to decode response body: %s", err)
+					}
 
-				// Verify the messages after/before invite are visible or not
-				w = httptest.NewRecorder()
-				routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
-					"access_token": bobDev.AccessToken,
-					"dir":          "b",
-				})))
-				if w.Code != 200 {
-					t.Logf("%s", w.Body.String())
-					t.Fatalf("got HTTP %d want %d", w.Code, 200)
-				}
-				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
-					t.Errorf("failed to decode response body: %s", err)
-				}
-				// verify results
-				verifyEventVisible(t, tc.wantResult.seeBeforeJoin, beforeJoinEv, res.Chunk)
-				verifyEventVisible(t, tc.wantResult.seeAfterInvite, afterInviteEv, res.Chunk)
+					verifyEventVisible(t, tc.wantResult.seeWithoutJoin, beforeJoinEv, res.Chunk)
+
+					// Create invite, a message, join the room and create another message.
+					inviteEv := room.CreateAndInsert(t, alice, "m.room.member", map[string]interface{}{"membership": "invite"}, test.WithStateKey(bob.ID))
+					afterInviteEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After invite in a %s room", tc.historyVisibility)})
+					joinEv := room.CreateAndInsert(t, bob, "m.room.member", map[string]interface{}{"membership": "join"}, test.WithStateKey(bob.ID))
+					afterJoinBody := fmt.Sprintf("After join in a %s room", tc.historyVisibility)
+					msgEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": afterJoinBody})
+
+					eventsToSend = append([]*rstypes.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
+
+					if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
+						t.Fatalf("failed to send events: %v", err)
+					}
+					syncUntil(ctx, t, routers, aliceDev.AccessToken, false,
+						func(syncBody string) bool {
+							path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, afterJoinBody)
+							return gjson.Get(syncBody, path).Exists()
+						},
+					)
+
+					// Verify the messages after/before invite are visible or not
+					w = httptest.NewRecorder()
+					routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
+						"access_token": bobDev.AccessToken,
+						"dir":          "b",
+					})))
+					if w.Code != 200 {
+						t.Logf("%s", w.Body.String())
+						t.Fatalf("got HTTP %d want %d", w.Code, 200)
+					}
+					if err = json.NewDecoder(w.Body).Decode(&res); err != nil {
+						t.Errorf("failed to decode response body: %s", err)
+					}
+					// verify results
+					verifyEventVisible(t, tc.wantResult.seeBeforeJoin, beforeJoinEv, res.Chunk)
+					verifyEventVisible(t, tc.wantResult.seeAfterInvite, afterInviteEv, res.Chunk)
+				})
 			})
 		}
+
 	}
 }
 
@@ -889,25 +914,26 @@ func TestGetMembership(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
 		routers := httputil.NewRouters()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
-		jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
 		// Use an actual roomserver for this
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
-		AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, caching.DisableMetrics)
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, caches, cacheutil.DisableMetrics)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -919,7 +945,7 @@ func TestGetMembership(t *testing.T) {
 				if tc.additionalEvents != nil {
 					tc.additionalEvents(t, room)
 				}
-				if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+				if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
 
@@ -927,7 +953,7 @@ func TestGetMembership(t *testing.T) {
 				if tc.useSleep {
 					time.Sleep(time.Millisecond * 100)
 				} else {
-					syncUntil(t, routers, aliceDev.AccessToken, false, func(syncBody string) bool {
+					syncUntil(ctx, t, routers, aliceDev.AccessToken, false, func(syncBody string) bool {
 						// wait for the last sent eventID to come down sync
 						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
 						return gjson.Get(syncBody, path).Exists()
@@ -955,10 +981,7 @@ func TestGetMembership(t *testing.T) {
 }
 
 func TestSendToDevice(t *testing.T) {
-	test.WithAllDatabases(t, testSendToDevice)
-}
 
-func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 	user := test.NewUser(t)
 	alice := userapi.Device{
 		ID:          "ALICEID",
@@ -968,143 +991,155 @@ func testSendToDevice(t *testing.T, testOpts test.DependancyOption) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	caches, err := caching.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
+		routers := httputil.NewRouters()
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
 
-	natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
 
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
-	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, caching.DisableMetrics)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
-	producer := producers.SyncAPIProducer{
-		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		JetStream:              jsctx,
-	}
+		AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, caches, cacheutil.DisableMetrics)
 
-	msgCounter := 0
+		cfgSyncAPI := cfg.SyncAPI
+		err = qm.RegisterPublisher(ctx, &cfgSyncAPI.Queues.OutputSendToDeviceEvent)
+		if err != nil {
+			t.Fatalf("failed to register publisher: %v", err)
+		}
 
-	testCases := []struct {
-		name              string
-		since             string
-		want              []string
-		sendMessagesCount int
-	}{
-		{
-			name: "initial sync, no messages",
-			want: []string{},
-		},
-		{
-			name:              "initial sync, one new message",
-			sendMessagesCount: 1,
-			want: []string{
-				"message 1",
+		producer := producers.SyncAPIProducer{
+			TopicSendToDeviceEvent: cfgSyncAPI.Queues.OutputSendToDeviceEvent.Ref(),
+			Qm:                     qm,
+		}
+
+		msgCounter := 0
+
+		testCases := []struct {
+			name              string
+			since             string
+			want              []string
+			sendMessagesCount int
+		}{
+			{
+				name: "initial sync, no messages",
+				want: []string{},
 			},
-		},
-		{
-			name:              "initial sync, two new messages", // we didn't advance the since token, so we'll receive two messages
-			sendMessagesCount: 1,
-			want: []string{
-				"message 1",
-				"message 2",
+			{
+				name:              "initial sync, one new message",
+				sendMessagesCount: 1,
+				want: []string{
+					"message 1",
+				},
 			},
-		},
-		{
-			name:  "incremental sync, one message", // this deletes message 1, as we advanced the since token
-			since: types.StreamingToken{SendToDevicePosition: 1}.String(),
-			want: []string{
-				"message 2",
+			{
+				name:              "initial sync, two new messages", // we didn't advance the since token, so we'll receive two messages
+				sendMessagesCount: 1,
+				want: []string{
+					"message 1",
+					"message 2",
+				},
 			},
-		},
-		{
-			name:  "failed incremental sync, one message", // didn't advance since, so still the same message
-			since: types.StreamingToken{SendToDevicePosition: 1}.String(),
-			want: []string{
-				"message 2",
+			{
+				name:  "incremental sync, one message", // this deletes message 1, as we advanced the since token
+				since: types.StreamingToken{SendToDevicePosition: 1}.String(),
+				want: []string{
+					"message 2",
+				},
 			},
-		},
-		{
-			name:  "incremental sync, no message",                         // this should delete message 2
-			since: types.StreamingToken{SendToDevicePosition: 2}.String(), // next_batch from previous sync
-			want:  []string{},
-		},
-		{
-			name:              "incremental sync, three new messages",
-			since:             types.StreamingToken{SendToDevicePosition: 2}.String(),
-			sendMessagesCount: 3,
-			want: []string{
-				"message 3", // message 2 was deleted in the previous test
-				"message 4",
-				"message 5",
+			{
+				name:  "failed incremental sync, one message", // didn't advance since, so still the same message
+				since: types.StreamingToken{SendToDevicePosition: 1}.String(),
+				want: []string{
+					"message 2",
+				},
 			},
-		},
-		{
-			name: "initial sync, three messages", // we expect three messages, as we didn't go beyond "2"
-			want: []string{
-				"message 3",
-				"message 4",
-				"message 5",
+			{
+				name:  "incremental sync, no message",                         // this should delete message 2
+				since: types.StreamingToken{SendToDevicePosition: 2}.String(), // next_batch from previous sync
+				want:  []string{},
 			},
-		},
-		{
-			name:  "incremental sync, no messages", // advance the sync token, no new messages
-			since: types.StreamingToken{SendToDevicePosition: 5}.String(),
-			want:  []string{},
-		},
-	}
+			{
+				name:              "incremental sync, three new messages",
+				since:             types.StreamingToken{SendToDevicePosition: 2}.String(),
+				sendMessagesCount: 3,
+				want: []string{
+					"message 3", // message 2 was deleted in the previous test
+					"message 4",
+					"message 5",
+				},
+			},
+			{
+				name: "initial sync, three messages", // we expect three messages, as we didn't go beyond "2"
+				want: []string{
+					"message 3",
+					"message 4",
+					"message 5",
+				},
+			},
+			{
+				name:  "incremental sync, no messages", // advance the sync token, no new messages
+				since: types.StreamingToken{SendToDevicePosition: 5}.String(),
+				want:  []string{},
+			},
+		}
 
-	for _, tc := range testCases {
-		// Send to-device messages of type "m.dendrite.test" with content `{"dummy":"message $counter"}`
-		for i := 0; i < tc.sendMessagesCount; i++ {
-			msgCounter++
-			msg := json.RawMessage(fmt.Sprintf(`{"dummy":"message %d"}`, msgCounter))
-			if err := producer.SendToDevice(ctx, user.ID, user.ID, alice.ID, "m.dendrite.test", msg); err != nil {
-				t.Fatalf("unable to send to device message: %v", err)
+		for _, tc := range testCases {
+			// Send to-device messages of type "m.dendrite.test" with content `{"dummy":"message $counter"}`
+			for i := 0; i < tc.sendMessagesCount; i++ {
+				msgCounter++
+				msg := json.RawMessage(fmt.Sprintf(`{"dummy":"message %d"}`, msgCounter))
+
+				userID, err0 := spec.NewUserID(user.ID, false)
+				if err0 != nil {
+					t.Fatalf("failed to generate user ID: %v", err0)
+				}
+				err = producer.SendToDevice(ctx, user.ID, userID, alice.ID, "m.dendrite.test", msg)
+				if err != nil {
+					t.Fatalf("unable to send to device message: %v", err)
+				}
+			}
+
+			syncUntil(ctx, t, routers, alice.AccessToken,
+				len(tc.want) == 0,
+				func(body string) bool {
+					return gjson.Get(body, fmt.Sprintf(`to_device.events.#(content.dummy=="message %d")`, msgCounter)).Exists()
+				},
+			)
+
+			// Execute a /sync request, recording the response
+			w := httptest.NewRecorder()
+			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+				"access_token": alice.AccessToken,
+				"since":        tc.since,
+			})))
+
+			// Extract the to_device.events, # gets all values of an array, in this case a string slice with "message $counter" entries
+			events := gjson.Get(w.Body.String(), "to_device.events.#.content.dummy").Array()
+			got := make([]string, len(events))
+			for i := range events {
+				got[i] = events[i].String()
+			}
+
+			// Ensure the messages we received are as we expect them to be
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Logf("[%s|since=%s]: Sync: %s", tc.name, tc.since, w.Body.String())
+				t.Fatalf("[%s|since=%s]: got: %+v, want: %+v", tc.name, tc.since, got, tc.want)
 			}
 		}
-
-		syncUntil(t, routers, alice.AccessToken,
-			len(tc.want) == 0,
-			func(body string) bool {
-				return gjson.Get(body, fmt.Sprintf(`to_device.events.#(content.dummy=="message %d")`, msgCounter)).Exists()
-			},
-		)
-
-		// Execute a /sync request, recording the response
-		w := httptest.NewRecorder()
-		routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
-			"access_token": alice.AccessToken,
-			"since":        tc.since,
-		})))
-
-		// Extract the to_device.events, # gets all values of an array, in this case a string slice with "message $counter" entries
-		events := gjson.Get(w.Body.String(), "to_device.events.#.content.dummy").Array()
-		got := make([]string, len(events))
-		for i := range events {
-			got[i] = events[i].String()
-		}
-
-		// Ensure the messages we received are as we expect them to be
-		if !reflect.DeepEqual(got, tc.want) {
-			t.Logf("[%s|since=%s]: Sync: %s", tc.name, tc.since, w.Body.String())
-			t.Fatalf("[%s|since=%s]: got: %+v, want: %+v", tc.name, tc.since, got, tc.want)
-		}
-	}
+	})
 }
 
 func TestContext(t *testing.T) {
-	test.WithAllDatabases(t, testContext)
-}
-
-func testContext(t *testing.T, testOpts test.DependancyOption) {
 
 	tests := []struct {
 		name             string
@@ -1194,88 +1229,91 @@ func testContext(t *testing.T, testOpts test.DependancyOption) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	defer closeRig()
-
-	routers := httputil.NewRouters()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	caches, err := caching.NewCache(&cfg.Global.Cache)
-	if err != nil {
-		t.Fatalf("failed to create a cache: %v", err)
-	}
-
-	// Use an actual roomserver for this
-	natsInstance := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
-	rsAPI.SetFederationAPI(ctx, nil, nil)
-
-	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches, caching.DisableMetrics)
-
-	room := test.NewRoom(t, user)
-
-	room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world 1!"})
-	room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world 2!"})
-	thirdMsg := room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world3!"})
-	room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world4!"})
-
-	if err := rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
-		t.Fatalf("failed to send events: %v", err)
-	}
-
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
-
-	syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
-		// wait for the last sent eventID to come down sync
-		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, thirdMsg.EventID())
-		return gjson.Get(syncBody, path).Exists()
-	})
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			params := map[string]string{
-				"access_token": alice.AccessToken,
-			}
-			w := httptest.NewRecorder()
-			// test overrides
-			roomID := room.ID
-			if tc.roomID != "" {
-				roomID = tc.roomID
-			}
-			eventID := thirdMsg.EventID()
-			if tc.eventID != "" {
-				eventID = tc.eventID
-			}
-			requestPath := fmt.Sprintf("/_matrix/client/v3/rooms/%s/context/%s", roomID, eventID)
-			if tc.params != nil {
-				for k, v := range tc.params {
-					params[k] = v
+
+			test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+				ctx, svc, cfg := testrig.Init(t, testOpts)
+				defer svc.Stop(ctx)
+
+				routers := httputil.NewRouters()
+				cm := sqlutil.NewConnectionManager(svc)
+				caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+				if err != nil {
+					t.Fatalf("failed to create a cache: %v", err)
 				}
-			}
-			routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", requestPath, test.WithQueryParams(params)))
 
-			if tc.wantError && w.Code == 200 {
-				t.Fatalf("Expected an error, but got none")
-			}
-			t.Log(w.Body.String())
-			resp := routing.ContextRespsonse{}
-			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-				t.Fatal(err)
-			}
-			if tc.wantStateLength > 0 && tc.wantStateLength != len(resp.State) {
-				t.Fatalf("expected %d state events, got %d", tc.wantStateLength, len(resp.State))
-			}
-			if tc.wantBeforeLength > 0 && tc.wantBeforeLength != len(resp.EventsBefore) {
-				t.Fatalf("expected %d before events, got %d", tc.wantBeforeLength, len(resp.EventsBefore))
-			}
-			if tc.wantAfterLength > 0 && tc.wantAfterLength != len(resp.EventsAfter) {
-				t.Fatalf("expected %d after events, got %d", tc.wantAfterLength, len(resp.EventsAfter))
-			}
+				// Use an actual roomserver for this
+				qm := queueutil.NewQueueManager(svc)
+				am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+				if err != nil {
+					t.Fatalf("failed to create an actor manager: %v", err)
+				}
+				rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
+				rsAPI.SetFederationAPI(ctx, nil, nil)
 
-			if !tc.wantError && resp.Event.EventID != eventID {
-				t.Fatalf("unexpected eventID %s, expected %s", resp.Event.EventID, eventID)
-			}
+				AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, rsAPI, caches, cacheutil.DisableMetrics)
+
+				room := test.NewRoom(t, user)
+
+				room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world 1!"})
+				room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world 2!"})
+				thirdMsg := room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world3!"})
+				room.CreateAndInsert(t, user, "m.room.message", map[string]interface{}{"body": "hello world4!"})
+
+				if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Fatalf("failed to send events: %v", err)
+				}
+
+				syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
+					// wait for the last sent eventID to come down sync
+					path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, thirdMsg.EventID())
+					return gjson.Get(syncBody, path).Exists()
+				})
+
+				params := map[string]string{
+					"access_token": alice.AccessToken,
+				}
+				w := httptest.NewRecorder()
+				// test overrides
+				roomID := room.ID
+				if tc.roomID != "" {
+					roomID = tc.roomID
+				}
+				eventID := thirdMsg.EventID()
+				if tc.eventID != "" {
+					eventID = tc.eventID
+				}
+				requestPath := fmt.Sprintf("/_matrix/client/v3/rooms/%s/context/%s", roomID, eventID)
+				if tc.params != nil {
+					for k, v := range tc.params {
+						params[k] = v
+					}
+				}
+				routers.Client.ServeHTTP(w, test.NewRequest(t, "GET", requestPath, test.WithQueryParams(params)))
+
+				if tc.wantError && w.Code == 200 {
+					t.Fatalf("Expected an error, but got none")
+				}
+				t.Log(w.Body.String())
+				resp := routing.ContextRespsonse{}
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				if tc.wantStateLength > 0 && tc.wantStateLength != len(resp.State) {
+					t.Fatalf("expected %d state events, got %d", tc.wantStateLength, len(resp.State))
+				}
+				if tc.wantBeforeLength > 0 && tc.wantBeforeLength != len(resp.EventsBefore) {
+					t.Fatalf("expected %d before events, got %d", tc.wantBeforeLength, len(resp.EventsBefore))
+				}
+				if tc.wantAfterLength > 0 && tc.wantAfterLength != len(resp.EventsAfter) {
+					t.Fatalf("expected %d after events, got %d", tc.wantAfterLength, len(resp.EventsAfter))
+				}
+
+				if !tc.wantError && resp.Event.EventID != eventID {
+					t.Fatalf("unexpected eventID %s, expected %s", resp.Event.EventID, eventID)
+				}
+			})
 		})
 	}
 }
@@ -1339,13 +1377,12 @@ func TestUpdateRelations(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		t.Cleanup(closeRig)
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		cm := sqlutil.NewConnectionManager(svc)
 
-		db, err := storage.NewSyncServerDatasource(ctx, cm, &cfg.SyncAPI.Database)
+		db, err := storage.NewSyncServerDatabase(ctx, cm)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1378,28 +1415,29 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 
 	routers := httputil.NewRouters()
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	cfg.SyncAPI.Fulltext.Enabled = true
 
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	caches, err := caching.NewCache(&cfg.Global.Cache)
+	cm := sqlutil.NewConnectionManager(svc)
+	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
 
 	// Use an actual roomserver for this
-	natsInstance := jetstream.NATSInstance{}
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
+	qm := queueutil.NewQueueManager(svc)
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
 
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 
 	room := test.NewRoom(t, user)
-	AddPublicRoutes(ctx, routers, cfg, cm, &natsInstance, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, caching.DisableMetrics)
+	AddPublicRoutes(ctx, routers, cfg, cm, qm, am, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, caches, cacheutil.DisableMetrics)
 
 	if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 		t.Fatalf("failed to send events: %v", err)
@@ -1425,7 +1463,7 @@ func TestRemoveEditedEventFromSearchIndex(t *testing.T) {
 			t.Fatalf("failed to send events: %v", err)
 		}
 
-		syncUntil(t, routers, alice.AccessToken, false, func(syncBody string) bool {
+		syncUntil(ctx, t, routers, alice.AccessToken, false, func(syncBody string) bool {
 			// wait for the last sent eventID to come down sync
 			path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, e.EventID())
 
@@ -1462,7 +1500,7 @@ func searchRequest(t *testing.T, router *mux.Router, accessToken, searchTerm str
 	assert.NoError(t, err)
 	return body
 }
-func syncUntil(t *testing.T,
+func syncUntil(ctx context.Context, t *testing.T,
 	routers httputil.Routers, accessToken string,
 	skip bool,
 	checkFunc func(syncBody string) bool,
@@ -1477,7 +1515,6 @@ func syncUntil(t *testing.T,
 	// loop on /sync until we receive the last send message or timeout after 5 seconds, since we don't know if the message made it
 	// to the syncAPI when hitting /sync
 	done := make(chan bool)
-	defer close(done)
 	go func() {
 		for {
 			w := httptest.NewRecorder()
@@ -1487,26 +1524,33 @@ func syncUntil(t *testing.T,
 			})))
 			if checkFunc(w.Body.String()) {
 				done <- true
+				close(done)
 				return
 			}
 		}
+
 	}()
 
 	select {
+	case <-ctx.Done():
 	case <-done:
 	case <-time.After(time.Second * 5):
 		t.Fatalf("Timed out waiting for messages")
 	}
 }
 
-func toNATSMsgs(t *testing.T, cfg *config.Dendrite, input ...*rstypes.HeaderedEvent) []*nats.Msg {
-	result := make([]*nats.Msg, len(input))
+func toQueueMsgs(t *testing.T, input ...*rstypes.HeaderedEvent) []*testrig.QMsg {
+	result := make([]*testrig.QMsg, len(input))
+
 	for i, ev := range input {
 		var addsStateIDs []string
 		if ev.StateKey() != nil {
 			addsStateIDs = append(addsStateIDs, ev.EventID())
 		}
-		result[i] = testrig.NewOutputEventMsg(t, cfg, ev.RoomID().String(), rsapi.OutputEvent{
+
+		roomID := ev.RoomID()
+
+		result[i] = testrig.NewOutputEventMsg(t, &roomID, rsapi.OutputEvent{
 			Type: rsapi.OutputTypeNewRoomEvent,
 			NewRoomEvent: &rsapi.OutputNewRoomEvent{
 				Event:             ev,

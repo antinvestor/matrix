@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,22 +23,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/nats-io/nats.go"
-	"github.com/stretchr/testify/assert"
-	"gotest.tools/v3/poll"
-
 	"github.com/antinvestor/matrix/federationapi/producers"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	keyAPI "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/frame"
+	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/poll"
 )
 
 const (
@@ -64,6 +63,14 @@ var (
 	testEvents      []*rstypes.HeaderedEvent
 	testStateEvents = make(map[gomatrixserverlib.StateKeyTuple]*rstypes.HeaderedEvent)
 )
+
+type msgHandler struct {
+	f func(ctx context.Context, metadata map[string]string, message []byte) error
+}
+
+func (h *msgHandler) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+	return h.f(ctx, metadata, message)
+}
 
 type FakeRsAPI struct {
 	rsAPI.RoomserverInternalAPI
@@ -107,7 +114,8 @@ func (r *FakeRsAPI) InputRoomEvents(
 
 func TestEmptyTransactionRequest(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", nil, nil, nil, false, []json.RawMessage{}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
 
@@ -117,7 +125,8 @@ func TestEmptyTransactionRequest(t *testing.T) {
 
 func TestProcessTransactionRequestPDU(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	keyRing := &test.NopJSONVerifier{}
 	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testEvent}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -131,7 +140,8 @@ func TestProcessTransactionRequestPDU(t *testing.T) {
 
 func TestProcessTransactionRequestPDUs(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	keyRing := &test.NopJSONVerifier{}
 	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, append(testData, testEvent), []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -145,7 +155,8 @@ func TestProcessTransactionRequestPDUs(t *testing.T) {
 
 func TestProcessTransactionRequestBadPDU(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	pdu := json.RawMessage("{\"room_id\":\"asdf\"}")
 	pdu2 := json.RawMessage("\"roomid\":\"asdf\"")
 	keyRing := &test.NopJSONVerifier{}
@@ -161,7 +172,8 @@ func TestProcessTransactionRequestBadPDU(t *testing.T) {
 
 func TestProcessTransactionRequestPDUQueryFailure(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	keyRing := &test.NopJSONVerifier{}
 	txn := NewTxnReq(&FakeRsAPI{shouldFailQuery: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testEvent}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -172,7 +184,8 @@ func TestProcessTransactionRequestPDUQueryFailure(t *testing.T) {
 
 func TestProcessTransactionRequestPDUBannedFromRoom(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	keyRing := &test.NopJSONVerifier{}
 	txn := NewTxnReq(&FakeRsAPI{bannedFromRoom: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testEvent}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -186,7 +199,9 @@ func TestProcessTransactionRequestPDUBannedFromRoom(t *testing.T) {
 
 func TestProcessTransactionRequestPDUInvalidSignature(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	keyRing := &test.NopJSONVerifier{}
 	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{invalidSignatures}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -198,32 +213,59 @@ func TestProcessTransactionRequestPDUInvalidSignature(t *testing.T) {
 	}
 }
 
-func createTransactionWithEDU(ctx context.Context, t *testing.T, edus []gomatrixserverlib.EDU) (*config.Dendrite, TxnReq, nats.JetStreamContext, func()) {
+func createTransactionWithEDU(ctx context.Context, svc *frame.Service, cfg *config.Matrix, edus []gomatrixserverlib.EDU) (*TxnReq, queueutil.QueueManager, error) {
 
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
+	qm := queueutil.NewQueueManager(svc)
 
-	natsInstance := &jetstream.NATSInstance{}
-	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+	cfgUserApi := cfg.UserAPI
+	cfgSyncApi := cfg.SyncAPI
+
+	_, err := qm.GetOrCreatePublisher(ctx, &cfgSyncApi.Queues.OutputReceiptEvent)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgSyncApi.Queues.OutputSendToDeviceEvent)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgSyncApi.Queues.OutputTypingEvent)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgSyncApi.Queues.OutputPresenceEvent)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgUserApi.Queues.InputDeviceListUpdate)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgUserApi.Queues.InputSigningKeyUpdate)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	producer := &producers.SyncAPIProducer{
-		JetStream:              js,
-		TopicReceiptEvent:      cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		TopicTypingEvent:       cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		TopicPresenceEvent:     cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
-		TopicDeviceListUpdate:  cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
-		TopicSigningKeyUpdate:  cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		Qm:                     qm,
+		TopicReceiptEvent:      cfgSyncApi.Queues.OutputReceiptEvent.Ref(),
+		TopicSendToDeviceEvent: cfgSyncApi.Queues.OutputSendToDeviceEvent.Ref(),
+		TopicTypingEvent:       cfgSyncApi.Queues.OutputTypingEvent.Ref(),
+		TopicPresenceEvent:     cfgSyncApi.Queues.OutputPresenceEvent.Ref(),
+		TopicDeviceListUpdate:  cfgUserApi.Queues.InputDeviceListUpdate.Ref(),
+		TopicSigningKeyUpdate:  cfgUserApi.Queues.InputSigningKeyUpdate.Ref(),
 		Config:                 &cfg.FederationAPI,
 		UserAPI:                nil,
 	}
 	keyRing := &test.NopJSONVerifier{}
 	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, producer, true, []json.RawMessage{}, edus, "kaer.morhen", "", "ourserver")
-	return cfg, txn, js, closeRig
+	return &txn, qm, nil
 }
 
 func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 	var err error
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	roomID := "!roomid:kaer.morhen"
 	userID := "@userid:kaer.morhen"
@@ -237,37 +279,31 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.typing"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	cfg, txn, js, closeFn := createTransactionWithEDU(ctx, t, edus)
-	defer closeFn()
+	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)
+	assert.NoError(t, err)
 
 	received := atomic.Bool{}
-	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
-		msg := msgs[0] // Guaranteed to exist if onMessage is called
-		room := msg.Header.Get(jetstream.RoomID)
+
+	h := &msgHandler{f: func(ctx context.Context, metadata map[string]string, message []byte) error {
+
+		room := metadata[constants.RoomID]
 		assert.Equal(t, roomID, room)
-		user := msg.Header.Get(jetstream.UserID)
+		user := metadata[constants.UserID]
 		assert.Equal(t, userID, user)
-		typ, parseErr := strconv.ParseBool(msg.Header.Get("typing"))
+		typ, parseErr := strconv.ParseBool(metadata["typing"])
 		if parseErr != nil {
-			return true
+			return nil
 		}
 		assert.Equal(t, typing, typ)
 
 		received.Store(true)
-		return true
-	}
+		return nil
+	}}
 
-	outputTypingEventTopic := cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent)
-	eventTopicDurable := cfg.Global.JetStream.Durable("TestTypingConsumer")
-
-	err = jetstream.Consumer(
-		ctx, js, outputTypingEventTopic,
-		eventTopicDurable, 1,
-		onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
+	err = qm.RegisterSubscriber(ctx, &cfg.SyncAPI.Queues.OutputTypingEvent, h)
 	assert.Nil(t, err)
 
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -286,7 +322,8 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 	var err error
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	sender := "@userid:kaer.morhen"
 	messageID := "$x4MKEPRSF6OGlo0qpnsP3BfSmYX5HhVlykOsQH3ECyg"
@@ -310,36 +347,33 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.direct_to_device"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	cfg, txn, js, closeFn := createTransactionWithEDU(ctx, t, edus)
-	defer closeFn()
+	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)
+	assert.NoError(t, err)
 
 	received := atomic.Bool{}
-	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
-		msg := msgs[0] // Guaranteed to exist if onMessage is called
+	h := &msgHandler{f: func(ctx context.Context, metadata map[string]string, message []byte) error {
 
 		var output types.OutputSendToDeviceEvent
-		if err = json.Unmarshal(msg.Data, &output); err != nil {
+		if err = json.Unmarshal(message, &output); err != nil {
 			// If the message was invalid, log it and move on to the next message in the stream
 			println(err.Error())
-			return true
+			return nil
 		}
 		assert.Equal(t, sender, output.Sender)
 		assert.Equal(t, msgType, output.Type)
 
 		received.Store(true)
-		return true
-	}
+		return nil
+	}}
 
-	outputSendToDeviceEventTopic := cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent)
-	eventTopicDurable := cfg.Global.JetStream.Durable("TestToDevice")
-	err = jetstream.Consumer(
-		ctx, js, outputSendToDeviceEventTopic,
-		eventTopicDurable, 1,
-		onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
+	outputQOpts := cfg.SyncAPI.Queues.OutputSendToDeviceEvent
+	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject").
+		ExtendQuery("consumer_headers_only", "false")
+
+	err = qm.RegisterSubscriber(ctx, &outputQOpts, h)
 	assert.Nil(t, err)
 
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -358,7 +392,8 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 	var err error
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	deviceID := "QBUAZIFURK"
 	userID := "@john:example.com"
@@ -393,37 +428,29 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.device_list_update"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	cfg, txn, js, closeFn := createTransactionWithEDU(ctx, t, edus)
-	defer closeFn()
+	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)
+	assert.NoError(t, err)
 
 	received := atomic.Bool{}
-	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
-		msg := msgs[0] // Guaranteed to exist if onMessage is called
+	h := &msgHandler{f: func(ctx context.Context, metadata map[string]string, message []byte) error {
 
 		var output gomatrixserverlib.DeviceListUpdateEvent
-		if err = json.Unmarshal(msg.Data, &output); err != nil {
+		if err = json.Unmarshal(message, &output); err != nil {
 			// If the message was invalid, log it and move on to the next message in the stream
 			println(err.Error())
-			return true
+			return nil
 		}
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, deviceID, output.DeviceID)
 
 		received.Store(true)
-		return true
-	}
+		return nil
+	}}
 
-	inputDeviceListUpdateTopic := cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate)
-	eventTopicDurable := cfg.Global.JetStream.Durable("TestDeviceListUpdate")
-
-	err = jetstream.Consumer(
-		ctx, js, inputDeviceListUpdateTopic,
-		eventTopicDurable, 1,
-		onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
+	err = qm.RegisterSubscriber(ctx, &cfg.UserAPI.Queues.InputDeviceListUpdate, h)
 	assert.Nil(t, err)
 
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -442,7 +469,8 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 	var err error
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	roomID := "!some_room:example.org"
 	edu := gomatrixserverlib.EDU{Type: "m.receipt"}
@@ -463,7 +491,7 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.receipt"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	badUser := gomatrixserverlib.EDU{Type: "m.receipt"}
 	if badUser.Content, err = json.Marshal(map[string]interface{}{
 		roomID: map[string]interface{}{
@@ -500,29 +528,21 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 	}
 	edus := []gomatrixserverlib.EDU{badEDU, badUser, edu}
 
-	cfg, txn, js, closeFn := createTransactionWithEDU(ctx, t, edus)
-	defer closeFn()
+	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)
+	assert.Nil(t, err)
 
 	received := atomic.Bool{}
-	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
-		msg := msgs[0] // Guaranteed to exist if onMessage is called
+	h := &msgHandler{f: func(ctx context.Context, metadata map[string]string, message []byte) error {
 
 		var output types.OutputReceiptEvent
-		output.RoomID = msg.Header.Get(jetstream.RoomID)
+		output.RoomID = metadata[constants.RoomID]
 		assert.Equal(t, roomID, output.RoomID)
 
 		received.Store(true)
-		return true
-	}
+		return nil
+	}}
 
-	outputReceiptEventTopic := cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent)
-	eventTopicDurable := cfg.Global.JetStream.Durable("TestReceipt")
-
-	err = jetstream.Consumer(
-		ctx, js, outputReceiptEventTopic,
-		eventTopicDurable, 1,
-		onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
+	err = qm.RegisterSubscriber(ctx, &cfg.SyncAPI.Queues.OutputReceiptEvent, h)
 	assert.Nil(t, err)
 
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -541,42 +561,35 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 	var err error
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	edu := gomatrixserverlib.EDU{Type: "m.signing_key_update"}
-	if edu.Content, err = json.Marshal(map[string]interface{}{}); err != nil {
+	if edu.Content, err = json.Marshal(map[string]any{}); err != nil {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.signing_key_update"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	cfg, txn, js, closeFn := createTransactionWithEDU(ctx, t, edus)
-	defer closeFn()
+	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)
+	assert.NoError(t, err)
 
 	received := atomic.Bool{}
-	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
-		msg := msgs[0] // Guaranteed to exist if onMessage is called
+	h := &msgHandler{f: func(ctx context.Context, metadata map[string]string, message []byte) error {
 
 		var output keyAPI.CrossSigningKeyUpdate
-		if err = json.Unmarshal(msg.Data, &output); err != nil {
+		if err = json.Unmarshal(message, &output); err != nil {
 			// If the message was invalid, log it and move on to the next message in the stream
-			println(err.Error())
-			return true
+			println(" CrsSgn K ", string(message), " error : ", err.Error())
+			return nil
 		}
 
 		received.Store(true)
-		return true
-	}
+		return nil
+	}}
 
-	inputSigningKeyUpdateTopic := cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate)
-	eventTopicDurable := cfg.Global.JetStream.Durable("TestSigningKeyUpdate")
-
-	err = jetstream.Consumer(
-		ctx, js, inputSigningKeyUpdateTopic,
-		eventTopicDurable, 1,
-		onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
+	err = qm.RegisterSubscriber(ctx, &cfg.UserAPI.Queues.InputSigningKeyUpdate, h)
 	assert.Nil(t, err)
 
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -595,7 +608,8 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 	var err error
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	userID := "@john:kaer.morhen"
 	presence := "online"
@@ -612,33 +626,26 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 	badEDU := gomatrixserverlib.EDU{Type: "m.presence"}
-	badEDU.Content = spec.RawJSON("badjson")
+	badEDU.Content = json.RawMessage("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	cfg, txn, js, closeFn := createTransactionWithEDU(ctx, t, edus)
-	defer closeFn()
+	txn, qm, err := createTransactionWithEDU(ctx, svc, cfg, edus)
+	assert.NoError(t, err)
 
 	received := atomic.Bool{}
-	onMessage := func(_ context.Context, msgs []*nats.Msg) bool {
-		msg := msgs[0] // Guaranteed to exist if onMessage is called
 
-		userIDRes := msg.Header.Get(jetstream.UserID)
-		presenceRes := msg.Header.Get("presence")
+	h := &msgHandler{f: func(ctx context.Context, metadata map[string]string, message []byte) error {
+
+		userIDRes := metadata[constants.UserID]
+		presenceRes := metadata["presence"]
 		assert.Equal(t, userID, userIDRes)
 		assert.Equal(t, presence, presenceRes)
 
 		received.Store(true)
-		return true
-	}
+		return nil
+	}}
 
-	outputPresenceEventTopic := cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent)
-	eventTopicDurable := cfg.Global.JetStream.Durable("TestPresence")
-
-	err = jetstream.Consumer(
-		ctx, js, outputPresenceEventTopic,
-		eventTopicDurable, 1,
-		onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
+	err = qm.RegisterSubscriber(ctx, &cfg.SyncAPI.Queues.OutputPresenceEvent, h)
 	assert.Nil(t, err)
 
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
@@ -657,15 +664,16 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 func TestProcessTransactionRequestEDUUnhandled(t *testing.T) {
 	var err error
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	edu := gomatrixserverlib.EDU{Type: "m.unhandled"}
 	if edu.Content, err = json.Marshal(map[string]interface{}{}); err != nil {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 
-	_, txn, _, closeFn := createTransactionWithEDU(ctx, t, []gomatrixserverlib.EDU{edu})
-	defer closeFn()
+	txn, _, err := createTransactionWithEDU(ctx, svc, cfg, []gomatrixserverlib.EDU{edu})
+	assert.NoError(t, err)
 
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)
 
@@ -802,7 +810,8 @@ func mustCreateTransaction(rsAPI rsAPI.FederationRoomserverAPI, pdus []json.RawM
 
 func mustProcessTransaction(t *testing.T, txn *TxnReq, pdusWithErrors []string) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	res, err := txn.ProcessTransaction(ctx)
 	if err != nil {

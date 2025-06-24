@@ -22,7 +22,7 @@ import (
 )
 
 // DefaultCleanupPeriod represents the default time duration after which cacheCleanService runs.
-const DefaultCleanupPeriod time.Duration = 30 * time.Minute
+const DefaultCleanupPeriod = 30 * time.Minute
 
 type txnsMap map[CacheKey]*util.JSONResponse
 

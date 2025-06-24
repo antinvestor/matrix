@@ -1,0 +1,12 @@
+version: v2
+modules:
+  - path: ./
+    name: buf.build/antinvestor/presence
+deps:
+  - buf.build/bufbuild/protovalidate
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - STANDARD

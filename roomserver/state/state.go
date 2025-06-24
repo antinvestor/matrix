@@ -1,6 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
 // Copyright 2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,12 +25,11 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type StateResolutionStorage interface {
@@ -138,7 +137,7 @@ func (v *StateResolution) LoadStateAtSnapshot(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+			panic(fmt.Errorf("corrupt Cm: Missing state block numeric ID %d", stateBlockNID))
 		}
 		fullState = append(fullState, entries...)
 	}
@@ -220,7 +219,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			return nil, fmt.Errorf("corrupt DB: Missing state snapshot numeric ID %d", stateBlockNIDList.StateSnapshotNID)
+			return nil, fmt.Errorf("corrupt Cm: Missing state snapshot numeric ID %d", stateBlockNIDList.StateSnapshotNID)
 		}
 
 		for _, stateBlockNID := range stateBlockNIDs {
@@ -228,7 +227,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 			if !ok {
 				// This should only get hit if the database is corrupt.
 				// It should be impossible for an event to reference a NID that doesn't exist
-				return nil, fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID)
+				return nil, fmt.Errorf("corrupt Cm: Missing state block numeric ID %d", stateBlockNID)
 			}
 
 			evIDs := snapshotNIDMap[stateBlockNIDList.StateSnapshotNID]
@@ -310,7 +309,7 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("corrupt DB: Missing state snapshot numeric ID %d", prevState.BeforeStateSnapshotNID))
+			panic(fmt.Errorf("corrupt Cm: Missing state snapshot numeric ID %d", prevState.BeforeStateSnapshotNID))
 		}
 
 		// Combine all the state entries for this snapshot.
@@ -321,7 +320,7 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 			if !ok {
 				// This should only get hit if the database is corrupt.
 				// It should be impossible for an event to reference a NID that doesn't exist
-				panic(fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+				panic(fmt.Errorf("corrupt Cm: Missing state block numeric ID %d", stateBlockNID))
 			}
 			fullState = append(fullState, entries...)
 		}
@@ -772,13 +771,13 @@ func (v *StateResolution) CalculateAndStoreStateAfterEvents(
 			// 4) The number of state data blocks is small enough that we can just
 			// add the state event as a block of size one to the end of the blocks.
 			metrics.algorithm = "single_delta"
-			stateNID, err := v.db.AddState(
+			stateNID, err0 := v.db.AddState(
 				ctx, v.roomInfo.RoomNID, stateBlockNIDs, []types.StateEntry{prevState.StateEntry},
 			)
-			if err != nil {
-				err = fmt.Errorf("v.db.AddState: %w", err)
+			if err0 != nil {
+				err0 = fmt.Errorf("v.db.AddState: %w", err0)
 			}
-			return metrics.stop(stateNID, err)
+			return metrics.stop(stateNID, err0)
 		}
 		// If there are too many deltas then we need to calculate the full state
 		// So fall through to calculateAndStoreStateAfterManyEvents
@@ -1166,7 +1165,7 @@ func (v *StateResolution) loadStateEvents(
 	for _, entry := range eventEntries {
 		event, ok := eventMap(events).lookup(entry.EventNID)
 		if !ok {
-			panic(fmt.Errorf("corrupt DB: Missing event numeric ID %d", entry.EventNID))
+			panic(fmt.Errorf("corrupt Cm: Missing event numeric ID %d", entry.EventNID))
 		}
 		result = append(result, event.PDU)
 		eventIDMap[event.EventID()] = entry

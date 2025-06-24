@@ -7,12 +7,11 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-
 	asAPI "github.com/antinvestor/matrix/appservice/api"
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // ErrInvalidID is an error returned if the userID is invalid
@@ -263,7 +262,7 @@ type ClientRoomserverAPI interface {
 	// If true, then the alias has not been set to the provided room, as it already in use.
 	SetRoomAlias(ctx context.Context, senderID spec.SenderID, roomID spec.RoomID, alias string) (aliasAlreadyExists bool, err error)
 
-	//RemoveRoomAlias(ctx context.Context, req *RemoveRoomAliasRequest, res *RemoveRoomAliasResponse) error
+	// RemoveRoomAlias(ctx context.Context, req *RemoveRoomAliasRequest, res *RemoveRoomAliasResponse) error
 	// Removes a room alias, as provided sender.
 	//
 	// Returns whether the alias was found, whether it was removed, and an error (if any occurred)

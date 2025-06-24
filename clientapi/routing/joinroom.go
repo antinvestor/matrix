@@ -70,7 +70,7 @@ func JoinRoomByIDOrAlias(
 		joinReq.Content["displayname"] = profile.DisplayName
 		joinReq.Content["avatar_url"] = profile.AvatarURL
 	case appserviceAPI.ErrProfileNotExists:
-		util.GetLogger(req.Context()).Error("Unable to query user profile, no profile found.")
+		util.Log(req.Context()).Error("Unable to query user profile, no profile found.")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("Unable to query user profile, no profile found."),

@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	userapi "github.com/antinvestor/matrix/userapi/api"
@@ -13,7 +11,6 @@ import (
 
 type SyncRequest struct {
 	Context       context.Context
-	Log           *logrus.Entry
 	Device        *userapi.Device
 	Response      *Response
 	Filter        synctypes.Filter

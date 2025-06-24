@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,38 +16,17 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-
-	"github.com/lib/pq"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
-func NewPostgresNotificationDataTable(ctx context.Context, db *sql.DB) (tables.NotificationData, error) {
-	_, err := db.Exec(notificationDataSchema)
-	if err != nil {
-		return nil, err
-	}
-	r := &notificationDataStatements{}
-	return r, sqlutil.StatementList{
-		{&r.upsertRoomUnreadCounts, upsertRoomUnreadNotificationCountsSQL},
-		{&r.selectUserUnreadCountsForRooms, selectUserUnreadNotificationsForRooms},
-		{&r.selectMaxID, selectMaxNotificationIDSQL},
-		{&r.purgeNotificationData, purgeNotificationDataSQL},
-	}.Prepare(db)
-}
-
-type notificationDataStatements struct {
-	upsertRoomUnreadCounts         *sql.Stmt
-	selectUserUnreadCountsForRooms *sql.Stmt
-	selectMaxID                    *sql.Stmt
-	purgeNotificationData          *sql.Stmt
-}
-
+// Schema for notification data table
 const notificationDataSchema = `
 CREATE TABLE IF NOT EXISTS syncapi_notification_data (
 	id BIGSERIAL PRIMARY KEY,
@@ -58,32 +37,88 @@ CREATE TABLE IF NOT EXISTS syncapi_notification_data (
 	CONSTRAINT syncapi_notification_data_unique UNIQUE (user_id, room_id)
 );`
 
-const upsertRoomUnreadNotificationCountsSQL = `INSERT INTO syncapi_notification_data
+// Revert schema for notification data table
+const notificationDataSchemaRevert = `
+DROP TABLE IF EXISTS syncapi_notification_data;
+`
+
+// SQL query to upsert room unread notification counts
+const upsertRoomUnreadNotificationCountsSQL = `
+INSERT INTO syncapi_notification_data
   (user_id, room_id, notification_count, highlight_count)
   VALUES ($1, $2, $3, $4)
   ON CONFLICT (user_id, room_id)
   DO UPDATE SET id = nextval('syncapi_notification_data_id_seq'), notification_count = $3, highlight_count = $4
-  RETURNING id`
+  RETURNING id
+`
 
-const selectUserUnreadNotificationsForRooms = `SELECT room_id, notification_count, highlight_count
+// SQL query to select user unread notifications for rooms
+const selectUserUnreadNotificationsForRooms = `
+SELECT room_id, notification_count, highlight_count
 	FROM syncapi_notification_data
 	WHERE user_id = $1 AND
-	      room_id = ANY($2)`
+	      room_id = ANY($2)
+`
 
-const selectMaxNotificationIDSQL = `SELECT CASE COUNT(*) WHEN 0 THEN 0 ELSE MAX(id) END FROM syncapi_notification_data`
+// SQL query to select max notification ID
+const selectMaxNotificationIDSQL = `
+SELECT CASE COUNT(*) WHEN 0 THEN 0 ELSE MAX(id) END FROM syncapi_notification_data
+`
 
-const purgeNotificationDataSQL = "" +
-	"DELETE FROM syncapi_notification_data WHERE room_id = $1"
+// SQL query to purge notification data
+const purgeNotificationDataSQL = `
+DELETE FROM syncapi_notification_data WHERE room_id = $1
+`
 
-func (r *notificationDataStatements) UpsertRoomUnreadCounts(ctx context.Context, txn *sql.Tx, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
-	err = sqlutil.TxStmt(txn, r.upsertRoomUnreadCounts).QueryRowContext(ctx, userID, roomID, notificationCount, highlightCount).Scan(&pos)
+// notificationDataTable implements tables.NotificationData
+type notificationDataTable struct {
+	cm                                    sqlutil.ConnectionManager
+	upsertRoomUnreadNotificationCountsSQL string
+	selectUserUnreadNotificationsForRooms string
+	selectMaxNotificationIDSQL            string
+	purgeNotificationDataSQL              string
+}
+
+// NewPostgresNotificationDataTable creates a new notification data table
+func NewPostgresNotificationDataTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.NotificationData, error) {
+
+	// Perform the migration
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "syncapi_notification_data_table_schema_001",
+		Patch:       notificationDataSchema,
+		RevertPatch: notificationDataSchemaRevert,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	t := &notificationDataTable{
+		cm:                                    cm,
+		upsertRoomUnreadNotificationCountsSQL: upsertRoomUnreadNotificationCountsSQL,
+		selectUserUnreadNotificationsForRooms: selectUserUnreadNotificationsForRooms,
+		selectMaxNotificationIDSQL:            selectMaxNotificationIDSQL,
+		purgeNotificationDataSQL:              purgeNotificationDataSQL,
+	}
+
+	return t, nil
+}
+
+// UpsertRoomUnreadCounts updates or inserts unread counts for a room
+func (t *notificationDataTable) UpsertRoomUnreadCounts(
+	ctx context.Context, userID, roomID string, notificationCount, highlightCount int,
+) (pos types.StreamPosition, err error) {
+	db := t.cm.Connection(ctx, false)
+	row := db.Raw(t.upsertRoomUnreadNotificationCountsSQL, userID, roomID, notificationCount, highlightCount).Row()
+	err = row.Scan(&pos)
 	return
 }
 
-func (r *notificationDataStatements) SelectUserUnreadCountsForRooms(
-	ctx context.Context, txn *sql.Tx, userID string, roomIDs []string,
+// SelectUserUnreadCountsForRooms retrieves unread counts for multiple rooms
+func (t *notificationDataTable) SelectUserUnreadCountsForRooms(
+	ctx context.Context, userID string, roomIDs []string,
 ) (map[string]*eventutil.NotificationData, error) {
-	rows, err := sqlutil.TxStmt(txn, r.selectUserUnreadCountsForRooms).QueryContext(ctx, userID, pq.Array(roomIDs))
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectUserUnreadNotificationsForRooms, userID, pq.Array(roomIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -106,15 +141,19 @@ func (r *notificationDataStatements) SelectUserUnreadCountsForRooms(
 	return roomCounts, rows.Err()
 }
 
-func (r *notificationDataStatements) SelectMaxID(ctx context.Context, txn *sql.Tx) (int64, error) {
+// SelectMaxID returns the maximum notification ID
+func (t *notificationDataTable) SelectMaxID(ctx context.Context) (int64, error) {
 	var id int64
-	err := sqlutil.TxStmt(txn, r.selectMaxID).QueryRowContext(ctx).Scan(&id)
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectMaxNotificationIDSQL).Row()
+	err := row.Scan(&id)
 	return id, err
 }
 
-func (s *notificationDataStatements) PurgeNotificationData(
-	ctx context.Context, txn *sql.Tx, roomID string,
+// PurgeNotificationData purges all notification data for a room
+func (t *notificationDataTable) PurgeNotificationData(
+	ctx context.Context, roomID string,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeNotificationData).ExecContext(ctx, roomID)
-	return err
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.purgeNotificationDataSQL, roomID).Error
 }

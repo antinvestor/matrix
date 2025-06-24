@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,14 +20,12 @@ import (
 	"net/http"
 	"sync"
 
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+	"golang.org/x/oauth2"
 )
 
 // Type represents an auth type
@@ -177,10 +175,10 @@ func (u *UserInteractive) challenge(sessionID string) *util.JSONResponse {
 }
 
 // NewSession returns a challenge with a new session ID and remembers the session ID
-func (u *UserInteractive) NewSession() *util.JSONResponse {
+func (u *UserInteractive) NewSession(ctx context.Context) *util.JSONResponse {
 	sessionID, err := GenerateAccessToken()
 	if err != nil {
-		logrus.WithError(err).Error("failed to generate session ID")
+		util.Log(ctx).WithError(err).Error("failed to generate session ID")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -230,7 +228,7 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	// https://matrix.org/docs/spec/client_server/r0.6.1#user-interactive-api-in-the-rest-api
 	hasResponse := gjson.GetBytes(bodyBytes, "auth").Exists()
 	if !hasResponse {
-		return nil, u.NewSession()
+		return nil, u.NewSession(ctx)
 	}
 
 	// extract the type so we know which login type to use

@@ -16,31 +16,32 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
-	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
-	"github.com/pitabwire/frame"
-
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	apis "github.com/antinvestor/apis/go/common"
+	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
-
 	"github.com/antinvestor/gomatrixserverlib/fclient"
-	"github.com/antinvestor/matrix/internal"
-	"github.com/antinvestor/matrix/internal/caching"
-	"github.com/antinvestor/matrix/internal/httputil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/getsentry/sentry-go"
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/antinvestor/matrix/appservice"
 	"github.com/antinvestor/matrix/federationapi"
+	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/setup"
 	basepkg "github.com/antinvestor/matrix/setup/base"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/mscs"
 	"github.com/antinvestor/matrix/userapi"
+	"github.com/getsentry/sentry-go"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
@@ -50,10 +51,10 @@ func main() {
 	cfg := setup.ParseFlags(true)
 	globalCfg := cfg.Global
 
-	ctx, service := frame.NewService(serviceName, frame.Config(&globalCfg))
+	ctx, service := frame.NewService(serviceName, frame.WithConfig(&globalCfg))
 	defer service.Stop(ctx)
 
-	log := service.L(ctx)
+	log := util.Log(ctx)
 
 	log.
 		WithField("oauth2 service uri", globalCfg.Oauth2ServiceURI).
@@ -61,16 +62,16 @@ func main() {
 		WithField("debug", globalCfg.LoggingLevel()).
 		Info("debug configuration values")
 
-	configErrors := &config.ConfigErrors{}
+	configErrors := &config.Errors{}
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
-			log.Errorf("Configuration error: %s", err)
+			log.WithField("issue", err).Error("Configuration error")
 		}
-		log.Fatalf("Failed to start due to configuration errors")
+		log.Fatal("Failed to start due to configuration errors")
 	}
 
-	log.Infof("Matrix version %s", internal.VersionString())
+	log.WithField("version", internal.VersionString()).Info("Global version")
 	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
 		log.Warn("Open registration is enabled")
 	}
@@ -79,27 +80,19 @@ func main() {
 	var dnsCache *fclient.DNSCache
 	if globalCfg.DNSCache.Enabled {
 		dnsCache = fclient.NewDNSCache(
-			globalCfg.DNSCache.CacheSize,
-			globalCfg.DNSCache.CacheLifetime,
+			globalCfg.DNSCache.CacheSize, globalCfg.DNSCache.CacheLifetime, []string{}, []string{},
 		)
-		log.Infof(
+		log.Info(
 			"DNS cache enabled (size %d, lifetime %s)",
 			globalCfg.DNSCache.CacheSize,
 			globalCfg.DNSCache.CacheLifetime,
 		)
 	}
 
-	// setup tracing
-	closer, err := cfg.SetupTracing()
-	if err != nil {
-		log.WithError(err).Panicf("failed to start opentracing")
-	}
-	defer closer.Close() // nolint: errcheck
-
 	// setup sentry
 	if globalCfg.Sentry.Enabled {
 		log.Info("Setting up Sentry for debugging...")
-		err = sentry.Init(sentry.ClientOptions{
+		err := sentry.Init(sentry.ClientOptions{
 			Dsn:              globalCfg.Sentry.DSN,
 			Environment:      globalCfg.Sentry.Environment,
 			Debug:            true,
@@ -123,7 +116,7 @@ func main() {
 		Info("distributed apis")
 	if globalCfg.DistributedAPI.Enabled {
 
-		err = service.RegisterForJwt(ctx)
+		err := service.RegisterForJwt(ctx)
 		if err != nil {
 			log.WithError(err).Fatal("main -- could not register fo jwt")
 		}
@@ -150,7 +143,7 @@ func main() {
 			apis.WithTokenPassword(service.JwtClientSecret()),
 			apis.WithAudiences(audienceList...))
 		if err != nil {
-			log.WithError(err).Panicf("failed to initialise profile api client")
+			log.WithError(err).Panic("failed to initialise profile api client")
 		}
 
 		partitionCli, err = partitionv1.NewPartitionsClient(ctx,
@@ -161,7 +154,7 @@ func main() {
 			apis.WithAudiences(audienceList...))
 
 		if err != nil {
-			log.WithError(err).Panicf("failed to initialise partition api client")
+			log.WithError(err).Panic("failed to initialise partition api client")
 		}
 	}
 
@@ -169,19 +162,29 @@ func main() {
 	httpClient := basepkg.CreateClient(cfg, dnsCache)
 
 	// prepare required dependencies
-	cm := sqlutil.NewConnectionManager(ctx, globalCfg.DatabaseOptions)
+	cm := sqlutil.NewConnectionManager(service)
 	routers := httputil.NewRouters()
 
-	globalCfg.Cache.EnablePrometheus = caching.EnableMetrics
-	caches, err := caching.NewCache(&globalCfg.Cache)
+	globalCfg.Cache.EnablePrometheus = cacheutil.EnableMetrics
+	caches, err := cacheutil.NewCache(&globalCfg.Cache)
 	if err != nil {
-		log.WithError(err).Panicf("failed to create cache")
+		log.WithError(err).Panic("failed to create cache")
 	}
 
-	natsInstance := jetstream.NATSInstance{}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.EnableMetrics)
+	qm := queueutil.NewQueueManager(service)
+
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		log.WithError(err).Panic("failed to create the system actor manager")
+	}
+
+	presenceCli := presencev1connect.NewPresenceServiceClient(
+		http.DefaultClient, cfg.Global.SyncAPIPresenceURI,
+	)
+
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.EnableMetrics)
 	fsAPI := federationapi.NewInternalAPI(
-		ctx, cfg, cm, &natsInstance, federationClient, rsAPI, caches, nil, false,
+		ctx, cfg, cm, qm, am, federationClient, rsAPI, caches, nil, false, presenceCli,
 	)
 
 	keyRing := fsAPI.KeyRing()
@@ -191,8 +194,8 @@ func main() {
 	// dependency. Other components also need updating after their dependencies are up.
 	rsAPI.SetFederationAPI(ctx, fsAPI, keyRing)
 
-	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, federationClient, profileCli, caching.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
-	asAPI := appservice.NewInternalAPI(ctx, cfg, &natsInstance, userAPI, rsAPI)
+	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, federationClient, profileCli, cacheutil.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI)
 
 	rsAPI.SetAppserviceAPI(ctx, asAPI)
 	rsAPI.SetUserAPI(ctx, userAPI)
@@ -213,13 +216,15 @@ func main() {
 
 		PartitionCli: partitionCli,
 		ProfileCli:   profileCli,
+
+		PresenceCli: presenceCli,
 	}
-	monolith.AddAllPublicRoutes(ctx, cfg, routers, cm, &natsInstance, caches, caching.EnableMetrics)
+	monolith.AddAllPublicRoutes(ctx, cfg, routers, cm, qm, caches, am, cacheutil.EnableMetrics)
 
 	if len(cfg.MSCs.MSCs) > 0 {
 		err = mscs.Enable(ctx, cfg, cm, routers, &monolith, caches)
 		if err != nil {
-			log.WithError(err).Fatalf("Failed to enable MSCs")
+			log.WithError(err).Fatal("Failed to enable MSCs")
 		}
 	}
 
@@ -240,9 +245,9 @@ func main() {
 	}
 
 	serviceOptions := []frame.Option{httpOpt}
-	service.Init(serviceOptions...)
+	service.Init(ctx, serviceOptions...)
 
-	log.WithField("server http port", globalCfg.HttpServerPort).
+	log.WithField("server http port", globalCfg.HTTPServerPort).
 		Info(" Initiating server operations")
 	defer monolith.Service.Stop(ctx)
 	err = monolith.Service.Run(ctx, "")

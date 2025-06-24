@@ -12,14 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pitabwire/frame"
-
-	"github.com/antinvestor/matrix/test"
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/httputil"
 	basepkg "github.com/antinvestor/matrix/setup/base"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,19 +32,18 @@ func TestLandingPage_Tcp(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	// Hack to get a free port to use in test
 	s := httptest.NewServer(nil)
 	s.Close()
 
 	httpUrl, err := url.Parse(s.URL)
-	cfg.Global.HttpServerPort = fmt.Sprintf(":%s", httpUrl.Port())
+	cfg.Global.HTTPServerPort = fmt.Sprintf(":%s", httpUrl.Port())
 
 	ctx, service := frame.NewServiceWithContext(ctx, "matrix tests",
-		frame.Config(&cfg.Global))
+		frame.WithConfig(&cfg.Global))
 	defer service.Stop(ctx)
 
 	routers := httputil.NewRouters()
@@ -58,7 +54,7 @@ func TestLandingPage_Tcp(t *testing.T) {
 	assert.NoError(t, err)
 
 	go func(ctx context.Context, service *frame.Service, opt frame.Option) {
-		service.Init(opt)
+		service.Init(ctx, opt)
 		err = service.Run(ctx, "")
 	}(ctx, service, opt)
 	time.Sleep(time.Millisecond * 10)

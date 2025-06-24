@@ -10,38 +10,32 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/pushrules"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
-	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/antinvestor/matrix/test/testrig"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/bcrypt"
-
-	"github.com/antinvestor/matrix/internal/pushrules"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/storage"
 	userAPITypes "github.com/antinvestor/matrix/userapi/types"
+	"github.com/pitabwire/frame"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/bcrypt"
 )
 
-func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.UserDatabase, func()) {
+func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.UserDatabase {
 	t.Helper()
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewUserDatabase(ctx, nil, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, "", 4, 0, 0, "")
+
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewUserDatabase(ctx, nil, cm, "", 4, 0, 0, "")
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
-	return db, closeDb
+	return db
 }
 
 func mustCreateEvent(t *testing.T, content string) *types.HeaderedEvent {
@@ -62,9 +56,10 @@ func (f *FakeUserRoomserverAPI) QueryUserIDForSender(ctx context.Context, _ spec
 func Test_evaluatePushRules(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
 		consumer := OutputRoomEventConsumer{db: db, rsAPI: &FakeUserRoomserverAPI{}}
 
 		testCases := []struct {
@@ -155,20 +150,23 @@ func TestLocalRoomMembers(t *testing.T) {
 	room.CreateAndInsert(t, charlie, spec.MRoomMember, map[string]string{"membership": spec.Join}, test.WithStateKey(charlie.ID))
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		natsInstance := &jetstream.NATSInstance{}
+		cm := sqlutil.NewConnectionManager(svc)
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		db, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+		db, err := storage.NewUserDatabase(ctx, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 		assert.NoError(t, err)
 
 		err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
@@ -265,9 +263,9 @@ func TestMessageStats(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -308,18 +306,22 @@ func TestMessageStats(t *testing.T) {
 func BenchmarkLocalRoomMembers(b *testing.B) {
 	t := &testing.T{}
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	natsInstance := &jetstream.NATSInstance{}
-	caches, err := caching.NewCache(&cfg.Global.Cache)
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
+
+	cm := sqlutil.NewConnectionManager(svc)
+	qm := queueutil.NewQueueManager(svc)
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
+	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
-	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
-	db, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+	db, err := storage.NewUserDatabase(ctx, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 	assert.NoError(b, err)
 
 	consumer := OutputRoomEventConsumer{db: db, rsAPI: rsAPI, serverName: "test", cfg: &cfg.UserAPI}

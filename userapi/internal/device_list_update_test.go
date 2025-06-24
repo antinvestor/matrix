@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,21 +27,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	api2 "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/statistics"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-
 	roomserver "github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
+	"github.com/pitabwire/frame"
 )
 
 type mockKeyChangeProducer struct {
@@ -158,7 +156,8 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) fclient.F
 // Test that the device keys get persisted and emitted if we have the previous IDs.
 func TestUpdateHavePrevID(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
@@ -168,7 +167,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 	}
 	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
-	updater := NewDeviceListUpdater(ctx, db, ap, producer, nil, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+	updater := NewDeviceListUpdater(ctx, db, ap, producer, nil, 1, nil, "localhost", cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 	event := gomatrixserverlib.DeviceListUpdateEvent{
 		DeviceDisplayName: "Foo Bar",
 		Deleted:           false,
@@ -196,7 +195,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 		t.Errorf("Update didn't produce correct event, got %v want %v", producer.events, want)
 	}
 	if !reflect.DeepEqual(db.storedKeys, []api.DeviceMessage{want}) {
-		t.Errorf("DB didn't store correct event, got %v want %v", db.storedKeys, want)
+		t.Errorf("Cm didn't store correct event, got %v want %v", db.storedKeys, want)
 	}
 	if db.isStale(event.UserID) {
 		t.Errorf("%s incorrectly marked as stale", event.UserID)
@@ -207,7 +206,8 @@ func TestUpdateHavePrevID(t *testing.T) {
 // and that the user's devices are marked as stale until it succeeds.
 func TestUpdateNoPrevID(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
@@ -243,7 +243,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 			`)),
 		}, nil
 	})
-	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 2, nil, "example.test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 2, nil, "example.test", cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 	if err := updater.Start(ctx); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
@@ -284,7 +284,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 		t.Errorf("Update didn't produce correct event, got %v want %v", producer.events, want)
 	}
 	if !reflect.DeepEqual(db.storedKeys, []api.DeviceMessage{want}) {
-		t.Errorf("DB didn't store correct event, got %v want %v", db.storedKeys, want)
+		t.Errorf("Cm didn't store correct event, got %v want %v", db.storedKeys, want)
 	}
 
 }
@@ -293,9 +293,8 @@ func TestUpdateNoPrevID(t *testing.T) {
 // update is still ongoing.
 func TestDebounce(t *testing.T) {
 
-	t.Skipf("panic on closed channel on GHA")
-
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
@@ -309,15 +308,16 @@ func TestDebounce(t *testing.T) {
 	srv := spec.ServerName("example.com")
 	userID := "@alice:example.com"
 	keyJSON := `{"user_id":"` + userID + `","device_id":"JLAFKJWSCS","algorithms":["m.olm.v1.curve25519-aes-sha2","m.megolm.v1.aes-sha2"],"keys":{"curve25519:JLAFKJWSCS":"3C5BFWi2Y8MaVvjM8M22DBmh24PmgR0nPvJOIArzgyI","ed25519:JLAFKJWSCS":"lEuiRJBit0IG6nUf5pUzWTUEsRVVe/HJkoKuEww9ULI"},"signatures":{"` + userID + `":{"ed25519:JLAFKJWSCS":"dSO80A01XiigH3uBiDVx/EjzaoycHcjq9lfQX0uWsqxl2giMIiSPR8a4d291W1ihKJL/a+myXS367WT6NAIcBA"}}}`
-	incomingFedReq := make(chan struct{})
+	incomingFedReq := make(chan struct{}, 5)
+	defer close(incomingFedReq)
 	fedClient := newFedClient(func(req *http.Request) (*http.Response, error) {
 		if req.URL.Path != "/_matrix/federation/v1/user/devices/"+url.PathEscape(userID) {
 			return nil, fmt.Errorf("test: invalid path: %s", req.URL.Path)
 		}
-		close(incomingFedReq)
+		incomingFedReq <- struct{}{}
 		return <-fedCh, nil
 	})
-	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 1, nil, "localhost", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+	updater := NewDeviceListUpdater(ctx, db, ap, producer, fedClient, 1, nil, "example.test", cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 	if err := updater.Start(ctx); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
@@ -337,8 +337,8 @@ func TestDebounce(t *testing.T) {
 	// wait until the updater hits federation
 	select {
 	case <-incomingFedReq:
-	case <-time.After(time.Second):
-		t.Fatalf("timed out waiting for updater to hit federation")
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for updater to hit federation") // TODO: debounce time was 1 sec
 	}
 
 	// user should be marked as stale
@@ -373,20 +373,16 @@ func TestDebounce(t *testing.T) {
 	}
 }
 
-func mustCreateKeyserverDB(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.KeyDatabase, func()) {
+func mustCreateKeyserverDB(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.KeyDatabase {
 	t.Helper()
 
-	connStr, clearDB, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewKeyDatabase(ctx, cm, &config.DatabaseOptions{ConnectionString: connStr})
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return db, clearDB
+	return db
 }
 
 type mockKeyserverRoomserverAPI struct {
@@ -407,10 +403,10 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 	rsAPI := &mockKeyserverRoomserverAPI{leftUsers: []string{bob.ID}}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		db, clearDB := mustCreateKeyserverDB(ctx, t, testOpts)
-		defer clearDB()
+		db := mustCreateKeyserverDB(ctx, svc, t, testOpts)
 
 		// This should not get deleted
 		if err := db.MarkDeviceListStale(ctx, alice.ID, true); err != nil {
@@ -424,7 +420,7 @@ func TestDeviceListUpdater_CleanUp(t *testing.T) {
 
 		updater := NewDeviceListUpdater(ctx, db, nil,
 			nil, nil,
-			0, rsAPI, "test", caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+			0, rsAPI, "test", cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		if err := updater.CleanUp(ctx); err != nil {
 			t.Error(err)
 		}
@@ -495,7 +491,8 @@ func Test_dedupeStateList(t *testing.T) {
 
 func TestDeviceListUpdaterIgnoreBlacklisted(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	unreachableServer := spec.ServerName("notlocalhost")
 

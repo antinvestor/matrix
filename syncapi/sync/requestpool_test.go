@@ -6,12 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/antinvestor/matrix/test/testrig"
 )
 
 type dummyPublisher struct {
@@ -19,7 +18,7 @@ type dummyPublisher struct {
 	count int
 }
 
-func (d *dummyPublisher) SendPresence(userID string, presence types.Presence, statusMsg *string) error {
+func (d *dummyPublisher) SendPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.count++
@@ -119,10 +118,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 		producer: publisher,
 		consumer: consumer,
 		cfg: &config.SyncAPI{
-			Matrix: &config.Global{
-				JetStream: config.JetStream{
-					TopicPrefix: "Dendrite",
-				},
+			Global: &config.Global{
 				Presence: config.PresenceOptions{
 					EnableInbound:  true,
 					EnableOutbound: true,
@@ -132,7 +128,9 @@ func TestRequestPool_updatePresence(t *testing.T) {
 	}
 	db := dummyDB{}
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
+
 	go rp.cleanPresence(ctx, db, time.Millisecond*50)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

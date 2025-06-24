@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/relayapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 // GetTransactionFromRelay implements GET /_matrix/federation/v1/relay_txn/{userID}
@@ -33,7 +32,8 @@ func GetTransactionFromRelay(
 	relayAPI api.RelayInternalAPI,
 	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Infof("Processing relay_txn for %s", userID.String())
+	log := util.Log(httpReq.Context())
+	log.Info("Processing relay_txn for %s", userID.String())
 
 	var previousEntry fclient.RelayEntry
 	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err != nil {
@@ -48,7 +48,7 @@ func GetTransactionFromRelay(
 			JSON: spec.BadJSON("Invalid entry id provided. Must be >= 0."),
 		}
 	}
-	logrus.Infof("Previous entry provided: %v", previousEntry.EntryID)
+	log.Info("Previous entry provided: %v", previousEntry.EntryID)
 
 	response, err := relayAPI.QueryTransactions(httpReq.Context(), userID, previousEntry)
 	if err != nil {

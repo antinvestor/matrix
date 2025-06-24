@@ -2,15 +2,12 @@ package helpers
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"sort"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/auth"
 	"github.com/antinvestor/matrix/roomserver/state"
@@ -18,12 +15,13 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/util"
 )
 
 // TODO: temporary package which has helper functions used by both internal/perform packages.
 // Move these to a more sensible place.
 
-func UpdateToInviteMembership(
+func UpdateToInviteMembership(ctx context.Context,
 	mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
 	roomVersion gomatrixserverlib.RoomVersion,
 ) ([]api.OutputEvent, error) {
@@ -31,7 +29,7 @@ func UpdateToInviteMembership(
 	// reprocessing this event, or because the we received this invite from a
 	// remote server via the federation invite API. In those cases we don't need
 	// to send the event.
-	needsSending, retired, err := mu.Update(tables.MembershipStateInvite, add)
+	needsSending, retired, err := mu.Update(ctx, tables.MembershipStateInvite, add)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +102,7 @@ func IsInvitePending(
 	// Look up the room NID for the supplied room ID.
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
-		return false, "", "", nil, fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.Cm.RoomInfo: %w", err)
 	}
 	if info == nil {
 		return false, "", "", nil, fmt.Errorf("cannot get RoomInfo: unknown room ID %s", roomID)
@@ -113,7 +111,7 @@ func IsInvitePending(
 	// Look up the state key NID for the supplied user ID.
 	targetUserNIDs, err := db.EventStateKeyNIDs(ctx, []string{string(senderID)})
 	if err != nil {
-		return false, "", "", nil, fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.Cm.EventStateKeyNIDs: %w", err)
 	}
 	targetUserNID, targetUserFound := targetUserNIDs[string(senderID)]
 	if !targetUserFound {
@@ -125,7 +123,7 @@ func IsInvitePending(
 	// send_leave to.
 	senderUserNIDs, eventIDs, eventJSON, err := db.GetInvitesForUser(ctx, info.RoomNID, targetUserNID)
 	if err != nil {
-		return false, "", "", nil, fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.Cm.GetInvitesForUser: %w", err)
 	}
 	if len(senderUserNIDs) == 0 {
 		return false, "", "", nil, nil
@@ -138,7 +136,7 @@ func IsInvitePending(
 	// Look up the user ID from the NID.
 	senderUsers, err := db.EventStateKeys(ctx, senderUserNIDs)
 	if err != nil {
-		return false, "", "", nil, fmt.Errorf("r.DB.EventStateKeys: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.Cm.EventStateKeys: %w", err)
 	}
 	if len(senderUsers) == 0 {
 		return false, "", "", nil, fmt.Errorf("no senderUsers")
@@ -297,7 +295,7 @@ func slowGetHistoryVisibilityState(
 	roomState := state.NewStateResolution(db, info, querier)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("roomState.LoadStateAtEvent: %w", err)
@@ -398,7 +396,7 @@ BFSLoop:
 			ev := events[0]
 			isServerInRoom, err = IsServerCurrentlyInRoom(ctx, db, querier, serverName, ev.RoomID().String())
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to check if server is currently in room, assuming not.")
+				util.Log(ctx).WithError(err).WithField("server", serverName).WithField("room_id", ev.RoomID().String()).Error("Failed to check if server is currently in room, assuming not.")
 			}
 			checkedServerInRoom = true
 		}
@@ -421,10 +419,8 @@ BFSLoop:
 					visited[pre] = true
 					allowed, err = CheckServerAllowedToSeeEvent(ctx, db, info, ev.RoomID().String(), pre, serverName, isServerInRoom, querier)
 					if err != nil {
-						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).WithError(err).Error(
-							"Error checking if allowed to see event",
-						)
-						// drop the error, as we will often error at the DB level if we don't have the prev_event itself. Let's
+						util.Log(ctx).WithError(err).WithField("server", serverName).WithField("event_id", pre).Error("Error checking if allowed to see event")
+						// drop the error, as we will often error at the Cm level if we don't have the prev_event itself. Let's
 						// just return what we have.
 						return resultNIDs, redactEventIDs, nil
 					}
@@ -434,7 +430,7 @@ BFSLoop:
 					// the list of events to retrieve.
 					next = append(next, pre)
 					if !allowed {
-						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).Info("Not allowed to see event")
+						util.Log(ctx).WithField("server", serverName).WithField("event_id", pre).Info("Not allowed to see event")
 						redactEventIDs[pre] = struct{}{}
 					}
 				}

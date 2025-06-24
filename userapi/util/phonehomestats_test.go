@@ -7,22 +7,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/antinvestor/matrix/internal"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/storage"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestCollect(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeDB := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeDB()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		db, err := storage.NewUserDatabase(ctx, nil, cm, &cfg.UserAPI.AccountDatabase, "localhost", bcrypt.MinCost, 1000, 1000, "")
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		cm := sqlutil.NewConnectionManager(svc)
+		db, err := storage.NewUserDatabase(ctx, nil, cm, "localhost", bcrypt.MinCost, 1000, 1000, "")
 		if err != nil {
 			t.Error(err)
 		}
@@ -74,7 +73,7 @@ func TestCollect(t *testing.T) {
 
 		select {
 		case <-time.After(time.Second * 5):
-			t.Error("timed out waiting for response")
+			t.Errorf("timed out waiting for response")
 		case <-receivedRequest:
 		}
 	})

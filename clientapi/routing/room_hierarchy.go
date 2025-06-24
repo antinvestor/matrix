@@ -1,4 +1,4 @@
-// Copyright 2023 The Matrix.org Foundation C.I.C.
+// Copyright 2023 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import (
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/google/uuid"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 )
 
 // For storing pagination information for room hierarchies
@@ -67,6 +66,10 @@ func (c *RoomHierarchyPaginationCache) AddLine(line roomserverAPI.RoomHierarchyW
 //
 // Implements /_matrix/client/v1/rooms/{roomID}/hierarchy
 func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr string, rsAPI roomserverAPI.ClientRoomserverAPI, paginationCache *RoomHierarchyPaginationCache) util.JSONResponse {
+
+	ctx := req.Context()
+	log := util.Log(ctx)
+
 	parsedRoomID, err := spec.NewRoomID(roomIDStr)
 	if err != nil {
 		return util.JSONResponse{
@@ -143,13 +146,13 @@ func QueryRoomHierarchy(req *http.Request, device *userapi.Device, roomIDStr str
 	if err != nil {
 		switch err.(type) {
 		case roomserverAPI.ErrRoomUnknownOrNotAllowed:
-			util.GetLogger(req.Context()).WithError(err).Debugln("room unknown/forbidden when handling CS room hierarchy request")
+			util.Log(req.Context()).WithError(err).Debug("room unknown/forbidden when handling CS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden("room is unknown/forbidden"),
 			}
 		default:
-			log.WithError(err).Errorf("failed to fetch next page of room hierarchy (CS API)")
+			log.WithError(err).Error("failed to fetch next page of room hierarchy (CS API)")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),

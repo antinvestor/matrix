@@ -19,23 +19,22 @@ import (
 	"sync"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/sirupsen/logrus"
-
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/appservice/consumers"
 	"github.com/antinvestor/matrix/appservice/query"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	ctx context.Context,
-	cfg *config.Dendrite,
-	natsInstance *jetstream.NATSInstance,
+	cfg *config.Matrix,
+	qm queueutil.QueueManager,
 	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceInternalAPI {
@@ -58,21 +57,20 @@ func NewInternalAPI(
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		// Create bot account for this AS if it doesn't already exist
 		if err := generateAppServiceAccount(ctx, userAPI, appservice, cfg.Global.ServerName); err != nil {
-			logrus.WithFields(logrus.Fields{
-				"appservice": appservice.ID,
-			}).WithError(err).Panicf("failed to generate bot account for appservice")
+			util.Log(ctx).
+				WithField("appservice", appservice.ID).
+				WithError(err).Panic("failed to generate bot account for appservice")
 		}
 	}
 
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
 	// We can't add ASes at runtime so this is safe to do.
-	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	consumer := consumers.NewOutputRoomEventConsumer(
+	err := consumers.NewOutputRoomEventConsumer(
 		ctx, &cfg.AppServiceAPI,
-		js, rsAPI,
+		qm, rsAPI,
 	)
-	if err := consumer.Start(ctx); err != nil {
-		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
+	if err != nil {
+		util.Log(ctx).WithError(err).Panic("failed to start appservice roomserver consumer")
 	}
 
 	return appserviceQueryAPI

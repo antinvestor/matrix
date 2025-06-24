@@ -16,37 +16,37 @@ package federationapi
 
 import (
 	"context"
+	"net/http"
 	"time"
 
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
-	"github.com/antinvestor/matrix/internal/httputil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
-	"github.com/sirupsen/logrus"
-
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/consumers"
 	"github.com/antinvestor/matrix/federationapi/internal"
 	"github.com/antinvestor/matrix/federationapi/producers"
 	"github.com/antinvestor/matrix/federationapi/queue"
+	"github.com/antinvestor/matrix/federationapi/routing"
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/setup/config"
 	userAPI "github.com/antinvestor/matrix/userapi/api"
-
-	"github.com/antinvestor/gomatrixserverlib"
-
-	"github.com/antinvestor/matrix/federationapi/routing"
+	"github.com/pitabwire/util"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	dendriteConfig *config.Dendrite,
-	natsInstance *jetstream.NATSInstance,
+	dendriteConfig *config.Matrix,
+	qm queueutil.QueueManager,
 	userAPI userAPI.FederationUserAPI,
 	federation fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
@@ -55,16 +55,42 @@ func AddPublicRoutes(
 	enableMetrics bool,
 ) {
 	cfg := &dendriteConfig.FederationAPI
+	cfgUserApi := &dendriteConfig.UserAPI
 	mscCfg := &dendriteConfig.MSCs
-	js, _ := natsInstance.Prepare(ctx, &cfg.Matrix.JetStream)
+
+	_, err := qm.GetOrCreatePublisher(ctx, &cfg.Queues.OutputReceiptEvent)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register receipt event publisher")
+	}
+	_, err = qm.GetOrCreatePublisher(ctx, &cfg.Queues.OutputSendToDeviceEvent)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register send to device event publisher")
+	}
+	_, err = qm.GetOrCreatePublisher(ctx, &cfg.Queues.OutputTypingEvent)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register typing event publisher")
+	}
+	_, err = qm.GetOrCreatePublisher(ctx, &cfg.Queues.OutputPresenceEvent)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register presence event publisher")
+	}
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgUserApi.Queues.InputDeviceListUpdate)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register input device list update event publisher")
+	}
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgUserApi.Queues.InputSigningKeyUpdate)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to register input signing key event publisher")
+	}
+
 	producer := &producers.SyncAPIProducer{
-		JetStream:              js,
-		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
-		TopicDeviceListUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
-		TopicSigningKeyUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		Qm:                     qm,
+		TopicReceiptEvent:      cfg.Queues.OutputReceiptEvent.Ref(),
+		TopicSendToDeviceEvent: cfg.Queues.OutputSendToDeviceEvent.Ref(),
+		TopicTypingEvent:       cfg.Queues.OutputTypingEvent.Ref(),
+		TopicPresenceEvent:     cfg.Queues.OutputPresenceEvent.Ref(),
+		TopicDeviceListUpdate:  cfgUserApi.Queues.InputDeviceListUpdate.Ref(),
+		TopicSigningKeyUpdate:  cfgUserApi.Queues.InputSigningKeyUpdate.Ref(),
 		Config:                 cfg,
 		UserAPI:                userAPI,
 	}
@@ -76,11 +102,12 @@ func AddPublicRoutes(
 	// be the same thing now.
 	f, ok := fedAPI.(*internal.FederationInternalAPI)
 	if !ok {
-		panic("federationapi.AddPublicRoutes called with a FederationInternalAPI impl which was not " +
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("federationapi.AddPublicRoutes called with a FederationInternalAPI impl which was not " +
 			"FederationInternalAPI. This is a programming error.")
 	}
 
 	routing.Setup(
+		ctx,
 		routers,
 		dendriteConfig,
 		rsAPI, f, keyRing,
@@ -93,20 +120,32 @@ func AddPublicRoutes(
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	ctx context.Context,
-	dendriteCfg *config.Dendrite,
-	cm *sqlutil.Connections,
-	natsInstance *jetstream.NATSInstance,
+	mcfg *config.Matrix,
+	cm sqlutil.ConnectionManager,
+	qm queueutil.QueueManager,
+	am actorutil.ActorManager,
 	federation fclient.FederationClient,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
-	caches *caching.Caches,
+	caches *cacheutil.Caches,
 	keyRing *gomatrixserverlib.KeyRing,
 	resetBlacklist bool,
+	presenceCli presencev1connect.PresenceServiceClient,
 ) *internal.FederationInternalAPI {
-	cfg := &dendriteCfg.FederationAPI
+	cfg := &mcfg.FederationAPI
 
-	federationDB, err := storage.NewDatabase(ctx, cm, &cfg.Database, caches, dendriteCfg.Global.IsLocalServerName)
+	federationCm, err := cm.FromOptions(ctx, &cfg.Database)
 	if err != nil {
-		logrus.WithError(err).Panic("failed to connect to federation sender db")
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to obtain federation sender db connection manager")
+	}
+	federationDB, err := storage.NewDatabase(ctx, federationCm, caches, cfg.Global.IsLocalServerName)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to connect to federation sender db")
+	}
+
+	if presenceCli == nil {
+		presenceCli = presencev1connect.NewPresenceServiceClient(
+			http.DefaultClient, cfg.Global.SyncAPIPresenceURI,
+		)
 	}
 
 	if resetBlacklist {
@@ -115,64 +154,75 @@ func NewInternalAPI(
 
 	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1, cfg.P2PFederationRetriesUntilAssumedOffline+1, cfg.EnableRelays)
 
-	js, nats := natsInstance.Prepare(ctx, &cfg.Matrix.JetStream)
-
-	signingInfo := dendriteCfg.Global.SigningIdentities()
+	signingInfo := cfg.Global.SigningIdentities()
 
 	queues := queue.NewOutgoingQueues(ctx,
 		federationDB,
-		cfg.Matrix.DisableFederation,
-		cfg.Matrix.ServerName, federation, &stats,
+		cfg.Global.DisableFederation,
+		cfg.Global.ServerName, federation, &stats,
 		signingInfo,
 	)
 
-	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		ctx, cfg, js, nats, queues, federationDB, rsAPI,
+	err = consumers.NewOutputRoomEventConsumer(
+		ctx, cfg, qm, am, queues, federationDB, rsAPI, presenceCli,
 	)
-	if err = rsConsumer.Start(ctx); err != nil {
-		logrus.WithError(err).Panic("failed to start room server consumer")
-	}
-	tsConsumer := consumers.NewOutputSendToDeviceConsumer(
-		ctx, cfg, js, queues, federationDB,
-	)
-	if err = tsConsumer.Start(ctx); err != nil {
-		logrus.WithError(err).Panic("failed to start send-to-device consumer")
-	}
-	receiptConsumer := consumers.NewOutputReceiptConsumer(
-		ctx, cfg, js, queues, federationDB,
-	)
-	if err = receiptConsumer.Start(ctx); err != nil {
-		logrus.WithError(err).Panic("failed to start receipt consumer")
-	}
-	typingConsumer := consumers.NewOutputTypingConsumer(
-		ctx, cfg, js, queues, federationDB,
-	)
-	if err = typingConsumer.Start(ctx); err != nil {
-		logrus.WithError(err).Panic("failed to start typing consumer")
-	}
-	keyConsumer := consumers.NewKeyChangeConsumer(
-		ctx, &dendriteCfg.KeyServer, js, queues, federationDB, rsAPI,
-	)
-	if err = keyConsumer.Start(ctx); err != nil {
-		logrus.WithError(err).Panic("failed to start key server consumer")
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start room server consumer")
 	}
 
-	presenceConsumer := consumers.NewOutputPresenceConsumer(
-		ctx, cfg, js, queues, federationDB, rsAPI,
+	err = consumers.NewOutputSendToDeviceConsumer(
+		ctx, cfg, qm, queues, federationDB,
 	)
-	if err = presenceConsumer.Start(ctx); err != nil {
-		logrus.WithError(err).Panic("failed to start presence consumer")
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start send-to-device consumer")
+	}
+	err = consumers.NewOutputReceiptConsumer(
+		ctx, cfg, qm, queues, federationDB,
+	)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start receipt consumer")
+	}
+	err = consumers.NewOutputTypingConsumer(
+		ctx, cfg, qm, queues, federationDB,
+	)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start typing consumer")
+	}
+	err = consumers.NewKeyChangeConsumer(
+		ctx, &mcfg.KeyServer, qm, queues, federationDB, rsAPI,
+	)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start key server consumer")
+	}
+
+	err = consumers.NewOutputPresenceConsumer(
+		ctx, cfg, qm, queues, federationDB, rsAPI,
+	)
+	if err != nil {
+		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to start presence consumer")
 	}
 
 	var cleanExpiredEDUs func()
 	cleanExpiredEDUs = func() {
-		logrus.Infof("Cleaning expired EDUs")
-		if err := federationDB.DeleteExpiredEDUs(ctx); err != nil {
-			logrus.WithError(err).Error("Failed to clean expired EDUs")
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+
+			util.Log(ctx).
+				WithField("component", "federationapi").
+				Info("Cleaning expired EDUs")
+
+			if err = federationDB.DeleteExpiredEDUs(ctx); err != nil {
+				util.Log(ctx).WithError(err).
+					WithField("component", "federationapi").
+					Error("Failed to clean expired EDUs")
+			}
+			time.AfterFunc(time.Hour, cleanExpiredEDUs)
 		}
-		time.AfterFunc(time.Hour, cleanExpiredEDUs)
 	}
 	time.AfterFunc(time.Minute, cleanExpiredEDUs)
 
-	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, &stats, caches, queues, keyRing)
+	return internal.NewFederationInternalAPI(ctx, federationDB, cfg, rsAPI, federation, &stats, caches, queues, keyRing)
 }

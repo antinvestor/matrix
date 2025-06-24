@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,96 +17,80 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/federationapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/federationapi/storage/shared"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 )
 
 // Database stores information needed by the federation sender
 type Database struct {
 	shared.Database
-	db     *sql.DB
-	writer sqlutil.Writer
 }
 
 // NewDatabase opens a new database
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager, cache cacheutil.FederationCache, isLocalServerName func(spec.ServerName) bool) (*Database, error) {
 	var d Database
-	var err error
-	if d.db, d.writer, err = conMan.Connection(ctx, dbProperties); err != nil {
-		return nil, err
-	}
-	blacklist, err := NewPostgresBlacklistTable(ctx, d.db)
+
+	blacklist, err := NewPostgresBlacklistTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	joinedHosts, err := NewPostgresJoinedHostsTable(ctx, d.db)
+	joinedHosts, err := NewPostgresJoinedHostsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	queuePDUs, err := NewPostgresQueuePDUsTable(ctx, d.db)
+	queuePDUs, err := NewPostgresQueuePDUsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	queueEDUs, err := NewPostgresQueueEDUsTable(ctx, d.db)
+	queueEDUs, err := NewPostgresQueueEDUsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	queueJSON, err := NewPostgresQueueJSONTable(ctx, d.db)
+	queueJSON, err := NewPostgresQueueJSONTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	assumedOffline, err := NewPostgresAssumedOfflineTable(ctx, d.db)
+	assumedOffline, err := NewPostgresAssumedOfflineTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	relayServers, err := NewPostgresRelayServersTable(ctx, d.db)
+	relayServers, err := NewPostgresRelayServersTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	inboundPeeks, err := NewPostgresInboundPeeksTable(ctx, d.db)
+	inboundPeeks, err := NewPostgresInboundPeeksTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	outboundPeeks, err := NewPostgresOutboundPeeksTable(ctx, d.db)
+	outboundPeeks, err := NewPostgresOutboundPeeksTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, d.db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresNotaryServerKeysTable: %s", err)
-	}
-	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, d.db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresNotaryServerKeysMetadataTable: %s", err)
-	}
-	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, d.db)
+	notaryJSON, err := NewPostgresNotaryServerKeysTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	m := sqlutil.NewMigrator(d.db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "federationsender: drop federationsender_rooms",
-		Up:      deltas.UpRemoveRoomsTable,
-	})
-	err = m.Up(ctx)
+	notaryMetadata, err := NewPostgresNotaryServerKeysMetadataTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	if err = queueEDUs.Prepare(); err != nil {
+	serverSigningKeys, err := NewPostgresServerSigningKeysTable(ctx, cm)
+	if err != nil {
 		return nil, err
 	}
+
+	err = cm.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	d.Database = shared.Database{
-		DB:                       d.db,
+		Cm:                       cm,
 		IsLocalServerName:        isLocalServerName,
 		Cache:                    cache,
-		Writer:                   d.writer,
 		FederationJoinedHosts:    joinedHosts,
 		FederationQueuePDUs:      queuePDUs,
 		FederationQueueEDUs:      queueEDUs,

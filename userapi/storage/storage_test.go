@@ -12,21 +12,20 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/syncapi/synctypes"
-	"github.com/antinvestor/matrix/userapi/types"
-	"github.com/pitabwire/util"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/internal/pushrules"
-	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/antinvestor/matrix/userapi/types"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const loginTokenLifetime = time.Minute
@@ -35,28 +34,24 @@ var (
 	openIDLifetimeMS = time.Minute.Milliseconds()
 )
 
-func mustCreateUserDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.UserDatabase, func()) {
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewUserDatabase(ctx, nil, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
+func mustCreateUserDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.UserDatabase {
+
+	cm := sqlutil.NewConnectionManager(svc)
+
+	db, err := storage.NewUserDatabase(ctx, nil, cm, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
 		t.Fatalf("NewUserDatabase returned %s", err)
 	}
-	return db, closeDb
+	return db
 }
 
 // Tests storing and getting account data
 func Test_AccountData(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateUserDatabase(ctx, svc, t, testOpts)
+
 		alice := test.NewUser(t)
 		localpart, domain, err := gomatrixserverlib.SplitID('@', alice.ID)
 		assert.NoError(t, err)
@@ -86,9 +81,10 @@ func Test_AccountData(t *testing.T) {
 // Tests the creation of accounts
 func Test_Accounts(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateUserDatabase(ctx, svc, t, testOpts)
+
 		alice := test.NewUser(t)
 		aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 		assert.NoError(t, err)
@@ -135,10 +131,10 @@ func Test_Accounts(t *testing.T) {
 		assert.NoError(t, err, "failed to deactivate account")
 		// This should fail now, as the account is deactivated
 		_, err = db.GetAccountByPassword(ctx, aliceLocalpart, aliceDomain, "newPassword")
-		assert.Error(t, err, "expected an error, got none")
+		assert.Errorf(t, err, "expected an error, got none")
 
 		_, err = db.GetAccountByLocalpart(ctx, "unusename", aliceDomain)
-		assert.Error(t, err, "expected an error for non existent localpart")
+		assert.Errorf(t, err, "expected an error for non existent localpart")
 
 		// create an empty localpart; this should never happen, but is required to test getting a numeric localpart
 		// if there's already a user without a localpart in the database
@@ -167,9 +163,9 @@ func Test_Devices(t *testing.T) {
 	accessToken := util.RandomString(16)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateUserDatabase(ctx, svc, t, testOpts)
 
 		deviceWithID, err := db.CreateDevice(ctx, localpart, domain, &deviceID, accessToken, nil, nil, "", "")
 		assert.NoError(t, err, "unable to create deviceWithoutID")
@@ -248,9 +244,9 @@ func Test_KeyBackup(t *testing.T) {
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateUserDatabase(ctx, svc, t, testOpts)
 
 		wantAuthData := json.RawMessage("my auth data")
 		wantVersion, err := db.CreateKeyBackup(ctx, alice.ID, "dummyAlgo", wantAuthData)
@@ -326,9 +322,9 @@ func Test_KeyBackup(t *testing.T) {
 func Test_LoginToken(t *testing.T) {
 	alice := test.NewUser(t)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateUserDatabase(ctx, svc, t, testOpts)
 
 		// create a new token
 		wantLoginToken := &api.LoginTokenData{UserID: alice.ID}
@@ -350,7 +346,7 @@ func Test_LoginToken(t *testing.T) {
 
 		// check if the token was actually deleted
 		_, err = db.GetLoginTokenDataByToken(ctx, gotMetadata.Token)
-		assert.Error(t, err, "expected an error, but got none")
+		assert.Errorf(t, err, "expected an error, but got none")
 	})
 }
 
@@ -359,9 +355,9 @@ func Test_OpenID(t *testing.T) {
 	token := util.RandomString(24)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateUserDatabase(ctx, svc, t, testOpts)
 
 		expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + openIDLifetimeMS
 		expires, err := db.CreateOpenIDToken(ctx, token, alice.ID)
@@ -381,9 +377,9 @@ func Test_Profile(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateUserDatabase(ctx, svc, t, testOpts)
 
 		// create account, which also creates a profile
 		_, err = db.CreateAccount(ctx, aliceLocalpart, aliceDomain, "testing", "", api.AccountTypeAdmin)
@@ -431,9 +427,9 @@ func Test_Pusher(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateUserDatabase(ctx, svc, t, testOpts)
 
 		appID := util.RandomString(8)
 		var pushKeys []string
@@ -483,9 +479,10 @@ func Test_ThreePID(t *testing.T) {
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateUserDatabase(ctx, svc, t, testOpts)
+
 		threePID := util.RandomString(8)
 		medium := util.RandomString(8)
 		err = db.SaveThreePIDAssociation(ctx, threePID, aliceLocalpart, aliceDomain, medium)
@@ -523,9 +520,10 @@ func Test_Notification(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateUserDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateUserDatabase(ctx, svc, t, testOpts)
+
 		// generate some dummy notifications
 		for i := 0; i < 10; i++ {
 			eventID := util.RandomString(16)
@@ -541,7 +539,7 @@ func Test_Notification(t *testing.T) {
 					{},
 				},
 				Event: synctypes.ClientEvent{
-					Content: spec.RawJSON("{}"),
+					Content: json.RawMessage("{}"),
 				},
 				Read:   false,
 				RoomID: roomID,
@@ -589,14 +587,14 @@ func Test_Notification(t *testing.T) {
 	})
 }
 
-func mustCreateKeyDatabase(ctx context.Context, t *testing.T, testOpts test.DependancyOption) (storage.KeyDatabase, func()) {
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	db, err := storage.NewKeyDatabase(ctx, cm, &cfg.KeyServer.Database)
+func mustCreateKeyDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.KeyDatabase {
+
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
 		t.Fatalf("failed to create new database: %v", err)
 	}
-	return db, closeRig
+	return db
 }
 
 func MustNotError(t *testing.T, err error) {
@@ -609,9 +607,10 @@ func MustNotError(t *testing.T, err error) {
 
 func TestKeyChanges(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, clean := mustCreateKeyDatabase(ctx, t, testOpts)
-		defer clean()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateKeyDatabase(ctx, svc, t, testOpts)
+
 		_, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
 		deviceChangeIDB, err := db.StoreKeyChange(ctx, "@bob:localhost")
@@ -633,9 +632,10 @@ func TestKeyChanges(t *testing.T) {
 
 func TestKeyChangesNoDupes(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, clean := mustCreateKeyDatabase(ctx, t, testOpts)
-		defer clean()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateKeyDatabase(ctx, svc, t, testOpts)
+
 		deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
 		deviceChangeIDB, err := db.StoreKeyChange(ctx, "@alice:localhost")
@@ -660,9 +660,10 @@ func TestKeyChangesNoDupes(t *testing.T) {
 
 func TestKeyChangesUpperLimit(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, clean := mustCreateKeyDatabase(ctx, t, testOpts)
-		defer clean()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateKeyDatabase(ctx, svc, t, testOpts)
+
 		deviceChangeIDA, err := db.StoreKeyChange(ctx, "@alice:localhost")
 		MustNotError(t, err)
 		deviceChangeIDB, err := db.StoreKeyChange(ctx, "@bob:localhost")
@@ -690,9 +691,10 @@ var deviceArray = []string{"AAA", "another_device"}
 func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 	var err error
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, clean := mustCreateKeyDatabase(ctx, t, testOpts)
-		defer clean()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateKeyDatabase(ctx, svc, t, testOpts)
+
 		alice := "@alice:TestDeviceKeysStreamIDGeneration"
 		bob := "@bob:TestDeviceKeysStreamIDGeneration"
 		msgs := []api.DeviceMessage{
@@ -777,9 +779,10 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 
 func TestOneTimeKeys(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, clean := mustCreateKeyDatabase(ctx, t, testOpts)
-		defer clean()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateKeyDatabase(ctx, svc, t, testOpts)
+
 		userID := "@alice:localhost"
 		deviceID := "alice_device"
 		otk := api.OneTimeKeys{
@@ -788,7 +791,7 @@ func TestOneTimeKeys(t *testing.T) {
 			KeyJSON:  map[string]json.RawMessage{"curve25519:KEY1": []byte(`{"key":"v1"}`)},
 		}
 
-		// Add a one time key to the DB
+		// Add a one time key to the Cm
 		_, err := db.StoreOneTimeKeys(ctx, otk)
 		MustNotError(t, err)
 

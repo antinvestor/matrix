@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,13 +20,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/syncapi/notifier"
-	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 type PresenceStreamProvider struct {
@@ -37,14 +36,14 @@ type PresenceStreamProvider struct {
 }
 
 func (p *PresenceStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseTransaction,
+	ctx context.Context,
 ) {
-	p.DefaultStreamProvider.Setup(ctx, snapshot)
+	p.DefaultStreamProvider.Setup(ctx)
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := snapshot.MaxStreamPositionForPresence(ctx)
+	id, err := p.DB.MaxStreamPositionForPresence(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -53,28 +52,29 @@ func (p *PresenceStreamProvider) Setup(
 
 func (p *PresenceStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *PresenceStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
+
+	log := util.Log(ctx)
+
 	// We pull out a larger number than the filter asks for, since we're filtering out events later
-	presences, err := snapshot.PresenceAfter(ctx, from, synctypes.EventFilter{Limit: 1000})
+	presences, err := p.DB.PresenceAfter(ctx, from, synctypes.EventFilter{Limit: 1000})
 	if err != nil {
-		req.Log.WithError(err).Error("p.DB.PresenceAfter failed")
+		log.WithError(err).Error("p.Cm.PresenceAfter failed")
 		return from
 	}
 
 	getPresenceForUsers, err := p.getNeededUsersFromRequest(ctx, req, presences)
 	if err != nil {
-		req.Log.WithError(err).Error("getNeededUsersFromRequest failed")
+		log.WithError(err).Error("getNeededUsersFromRequest failed")
 		return from
 	}
 
@@ -83,10 +83,9 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		return to
 	}
 
-	dbPresences, err := snapshot.GetPresences(ctx, getPresenceForUsers)
+	dbPresences, err := p.DB.GetPresences(ctx, getPresenceForUsers)
 	if err != nil {
-		req.Log.WithError(err).Error("unable to query presence for user")
-		_ = snapshot.Rollback()
+		log.WithError(err).Error("unable to query presence for user")
 		return from
 	}
 	for _, presence := range dbPresences {
@@ -111,7 +110,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 			skip := prevPresence.Equals(presence) && currentlyActive && req.Device.UserID != presence.UserID
 			_, membershipChange := req.MembershipChanges[presence.UserID]
 			if skip && !membershipChange {
-				req.Log.Tracef("Skipping presence, no change (%s)", presence.UserID)
+				log.Debug("Skipping presence, no change (%s)", presence.UserID)
 				continue
 			}
 		}

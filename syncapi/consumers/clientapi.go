@@ -20,24 +20,20 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/eventutil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
-	"github.com/getsentry/sentry-go"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
-	jetstream    nats.JetStreamContext
-	nats         *nats.Conn
-	durable      string
-	topic        string
-	topicReIndex string
+	qm           queueutil.QueueManager
+	topicReIndex *config.QueueOptions
 	db           storage.Database
 	stream       streams.StreamProvider
 	notifier     *notifier.Notifier
@@ -47,80 +43,67 @@ type OutputClientDataConsumer struct {
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
 func NewOutputClientDataConsumer(
-	_ context.Context,
+	ctx context.Context,
 	cfg *config.SyncAPI,
-	js nats.JetStreamContext,
-	nats *nats.Conn,
+	qm queueutil.QueueManager,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
-) *OutputClientDataConsumer {
-	return &OutputClientDataConsumer{
-		jetstream:    js,
-		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
-		topicReIndex: cfg.Matrix.JetStream.Prefixed(jetstream.InputFulltextReindex),
-		durable:      cfg.Matrix.JetStream.Durable("SyncAPIAccountDataConsumer"),
-		nats:         nats,
+) error {
+
+	c := &OutputClientDataConsumer{
+		qm:           qm,
+		topicReIndex: &cfg.Queues.InputFulltextReindex,
 		db:           store,
 		notifier:     notifier,
 		stream:       stream,
-		serverName:   cfg.Matrix.ServerName,
+		serverName:   cfg.Global.ServerName,
 		cfg:          cfg,
 	}
+
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputClientData, c)
 }
 
-// Start consuming from room servers
-func (s *OutputClientDataConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
-
-// onMessage is called when the sync server receives a new event from the client API server output log.
+// Handle is called when the sync server receives a new event from the client API server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
+func (s *OutputClientDataConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+
+	log := util.Log(ctx)
 	// Parse out the event JSON
-	userID := msg.Header.Get(jetstream.UserID)
+	userID := metadata[constants.UserID]
 	var output eventutil.AccountData
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
+	if err := json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("client API server output log: message parse failure")
-		sentry.CaptureException(err)
-		return true
+		log.WithError(err).Error("client API server output log: message parse failure")
+		return nil
 	}
 
-	log.WithFields(log.Fields{
-		"type":    output.Type,
-		"room_id": output.RoomID,
-	}).Debug("Received data from client API server")
+	log.WithField("type", output.Type).
+		WithField("room_id", output.RoomID).
+		Debug("Received data from client API server")
 
 	streamPos, err := s.db.UpsertAccountData(
 		ctx, userID, output.RoomID, output.Type,
 	)
 	if err != nil {
-		sentry.CaptureException(err)
-		log.WithFields(log.Fields{
-			"type":       output.Type,
-			"room_id":    output.RoomID,
-			log.ErrorKey: err,
-		}).Errorf("could not save account data")
-		return false
+		log.WithError(err).
+			WithField("type", output.Type).
+			WithField("room_id", output.RoomID).Error("could not save account data")
+		return err
 	}
 
 	if output.IgnoredUsers != nil {
-		if err := s.db.UpdateIgnoresForUser(ctx, userID, output.IgnoredUsers); err != nil {
-			log.WithError(err).WithFields(log.Fields{
-				"user_id": userID,
-			}).Errorf("Failed to update ignored users")
-			sentry.CaptureException(err)
+		err = s.db.UpdateIgnoresForUser(ctx, userID, output.IgnoredUsers)
+		if err != nil {
+			log.WithError(err).
+				WithField("user_id", userID).Error("Failed to update ignored users")
+
 		}
 	}
 
 	s.stream.Advance(streamPos)
 	s.notifier.OnNewAccountData(userID, types.StreamingToken{AccountDataPosition: streamPos})
 
-	return true
+	return nil
 }

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,14 +19,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/shared"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,10 +61,12 @@ func (f *testFedClient) P2PGetTransactionFromRelay(
 }
 
 func TestPerformRelayServerSync(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -84,10 +84,12 @@ func TestPerformRelayServerSync(t *testing.T) {
 }
 
 func TestPerformRelayServerSyncFedError(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}
@@ -105,10 +107,12 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 }
 
 func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	testDB := test.NewInMemoryRelayDatabase()
+	cm := test.NewInMemoryConnectionManager()
 	db := shared.Database{
-		Writer:         sqlutil.NewDummyWriter(),
+		Cm:             cm,
 		RelayQueue:     testDB,
 		RelayQueueJSON: testDB,
 	}

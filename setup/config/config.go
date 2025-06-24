@@ -18,9 +18,9 @@ import (
 	"bytes"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -28,24 +28,21 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
-	"github.com/sirupsen/logrus"
+	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	"golang.org/x/crypto/ed25519"
 	"gopkg.in/yaml.v3"
-
-	jaegerconfig "github.com/uber/jaeger-client-go/config"
-	jaegermetrics "github.com/uber/jaeger-lib/metrics"
 )
 
-// keyIDRegexp defines allowable characters in Key IDs.
+// keyIDRegexp defines allowable characters in K IDs.
 var keyIDRegexp = regexp.MustCompile("^ed25519:[a-zA-Z0-9_]+$")
 
 // Version is the current version of the config format.
 // This will change whenever we make breaking changes to the config format.
 const Version = 2
 
-// Dendrite contains all the config used by a dendrite process.
+// Matrix contains all the config used by a matrix process.
 // Relative paths are resolved relative to the current working directory
-type Dendrite struct {
+type Matrix struct {
 	// The version of the configuration file.
 	// If the version in a file doesn't match the current dendrite config
 	// version then we can give a clear error message telling the user
@@ -74,9 +71,6 @@ type Dendrite struct {
 		// The config for the jaeger opentracing reporter.
 		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
 	} `yaml:"tracing"`
-
-	// The config for logging informations. Each hook will be added to logrus.
-	Logging []LogrusHook `yaml:"logging"`
 
 	// Any information derived from the configuration options for later use.
 	Derived Derived `yaml:"-"`
@@ -155,12 +149,126 @@ func (d DataSource) IsPostgres() bool {
 	return keyValueRegex.MatchString(string(d))
 }
 
+func (d DataSource) IsDB() bool {
+	return d.IsPostgres() || d.IsSQLite()
+}
+
 func (d DataSource) IsRedis() bool {
 	return strings.HasPrefix(string(d), "redis://")
+}
+func (d DataSource) IsCache() bool {
+	return d.IsRedis()
 }
 
 func (d DataSource) IsNats() bool {
 	return strings.HasPrefix(string(d), "nats://")
+}
+
+func (d DataSource) IsMem() bool {
+	return strings.HasPrefix(string(d), "mem://")
+}
+
+func (d DataSource) IsQueue() bool {
+	return d.IsMem() || d.IsNats()
+}
+
+func (d DataSource) ToURI() (*url.URL, error) {
+	return url.Parse(string(d))
+}
+
+func (d DataSource) ExtendPath(epath ...string) DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
+	}
+
+	nuPathPieces := []string{nuUri.Path}
+	nuPathPieces = append(nuPathPieces, epath...)
+
+	nuUri.Path = path.Join(nuPathPieces...)
+
+	return DataSource(nuUri.String())
+}
+
+func (d DataSource) SuffixPath(suffix string) DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
+	}
+
+	if nuUri.Path != "" {
+
+		nuUri.Path = strings.Join([]string{nuUri.Path, suffix}, "")
+	}
+	return DataSource(nuUri.String())
+}
+
+func (d DataSource) PrefixPath(prefix string) DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
+	}
+
+	if nuUri.Path != "" {
+		nuUri.Path = strings.Join([]string{prefix, nuUri.Path}, "")
+	}
+
+	return DataSource(nuUri.String())
+}
+
+func (d DataSource) DelPath() DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
+	}
+
+	nuUri.Path = ""
+
+	return DataSource(nuUri.String())
+}
+
+func (d DataSource) ExtendQuery(key, value string) DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
+	}
+
+	q := nuUri.Query()
+	q.Set(key, value)
+
+	nuUri.RawQuery = q.Encode()
+
+	return DataSource(nuUri.String())
+}
+
+func (d DataSource) RemoveQuery(key ...string) DataSource {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return d
+	}
+
+	q := nuUri.Query()
+
+	for _, k := range key {
+		q.Del(k)
+	}
+
+	nuUri.RawQuery = q.Encode()
+
+	return DataSource(nuUri.String())
+}
+
+func (d DataSource) GetQuery(key string) string {
+	nuUri, err := d.ToURI()
+	if err != nil {
+		return ""
+	}
+
+	return nuUri.Query().Get(key)
+}
+
+func (d DataSource) String() string {
+	return string(d)
 }
 
 // A Topic in kafka.
@@ -181,27 +289,13 @@ type ThumbnailSize struct {
 	ResizeMethod string `yaml:"method,omitempty"`
 }
 
-// LogrusHook represents a single logrus hook. At this point, only parsing and
-// verification of the proper values for type and level are done.
-// Validity/integrity checks on the parameters are done when configuring logrus.
-type LogrusHook struct {
-	// The type of hook, currently only "file" is supported.
-	Type string `yaml:"type"`
-
-	// The level of the logs to produce. Will output only this level and above.
-	Level string `yaml:"level"`
-
-	// The parameters for this hook.
-	Params map[string]interface{} `yaml:"params"`
-}
-
-// ConfigErrors stores problems encountered when parsing a config file.
+// Errors stores problems encountered when parsing a config file.
 // It implements the error interface.
-type ConfigErrors []string
+type Errors []string
 
 // Load a yaml config file for a server run as multiple processes or as a monolith.
 // Checks the config to ensure that it is valid.
-func Load(configPath string) (*Dendrite, error) {
+func Load(configPath string) (*Matrix, error) {
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -219,8 +313,8 @@ func loadConfig(
 	basePath string,
 	configData []byte,
 	readFile func(string) ([]byte, error),
-) (*Dendrite, error) {
-	var c Dendrite
+) (*Matrix, error) {
+	var c Matrix
 	c.Defaults(DefaultOpts{})
 
 	err := yaml.Unmarshal(configData, &c)
@@ -316,7 +410,7 @@ func LoadMatrixKey(privateKeyPath string, readFile func(string) ([]byte, error))
 
 // Derive generates data that is derived from various values provided in
 // the config file.
-func (config *Dendrite) Derive() error {
+func (config *Matrix) Derive() error {
 	// Determine registration flows based off config values
 
 	config.Derived.Registration.Params = make(map[string]interface{})
@@ -343,18 +437,54 @@ func (config *Dendrite) Derive() error {
 	return nil
 }
 
-func (config *Dendrite) LoadEnv() error {
+func (config *Matrix) LoadEnv() error {
 	return config.Global.LoadEnv()
 }
 
 type DefaultOpts struct {
-	DatabaseConnectionStr DataSource
-	CacheConnectionStr    DataSource
-	QueueConnectionStr    DataSource
+	DSDatabaseConn   DataSource
+	DSCacheConn      DataSource
+	DSQueueConn      DataSource
+	RandomnessPrefix string
+}
+
+type KVOpt struct {
+	K string
+	V string
+}
+
+func (d *DefaultOpts) defaultQ(s string, opts ...KVOpt) QueueOptions {
+
+	ref := fmt.Sprintf("%s_Ref", s)
+
+	if d.DSQueueConn.IsNats() {
+
+		durable := strings.ReplaceAll(fmt.Sprintf("CnsDurable_%s", s), ".", "_")
+
+		ds := d.DSQueueConn.
+			ExtendQuery("jetstream", "true").
+			ExtendQuery("subject", s).
+			ExtendQuery("stream_name", s).
+			ExtendQuery("stream_subjects", s).
+			ExtendQuery("stream_storage", "file").
+			ExtendQuery("stream_retention", "workqueue").
+			ExtendQuery("consumer_filter_subject", s).
+			ExtendQuery("consumer_durable_name", durable).
+			ExtendQuery("consumer_deliver_policy", "all").
+			ExtendQuery("consumer_ack_policy", "explicit").
+			ExtendQuery("consumer_replay_policy", "instant")
+
+		for _, kv := range opts {
+			ds = ds.ExtendQuery(kv.K, kv.V)
+		}
+
+		return QueueOptions{Prefix: d.RandomnessPrefix, QReference: ref, DS: ds}
+	}
+	return QueueOptions{Prefix: d.RandomnessPrefix, QReference: ref, DS: d.DSQueueConn.SuffixPath(s)}
 }
 
 // Defaults sets default config values if they are not explicitly set.
-func (config *Dendrite) Defaults(opts DefaultOpts) {
+func (config *Matrix) Defaults(opts DefaultOpts) {
 	config.Version = Version
 
 	config.Global.Defaults(opts)
@@ -371,9 +501,9 @@ func (config *Dendrite) Defaults(opts DefaultOpts) {
 	config.Wiring()
 }
 
-func (config *Dendrite) Verify(configErrs *ConfigErrors) {
+func (config *Matrix) Verify(configErrs *Errors) {
 	type verifiable interface {
-		Verify(configErrs *ConfigErrors)
+		Verify(configErrs *Errors)
 	}
 	for _, c := range []verifiable{
 		&config.Global, &config.ClientAPI, &config.FederationAPI,
@@ -385,31 +515,23 @@ func (config *Dendrite) Verify(configErrs *ConfigErrors) {
 	}
 }
 
-func (config *Dendrite) Wiring() {
-	config.ClientAPI.Matrix = &config.Global
-	config.FederationAPI.Matrix = &config.Global
-	config.FederationAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+func (config *Matrix) Wiring() {
+	config.ClientAPI.Global = &config.Global
+	config.FederationAPI.Global = &config.Global
 
-	config.KeyServer.Matrix = &config.Global
-	config.KeyServer.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+	config.KeyServer.Global = &config.Global
 
-	config.MediaAPI.Matrix = &config.Global
-	config.MediaAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+	config.MediaAPI.Global = &config.Global
 
-	config.RoomServer.Matrix = &config.Global
-	config.RoomServer.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+	config.RoomServer.Global = &config.Global
 
-	config.SyncAPI.Matrix = &config.Global
-	config.SyncAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+	config.SyncAPI.Global = &config.Global
 
-	config.UserAPI.Matrix = &config.Global
-	config.UserAPI.AccountDatabase.ConnectionString = config.Global.DatabaseOptions.ConnectionString
-	config.AppServiceAPI.Matrix = &config.Global
-	config.RelayAPI.Matrix = &config.Global
-	config.RelayAPI.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
+	config.UserAPI.Global = &config.Global
+	config.AppServiceAPI.Global = &config.Global
+	config.RelayAPI.Global = &config.Global
 
 	config.MSCs.Matrix = &config.Global
-	config.MSCs.Database.ConnectionString = config.Global.DatabaseOptions.ConnectionString
 
 	config.ClientAPI.Derived = &config.Derived
 	config.AppServiceAPI.Derived = &config.Derived
@@ -418,7 +540,7 @@ func (config *Dendrite) Wiring() {
 
 // Error returns a string detailing how many errors were contained within a
 // configErrors type.
-func (errs ConfigErrors) Error() string {
+func (errs Errors) Error() string {
 	if len(errs) == 1 {
 		return errs[0]
 	}
@@ -430,15 +552,15 @@ func (errs ConfigErrors) Error() string {
 // Add appends an error to the list of errors in this configErrors.
 // It is a wrapper to the builtin append and hides pointers from
 // the client code.
-// This method is safe to use with an uninitialized configErrors because
+// This method is safe to use with an uninitialise configErrors because
 // if it is nil, it will be properly allocated.
-func (errs *ConfigErrors) Add(str string) {
+func (errs *Errors) Add(str string) {
 	*errs = append(*errs, str)
 }
 
 // checkNotEmpty verifies the given value is not empty in the configuration.
 // If it is, adds an error to the list.
-func checkNotEmpty(configErrs *ConfigErrors, key, value string) {
+func checkNotEmpty(configErrs *Errors, key, value string) {
 	if value == "" {
 		configErrs.Add(fmt.Sprintf("missing config key %q", key))
 	}
@@ -446,24 +568,16 @@ func checkNotEmpty(configErrs *ConfigErrors, key, value string) {
 
 // checkPositive verifies the given value is positive (zero included)
 // in the configuration. If it is not, adds an error to the list.
-func checkPositive(configErrs *ConfigErrors, key string, value int64) {
+func checkPositive(configErrs *Errors, key string, value int64) {
 	if value < 0 {
 		configErrs.Add(fmt.Sprintf("invalid value for config key %q: %d", key, value))
 	}
 }
 
-// checkLogging verifies the parameters logging.* are valid.
-func (config *Dendrite) checkLogging(configErrs *ConfigErrors) {
-	for _, logrusHook := range config.Logging {
-		checkNotEmpty(configErrs, "logging.type", string(logrusHook.Type))
-		checkNotEmpty(configErrs, "logging.level", string(logrusHook.Level))
-	}
-}
-
 // check returns an error type containing all errors found within the config
 // file.
-func (config *Dendrite) check() error { // monolithic
-	var configErrs ConfigErrors
+func (config *Matrix) check() error { // monolithic
+	var configErrs Errors
 
 	if config.Version != Version {
 		configErrs.Add(fmt.Sprintf(
@@ -476,15 +590,13 @@ func (config *Dendrite) check() error { // monolithic
 		return &configErrs
 	}
 
-	config.checkLogging(&configErrs)
-
 	// Due to how Golang manages its interface types, this condition is not redundant.
 	// In order to get the proper behaviour, it is necessary to return an explicit nil
 	// and not a nil configErrors.
 	// This is because the following equalities hold:
 	// error(nil) == nil
 	// error(configErrors(nil)) != nil
-	if configErrs != nil {
+	if len(configErrs) > 0 {
 		return &configErrs
 	}
 	return nil
@@ -510,7 +622,7 @@ func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserv
 			return "", nil, fmt.Errorf("keyBlock is nil %q", path)
 		}
 		if keyBlock.Type == "MATRIX PRIVATE KEY" {
-			keyID := keyBlock.Headers["Key-ID"]
+			keyID := keyBlock.Headers["K-ID"]
 			if keyID == "" {
 				return "", nil, fmt.Errorf("missing key ID in PEM data in %q", path)
 			}
@@ -527,29 +639,4 @@ func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserv
 			return gomatrixserverlib.KeyID(keyID), privKey, nil
 		}
 	}
-}
-
-// SetupTracing configures the opentracing using the supplied configuration.
-func (config *Dendrite) SetupTracing() (closer io.Closer, err error) {
-	if !config.Tracing.Enabled {
-		return io.NopCloser(bytes.NewReader([]byte{})), nil
-	}
-	return config.Tracing.Jaeger.InitGlobalTracer(
-		"Dendrite",
-		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
-		jaegerconfig.Metrics(jaegermetrics.NullFactory),
-	)
-}
-
-// logrusLogger is a small wrapper that implements jaeger.Logger using logrus.
-type logrusLogger struct {
-	l *logrus.Logger
-}
-
-func (l logrusLogger) Error(msg string) {
-	l.l.Error(msg)
-}
-
-func (l logrusLogger) Infof(msg string, args ...interface{}) {
-	l.l.Infof(msg, args...)
 }

@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,17 +17,19 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/lib/pq"
-	"github.com/pitabwire/util"
-
+	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
+// SQL schema for the state snapshot table
 const stateSnapshotSchema = `
 -- The state of a room before an event.
 -- Stored as a list of state_block entries stored in a separate table.
@@ -54,6 +56,14 @@ CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
 );
 `
 
+// SQL query to revert the state snapshot table schema
+const stateSnapshotSchemaRevert = `
+DROP TABLE IF EXISTS roomserver_state_snapshots;
+DROP SEQUENCE IF EXISTS roomserver_state_snapshot_nid_seq;
+`
+
+// SQL queries for the state snapshot table
+
 // Insert a new state snapshot. If we conflict on the hash column then
 // we must perform an update so that the RETURNING statement returns the
 // ID of the row that we conflicted with, so that we can then refer to
@@ -62,8 +72,6 @@ const insertStateSQL = "" +
 	"INSERT INTO roomserver_state_snapshots (state_snapshot_hash, room_nid, state_block_nids)" +
 	" VALUES ($1, $2, $3)" +
 	" ON CONFLICT (state_snapshot_hash) DO UPDATE SET room_nid=$2" +
-	// Performing an update, above, ensures that the RETURNING statement
-	// below will always return a valid state snapshot ID
 	" RETURNING state_snapshot_nid"
 
 // Bulk state data NID lookup.
@@ -81,86 +89,122 @@ const bulkSelectStateBlockNIDsSQL = "" +
 // Event type NIDs are:
 // - 5: m.room.member as per https://github.com/antinvestor/matrix/blob/c7f7aec4d07d59120d37d5b16a900f6d608a75c4/roomserver/storage/postgres/event_types_table.go#L40
 // - 7: m.room.history_visibility as per https://github.com/antinvestor/matrix/blob/c7f7aec4d07d59120d37d5b16a900f6d608a75c4/roomserver/storage/postgres/event_types_table.go#L42
-const bulkSelectStateForHistoryVisibilitySQL = `
-	SELECT event_nid FROM (
-	  SELECT event_nid, event_type_nid, event_state_key_nid FROM roomserver_events
-	  WHERE (event_type_nid = 5 OR event_type_nid = 7)
-	  AND event_nid = ANY(
-	    SELECT UNNEST(event_nids) FROM roomserver_state_block
-	    WHERE state_block_nid = ANY(
-	      SELECT UNNEST(state_block_nids) FROM roomserver_state_snapshots
-	      WHERE state_snapshot_nid = $1
-	    )
-	  )
-	  ORDER BY depth ASC
-	) AS roomserver_events
-	INNER JOIN roomserver_event_state_keys
-	  ON roomserver_events.event_state_key_nid = roomserver_event_state_keys.event_state_key_nid
-	  AND (event_type_nid = 7 OR event_state_key LIKE '%:' || $2);
-`
+const bulkSelectStateForHistoryVisibilitySQL = "" +
+	"SELECT event_nid FROM (" +
+	"  SELECT event_nid, event_type_nid, event_state_key_nid FROM roomserver_events" +
+	"  WHERE (event_type_nid = 5 OR event_type_nid = 7)" +
+	"  AND event_nid = ANY(" +
+	"    SELECT UNNEST(event_nids) FROM roomserver_state_block" +
+	"    WHERE state_block_nid = ANY(" +
+	"      SELECT UNNEST(state_block_nids) FROM roomserver_state_snapshots" +
+	"      WHERE state_snapshot_nid = $1" +
+	"    )" +
+	"  )" +
+	"  ORDER BY depth ASC" +
+	") AS roomserver_events" +
+	" INNER JOIN roomserver_event_state_keys" +
+	"  ON roomserver_events.event_state_key_nid = roomserver_event_state_keys.event_state_key_nid" +
+	"  AND (event_type_nid = 7 OR event_state_key LIKE '%:' || $2)"
 
 // bulkSelectMembershipForHistoryVisibilitySQL is an optimization to get membership events for a specific user for defined set of events.
 // Returns the event_id of the event we want the membership event for, the event_id of the membership event and the membership event JSON.
-const bulkSelectMembershipForHistoryVisibilitySQL = `
-SELECT re.event_id, re2.event_id, rej.event_json
-FROM roomserver_events re
-LEFT JOIN roomserver_state_snapshots rss on re.state_snapshot_nid = rss.state_snapshot_nid
-CROSS JOIN unnest(rss.state_block_nids) AS blocks(block_nid)
-LEFT JOIN roomserver_state_block rsb ON rsb.state_block_nid = blocks.block_nid
-CROSS JOIN unnest(rsb.event_nids) AS rsb2(event_nid)
-JOIN roomserver_events re2 ON re2.room_nid = $3 AND re2.event_type_nid = 5 AND re2.event_nid = rsb2.event_nid AND re2.event_state_key_nid = $1
-LEFT JOIN roomserver_event_json rej ON rej.event_nid = re2.event_nid
-WHERE re.event_id = ANY($2)
+const bulkSelectMembershipForHistoryVisibilitySQL = "" +
+	"SELECT re.event_id, re2.event_id, rej.event_json" +
+	" FROM roomserver_events re" +
+	" LEFT JOIN roomserver_state_snapshots rss on re.state_snapshot_nid = rss.state_snapshot_nid" +
+	" CROSS JOIN unnest(rss.state_block_nids) AS blocks(block_nid)" +
+	" LEFT JOIN roomserver_state_block rsb ON rsb.state_block_nid = blocks.block_nid" +
+	" CROSS JOIN unnest(rsb.event_nids) AS rsb2(event_nid)" +
+	" JOIN roomserver_events re2 ON re2.room_nid = $3 AND re2.event_type_nid = 5 AND re2.event_nid = rsb2.event_nid AND re2.event_state_key_nid = $1" +
+	" LEFT JOIN roomserver_event_json rej ON rej.event_nid = re2.event_nid" +
+	" WHERE re.event_id = ANY($2)"
 
-`
+// StateSnapshot represents a state snapshot in the database
+type StateSnapshot struct {
+	StateSnapshotNID  int64   `gorm:"column:state_snapshot_nid;primaryKey"`
+	StateSnapshotHash []byte  `gorm:"column:state_snapshot_hash;unique"`
+	RoomNID           int64   `gorm:"column:room_nid;not null"`
+	StateBlockNIDs    []int64 `gorm:"column:state_block_nids;type:bigint[]"`
+}
 
+// stateSnapshotStatements holds prepared SQL statements for the state snapshot table.
 type stateSnapshotStatements struct {
-	insertStateStmt                               *sql.Stmt
-	bulkSelectStateBlockNIDsStmt                  *sql.Stmt
-	bulkSelectStateForHistoryVisibilityStmt       *sql.Stmt
-	bulktSelectMembershipForHistoryVisibilityStmt *sql.Stmt
+	cm sqlutil.ConnectionManager
+
+	// SQL query string fields
+	insertStateSQL                              string
+	bulkSelectStateBlockNIDsSQL                 string
+	bulkSelectStateForHistoryVisibilitySQL      string
+	bulkSelectMembershipForHistoryVisibilitySQL string
 }
 
-func CreateStateSnapshotTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(stateSnapshotSchema)
-	return err
-}
+// NewPostgresStateSnapshotTable creates a new instance of the state snapshot table.
+// If the table does not exist, it will be created.
+func NewPostgresStateSnapshotTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.StateSnapshot, error) {
+	s := &stateSnapshotStatements{
+		cm: cm,
 
-func PrepareStateSnapshotTable(ctx context.Context, db *sql.DB) (*stateSnapshotStatements, error) {
-	s := &stateSnapshotStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertStateStmt, insertStateSQL},
-		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
-		{&s.bulkSelectStateForHistoryVisibilityStmt, bulkSelectStateForHistoryVisibilitySQL},
-		{&s.bulktSelectMembershipForHistoryVisibilityStmt, bulkSelectMembershipForHistoryVisibilitySQL},
-	}.Prepare(db)
-}
-
-func (s *stateSnapshotStatements) InsertState(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, nids types.StateBlockNIDs,
-) (stateNID types.StateSnapshotNID, err error) {
-	nids = nids[:util.SortAndUnique(nids)]
-	err = sqlutil.TxStmt(txn, s.insertStateStmt).QueryRowContext(ctx, nids.Hash(), int64(roomNID), stateBlockNIDsAsArray(nids)).Scan(&stateNID)
-	if err != nil {
-		return 0, err
+		insertStateSQL:                              insertStateSQL,
+		bulkSelectStateBlockNIDsSQL:                 bulkSelectStateBlockNIDsSQL,
+		bulkSelectStateForHistoryVisibilitySQL:      bulkSelectStateForHistoryVisibilitySQL,
+		bulkSelectMembershipForHistoryVisibilitySQL: bulkSelectMembershipForHistoryVisibilitySQL,
 	}
+
+	// Create the table if it doesn't exist
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "roomserver_state_snapshots_schema_001",
+		Patch:       stateSnapshotSchema,
+		RevertPatch: stateSnapshotSchemaRevert,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return s, nil
+}
+
+// InsertState inserts a new state snapshot and returns a new state snapshot NID.
+func (s *stateSnapshotStatements) InsertState(
+	ctx context.Context, roomNID types.RoomNID, nids types.StateBlockNIDs,
+) (stateNID types.StateSnapshotNID, err error) {
+	// Sort and deduplicate state block NIDs
+	nids = nids[:util.SortAndUnique(nids)]
+
+	// Convert state block NIDs to int64 array
+	blockNIDs := make([]int64, len(nids))
+	for i := range nids {
+		blockNIDs[i] = int64(nids[i])
+	}
+
+	// Get a connection
+	db := s.cm.Connection(ctx, false)
+
+	// Insert the state snapshot
+	err = db.Raw(s.insertStateSQL, nids.Hash(), int64(roomNID), pq.Array(blockNIDs)).Row().Scan(&stateNID)
 	return
 }
 
+// BulkSelectStateBlockNIDs returns the state block NIDs for the given state snapshot NIDs.
 func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
-	ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID,
+	ctx context.Context, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
+	// Convert state snapshot NIDs to int64 array
 	nids := make([]int64, len(stateNIDs))
 	for i := range stateNIDs {
 		nids[i] = int64(stateNIDs[i])
 	}
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateBlockNIDsStmt)
-	rows, err := stmt.QueryContext(ctx, pq.Int64Array(nids))
+
+	// Get a connection
+	db := s.cm.Connection(ctx, true)
+
+	// Execute the query
+	rows, err := db.Raw(s.bulkSelectStateBlockNIDsSQL, pq.Array(nids)).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockNIDs: rows.close() failed")
+
+	// Process the results
 	results := make([]types.StateBlockNIDList, len(stateNIDs))
 	i := 0
 	var stateBlockNIDs pq.Int64Array
@@ -183,15 +227,21 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	return results, nil
 }
 
+// BulkSelectStateForHistoryVisibility returns the event NIDs for history visibility events and members of a domain.
 func (s *stateSnapshotStatements) BulkSelectStateForHistoryVisibility(
-	ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string,
+	ctx context.Context, stateSnapshotNID types.StateSnapshotNID, domain string,
 ) ([]types.EventNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateForHistoryVisibilityStmt)
-	rows, err := stmt.QueryContext(ctx, stateSnapshotNID, domain)
+	// Get a connection
+	db := s.cm.Connection(ctx, true)
+
+	// Execute the query
+	rows, err := db.Raw(s.bulkSelectStateForHistoryVisibilitySQL, stateSnapshotNID, domain).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateForHistoryVisibility: rows.close() failed")
+
+	// Process the results
 	results := make([]types.EventNID, 0, 16)
 	for rows.Next() {
 		var eventNID types.EventNID
@@ -203,15 +253,20 @@ func (s *stateSnapshotStatements) BulkSelectStateForHistoryVisibility(
 	return results, rows.Err()
 }
 
+// BulkSelectMembershipForHistoryVisibility returns the membership events for a user in specific events.
 func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(
-	ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
+	ctx context.Context, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
 ) (map[string]*types.HeaderedEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulktSelectMembershipForHistoryVisibilityStmt)
-	rows, err := stmt.QueryContext(ctx, userNID, pq.Array(eventIDs), roomInfo.RoomNID)
+	// Get a connection
+	db := s.cm.Connection(ctx, true)
+
+	// Execute the query
+	rows, err := db.Raw(s.bulkSelectMembershipForHistoryVisibilitySQL, userNID, pq.Array(eventIDs), roomInfo.RoomNID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectMembershipForHistoryVisibility: rows.close() failed")
+
 	result := make(map[string]*types.HeaderedEvent, len(eventIDs))
 	var evJson []byte
 	var eventID string

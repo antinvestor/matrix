@@ -32,7 +32,7 @@ func Logout(
 		DeviceIDs: []string{device.ID},
 	}, &performRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
+		util.Log(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -55,7 +55,7 @@ func LogoutAll(
 		DeviceIDs: nil,
 	}, &performRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
+		util.Log(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

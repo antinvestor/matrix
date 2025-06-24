@@ -31,7 +31,7 @@ func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONRespon
 	// https://matrix.org/docs/spec/client_server/r0.6.1#api-standards
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("io.ReadAll failed")
+		util.Log(req.Context()).WithError(err).Error("io.ReadAll failed")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

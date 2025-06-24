@@ -1,7 +1,7 @@
 package sqlutil
 
 import (
-	"database/sql"
+	"context"
 	"errors"
 	"sync/atomic"
 )
@@ -11,21 +11,23 @@ import (
 // contend on database locks in, e.g. SQLite. Only one task will run
 // at a time on a given ExclusiveWriter.
 type ExclusiveWriter struct {
+	cm      ConnectionManager
 	running atomic.Bool
 	todo    chan transactionWriterTask
 }
 
-func NewExclusiveWriter() Writer {
+func NewExclusiveWriter(cm ConnectionManager) Writer {
 	return &ExclusiveWriter{
+		cm:   cm,
 		todo: make(chan transactionWriterTask),
 	}
 }
 
 // transactionWriterTask represents a specific task.
 type transactionWriterTask struct {
-	db   *sql.DB
-	txn  *sql.Tx
-	f    func(txn *sql.Tx) error
+	ctx  context.Context
+	opts []*WriterOption
+	f    func(ctx context.Context) error
 	wait chan error
 }
 
@@ -34,7 +36,7 @@ type transactionWriterTask struct {
 // txn parameter if one is supplied, and if not, will take out a
 // new transaction from the database supplied in the database
 // parameter. Either way, this will block until the task is done.
-func (w *ExclusiveWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error) error {
+func (w *ExclusiveWriter) Do(ctx context.Context, f func(ctx context.Context) error, opts ...*WriterOption) error {
 	if w.todo == nil {
 		return errors.New("not initialised")
 	}
@@ -42,8 +44,8 @@ func (w *ExclusiveWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error)
 		go w.run()
 	}
 	task := transactionWriterTask{
-		db:   db,
-		txn:  txn,
+		ctx:  ctx,
+		opts: opts,
 		f:    f,
 		wait: make(chan error, 1),
 	}
@@ -62,14 +64,19 @@ func (w *ExclusiveWriter) run() {
 
 	defer w.running.Store(false)
 	for task := range w.todo {
-		if task.db != nil && task.txn != nil {
-			task.wait <- task.f(task.txn)
-		} else if task.db != nil && task.txn == nil {
-			task.wait <- WithTransaction(task.db, func(txn *sql.Tx) error {
-				return task.f(txn)
-			})
+		if w.cm != nil {
+
+			task.wait <- func(ctx context.Context) error {
+				ctx0, txn, err := w.cm.BeginTx(ctx, task.opts...)
+				if err != nil {
+					return err
+				}
+				return WithTransaction(ctx0, txn, func(ctx context.Context) error {
+					return task.f(ctx)
+				})
+			}(task.ctx)
 		} else {
-			task.wait <- task.f(nil)
+			task.wait <- task.f(task.ctx)
 		}
 		close(task.wait)
 	}

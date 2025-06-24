@@ -1,6 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
 // Copyright 2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,11 +24,10 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/pitabwire/util"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
@@ -351,8 +350,8 @@ type QueryAdminEventReportsResponse struct {
 	Score            int64                  `json:"score"`
 	EventNID         types.EventNID         `json:"-"` // only used to query the state
 	RoomNID          types.RoomNID          `json:"-"` // only used to query the state
-	ReportingUserNID types.EventStateKeyNID `json:"-"` // only used in the DB
-	SenderNID        types.EventStateKeyNID `json:"-"` // only used in the DB
+	ReportingUserNID types.EventStateKeyNID `json:"-"` // only used in the Cm
+	SenderNID        types.EventStateKeyNID `json:"-"` // only used in the Cm
 	RoomID           string                 `json:"room_id"`
 	EventID          string                 `json:"event_id"`
 	UserID           string                 `json:"user_id"` // the user reporting the event
@@ -453,6 +452,9 @@ func (rq *JoinRoomQuerier) InvitePending(ctx context.Context, roomID spec.RoomID
 }
 
 func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID spec.RoomID, senderID spec.SenderID, localServerName spec.ServerName) (*gomatrixserverlib.RestrictedRoomJoinInfo, error) {
+
+	log := util.Log(ctx)
+
 	roomInfo, err := rq.Roomserver.QueryRoomInfo(ctx, roomID)
 	if err != nil || roomInfo == nil || roomInfo.IsStub() {
 		return nil, err
@@ -464,19 +466,19 @@ func (rq *JoinRoomQuerier) RestrictedRoomJoinInfo(ctx context.Context, roomID sp
 	}
 	res := QueryServerJoinedToRoomResponse{}
 	if err = rq.Roomserver.QueryServerJoinedToRoom(ctx, &req, &res); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
+		log.WithError(err).Error("rsAPI.QueryServerJoinedToRoom failed")
 		return nil, fmt.Errorf("InternalServerError: Failed to query room: %w", err)
 	}
 
 	userJoinedToRoom, err := rq.Roomserver.UserJoinedToRoom(ctx, types.RoomNID(roomInfo.RoomNID), senderID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("rsAPI.UserJoinedToRoom failed")
+		log.WithError(err).Error("rsAPI.UserJoinedToRoom failed")
 		return nil, fmt.Errorf("InternalServerError: %w", err)
 	}
 
 	locallyJoinedUsers, err := rq.Roomserver.LocallyJoinedUsers(ctx, roomInfo.RoomVersion, types.RoomNID(roomInfo.RoomNID))
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
+		log.WithError(err).Error("rsAPI.GetLocallyJoinedUsers failed")
 		return nil, fmt.Errorf("InternalServerError: %w", err)
 	}
 

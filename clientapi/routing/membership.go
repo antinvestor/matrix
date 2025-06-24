@@ -33,8 +33,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/getsentry/sentry-go"
-
 	"github.com/pitabwire/util"
 )
 
@@ -106,7 +104,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
+		util.Log(ctx).WithError(err).Error("buildMembershipEvent failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -124,7 +122,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		nil,
 		false,
 	); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
+		util.Log(ctx).WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -358,7 +356,7 @@ func sendInvite(
 		}, err
 	}
 
-	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	identity, err := cfg.Global.SigningIdentityFor(device.UserDomain())
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -393,8 +391,8 @@ func sendInvite(
 		}, e
 	case nil:
 	default:
-		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
-		sentry.CaptureException(err)
+		util.Log(ctx).WithError(err).Error("PerformInvite failed")
+
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -508,7 +506,7 @@ func loadProfile(
 	}
 
 	var profile *authtypes.Profile
-	if cfg.Matrix.IsLocalServerName(serverName) {
+	if cfg.Global.IsLocalServerName(serverName) {
 		profile, err = appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, profileAPI)
 	} else {
 		profile = &authtypes.Profile{}
@@ -545,39 +543,42 @@ func checkAndProcessThreepid(
 	roomID string,
 	evTime time.Time,
 ) (inviteStored bool, errRes *util.JSONResponse) {
-
+	ctx := req.Context()
 	inviteStored, err := threepid.CheckAndProcessInvite(
-		req.Context(), device, body, cfg, rsAPI, profileAPI,
+		ctx, device, body, cfg, rsAPI, profileAPI,
 		roomID, evTime,
 	)
+
+	log := util.Log(ctx)
+
 	switch e := err.(type) {
 	case nil:
 	case threepid.ErrMissingParameter:
-		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		log.WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(err.Error()),
 		}
 	case threepid.ErrNotTrusted:
-		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		log.WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotTrusted(body.IDServer),
 		}
 	case eventutil.ErrRoomNoExists:
-		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		log.WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound(err.Error()),
 		}
 	case gomatrixserverlib.BadJSONError:
-		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		log.WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON(e.Error()),
 		}
 	default:
-		util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAndProcessInvite failed")
+		log.WithError(err).Error("threepid.CheckAndProcessInvite failed")
 		return inviteStored, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -593,7 +594,7 @@ func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.ClientRoomserver
 		UserID: userID,
 	}, &membershipRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("QueryMembershipForUser: could not query membership for user")
+		util.Log(ctx).WithError(err).Error("QueryMembershipForUser: could not query membership for user")
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -613,7 +614,7 @@ func SendForget(
 	roomID string, rsAPI roomserverAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
 	ctx := req.Context()
-	logger := util.GetLogger(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)
+	logger := util.Log(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)
 
 	deviceUserID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {

@@ -28,7 +28,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 type Peeker struct {
@@ -57,7 +56,7 @@ func (r *Peeker) performPeek(
 	if err != nil {
 		return "", api.ErrInvalidID{Err: fmt.Errorf("supplied user ID %q in incorrect format", req.UserID)}
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		return "", api.ErrInvalidID{Err: fmt.Errorf("user %q does not belong to this homeserver", req.UserID)}
 	}
 	if strings.HasPrefix(req.RoomIDOrAlias, "!") {
@@ -83,7 +82,7 @@ func (r *Peeker) performPeekRoomByAlias(
 	// Check if this alias matches our own server configuration. If it
 	// doesn't then we'll need to try a federated peek.
 	var roomID string
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		// The alias isn't owned by us, so we will need to try peeking using
 		// a remote server.
 		dirReq := fsAPI.PerformDirectoryLookupRequest{
@@ -93,7 +92,7 @@ func (r *Peeker) performPeekRoomByAlias(
 		dirRes := fsAPI.PerformDirectoryLookupResponse{}
 		err = r.FSAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
 		if err != nil {
-			logrus.WithError(err).Errorf("error looking up alias %q", req.RoomIDOrAlias)
+			util.Log(ctx).WithError(err).Error("error looking up alias %q", req.RoomIDOrAlias)
 			return "", fmt.Errorf("looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
 		}
 		roomID = dirRes.RoomID
@@ -119,18 +118,18 @@ func (r *Peeker) performPeekRoomByAlias(
 func (r *Peeker) performPeekRoomByID(
 	ctx context.Context,
 	req *api.PerformPeekRequest,
-) (roomID string, err error) {
-	roomID = req.RoomIDOrAlias
+) (string, error) {
 
-	// Get the domain part of the room ID.
-	_, domain, err := gomatrixserverlib.SplitID('!', roomID)
+	roomID, err := spec.NewRoomID(req.RoomIDOrAlias)
 	if err != nil {
 		return "", api.ErrInvalidID{Err: fmt.Errorf("room ID %q is invalid: %w", roomID, err)}
 	}
+	// Get the domain part of the room ID.
+	domain := roomID.Domain()
 
 	// handle federated peeks
 	// FIXME: don't create an outbound peek if we already have one going.
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		// If the server name in the room ID isn't ours then it's a
 		// possible candidate for finding the room via federation. Add
 		// it to the list of servers to try.
@@ -153,10 +152,10 @@ func (r *Peeker) performPeekRoomByID(
 	// XXX: we should probably factor out history_visibility checks into a common utility method somewhere
 	// which handles the default value etc.
 	var worldReadable = false
-	if ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.history_visibility", ""); ev != nil {
+	if ev, _ := r.DB.GetStateEvent(ctx, roomID.String(), "m.room.history_visibility", ""); ev != nil {
 		content := map[string]string{}
 		if err = json.Unmarshal(ev.Content(), &content); err != nil {
-			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
+			util.Log(ctx).WithError(err).Error("json.Unmarshal for history visibility failed")
 			return "", err
 		}
 		if visibility, ok := content["history_visibility"]; ok {
@@ -168,17 +167,17 @@ func (r *Peeker) performPeekRoomByID(
 		return "", api.ErrNotAllowed{Err: fmt.Errorf("room is not world-readable")}
 	}
 
-	if ev, _ := r.DB.GetStateEvent(ctx, roomID, "m.room.encryption", ""); ev != nil {
+	if ev, _ := r.DB.GetStateEvent(ctx, roomID.String(), "m.room.encryption", ""); ev != nil {
 		return "", api.ErrNotAllowed{Err: fmt.Errorf("cannot peek into an encrypted room")}
 	}
 
 	// TODO: handle federated peeks
 
-	err = r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
+	err = r.Inputer.OutputProducer.ProduceRoomEvents(ctx, roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeNewPeek,
 			NewPeek: &api.OutputNewPeek{
-				RoomID:   roomID,
+				RoomID:   roomID.String(),
 				UserID:   req.UserID,
 				DeviceID: req.DeviceID,
 			},
@@ -192,5 +191,5 @@ func (r *Peeker) performPeekRoomByID(
 	// it will have been overwritten with a room ID by performPeekRoomByAlias.
 	// We should now include this in the response so that the CS API can
 	// return the right room ID.
-	return roomID, nil
+	return roomID.String(), nil
 }

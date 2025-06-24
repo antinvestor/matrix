@@ -3,10 +3,12 @@ package config
 import (
 	"fmt"
 	"time"
+
+	"github.com/antinvestor/matrix/setup/constants"
 )
 
 type ClientAPI struct {
-	Matrix  *Global  `yaml:"-"`
+	Global  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
 
 	// If set disables new users from registering (except via shared
@@ -58,6 +60,8 @@ type ClientAPI struct {
 	RateLimiting RateLimiting `yaml:"rate_limiting"`
 
 	MSCs *MSCs `yaml:"-"`
+
+	Queues ClientQueues `yaml:"queues"`
 }
 
 func (c *ClientAPI) Defaults(opts DefaultOpts) {
@@ -71,9 +75,10 @@ func (c *ClientAPI) Defaults(opts DefaultOpts) {
 	c.RegistrationDisabled = true
 	c.OpenRegistrationWithoutVerificationEnabled = false
 	c.RateLimiting.Defaults()
+	c.Queues.Defaults(opts)
 }
 
-func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
+func (c *ClientAPI) Verify(configErrs *Errors) {
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
 	if c.RecaptchaEnabled {
@@ -101,8 +106,8 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
 				"(such as reCAPTCHA). By enabling open registration, you are SIGNIFICANTLY " +
 				"increasing the risk that your server will be used to send spam or abuse, and may result in " +
 				"your server being banned from some rooms. If you are ABSOLUTELY CERTAIN you want to do this, " +
-				"start Dendrite with the -really-enable-open-registration command line flag. Otherwise, you " +
-				"should set the registration_disabled option in your Dendrite config.",
+				"start Matrix with the -really-enable-open-registration command line flag. Otherwise, you " +
+				"should set the registration_disabled option in your Matrix config.",
 		)
 	}
 }
@@ -110,10 +115,10 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors) {
 type LoginSSO struct {
 
 	// CallbackURL is the absolute URL where a user agent can reach
-	// the Dendrite `/_matrix/v3/login/sso/callback` endpoint. This is
+	// the Matrix `/_matrix/v3/login/sso/callback` endpoint. This is
 	// used to create LoginSSO redirect URLs passed to identity
 	// providers. If this is empty, a default is inferred from request
-	// headers. When Dendrite is running behind a proxy, this may not
+	// headers. When Matrix is running behind a proxy, this may not
 	// always be the right information.
 	CallbackURL string `yaml:"callback_url"`
 
@@ -126,7 +131,7 @@ type LoginSSO struct {
 	DefaultProviderID string `yaml:"default_provider"`
 }
 
-func (sso *LoginSSO) Verify(configErrs *ConfigErrors) {
+func (sso *LoginSSO) Verify(configErrs *Errors) {
 	var foundDefaultProvider bool
 	seenPIDs := make(map[string]bool, len(sso.Providers))
 	for _, p := range sso.Providers {
@@ -172,12 +177,12 @@ func (idp *IdentityProvider) WithDefaults() IdentityProvider {
 	return p
 }
 
-func (idp *IdentityProvider) Verify(configErrs *ConfigErrors) {
+func (idp *IdentityProvider) Verify(configErrs *Errors) {
 	p := idp.WithDefaults()
 	p.verifyNormalized(configErrs)
 }
 
-func (idp *IdentityProvider) verifyNormalized(configErrs *ConfigErrors) {
+func (idp *IdentityProvider) verifyNormalized(configErrs *Errors) {
 	checkNotEmpty(configErrs, "client_api.sso.providers.id", idp.ID)
 	checkNotEmpty(configErrs, "client_api.sso.providers.name", idp.Name)
 
@@ -209,7 +214,7 @@ type TURN struct {
 	Password string `yaml:"turn_password"`
 }
 
-func (c *TURN) Verify(configErrs *ConfigErrors) {
+func (c *TURN) Verify(configErrs *Errors) {
 	value := c.UserLifetime
 	if value != "" {
 		if _, err := time.ParseDuration(value); err != nil {
@@ -235,7 +240,7 @@ type RateLimiting struct {
 	ExemptUserIDs []string `yaml:"exempt_user_ids"`
 }
 
-func (r *RateLimiting) Verify(configErrs *ConfigErrors) {
+func (r *RateLimiting) Verify(configErrs *Errors) {
 	if r.Enabled {
 		checkPositive(configErrs, "client_api.rate_limiting.threshold", r.Threshold)
 		checkPositive(configErrs, "client_api.rate_limiting.cooloff_ms", r.CooloffMS)
@@ -246,4 +251,16 @@ func (r *RateLimiting) Defaults() {
 	r.Enabled = true
 	r.Threshold = 5
 	r.CooloffMS = 500
+}
+
+type ClientQueues struct {
+	InputFulltextReindex QueueOptions `yaml:"input_fulltext_reindex"`
+}
+
+func (q *ClientQueues) Defaults(opts DefaultOpts) {
+	q.InputFulltextReindex = opts.defaultQ(constants.InputFulltextReindex)
+}
+
+func (q *ClientQueues) Verify(configErrs *Errors) {
+	checkNotEmpty(configErrs, "client_api.queues.input_fulltext_reindex", string(q.InputFulltextReindex.DS))
 }

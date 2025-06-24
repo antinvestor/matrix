@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,13 +20,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
-
-	"github.com/antinvestor/gomatrixserverlib"
 )
 
 // ErrRoomNoExists is returned when trying to lookup the state of a room that
@@ -43,7 +42,7 @@ func (e ErrRoomNoExists) Unwrap() error {
 	return errRoomNoExists
 }
 
-// QueryAndBuildEvent builds a Matrix event using the event builder and roomserver query
+// QueryAndBuildEvent builds a Global event using the event builder and roomserver query
 // API client provided. If also fills roomserver query API response (if provided)
 // in case the function calling FillBuilder needs to use it.
 // Returns ErrRoomNoExists if the state of the room could not be retrieved because
@@ -67,7 +66,7 @@ func QueryAndBuildEvent(
 	return BuildEvent(ctx, proto, identity, evTime, eventsNeeded, queryRes)
 }
 
-// BuildEvent builds a Matrix event from the builder and QueryLatestEventsAndStateResponse
+// BuildEvent builds a Global event from the builder and QueryLatestEventsAndStateResponse
 // provided.
 func BuildEvent(
 	ctx context.Context,

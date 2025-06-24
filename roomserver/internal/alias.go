@@ -16,7 +16,6 @@ package internal
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -25,6 +24,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	asAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/internal/eventutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/types"
@@ -119,7 +119,7 @@ func (r *RoomserverInternalAPI) GetAliasesForRoomID(
 func (r *RoomserverInternalAPI) RemoveRoomAlias(ctx context.Context, senderID spec.SenderID, alias string) (aliasFound bool, aliasRemoved bool, err error) {
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, alias)
 	if err != nil {
-		return false, false, fmt.Errorf("r.DB.GetRoomIDForAlias: %w", err)
+		return false, false, fmt.Errorf("r.Cm.GetRoomIDForAlias: %w", err)
 	}
 	if roomID == "" {
 		return false, false, nil
@@ -138,7 +138,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(ctx context.Context, senderID sp
 
 	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, alias)
 	if err != nil {
-		return true, false, fmt.Errorf("r.DB.GetCreatorIDForAlias: %w", err)
+		return true, false, fmt.Errorf("r.Cm.GetCreatorIDForAlias: %w", err)
 	}
 
 	if spec.SenderID(creatorID) != senderID {
@@ -147,7 +147,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(ctx context.Context, senderID sp
 
 		plEvent, err = r.DB.GetStateEvent(ctx, roomID, spec.MRoomPowerLevels, "")
 		if err != nil {
-			return true, false, fmt.Errorf("r.DB.GetStateEvent: %w", err)
+			return true, false, fmt.Errorf("r.Cm.GetStateEvent: %w", err)
 		}
 
 		pls, err = plEvent.PowerLevels()
@@ -161,7 +161,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(ctx context.Context, senderID sp
 	}
 
 	ev, err := r.DB.GetStateEvent(ctx, roomID, spec.MRoomCanonicalAlias, "")
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
 		return true, false, err
 	} else if ev != nil {
 		stateAlias := gjson.GetBytes(ev.Content(), "alias").Str

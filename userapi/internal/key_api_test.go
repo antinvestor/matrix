@@ -5,32 +5,24 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/internal"
 	"github.com/antinvestor/matrix/userapi/storage"
+	"github.com/pitabwire/frame"
 )
 
-func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.KeyDatabase, func()) {
+func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) storage.KeyDatabase {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: connStr})
-	db, err := storage.NewKeyDatabase(ctx, cm, &config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	})
+	cm := sqlutil.NewConnectionManager(svc)
+	db, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
-	return db, closeDb
+	return db
 }
 
 func Test_QueryDeviceMessages(t *testing.T) {
@@ -141,9 +133,10 @@ func Test_QueryDeviceMessages(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		db, closeDB := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDB()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateDatabase(ctx, svc, t, testOpts)
+
 		if err := db.StoreLocalDeviceKeys(ctx, deviceMessages); err != nil {
 			t.Fatalf("failed to store local devicesKeys")
 		}

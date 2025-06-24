@@ -5,32 +5,31 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"golang.org/x/crypto/bcrypt"
-	"gopkg.in/yaml.v3"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
+	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
 	defaultsForCI := flag.Bool("ci", false, "Populate the configuration with sane defaults for use in CI")
 	serverName := flag.String("server", "", "The domain name of the server if not 'localhost'")
-	databaseURI := flag.String("database_uri", "", "The DB URI to use for all components (PostgreSQL only)")
+	databaseURI := flag.String("database_uri", "", "The Cm URI to use for all components (PostgreSQL only)")
 	cacheURI := flag.String("cache_uri", "", "The Cache URI to use for all components")
 	queueURI := flag.String("queue_uri", "", "The Queue URI to use for all components")
 	dirPath := flag.String("dir", "./", "The folder to use for paths ( media storage)")
 	normalise := flag.String("normalise", "", "Normalise an existing configuration file by adding new/missing options and defaults")
 	flag.Parse()
 
-	var cfg *config.Dendrite
+	var cfg *config.Matrix
 	if *normalise == "" {
-		cfg = &config.Dendrite{
+		cfg = &config.Matrix{
 			Version: config.Version,
 		}
 		cfg.Defaults(config.DefaultOpts{
-			DatabaseConnectionStr: config.DataSource(*databaseURI),
-			CacheConnectionStr:    config.DataSource(*cacheURI),
-			QueueConnectionStr:    config.DataSource(*queueURI),
+			DSDatabaseConn: config.DataSource(*databaseURI),
+			DSCacheConn:    config.DataSource(*cacheURI),
+			DSQueueConn:    config.DataSource(*queueURI),
 		})
 		if *serverName != "" {
 			cfg.Global.ServerName = spec.ServerName(*serverName)
@@ -38,15 +37,7 @@ func main() {
 
 		cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
 		cfg.SyncAPI.Fulltext.IndexPath = config.Path(filepath.Join(*dirPath, "searchindex"))
-		cfg.Logging = []config.LogrusHook{
-			{
-				Type:  "file",
-				Level: "info",
-				Params: map[string]interface{}{
-					"path": filepath.Join(*dirPath, "log"),
-				},
-			},
-		}
+
 		if *defaultsForCI {
 			cfg.AppServiceAPI.DisableTLSValidation = true
 			cfg.ClientAPI.RateLimiting.Enabled = false
@@ -56,8 +47,6 @@ func main() {
 			cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{}
 			cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
 			cfg.MSCs.MSCs = []string{"msc2836", "msc2444", "msc2753"}
-			cfg.Logging[0].Level = "trace"
-			cfg.Logging[0].Type = "std"
 			cfg.UserAPI.BCryptCost = bcrypt.MinCost
 			cfg.ClientAPI.RegistrationDisabled = false
 			cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true

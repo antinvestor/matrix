@@ -17,29 +17,29 @@ package clientapi
 import (
 	"context"
 
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
-	"github.com/antinvestor/matrix/internal/httputil"
-	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
-
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/clientapi/producers"
 	"github.com/antinvestor/matrix/clientapi/routing"
 	federationAPI "github.com/antinvestor/matrix/federationapi/api"
+	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/transactions"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
-
+	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	cfg *config.Dendrite,
-	natsInstance *jetstream.NATSInstance,
+	cfg *config.Matrix,
+	qm queueutil.QueueManager,
 	federation fclient.FederationClient,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
@@ -49,16 +49,39 @@ func AddPublicRoutes(
 	userDirectoryProvider userapi.QuerySearchProfilesAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	partitionCli *partitionv1.PartitionClient,
+	presenceCli presencev1connect.PresenceServiceClient,
 	enableMetrics bool,
 ) {
-	js, natsClient := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
+
+	log := util.Log(ctx)
+	syncApiCfg := cfg.SyncAPI.Queues
+
+	err := qm.RegisterPublisher(ctx, &syncApiCfg.OutputReceiptEvent)
+	if err != nil {
+		log.WithError(err).Panic("failed to register publisher for receipt event")
+	}
+
+	err = qm.RegisterPublisher(ctx, &syncApiCfg.OutputSendToDeviceEvent)
+	if err != nil {
+		log.WithError(err).Panic("failed to register publisher for send to device event")
+	}
+
+	err = qm.RegisterPublisher(ctx, &syncApiCfg.OutputTypingEvent)
+	if err != nil {
+		log.WithError(err).Panic("failed to register publisher for typing event")
+	}
+
+	err = qm.RegisterPublisher(ctx, &syncApiCfg.OutputPresenceEvent)
+	if err != nil {
+		log.WithError(err).Panic("failed to register publisher for presence event")
+	}
 
 	syncProducer := &producers.SyncAPIProducer{
-		JetStream:              js,
-		TopicReceiptEvent:      cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		TopicSendToDeviceEvent: cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		TopicTypingEvent:       cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		TopicPresenceEvent:     cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		Qm:                     qm,
+		TopicReceiptEvent:      syncApiCfg.OutputReceiptEvent.Ref(),
+		TopicSendToDeviceEvent: syncApiCfg.OutputSendToDeviceEvent.Ref(),
+		TopicTypingEvent:       syncApiCfg.OutputTypingEvent.Ref(),
+		TopicPresenceEvent:     syncApiCfg.OutputPresenceEvent.Ref(),
 		UserAPI:                userAPI,
 		ServerName:             cfg.Global.ServerName,
 	}
@@ -69,6 +92,6 @@ func AddPublicRoutes(
 		cfg, rsAPI, asAPI,
 		userAPI, userDirectoryProvider, federation,
 		syncProducer, transactionsCache, fsAPI,
-		extRoomsProvider, natsClient, partitionCli, enableMetrics,
+		extRoomsProvider, partitionCli, presenceCli, enableMetrics,
 	)
 }

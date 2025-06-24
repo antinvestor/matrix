@@ -1,12 +1,15 @@
 package config
 
 import (
+	"fmt"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/setup/constants"
 )
 
 type FederationAPI struct {
-	Matrix *Global `yaml:"-"`
+	Global *Global `yaml:"-"`
 
 	// The database stores information used by the federation destination queues to
 	// send transactions to remote servers.
@@ -35,7 +38,7 @@ type FederationAPI struct {
 	// on remote federation endpoints. This is not recommended in production!
 	DisableTLSValidation bool `yaml:"disable_tls_validation"`
 
-	// DisableHTTPKeepalives prevents Dendrite from keeping HTTP connections
+	// DisableHTTPKeepalives prevents Matrix from keeping HTTP connections
 	// open for reuse for future requests. Connections will be closed quicker
 	// but we may spend more time on TLS handshakes instead.
 	DisableHTTPKeepalives bool `yaml:"disable_http_keepalives"`
@@ -46,6 +49,8 @@ type FederationAPI struct {
 
 	// Should we prefer direct key fetches over perspective ones?
 	PreferDirectFetch bool `yaml:"prefer_direct_fetch"`
+
+	Queues FederationAPIQueues `yaml:"queues"`
 }
 
 func (c *FederationAPI) Defaults(opts DefaultOpts) {
@@ -68,13 +73,15 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 			},
 		},
 	}
-	c.Database.ConnectionString = opts.DatabaseConnectionStr
-
+	c.Database.Reference = "FederationAPI"
+	c.Database.Prefix = opts.RandomnessPrefix
+	c.Database.DatabaseURI = opts.DSDatabaseConn
+	c.Queues.Defaults(opts)
 }
 
-func (c *FederationAPI) Verify(configErrs *ConfigErrors) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
+func (c *FederationAPI) Verify(configErrs *Errors) {
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "federation_api.database.database_uri", string(c.Database.DatabaseURI))
 	}
 }
 
@@ -97,7 +104,7 @@ func (c *Proxy) Defaults() {
 	c.Port = 8080
 }
 
-func (c *Proxy) Verify(configErrs *ConfigErrors) {
+func (c *Proxy) Verify(configErrs *Errors) {
 }
 
 // KeyPerspectives are used to configure perspective key servers for
@@ -117,4 +124,47 @@ type KeyPerspectiveTrustKey struct {
 	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
 	// The public key in base64 unpadded format
 	PublicKey string `yaml:"public_key"`
+}
+
+type FederationAPIQueues struct {
+
+	// durable - FederationAPIPresenceConsumer
+	OutputPresenceEvent QueueOptions `yaml:"output_presence_event"`
+
+	// durable - FederationAPIReceiptConsumer
+	OutputReceiptEvent QueueOptions `yaml:"output_receipt_event"`
+
+	// durable - FederationAPIRoomServerConsumer
+	OutputRoomEvent QueueOptions `yaml:"output_room_event"`
+
+	// durable - FederationAPIESendToDeviceConsumer
+	OutputSendToDeviceEvent QueueOptions `yaml:"output_send_to_device_event"`
+
+	// durable - FederationAPITypingConsumer
+	OutputTypingEvent QueueOptions `yaml:"output_typing_event"`
+}
+
+func (q *FederationAPIQueues) Defaults(opts DefaultOpts) {
+	q.OutputPresenceEvent = opts.defaultQ(constants.OutputPresenceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputPresenceEvent"})
+	q.OutputReceiptEvent = opts.defaultQ(constants.OutputReceiptEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputReceiptEvent"})
+
+	q.OutputRoomEvent = opts.defaultQ(constants.OutputRoomEvent,
+		KVOpt{K: "stream_retention", V: "interest"},
+		KVOpt{K: "stream_subjects", V: fmt.Sprintf("%s.*", constants.OutputRoomEvent)},
+		KVOpt{K: "consumer_filter_subject", V: fmt.Sprintf("%s.*", constants.OutputRoomEvent)},
+		KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputRoomEvent"},
+		KVOpt{K: "consumer_headers_only", V: "true"},
+		KVOpt{K: constants.QueueHeaderToExtendSubject, V: constants.RoomID})
+	q.OutputRoomEvent.QReference = fmt.Sprintf("FederationAPI_%s", q.OutputRoomEvent.QReference)
+
+	q.OutputSendToDeviceEvent = opts.defaultQ(constants.OutputSendToDeviceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputSendToDeviceEvent"})
+	q.OutputTypingEvent = opts.defaultQ(constants.OutputTypingEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_FederationAPIOutputTypingEvent"})
+}
+
+func (q *FederationAPIQueues) Verify(configErrs *Errors) {
+	checkNotEmpty(configErrs, "federation_api.queues.output_presence_event", string(q.OutputPresenceEvent.DS))
+	checkNotEmpty(configErrs, "federation_api.queues.output_receipt_event", string(q.OutputReceiptEvent.DS))
+	checkNotEmpty(configErrs, "federation_api.queues.output_room_event", string(q.OutputRoomEvent.DS))
+	checkNotEmpty(configErrs, "federation_api.queues.output_send_to_device_event", string(q.OutputSendToDeviceEvent.DS))
+	checkNotEmpty(configErrs, "federation_api.queues.output_typing_event", string(q.OutputTypingEvent.DS))
 }

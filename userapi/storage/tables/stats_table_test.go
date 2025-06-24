@@ -2,29 +2,25 @@ package tables_test
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
-func mustMakeDBs(ctx context.Context, t *testing.T, _ test.DependancyOption) (
-	*sql.DB, tables.AccountsTable, tables.DevicesTable, tables.StatsTable, func(),
-) {
+func mustMakeDBs(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (
+	sqlutil.ConnectionManager, tables.AccountsTable, tables.DevicesTable, tables.StatsTable) {
 	t.Helper()
 
 	var (
@@ -34,37 +30,32 @@ func mustMakeDBs(ctx context.Context, t *testing.T, _ test.DependancyOption) (
 		err        error
 	)
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, nil)
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
+	cm := sqlutil.NewConnectionManager(svc)
 
-	accTable, err = postgres.NewPostgresAccountsTable(ctx, db, "localhost")
+	accTable, err = postgres.NewPostgresAccountsTable(ctx, cm, "localhost")
 	if err != nil {
 		t.Fatalf("unable to create acc db: %v", err)
 	}
-	devTable, err = postgres.NewPostgresDevicesTable(ctx, db, "localhost")
+	devTable, err = postgres.NewPostgresDevicesTable(ctx, cm, "localhost")
 	if err != nil {
 		t.Fatalf("unable to open device db: %v", err)
 	}
-	statsTable, err = postgres.NewPostgresStatsTable(ctx, db, "localhost")
+	statsTable, err = postgres.NewPostgresStatsTable(ctx, cm, "localhost")
 	if err != nil {
 		t.Fatalf("unable to open stats db: %v", err)
 	}
 
-	return db, accTable, devTable, statsTable, closeDb
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("unable to migrate db: %v", err)
+	}
+
+	return cm, accTable, devTable, statsTable
 }
 
 func mustMakeAccountAndDevice(
-	t *testing.T,
 	ctx context.Context,
+	t *testing.T,
 	accDB tables.AccountsTable,
 	devDB tables.DevicesTable,
 	localpart string,
@@ -79,38 +70,38 @@ func mustMakeAccountAndDevice(
 		appServiceID = util.RandomString(16)
 	}
 
-	_, err := accDB.InsertAccount(ctx, nil, localpart, serverName, "", appServiceID, accType)
+	_, err := accDB.InsertAccount(ctx, localpart, serverName, "", appServiceID, accType)
 	if err != nil {
 		t.Fatalf("unable to create account: %v", err)
 	}
-	_, err = devDB.InsertDevice(ctx, nil, "deviceID", localpart, serverName, util.RandomString(16), nil, nil, "", userAgent)
+	_, err = devDB.InsertDevice(ctx, "deviceID", localpart, serverName, util.RandomString(16), nil, nil, "", userAgent)
 	if err != nil {
 		t.Fatalf("unable to create device: %v", err)
 	}
 }
 
 func mustUpdateDeviceLastSeen(
-	t *testing.T,
 	ctx context.Context,
-	db *sql.DB,
+	t *testing.T,
+	cm sqlutil.ConnectionManager,
 	localpart string,
 	timestamp time.Time,
 ) {
 	t.Helper()
-	_, err := db.ExecContext(ctx, "UPDATE userapi_devices SET last_seen_ts = $1 WHERE localpart = $2", spec.AsTimestamp(timestamp), localpart)
+	err := cm.Connection(ctx, false).Exec("UPDATE userapi_devices SET last_seen_ts = $1 WHERE localpart = $2", spec.AsTimestamp(timestamp), localpart).Error
 	if err != nil {
 		t.Fatalf("unable to update device last seen")
 	}
 }
 
 func mustUserUpdateRegistered(
-	t *testing.T,
 	ctx context.Context,
-	db *sql.DB,
+	t *testing.T,
+	cm sqlutil.ConnectionManager,
 	localpart string,
 	timestamp time.Time,
 ) {
-	_, err := db.ExecContext(ctx, "UPDATE userapi_accounts SET created_ts = $1 WHERE localpart = $2", spec.AsTimestamp(timestamp), localpart)
+	err := cm.Connection(ctx, false).Exec("UPDATE userapi_accounts SET created_ts = $1 WHERE localpart = $2", spec.AsTimestamp(timestamp), localpart).Error
 	if err != nil {
 		t.Fatalf("unable to update device last seen")
 	}
@@ -121,30 +112,31 @@ func Test_UserStatistics(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		db, accDB, devDB, statsDB, closeDb := mustMakeDBs(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		cm, accDB, devDB, statsDB := mustMakeDBs(ctx, svc, t, testOpts)
+
 		wantType := "Postgres"
 
 		t.Run(fmt.Sprintf("want %s database engine", wantType), func(t *testing.T) {
-			_, gotDB, err := statsDB.UserStatistics(ctx, nil)
+			_, gotDB, err := statsDB.UserStatistics(ctx)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
 			if wantType != gotDB.Engine { // can't use DeepEqual, as the Version might differ
-				t.Errorf("UserStatistics() got DB engine = %+v, want %s", gotDB.Engine, wantType)
+				t.Errorf("UserStatistics() got Cm engine = %+v, want %s", gotDB.Engine, wantType)
 			}
 		})
 
 		t.Run("Want Users", func(t *testing.T) {
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user1", "localhost", api.AccountTypeUser, "Element Android")
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user2", "localhost", api.AccountTypeUser, "Element iOS")
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user3", "localhost", api.AccountTypeUser, "Element web")
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user4", "localhost", api.AccountTypeGuest, "Element Electron")
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user5", "localhost", api.AccountTypeAdmin, "gecko")
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user6", "localhost", api.AccountTypeAppService, "gecko")
-			gotStats, _, err := statsDB.UserStatistics(ctx, nil)
+			mustMakeAccountAndDevice(ctx, t, accDB, devDB, "user1", "localhost", api.AccountTypeUser, "Element Android")
+			mustMakeAccountAndDevice(ctx, t, accDB, devDB, "user2", "localhost", api.AccountTypeUser, "Element iOS")
+			mustMakeAccountAndDevice(ctx, t, accDB, devDB, "user3", "localhost", api.AccountTypeUser, "Element web")
+			mustMakeAccountAndDevice(ctx, t, accDB, devDB, "user4", "localhost", api.AccountTypeGuest, "Element Electron")
+			mustMakeAccountAndDevice(ctx, t, accDB, devDB, "user5", "localhost", api.AccountTypeAdmin, "gecko")
+			mustMakeAccountAndDevice(ctx, t, accDB, devDB, "user6", "localhost", api.AccountTypeAppService, "gecko")
+			gotStats, _, err := statsDB.UserStatistics(ctx)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -174,9 +166,9 @@ func Test_UserStatistics(t *testing.T) {
 		})
 
 		t.Run("Users not active for one/two month", func(t *testing.T) {
-			mustUpdateDeviceLastSeen(t, ctx, db, "user1", time.Now().AddDate(0, 0, -60))
-			mustUpdateDeviceLastSeen(t, ctx, db, "user2", time.Now().AddDate(0, 0, -30))
-			gotStats, _, err := statsDB.UserStatistics(ctx, nil)
+			mustUpdateDeviceLastSeen(ctx, t, cm, "user1", time.Now().AddDate(0, 0, -60))
+			mustUpdateDeviceLastSeen(ctx, t, cm, "user2", time.Now().AddDate(0, 0, -30))
+			gotStats, _, err := statsDB.UserStatistics(ctx)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -211,17 +203,17 @@ func Test_UserStatistics(t *testing.T) {
 		- Where account creation and last_seen are > 30 days apart
 		*/
 		t.Run("R30Users tests", func(t *testing.T) {
-			mustUserUpdateRegistered(t, ctx, db, "user1", time.Now().AddDate(0, 0, -60))
-			mustUpdateDeviceLastSeen(t, ctx, db, "user1", time.Now())
-			mustUserUpdateRegistered(t, ctx, db, "user4", time.Now().AddDate(0, 0, -60))
-			mustUpdateDeviceLastSeen(t, ctx, db, "user4", time.Now())
+			mustUserUpdateRegistered(ctx, t, cm, "user1", time.Now().AddDate(0, 0, -60))
+			mustUpdateDeviceLastSeen(ctx, t, cm, "user1", time.Now())
+			mustUserUpdateRegistered(ctx, t, cm, "user4", time.Now().AddDate(0, 0, -60))
+			mustUpdateDeviceLastSeen(ctx, t, cm, "user4", time.Now())
 			startTime := time.Now().AddDate(0, 0, -2)
-			err := statsDB.UpdateUserDailyVisits(ctx, nil, startTime, startTime.Truncate(time.Hour*24))
+			err := statsDB.UpdateUserDailyVisits(ctx, startTime, startTime.Truncate(time.Hour*24))
 			if err != nil {
 				t.Fatalf("unable to update daily visits stats: %v", err)
 			}
 
-			gotStats, _, err := statsDB.UserStatistics(ctx, nil)
+			gotStats, _, err := statsDB.UserStatistics(ctx)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -264,15 +256,15 @@ func Test_UserStatistics(t *testing.T) {
 		t.Run("R30UsersV2 tests", func(t *testing.T) {
 			// generate some data
 			for i := 100; i > 0; i-- {
-				mustUpdateDeviceLastSeen(t, ctx, db, "user1", time.Now().AddDate(0, 0, -i))
-				mustUpdateDeviceLastSeen(t, ctx, db, "user5", time.Now().AddDate(0, 0, -i))
+				mustUpdateDeviceLastSeen(ctx, t, cm, "user1", time.Now().AddDate(0, 0, -i))
+				mustUpdateDeviceLastSeen(ctx, t, cm, "user5", time.Now().AddDate(0, 0, -i))
 				startTime := time.Now().AddDate(0, 0, -i)
-				err := statsDB.UpdateUserDailyVisits(ctx, nil, startTime, startTime.Truncate(time.Hour*24))
+				err := statsDB.UpdateUserDailyVisits(ctx, startTime, startTime.Truncate(time.Hour*24))
 				if err != nil {
 					t.Fatalf("unable to update daily visits stats: %v", err)
 				}
 			}
-			gotStats, _, err := statsDB.UserStatistics(ctx, nil)
+			gotStats, _, err := statsDB.UserStatistics(ctx)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

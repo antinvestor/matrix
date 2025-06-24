@@ -8,7 +8,7 @@ import (
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage"
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 type PusherDevice struct {
@@ -20,6 +20,9 @@ type PusherDevice struct {
 
 // GetPushDevices pushes to the configured devices of a local user.
 func GetPushDevices(ctx context.Context, localpart string, serverName spec.ServerName, tweaks map[string]interface{}, db storage.UserDatabase) ([]*PusherDevice, error) {
+
+	log := util.Log(ctx)
+
 	pushers, err := db.GetPushers(ctx, localpart, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("db.GetPushers: %w", err)
@@ -40,30 +43,30 @@ func GetPushDevices(ctx context.Context, localpart string, serverName spec.Serve
 			var ok bool
 			format, ok = fmtIface.(string)
 			if ok && format != "event_id_only" {
-				log.WithFields(log.Fields{
-					"localpart": localpart,
-					"app_id":    pusher.AppID,
-				}).Errorf("Only data.format event_id_only or empty is supported")
+				log.
+					WithField("localpart", localpart).
+					WithField("app_id", pusher.AppID).
+					Error("Only data.format event_id_only or empty is supported")
 				continue
 			}
 
 			urlIface := pusher.Data["url"]
 			url, ok = urlIface.(string)
 			if !ok {
-				log.WithFields(log.Fields{
-					"localpart": localpart,
-					"app_id":    pusher.AppID,
-				}).Errorf("No data.url configured for HTTP Pusher")
+				log.
+					WithField("localpart", localpart).
+					WithField("app_id", pusher.AppID).
+					Error("No data.url configured for HTTP Pusher")
 				continue
 			}
 			data = mapWithout(data, "url")
 
 		default:
-			log.WithFields(log.Fields{
-				"localpart": localpart,
-				"app_id":    pusher.AppID,
-				"kind":      pusher.Kind,
-			}).Errorf("Unhandled pusher kind")
+			log.
+				WithField("localpart", localpart).
+				WithField("app_id", pusher.AppID).
+				WithField("kind", pusher.Kind).
+				Error("Unhandled pusher kind")
 			continue
 		}
 

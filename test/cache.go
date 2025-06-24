@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,24 +25,24 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-//const RedisImage = "redis:7"
+// const RedisImage = "redis:7"
 //
-//func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
+// func setupRedis(ctx context.Context) (*tcRedis.RedisContainer, error) {
 //	return tcRedis.Run(ctx, RedisImage)
-//}
+// }
 //
-//// testContainerRedisDataSource Prepare a redis connection string for testing.
-//// Returns the connection string to use and a close function which must be called when the test finishes.
-//// Calling this function twice will return the same database, which will have data from previous tests
-//// unless close() is called.
-//func testContainerRedisDataSource(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
+// // testContainerRedisDataSource Prepare a redis connection string for testing.
+// // Returns the connection string to use and a close function which must be called when the test finishes.
+// // Calling this function twice will return the same database, which will have data from previous tests
+// // unless close() is called.
+// func testContainerRedisDataSource(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
 //
 //	container, err := setupRedis(ctx)
 //	if err != nil {
 //		return "", nil, err
 //	}
 //
-//	connStr, err := container.ConnectionString(ctx)
+//	connStr, err := container.DS(ctx)
 //	if err != nil {
 //		return "", nil, err
 //	}
@@ -50,10 +50,10 @@ import (
 //	return config.DataSource(connStr), func() {
 //		err = testcontainers.TerminateContainer(container)
 //		if err != nil {
-//			logrus.WithError(err).Error("failed to terminate container")
+//			util.Log(ctx).WithError(err).Error("failed to terminate container")
 //		}
 //	}, nil
-//}
+// }
 
 func clearCache(ctx context.Context, redisUriStr string) error {
 
@@ -66,20 +66,24 @@ func clearCache(ctx context.Context, redisUriStr string) error {
 	return client.FlushDB(ctx).Err()
 }
 
-// PrepareRedisDataSourceConnection Prepare a redis connection string for testing.
+// PrepareCacheConnection Prepare a redis connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareRedisDataSourceConnection(ctx context.Context) (connStr config.DataSource, close func(), err error) {
+func PrepareCacheConnection(ctx context.Context, randomnesPrefix string, testOpts DependancyOption) (connStr config.DataSource, close func(ctx context.Context), err error) {
+
+	if testOpts.Cache() != DefaultCache {
+		return "", func(ctx context.Context) {}, fmt.Errorf(" %s is unsupported, only redis is the usable cache", testOpts.Cache())
+	}
 
 	redisUriStr := os.Getenv("TESTING_CACHE_URI")
 	if redisUriStr == "" {
-		redisUriStr = "redis://matrix:s3cr3t@127.0.0.1:6379"
+		redisUriStr = "redis://matrix:s3cr3t@localhost:6378"
 	}
 
 	parsedUri, err := url.Parse(redisUriStr)
 	if err != nil {
-		return "", func() {}, err
+		return "", func(ctx context.Context) {}, err
 	}
 
 	newDb := rand.IntN(10000)
@@ -87,7 +91,7 @@ func PrepareRedisDataSourceConnection(ctx context.Context) (connStr config.DataS
 	parsedUri.Path = fmt.Sprintf("/%d", newDb)
 	redisUriStr = parsedUri.String()
 
-	return config.DataSource(redisUriStr), func() {
+	return config.DataSource(redisUriStr), func(ctx context.Context) {
 		_ = clearCache(ctx, redisUriStr)
 	}, nil
 }

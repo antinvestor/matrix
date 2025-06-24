@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,16 +16,17 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/relayapi/storage/tables"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
+// SQL query definitions as package-level constants
 const relayQueueSchema = `
 CREATE TABLE IF NOT EXISTS relayapi_queue (
 	-- The transaction ID that was generated before persisting the event.
@@ -44,90 +45,101 @@ CREATE INDEX IF NOT EXISTS relayapi_queue_server_name_idx
 	ON relayapi_queue (server_name);
 `
 
+// Schema revert to use for migration revert if needed
+const relayQueueSchemaRevert = `
+DROP TABLE IF EXISTS relayapi_queue;
+`
+
+// insertQueueEntrySQL inserts a new entry into the queue
 const insertQueueEntrySQL = "" +
 	"INSERT INTO relayapi_queue (transaction_id, server_name, json_nid)" +
 	" VALUES ($1, $2, $3)"
 
+// deleteQueueEntriesSQL deletes queue entries for a server and set of JSON NIDs
 const deleteQueueEntriesSQL = "" +
 	"DELETE FROM relayapi_queue WHERE server_name = $1 AND json_nid = ANY($2)"
 
+// selectQueueEntriesSQL retrieves queue entries for a server up to a limit
 const selectQueueEntriesSQL = "" +
 	"SELECT json_nid FROM relayapi_queue" +
 	" WHERE server_name = $1" +
 	" ORDER BY json_nid" +
 	" LIMIT $2"
 
+// selectQueueEntryCountSQL counts queue entries for a server
 const selectQueueEntryCountSQL = "" +
 	"SELECT COUNT(*) FROM relayapi_queue" +
 	" WHERE server_name = $1"
 
-type relayQueueStatements struct {
-	db                        *sql.DB
-	insertQueueEntryStmt      *sql.Stmt
-	deleteQueueEntriesStmt    *sql.Stmt
-	selectQueueEntriesStmt    *sql.Stmt
-	selectQueueEntryCountStmt *sql.Stmt
+// relayQueueTable implements the tables.RelayQueue interface
+type relayQueueTable struct {
+	cm sqlutil.ConnectionManager
+
+	// SQL queries stored as struct fields
+	insertQueueEntrySQL      string
+	deleteQueueEntriesSQL    string
+	selectQueueEntriesSQL    string
+	selectQueueEntryCountSQL string
 }
 
+// NewPostgresRelayQueueTable creates a new relay queue table
 func NewPostgresRelayQueueTable(
-	_ context.Context, db *sql.DB,
-) (s *relayQueueStatements, err error) {
-	s = &relayQueueStatements{
-		db: db,
-	}
-	_, err = s.db.Exec(relayQueueSchema)
-	if err != nil {
-		return
+	ctx context.Context, cm sqlutil.ConnectionManager,
+) (tables.RelayQueue, error) {
+	t := &relayQueueTable{
+		cm: cm,
+
+		// Initialise SQL query struct fields
+		insertQueueEntrySQL:      insertQueueEntrySQL,
+		deleteQueueEntriesSQL:    deleteQueueEntriesSQL,
+		selectQueueEntriesSQL:    selectQueueEntriesSQL,
+		selectQueueEntryCountSQL: selectQueueEntryCountSQL,
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.insertQueueEntryStmt, insertQueueEntrySQL},
-		{&s.deleteQueueEntriesStmt, deleteQueueEntriesSQL},
-		{&s.selectQueueEntriesStmt, selectQueueEntriesSQL},
-		{&s.selectQueueEntryCountStmt, selectQueueEntryCountSQL},
-	}.Prepare(db)
+	// Migrate the table schema
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "relayapi_relay_queue_table_schema_001",
+		Patch:       relayQueueSchema,
+		RevertPatch: relayQueueSchemaRevert,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return t, nil
 }
 
-func (s *relayQueueStatements) InsertQueueEntry(
+func (t *relayQueueTable) InsertQueueEntry(
 	ctx context.Context,
-	txn *sql.Tx,
 	transactionID gomatrixserverlib.TransactionID,
 	serverName spec.ServerName,
 	nid int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertQueueEntryStmt)
-	_, err := stmt.ExecContext(
-		ctx,
-		transactionID, // the transaction ID that we initially attempted
-		serverName,    // destination server name
-		nid,           // JSON blob NID
-	)
-	return err
+	db := t.cm.Connection(ctx, false) // Not read-only
+	return db.Exec(t.insertQueueEntrySQL, transactionID, serverName, nid).Error
 }
 
-func (s *relayQueueStatements) DeleteQueueEntries(
+func (t *relayQueueTable) DeleteQueueEntries(
 	ctx context.Context,
-	txn *sql.Tx,
 	serverName spec.ServerName,
 	jsonNIDs []int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteQueueEntriesStmt)
-	_, err := stmt.ExecContext(ctx, serverName, pq.Int64Array(jsonNIDs))
-	return err
+	db := t.cm.Connection(ctx, false) // Not read-only
+	return db.Exec(t.deleteQueueEntriesSQL, serverName, pq.Int64Array(jsonNIDs)).Error
 }
 
-func (s *relayQueueStatements) SelectQueueEntries(
+func (t *relayQueueTable) SelectQueueEntries(
 	ctx context.Context,
-	txn *sql.Tx,
 	serverName spec.ServerName,
 	limit int,
 ) ([]int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectQueueEntriesStmt)
-	rows, err := stmt.QueryContext(ctx, serverName, limit)
+	db := t.cm.Connection(ctx, true) // Read-only
+	rows, err := db.Raw(t.selectQueueEntriesSQL, serverName, limit).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "queueFromStmt: rows.close() failed")
+
 	var result []int64
 	for rows.Next() {
 		var nid int64
@@ -140,15 +152,14 @@ func (s *relayQueueStatements) SelectQueueEntries(
 	return result, rows.Err()
 }
 
-func (s *relayQueueStatements) SelectQueueEntryCount(
+func (t *relayQueueTable) SelectQueueEntryCount(
 	ctx context.Context,
-	txn *sql.Tx,
 	serverName spec.ServerName,
 ) (int64, error) {
 	var count int64
-	stmt := sqlutil.TxStmt(txn, s.selectQueueEntryCountStmt)
-	err := stmt.QueryRowContext(ctx, serverName).Scan(&count)
-	if errors.Is(err, sql.ErrNoRows) {
+	db := t.cm.Connection(ctx, true) // Read-only
+	err := db.Raw(t.selectQueueEntryCountSQL, serverName).Row().Scan(&count)
+	if sqlutil.ErrorIsNoRows(err) {
 		// It's acceptable for there to be no rows referencing a given
 		// JSON NID but it's not an error condition. Just return as if
 		// there's a zero count.

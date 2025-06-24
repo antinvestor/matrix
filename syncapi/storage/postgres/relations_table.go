@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,14 +16,15 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/frame"
 )
 
+// Schema for relations table
 const relationsSchema = `
 CREATE SEQUENCE IF NOT EXISTS syncapi_relation_id;
 
@@ -38,93 +39,123 @@ CREATE TABLE IF NOT EXISTS syncapi_relations (
 );
 `
 
-const insertRelationSQL = "" +
-	"INSERT INTO syncapi_relations (" +
-	"  room_id, event_id, child_event_id, child_event_type, rel_type" +
-	") VALUES ($1, $2, $3, $4, $5) " +
-	" ON CONFLICT DO NOTHING"
+// Revert schema for relations table
+const relationsSchemaRevert = `
+DROP TABLE IF EXISTS syncapi_relations;
+DROP SEQUENCE IF EXISTS syncapi_relation_id;
+`
 
-const deleteRelationSQL = "" +
-	"DELETE FROM syncapi_relations WHERE room_id = $1 AND child_event_id = $2"
+// SQL query to insert a relation
+const insertRelationSQL = `
+INSERT INTO syncapi_relations (
+  room_id, event_id, child_event_id, child_event_type, rel_type
+) VALUES ($1, $2, $3, $4, $5) 
+ ON CONFLICT DO NOTHING
+`
 
-const selectRelationsInRangeAscSQL = "" +
-	"SELECT id, child_event_id, rel_type FROM syncapi_relations" +
-	" WHERE room_id = $1 AND event_id = $2" +
-	" AND ( $3 = '' OR rel_type = $3 )" +
-	" AND ( $4 = '' OR child_event_type = $4 )" +
-	" AND id > $5 AND id <= $6" +
-	" ORDER BY id ASC LIMIT $7"
+// SQL query to delete a relation
+const deleteRelationSQL = `
+DELETE FROM syncapi_relations WHERE room_id = $1 AND child_event_id = $2
+`
 
-const selectRelationsInRangeDescSQL = "" +
-	"SELECT id, child_event_id, rel_type FROM syncapi_relations" +
-	" WHERE room_id = $1 AND event_id = $2" +
-	" AND ( $3 = '' OR rel_type = $3 )" +
-	" AND ( $4 = '' OR child_event_type = $4 )" +
-	" AND id >= $5 AND id < $6" +
-	" ORDER BY id DESC LIMIT $7"
+// SQL query to select relations in ascending order
+const selectRelationsInRangeAscSQL = `
+SELECT id, child_event_id, rel_type FROM syncapi_relations
+ WHERE room_id = $1 AND event_id = $2
+ AND ( $3 = '' OR rel_type = $3 )
+ AND ( $4 = '' OR child_event_type = $4 )
+ AND id > $5 AND id <= $6
+ ORDER BY id ASC LIMIT $7
+`
 
-const selectMaxRelationIDSQL = "" +
-	"SELECT COALESCE(MAX(id), 0) FROM syncapi_relations"
+// SQL query to select relations in descending order
+const selectRelationsInRangeDescSQL = `
+SELECT id, child_event_id, rel_type FROM syncapi_relations
+ WHERE room_id = $1 AND event_id = $2
+ AND ( $3 = '' OR rel_type = $3 )
+ AND ( $4 = '' OR child_event_type = $4 )
+ AND id >= $5 AND id < $6
+ ORDER BY id DESC LIMIT $7
+`
 
-type relationsStatements struct {
-	insertRelationStmt             *sql.Stmt
-	selectRelationsInRangeAscStmt  *sql.Stmt
-	selectRelationsInRangeDescStmt *sql.Stmt
-	deleteRelationStmt             *sql.Stmt
-	selectMaxRelationIDStmt        *sql.Stmt
+// SQL query to select max relation ID
+const selectMaxRelationIDSQL = `
+SELECT COALESCE(MAX(id), 0) FROM syncapi_relations
+`
+
+// relationsTable implements tables.Relations
+type relationsTable struct {
+	cm                            sqlutil.ConnectionManager
+	insertRelationSQL             string
+	selectRelationsInRangeAscSQL  string
+	selectRelationsInRangeDescSQL string
+	deleteRelationSQL             string
+	selectMaxRelationIDSQL        string
 }
 
-func NewPostgresRelationsTable(ctx context.Context, db *sql.DB) (tables.Relations, error) {
-	s := &relationsStatements{}
-	_, err := db.Exec(relationsSchema)
+// NewPostgresRelationsTable creates a new relations table
+func NewPostgresRelationsTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.Relations, error) {
+
+	// Perform the migration
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "syncapi_relations_table_schema_001",
+		Patch:       relationsSchema,
+		RevertPatch: relationsSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertRelationStmt, insertRelationSQL},
-		{&s.selectRelationsInRangeAscStmt, selectRelationsInRangeAscSQL},
-		{&s.selectRelationsInRangeDescStmt, selectRelationsInRangeDescSQL},
-		{&s.deleteRelationStmt, deleteRelationSQL},
-		{&s.selectMaxRelationIDStmt, selectMaxRelationIDSQL},
-	}.Prepare(db)
+
+	t := &relationsTable{
+		cm:                            cm,
+		insertRelationSQL:             insertRelationSQL,
+		selectRelationsInRangeAscSQL:  selectRelationsInRangeAscSQL,
+		selectRelationsInRangeDescSQL: selectRelationsInRangeDescSQL,
+		deleteRelationSQL:             deleteRelationSQL,
+		selectMaxRelationIDSQL:        selectMaxRelationIDSQL,
+	}
+
+	return t, nil
 }
 
-func (s *relationsStatements) InsertRelation(
-	ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, childEventType, relType string,
+// InsertRelation adds a new relation
+func (t *relationsTable) InsertRelation(
+	ctx context.Context, roomID, eventID, childEventID, childEventType, relType string,
 ) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.insertRelationStmt).ExecContext(
-		ctx, roomID, eventID, childEventID, childEventType, relType,
-	)
+	db := t.cm.Connection(ctx, false)
+	err = db.Exec(t.insertRelationSQL, roomID, eventID, childEventID, childEventType, relType).Error
 	return
 }
 
-func (s *relationsStatements) DeleteRelation(
-	ctx context.Context, txn *sql.Tx, roomID, childEventID string,
+// DeleteRelation removes a relation
+func (t *relationsTable) DeleteRelation(
+	ctx context.Context, roomID, childEventID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteRelationStmt)
-	_, err := stmt.ExecContext(
-		ctx, roomID, childEventID,
-	)
-	return err
+	db := t.cm.Connection(ctx, false)
+	return db.Exec(t.deleteRelationSQL, roomID, childEventID).Error
 }
 
 // SelectRelationsInRange returns a map rel_type -> []child_event_id
-func (s *relationsStatements) SelectRelationsInRange(
-	ctx context.Context, txn *sql.Tx, roomID, eventID, relType, eventType string,
+func (t *relationsTable) SelectRelationsInRange(
+	ctx context.Context, roomID, eventID, relType, eventType string,
 	r types.Range, limit int,
 ) (map[string][]types.RelationEntry, types.StreamPosition, error) {
 	var lastPos types.StreamPosition
-	var stmt *sql.Stmt
+	var sql string
+
 	if r.Backwards {
-		stmt = sqlutil.TxStmt(txn, s.selectRelationsInRangeDescStmt)
+		sql = t.selectRelationsInRangeDescSQL
 	} else {
-		stmt = sqlutil.TxStmt(txn, s.selectRelationsInRangeAscStmt)
+		sql = t.selectRelationsInRangeAscSQL
 	}
-	rows, err := stmt.QueryContext(ctx, roomID, eventID, relType, eventType, r.Low(), r.High(), limit)
+
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(sql, roomID, eventID, relType, eventType, r.Low(), r.High(), limit).Rows()
 	if err != nil {
 		return nil, lastPos, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRelationsInRange: rows.close() failed")
+
 	result := map[string][]types.RelationEntry{}
 	var (
 		id           types.StreamPosition
@@ -149,10 +180,10 @@ func (s *relationsStatements) SelectRelationsInRange(
 	return result, lastPos, rows.Err()
 }
 
-func (s *relationsStatements) SelectMaxRelationID(
-	ctx context.Context, txn *sql.Tx,
-) (id int64, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMaxRelationIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&id)
+// SelectMaxRelationID returns the maximum relation ID
+func (t *relationsTable) SelectMaxRelationID(ctx context.Context) (id int64, err error) {
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectMaxRelationIDSQL).Row()
+	err = row.Scan(&id)
 	return
 }

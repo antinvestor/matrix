@@ -15,9 +15,7 @@
 package sync
 
 import (
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -25,13 +23,12 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 const defaultSyncTimeout = time.Duration(0)
@@ -63,11 +60,12 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			// Try to load the filter from the database
 			localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 			if err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+				util.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 				return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 			}
-			if err := syncDB.GetFilter(req.Context(), &filter, localpart, filterQuery); err != nil && !errors.Is(err, sql.ErrNoRows) {
-				util.GetLogger(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
+			err = syncDB.GetFilter(req.Context(), &filter, localpart, filterQuery)
+			if err != nil && !sqlutil.ErrorIsNoRows(err) {
+				util.Log(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
 				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
 			}
 		}
@@ -83,17 +81,15 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		filter.Room.AccountData.Limit = math.MaxInt32
 	}
 
-	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
-		"user_id":   device.UserID,
-		"device_id": device.ID,
-		"since":     since,
-		"timeout":   timeout,
-		"limit":     filter.Room.Timeline.Limit,
-	})
+	// logger := util.Log(req.Context()).
+	//	WithField("user_id", device.UserID).
+	//	WithField("device_id", device.ID).
+	//	WithField("since", since).
+	//	WithField("timeout", timeout).
+	//	WithField("limit", filter.Room.Timeline.Limit)
 
 	return &types.SyncRequest{
 		Context:           req.Context(),             //
-		Log:               logger,                    //
 		Device:            &device,                   //
 		Response:          types.NewResponse(),       // Populated by all streams
 		Filter:            filter,                    //

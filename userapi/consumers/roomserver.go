@@ -8,20 +8,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
-
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/actorutil"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/internal/pushrules"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
@@ -29,16 +26,17 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	userAPITypes "github.com/antinvestor/matrix/userapi/types"
-	"github.com/antinvestor/matrix/userapi/util"
+	userapiutil "github.com/antinvestor/matrix/userapi/util"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 type OutputRoomEventConsumer struct {
 	cfg          *config.UserAPI
 	rsAPI        rsapi.UserRoomserverAPI
-	jetstream    nats.JetStreamContext
-	durable      string
+	qm           queueutil.QueueManager
+	am           actorutil.ActorManager
 	db           storage.UserDatabase
-	topic        string
 	pgClient     pushgateway.Client
 	syncProducer *producers.SyncAPI
 	msgCounts    map[spec.ServerName]userAPITypes.MessageStats
@@ -49,20 +47,19 @@ type OutputRoomEventConsumer struct {
 }
 
 func NewOutputRoomEventConsumer(
-	_ context.Context,
+	ctx context.Context,
 	cfg *config.UserAPI,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
+	am actorutil.ActorManager,
 	store storage.UserDatabase,
 	pgClient pushgateway.Client,
 	rsAPI rsapi.UserRoomserverAPI,
 	syncProducer *producers.SyncAPI,
-) *OutputRoomEventConsumer {
-	return &OutputRoomEventConsumer{
+) error {
+	c := &OutputRoomEventConsumer{
 		cfg:          cfg,
-		jetstream:    js,
+		qm:           qm,
 		db:           store,
-		durable:      cfg.Matrix.JetStream.Durable("UserAPIRoomServerConsumer"),
-		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		pgClient:     pgClient,
 		rsAPI:        rsAPI,
 		syncProducer: syncProducer,
@@ -70,36 +67,52 @@ func NewOutputRoomEventConsumer(
 		roomCounts:   map[spec.ServerName]map[string]bool{},
 		lastUpdate:   time.Now(),
 		countsLock:   sync.Mutex{},
-		serverName:   cfg.Matrix.ServerName,
+		serverName:   cfg.Global.ServerName,
 	}
+
+	am.EnableFunction(actorutil.ActorFunctionUserAPIOutputRoomEvents, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
+	c.am = am
+
+	outputQOpts := cfg.Queues.OutputRoomEvent
+	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject")
+
+	return qm.RegisterSubscriber(ctx, &outputQOpts, c)
 }
 
-func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
-	if err := jetstream.Consumer(
-		ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	); err != nil {
+func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
+
+	roomId, err := constants.DecodeRoomID(metadata[constants.RoomID])
+	if err != nil {
 		return err
 	}
+
+	_, err = s.am.Progress(ctx, actorutil.ActorFunctionUserAPIOutputRoomEvents, roomId)
+	if err != nil {
+		return err
+	}
+
 	return nil
+
 }
 
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
+func (s *OutputRoomEventConsumer) HandleRoomEvent(ctx context.Context, metadata map[string]string, message []byte) error {
 	// Only handle events we care about
+
+	log := util.Log(ctx)
 
 	var event *rstypes.HeaderedEvent
 	var isNewRoomEvent bool
-	switch rsapi.OutputType(msg.Header.Get(jetstream.RoomEventType)) {
+	switch rsapi.OutputType(metadata[constants.RoomEventType]) {
+
 	case rsapi.OutputTypeNewRoomEvent:
 		isNewRoomEvent = true
 		fallthrough
 	case rsapi.OutputTypeNewInviteEvent:
 		var output rsapi.OutputEvent
-		if err := json.Unmarshal(msg.Data, &output); err != nil {
+		if err := json.Unmarshal(message, &output); err != nil {
 			// If the message was invalid, log it and move on to the next message in the stream
-			log.WithError(err).Errorf("roomserver output log: message parse failure")
-			return true
+			log.WithError(err).Error("roomserver output log: message parse failure")
+			return nil
 		}
 		if isNewRoomEvent {
 			event = output.NewRoomEvent.Event
@@ -108,34 +121,33 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		}
 
 		if event == nil {
-			log.Errorf("userapi consumer: expected event")
-			return true
+			log.Error("userapi consumer: expected event")
+			return nil
 		}
 
-		log.WithFields(log.Fields{
-			"event_id":   event.EventID(),
-			"event_type": event.Type(),
-		}).Tracef("Received message from roomserver: %#v", output)
+		log.
+			WithField("event_id", event.EventID()).
+			WithField("event_type", event.Type()).
+			Debug("Received message from roomserver: %#v", output)
 	default:
-		return true
+		return nil
 	}
 
-	if s.cfg.Matrix.ReportStats.Enabled {
+	if s.cfg.Global.ReportStats.Enabled {
 		go s.storeMessageStats(ctx, event.Type(), string(event.SenderID()), event.RoomID().String())
 	}
 
-	metadata, err := msg.Metadata()
-	if err != nil {
-		return true
+	// TODO: previously this was extracted from message metadata, figure a way too pass in a stable position
+	timeNow := time.Now()
+
+	if err := s.processMessage(ctx, event, uint64(spec.AsTimestamp(timeNow))); err != nil {
+		log.
+			WithField("event_id", event.EventID()).
+			WithError(err).
+			Error("userapi consumer: process room event failure")
 	}
 
-	if err := s.processMessage(ctx, event, uint64(spec.AsTimestamp(metadata.Timestamp))); err != nil {
-		log.WithFields(log.Fields{
-			"event_id": event.EventID(),
-		}).WithError(err).Errorf("userapi consumer: process room event failure")
-	}
-
-	return true
+	return nil
 }
 
 func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context, eventType, eventSender, roomID string) {
@@ -185,9 +197,10 @@ func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context, eventTy
 				normalRooms++
 			}
 		}
-		err := s.db.UpsertDailyRoomsMessages(ctx, serverName, stats, normalRooms, encryptedRooms)
+		err = s.db.UpsertDailyRoomsMessages(ctx, serverName, stats, normalRooms, encryptedRooms)
 		if err != nil {
-			log.WithError(err).Errorf("failed to upsert daily messages")
+			log := util.Log(ctx)
+			log.WithError(err).Error("failed to upsert daily messages")
 		}
 		// Clear stats if we successfully stored it
 		if err == nil {
@@ -301,6 +314,9 @@ func (s *OutputRoomEventConsumer) copyTags(ctx context.Context, oldRoomID, newRo
 }
 
 func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rstypes.HeaderedEvent, streamPos uint64) error {
+
+	log := util.Log(ctx)
+
 	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID().String())
 	if err != nil {
 		return fmt.Errorf("s.localRoomMembers: %w", err)
@@ -319,7 +335,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 		if err != nil {
 			return fmt.Errorf("newLocalMembership: %w", err)
 		}
-		if member.Membership == spec.Invite && member.Domain == s.cfg.Matrix.ServerName {
+		if member.Membership == spec.Invite && member.Domain == s.cfg.Global.ServerName {
 			// localRoomMembers only adds joined members. An invite
 			// should also be pushed to the target user.
 			members = append(members, member)
@@ -330,7 +346,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 		newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
 		if err = s.handleRoomUpgrade(ctx, oldRoomID, newRoomID, members, roomSize); err != nil {
 			// while inconvenient, this shouldn't stop us from sending push notifications
-			log.WithError(err).Errorf("UserAPI: failed to handle room upgrade for users")
+			log.WithError(err).Error("UserAPI: failed to handle room upgrade for users")
 		}
 
 	}
@@ -341,12 +357,12 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 		return fmt.Errorf("s.roomName: %w", err)
 	}
 
-	log.WithFields(log.Fields{
-		"event_id":    event.EventID(),
-		"room_id":     event.RoomID().String(),
-		"num_members": len(members),
-		"room_size":   roomSize,
-	}).Tracef("Notifying members")
+	log.
+		WithField("event_id", event.EventID()).
+		WithField("room_id", event.RoomID().String()).
+		WithField("num_members", len(members)).
+		WithField("room_size", roomSize).
+		Debug("Notifying members")
 
 	// Notification.UserIsTarget is a per-member field, so we
 	// cannot group all users in a single request.
@@ -355,10 +371,11 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *rst
 	// removing it means we can send all notifications to
 	// e.g. Element's Push gateway in one go.
 	for _, mem := range members {
-		if err := s.notifyLocal(ctx, event, mem, roomSize, roomName, streamPos); err != nil {
-			log.WithFields(log.Fields{
-				"localpart": mem.Localpart,
-			}).WithError(err).Error("Unable to push to local user")
+		if err = s.notifyLocal(ctx, event, mem, roomSize, roomName, streamPos); err != nil {
+			log.
+				WithField("localpart", mem.Localpart).
+				WithError(err).
+				Error("Unable to push to local user")
 			continue
 		}
 	}
@@ -397,6 +414,9 @@ func newLocalMembership(event *synctypes.ClientEvent) (*localMembership, error) 
 // localRoomMembers fetches the current local members of a room, and
 // the total number of members.
 func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID string) ([]*localMembership, int, error) {
+
+	log := util.Log(ctx)
+
 	// Get only locally joined users to avoid unmarshalling and caching
 	// membership events we only use to calculate the room size.
 	req := &rsapi.QueryMembershipsForRoomRequest{
@@ -429,7 +449,7 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 		// local users
 		member, err := newLocalMembership(&event)
 		if err != nil {
-			log.WithError(err).Errorf("Parsing MemberContent")
+			log.WithError(err).Error("Parsing MemberContent")
 			continue
 		}
 
@@ -525,6 +545,9 @@ func unmarshalCanonicalAlias(event *rstypes.HeaderedEvent) (string, error) {
 
 // notifyLocal finds the right push actions for a local user, given an event.
 func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int, roomName string, streamPos uint64) error {
+
+	log := util.Log(ctx)
+
 	actions, err := s.evaluatePushRules(ctx, event, mem, roomSize)
 	if err != nil {
 		return fmt.Errorf("s.evaluatePushRules: %w", err)
@@ -535,11 +558,11 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 	}
 
 	if a != pushrules.NotifyAction {
-		log.WithFields(log.Fields{
-			"event_id":  event.EventID(),
-			"room_id":   event.RoomID().String(),
-			"localpart": mem.Localpart,
-		}).Tracef("Push rule evaluation rejected the event")
+		log.
+			WithField("event_id", event.EventID()).
+			WithField("room_id", event.RoomID().String()).
+			WithField("localpart", mem.Localpart).
+			Debug("Push rule evaluation rejected the event")
 		return nil
 	}
 
@@ -582,21 +605,20 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 		return fmt.Errorf("s.db.GetNotificationCount: %w", err)
 	}
 
-	log.WithFields(log.Fields{
-		"event_id":   event.EventID(),
-		"room_id":    event.RoomID().String(),
-		"localpart":  mem.Localpart,
-		"num_urls":   len(devicesByURLAndFormat),
-		"num_unread": userNumUnreadNotifs,
-	}).Trace("Notifying single member")
+	log.
+		WithField("event_id", event.EventID()).
+		WithField("room_id", event.RoomID().String()).
+		WithField("localpart", mem.Localpart).
+		WithField("num_urls", len(devicesByURLAndFormat)).
+		WithField("num_unread", userNumUnreadNotifs).
+		Debug("Notifying single member")
 
 	// Push gateways are out of our control, and we cannot risk
 	// looking up the server on a misbehaving push gateway. Each user
 	// receives a goroutine now that all internal API calls have been
 	// made.
 	//
-	// TODO: think about bounding this to one per user, and what
-	// ordering guarantees we must provide.
+	// TODO: think about bounding this to one per user, and what ordering guarantees we must provide.
 	go func() {
 		// This background processing cannot be tied to a request.
 		iCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -618,10 +640,11 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 				for _, dev := range devices {
 					rej, err := s.notifyHTTP(iCtx, event, url, format, []*pushgateway.Device{dev}, mem.Localpart, roomName, int(userNumUnreadNotifs))
 					if err != nil {
-						log.WithFields(log.Fields{
-							"event_id":  event.EventID(),
-							"localpart": mem.Localpart,
-						}).WithError(err).Errorf("Unable to notify HTTP pusher")
+						log.
+							WithField("event_id", event.EventID()).
+							WithField("localpart", mem.Localpart).
+							WithError(err).
+							Error("Unable to notify HTTP pusher")
 						continue
 					}
 					rejected = append(rejected, rej...)
@@ -640,6 +663,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *rstype
 // evaluatePushRules fetches and evaluates the push rules of a local
 // user. Returns actions (including dont_notify).
 func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *rstypes.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
+
 	user := ""
 	sender, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 	if err == nil {
@@ -691,12 +715,13 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		return nil, nil
 	}
 
-	log.WithFields(log.Fields{
-		"event_id":  event.EventID(),
-		"room_id":   event.RoomID().String(),
-		"localpart": mem.Localpart,
-		"rule_id":   rule.RuleID,
-	}).Trace("Matched a push rule")
+	log := util.Log(ctx)
+	log.
+		WithField("event_id", event.EventID()).
+		WithField("room_id", event.RoomID().String()).
+		WithField("localpart", mem.Localpart).
+		WithField("rule_id", rule.RuleID).
+		Debug("Matched a push rule")
 
 	return rule.Actions, nil
 }
@@ -741,7 +766,7 @@ func (rse *ruleSetEvalContext) HasPowerLevel(senderID spec.SenderID, levelKey st
 // localPushDevices pushes to the configured devices of a local
 // user. The map keys are [url][format].
 func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpart string, serverName spec.ServerName, tweaks map[string]interface{}) (map[string]map[string][]*pushgateway.Device, string, error) {
-	pusherDevices, err := util.GetPushDevices(ctx, localpart, serverName, tweaks, s.db)
+	pusherDevices, err := userapiutil.GetPushDevices(ctx, localpart, serverName, tweaks, s.db)
 	if err != nil {
 		return nil, "", fmt.Errorf("util.GetPushDevices: %w", err)
 	}
@@ -765,12 +790,11 @@ func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpar
 
 // notifyHTTP performs a notificatation to a Push Gateway.
 func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes.HeaderedEvent, url, format string, devices []*pushgateway.Device, localpart, roomName string, userNumUnreadNotifs int) ([]*pushgateway.Device, error) {
-	logger := log.WithFields(log.Fields{
-		"event_id":    event.EventID(),
-		"url":         url,
-		"localpart":   localpart,
-		"num_devices": len(devices),
-	})
+	logger := util.Log(ctx).
+		WithField("event_id", event.EventID()).
+		WithField("url", url).
+		WithField("localpart", localpart).
+		WithField("num_devices", len(devices))
 
 	var req pushgateway.NotifyRequest
 	switch format {
@@ -789,7 +813,7 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 	default:
 		sender, err := s.rsAPI.QueryUserIDForSender(ctx, event.RoomID(), event.SenderID())
 		if err != nil {
-			logger.WithError(err).Errorf("Failed to get userID for sender %s", event.SenderID())
+			logger.WithError(err).Error("Failed to get userID for sender %s", event.SenderID())
 			return nil, err
 		}
 		req = pushgateway.NotifyRequest{
@@ -810,17 +834,17 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 		if mem, memberErr := event.Membership(); memberErr == nil {
 			req.Notification.Membership = mem
 		}
-		userID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", localpart, s.cfg.Matrix.ServerName), true)
+		userID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", localpart, s.cfg.Global.ServerName), true)
 		if err != nil {
-			logger.WithError(err).Errorf("Failed to convert local user to userID %s", localpart)
+			logger.WithError(err).Error("Failed to convert local user to userID %s", localpart)
 			return nil, err
 		}
 		localSender, err := s.rsAPI.QuerySenderIDForUser(ctx, event.RoomID(), *userID)
 		if err != nil {
-			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID().String())
+			logger.WithError(err).Error("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID().String())
 			return nil, err
 		} else if localSender == nil {
-			logger.WithError(err).Errorf("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID().String())
+			logger.WithError(err).Error("Failed to get local user senderID for room %s: %s", userID.String(), event.RoomID().String())
 			return nil, fmt.Errorf("no sender ID for user %s in %s", userID.String(), event.RoomID().String())
 		}
 		if event.StateKey() != nil && *event.StateKey() == string(*localSender) {
@@ -828,13 +852,13 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 		}
 	}
 
-	logger.Tracef("Notifying push gateway %s", url)
+	logger.Debug("Notifying push gateway %s", url)
 	var res pushgateway.NotifyResponse
 	if err := s.pgClient.Notify(ctx, url, &req, &res); err != nil {
-		logger.WithError(err).Errorf("Failed to notify push gateway %s", url)
+		logger.WithError(err).Error("Failed to notify push gateway %s", url)
 		return nil, err
 	}
-	logger.WithField("num_rejected", len(res.Rejected)).Trace("Push gateway result")
+	logger.WithField("num_rejected", len(res.Rejected)).Debug("Push gateway result")
 
 	if len(res.Rejected) == 0 {
 		return nil, nil
@@ -857,17 +881,19 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *rstypes
 
 // deleteRejectedPushers deletes the pushers associated with the given devices.
 func (s *OutputRoomEventConsumer) deleteRejectedPushers(ctx context.Context, devices []*pushgateway.Device, localpart string, serverName spec.ServerName) {
-	log.WithFields(log.Fields{
-		"localpart":   localpart,
-		"app_id0":     devices[0].AppID,
-		"num_devices": len(devices),
-	}).Warnf("Deleting pushers rejected by the HTTP push gateway")
+	log := util.Log(ctx)
+	log.
+		WithField("localpart", localpart).
+		WithField("app_id0", devices[0].AppID).
+		WithField("num_devices", len(devices)).
+		Warn("Deleting pushers rejected by the HTTP push gateway")
 
 	for _, d := range devices {
 		if err := s.db.RemovePusher(ctx, d.AppID, d.PushKey, localpart, serverName); err != nil {
-			log.WithFields(log.Fields{
-				"localpart": localpart,
-			}).WithError(err).Errorf("Unable to delete rejected pusher")
+			log.
+				WithField("localpart", localpart).
+				WithError(err).
+				Error("Unable to delete rejected pusher")
 		}
 	}
 }

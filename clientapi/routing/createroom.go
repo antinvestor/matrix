@@ -22,17 +22,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
+	"github.com/antinvestor/matrix/clientapi/httputil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	roomserverVersion "github.com/antinvestor/matrix/roomserver/version"
-	"github.com/antinvestor/matrix/userapi/api"
-
-	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 )
 
 // https://matrix.org/docs/spec/client_server/r0.2.0.html#post-matrix-client-r0-createroom
@@ -143,26 +141,26 @@ func createRoom(
 ) util.JSONResponse {
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("invalid userID")
+		util.Log(ctx).WithError(err).Error("invalid userID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	if !cfg.Matrix.IsLocalServerName(userID.Domain()) {
+	if !cfg.Global.IsLocalServerName(userID.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: spec.Forbidden(fmt.Sprintf("User domain %q not configured locally", userID.Domain())),
 		}
 	}
 
-	logger := util.GetLogger(ctx)
+	logger := util.Log(ctx)
 
 	// TODO: Check room ID doesn't clash with an existing one, and we
 	//       probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	roomID, err := spec.NewRoomID(fmt.Sprintf("!%s:%s", util.RandomString(16), userID.Domain()))
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("invalid roomID")
+		util.Log(ctx).WithError(err).Error("invalid roomID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -184,15 +182,15 @@ func createRoom(
 		roomVersion = candidateVersion
 	}
 
-	logger.WithFields(log.Fields{
-		"userID":      userID.String(),
-		"roomID":      roomID.String(),
-		"roomVersion": roomVersion,
-	}).Info("Creating new room")
+	logger.
+		WithField("userID", userID.String()).
+		WithField("roomID", roomID.String()).
+		WithField("roomVersion", roomVersion).
+		Info("Creating new room")
 
 	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID.String(), asAPI, profileAPI)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
+		util.Log(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -202,8 +200,8 @@ func createRoom(
 	userDisplayName := profile.DisplayName
 	userAvatarURL := profile.AvatarURL
 
-	keyID := cfg.Matrix.KeyID
-	privateKey := cfg.Matrix.PrivateKey
+	keyID := cfg.Global.KeyID
+	privateKey := cfg.Global.PrivateKey
 
 	req := roomserverAPI.PerformCreateRoomRequest{
 		InvitedUsers:              createRequest.Invite,

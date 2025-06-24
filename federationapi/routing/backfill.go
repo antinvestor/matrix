@@ -88,14 +88,14 @@ func Backfill(
 		VirtualHost: request.Destination(),
 	}
 	if req.Limit, err = strconv.Atoi(limit); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
+		util.Log(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam(fmt.Sprintf("limit %q is invalid format", limit)),
 		}
 	}
 
-	// Enforce a limit of 100 events, as not to hit the DB to hard.
+	// Enforce a limit of 100 events, as not to hit the Cm to hard.
 	// Synapse has a hard limit of 100 events as well.
 	if req.Limit > 100 {
 		req.Limit = 100
@@ -103,7 +103,7 @@ func Backfill(
 
 	// Query the Roomserver.
 	if err = rsAPI.PerformBackfill(httpReq.Context(), &req, &res); err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
+		util.Log(httpReq.Context()).WithError(err).Error("query.PerformBackfill failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

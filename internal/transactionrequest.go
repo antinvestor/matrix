@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -29,10 +30,8 @@ import (
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	syncTypes "github.com/antinvestor/matrix/syncapi/types"
 	userAPI "github.com/antinvestor/matrix/userapi/api"
-	"github.com/getsentry/sentry-go"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -118,7 +117,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 
 		roomVersion, err := t.rsAPI.QueryRoomVersionForRoom(ctx, roomID)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", roomID)
+			util.Log(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", roomID)
 			return ""
 		}
 		roomVersions[roomID] = roomVersion
@@ -131,7 +130,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			RoomID string `json:"room_id"`
 		}
 		if err := json.Unmarshal(pdu, &header); err != nil {
-			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to extract room ID from event")
+			util.Log(ctx).WithError(err).Debug("Transaction: Failed to extract room ID from event")
 			// We don't know the event ID at this point so we can't return the
 			// failure in the PDU results
 			continue
@@ -143,7 +142,8 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		}
 		event, err := verImpl.NewEventFromUntrustedJSON(pdu)
 		if err != nil {
-			if _, ok := err.(gomatrixserverlib.BadJSONError); ok {
+			var badJSONError gomatrixserverlib.BadJSONError
+			if errors.As(err, &badJSONError) {
 				// Room version 6 states that homeservers should strictly enforce canonical JSON
 				// on PDUs.
 				//
@@ -156,7 +156,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 					JSON: spec.BadJSON("PDU contains bad JSON"),
 				}
 			}
-			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Failed to parse event JSON of event %s", string(pdu))
+			util.Log(ctx).WithError(err).Debug("Transaction: Failed to parse event JSON of event %s", string(pdu))
 			continue
 		}
 		if event.Type() == spec.MRoomCreate && event.StateKeyEquals("") {
@@ -171,7 +171,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		if err = gomatrixserverlib.VerifyEventSignatures(ctx, event, t.keys, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return t.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		}); err != nil {
-			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Couldn't validate signature of event %q", event.EventID())
+			util.Log(ctx).WithError(err).Debug("Transaction: Couldn't validate signature of event %q", event.EventID())
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
 			}
@@ -181,7 +181,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		// pass the event to the roomserver which will do auth checks
 		// If the event fail auth checks, gmsl.NotAllowed error will be returned which we be silently
 		// discarded by the caller of this function
-		if err = api.SendEvents(
+		err = api.SendEvents(
 			ctx,
 			t.rsAPI,
 			api.KindNew,
@@ -193,8 +193,9 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 			api.DoNotSendToOtherServers,
 			nil,
 			true,
-		); err != nil {
-			util.GetLogger(ctx).WithError(err).Errorf("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
+		)
+		if err != nil {
+			util.Log(ctx).WithError(err).Error("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
 			results[event.EventID()] = fclient.PDUResult{
 				Error: err.Error(),
 			}
@@ -211,6 +212,7 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 
 // nolint:gocyclo
 func (t *TxnReq) processEDUs(ctx context.Context) {
+	log := util.Log(ctx)
 	for _, e := range t.EDUs {
 		EDUCountTotal.Inc()
 		switch e.Type {
@@ -222,7 +224,7 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 				Typing bool   `json:"typing"`
 			}
 			if err := json.Unmarshal(e.Content, &typingPayload); err != nil {
-				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal typing event")
+				log.WithError(err).Debug("Failed to unmarshal typing event")
 				continue
 			}
 			if _, serverName, err := gomatrixserverlib.SplitID('@', typingPayload.UserID); err != nil {
@@ -233,13 +235,13 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 				continue
 			}
 			if err := t.producer.SendTyping(ctx, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to send typing event to JetStream")
+				log.WithError(err).Error("Failed to send typing event to JetStream")
 			}
 		case spec.MDirectToDevice:
 			// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
 			var directPayload gomatrixserverlib.ToDeviceMessage
 			if err := json.Unmarshal(e.Content, &directPayload); err != nil {
-				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal send-to-device events")
+				log.WithError(err).Debug("Failed to unmarshal send-to-device events")
 				continue
 			}
 			if _, serverName, err := gomatrixserverlib.SplitID('@', directPayload.Sender); err != nil {
@@ -249,30 +251,38 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 			} else if serverName != t.Origin {
 				continue
 			}
-			for userID, byUser := range directPayload.Messages {
+			for userIDStr, byUser := range directPayload.Messages {
+
+				userID, err0 := spec.NewUserID(userIDStr, false)
+				if err0 != nil {
+					util.Log(ctx).WithError(err0).Error("processEDUs.NewUserID invalid userID")
+					continue
+				}
+
 				for deviceID, message := range byUser {
 					// TODO: check that the user and the device actually exist here
-					if err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
-						sentry.CaptureException(err)
-						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
-							"sender":    directPayload.Sender,
-							"user_id":   userID,
-							"device_id": deviceID,
-						}).Error("Failed to send send-to-device event to JetStream")
+					err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message)
+					if err != nil {
+
+						log.WithError(err).
+							WithField("sender", directPayload.Sender).
+							WithField("user_id", userID).
+							WithField("device_id", deviceID).
+							Error("Failed to send send-to-device event to JetStream")
 					}
 				}
 			}
 		case spec.MDeviceListUpdate:
 			if err := t.producer.SendDeviceListUpdate(ctx, e.Content, t.Origin); err != nil {
-				sentry.CaptureException(err)
-				util.GetLogger(ctx).WithError(err).Error("failed to InputDeviceListUpdate")
+
+				log.WithError(err).Error("failed to InputDeviceListUpdate")
 			}
 		case spec.MReceipt:
 			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
 			payload := map[string]types.FederationReceiptMRead{}
 
 			if err := json.Unmarshal(e.Content, &payload); err != nil {
-				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal receipt event")
+				log.WithError(err).Debug("Failed to unmarshal receipt event")
 				continue
 			}
 
@@ -280,37 +290,42 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 				for userID, mread := range receipt.User {
 					_, domain, err := gomatrixserverlib.SplitID('@', userID)
 					if err != nil {
-						util.GetLogger(ctx).WithError(err).Debug("Failed to split domain from receipt event sender")
+						log.WithError(err).Debug("Failed to split domain from receipt event sender")
 						continue
 					}
 					if t.Origin != domain {
-						util.GetLogger(ctx).Debugf("Dropping receipt event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
+						log.
+							WithField("sender_domain", domain).
+							WithField("origin", t.Origin).
+							Debug("Dropping receipt event where sender domain doesn't match origin")
 						continue
 					}
-					if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs); err != nil {
-						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
-							"sender":  t.Origin,
-							"user_id": userID,
-							"room_id": roomID,
-							"events":  mread.EventIDs,
-						}).Error("Failed to send receipt event to JetStream")
+					err = t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs)
+					if err != nil {
+						log.WithError(err).
+							WithField("sender", t.Origin).
+							WithField("user_id", userID).
+							WithField("room_id", roomID).
+							WithField("events", mread.EventIDs).
+							Error("Failed to send receipt event to JetStream")
 						continue
 					}
 				}
 			}
 		case types.MSigningKeyUpdate:
-			if err := t.producer.SendSigningKeyUpdate(ctx, e.Content, t.Origin); err != nil {
-				sentry.CaptureException(err)
-				logrus.WithError(err).Errorf("Failed to process signing key update")
+			err := t.producer.SendSigningKeyUpdate(ctx, e.Content, t.Origin)
+			if err != nil {
+				log.WithError(err).Error("Failed to process signing key update")
 			}
 		case spec.MPresence:
 			if t.inboundPresenceEnabled {
-				if err := t.processPresence(ctx, e); err != nil {
-					logrus.WithError(err).Errorf("Failed to process presence update")
+				err := t.processPresence(ctx, e)
+				if err != nil {
+					log.WithError(err).Error("Failed to process presence update")
 				}
 			}
 		default:
-			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
+			log.WithField("type", e.Type).Debug("Unhandled EDU")
 		}
 	}
 }

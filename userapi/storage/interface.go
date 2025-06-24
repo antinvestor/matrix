@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,18 +19,16 @@ import (
 	"encoding/json"
 	"errors"
 
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-
 	clientapi "github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/internal/pushrules"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
+	"golang.org/x/oauth2"
 )
 
 type RegistrationTokens interface {
