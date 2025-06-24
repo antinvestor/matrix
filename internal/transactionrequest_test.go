@@ -220,27 +220,27 @@ func createTransactionWithEDU(ctx context.Context, svc *frame.Service, cfg *conf
 	cfgUserApi := cfg.UserAPI
 	cfgSyncApi := cfg.SyncAPI
 
-	err := qm.EnsurePublisherOk(ctx, &cfgSyncApi.Queues.OutputReceiptEvent)
+	_, err := qm.GetOrCreatePublisher(ctx, &cfgSyncApi.Queues.OutputReceiptEvent)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = qm.EnsurePublisherOk(ctx, &cfgSyncApi.Queues.OutputSendToDeviceEvent)
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgSyncApi.Queues.OutputSendToDeviceEvent)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = qm.EnsurePublisherOk(ctx, &cfgSyncApi.Queues.OutputTypingEvent)
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgSyncApi.Queues.OutputTypingEvent)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = qm.EnsurePublisherOk(ctx, &cfgSyncApi.Queues.OutputPresenceEvent)
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgSyncApi.Queues.OutputPresenceEvent)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = qm.EnsurePublisherOk(ctx, &cfgUserApi.Queues.InputDeviceListUpdate)
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgUserApi.Queues.InputDeviceListUpdate)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = qm.EnsurePublisherOk(ctx, &cfgUserApi.Queues.InputSigningKeyUpdate)
+	_, err = qm.GetOrCreatePublisher(ctx, &cfgUserApi.Queues.InputSigningKeyUpdate)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -369,7 +369,11 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 		return nil
 	}}
 
-	err = qm.RegisterSubscriber(ctx, &cfg.SyncAPI.Queues.OutputSendToDeviceEvent, h)
+	outputQOpts := cfg.SyncAPI.Queues.OutputSendToDeviceEvent
+	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject").
+		ExtendQuery("consumer_headers_only", "false")
+
+	err = qm.RegisterSubscriber(ctx, &outputQOpts, h)
 	assert.Nil(t, err)
 
 	txnRes, jsonRes := txn.ProcessTransaction(ctx)

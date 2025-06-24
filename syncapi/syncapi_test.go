@@ -1098,7 +1098,12 @@ func TestSendToDevice(t *testing.T) {
 			for i := 0; i < tc.sendMessagesCount; i++ {
 				msgCounter++
 				msg := json.RawMessage(fmt.Sprintf(`{"dummy":"message %d"}`, msgCounter))
-				err = producer.SendToDevice(ctx, user.ID, user.ID, alice.ID, "m.dendrite.test", msg)
+
+				userID, err0 := spec.NewUserID(user.ID, false)
+				if err0 != nil {
+					t.Fatalf("failed to generate user ID: %v", err0)
+				}
+				err = producer.SendToDevice(ctx, user.ID, userID, alice.ID, "m.dendrite.test", msg)
 				if err != nil {
 					t.Fatalf("unable to send to device message: %v", err)
 				}

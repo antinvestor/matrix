@@ -70,7 +70,7 @@ func NewOutputRoomEventConsumer(
 		serverName:   cfg.Global.ServerName,
 	}
 
-	am.EnableFunction(actorutil.ActorFunctionUserAPIServer, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
+	am.EnableFunction(actorutil.ActorFunctionUserAPIOutputRoomEvents, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
 	c.am = am
 
 	outputQOpts := cfg.Queues.OutputRoomEvent
@@ -86,7 +86,7 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 		return err
 	}
 
-	_, err = s.am.Progress(ctx, actorutil.ActorFunctionUserAPIServer, roomId)
+	_, err = s.am.Progress(ctx, actorutil.ActorFunctionUserAPIOutputRoomEvents, roomId)
 	if err != nil {
 		return err
 	}

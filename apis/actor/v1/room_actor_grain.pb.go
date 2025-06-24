@@ -8,80 +8,79 @@ package v1
 
 import (
 	fmt "fmt"
-	slog "log/slog"
-	time "time"
-
 	actor "github.com/asynkron/protoactor-go/actor"
 	cluster "github.com/asynkron/protoactor-go/cluster"
 	proto "google.golang.org/protobuf/proto"
+	slog "log/slog"
+	time "time"
 )
 
-var xRoomEventProcessorFactory func() RoomEventProcessor
+var xSequentialProcessorFactory func() SequentialProcessor
 
-// RoomEventProcessorFactory produces a RoomEventProcessor
-func RoomEventProcessorFactory(factory func() RoomEventProcessor) {
-	xRoomEventProcessorFactory = factory
+// SequentialProcessorFactory produces a SequentialProcessor
+func SequentialProcessorFactory(factory func() SequentialProcessor) {
+	xSequentialProcessorFactory = factory
 }
 
-// GetRoomEventProcessorGrainClient instantiates a new RoomEventProcessorGrainClient with given Identity
-func GetRoomEventProcessorGrainClient(c *cluster.Cluster, id string) *RoomEventProcessorGrainClient {
+// GetSequentialProcessorGrainClient instantiates a new SequentialProcessorGrainClient with given Identity
+func GetSequentialProcessorGrainClient(c *cluster.Cluster, id string) *SequentialProcessorGrainClient {
 	if c == nil {
 		panic(fmt.Errorf("nil cluster instance"))
 	}
 	if id == "" {
 		panic(fmt.Errorf("empty id"))
 	}
-	return &RoomEventProcessorGrainClient{Identity: id, cluster: c}
+	return &SequentialProcessorGrainClient{Identity: id, cluster: c}
 }
 
-// GetRoomEventProcessorKind instantiates a new cluster.Kind for RoomEventProcessor
-func GetRoomEventProcessorKind(opts ...actor.PropsOption) *cluster.Kind {
+// GetSequentialProcessorKind instantiates a new cluster.Kind for SequentialProcessor
+func GetSequentialProcessorKind(opts ...actor.PropsOption) *cluster.Kind {
 	props := actor.PropsFromProducer(func() actor.Actor {
-		return &RoomEventProcessorActor{
+		return &SequentialProcessorActor{
 			Timeout: 60 * time.Second,
 		}
 	}, opts...)
-	kind := cluster.NewKind("RoomEventProcessor", props)
+	kind := cluster.NewKind("SequentialProcessor", props)
 	return kind
 }
 
-// GetRoomEventProcessorKind instantiates a new cluster.Kind for RoomEventProcessor
-func NewRoomEventProcessorKind(factory func() RoomEventProcessor, timeout time.Duration, opts ...actor.PropsOption) *cluster.Kind {
-	xRoomEventProcessorFactory = factory
+// GetSequentialProcessorKind instantiates a new cluster.Kind for SequentialProcessor
+func NewSequentialProcessorKind(factory func() SequentialProcessor, timeout time.Duration, opts ...actor.PropsOption) *cluster.Kind {
+	xSequentialProcessorFactory = factory
 	props := actor.PropsFromProducer(func() actor.Actor {
-		return &RoomEventProcessorActor{
+		return &SequentialProcessorActor{
 			Timeout: timeout,
 		}
 	}, opts...)
-	kind := cluster.NewKind("RoomEventProcessor", props)
+	kind := cluster.NewKind("SequentialProcessor", props)
 	return kind
 }
 
-// RoomEventProcessor interfaces the services available to the RoomEventProcessor
-type RoomEventProcessor interface {
+// SequentialProcessor interfaces the services available to the SequentialProcessor
+type SequentialProcessor interface {
 	Init(ctx cluster.GrainContext)
 	Terminate(ctx cluster.GrainContext)
 	ReceiveDefault(ctx cluster.GrainContext)
 	Progress(req *ProgressRequest, ctx cluster.GrainContext) (*ProgressResponse, error)
 }
 
-// RoomEventProcessorGrainClient holds the base data for the RoomEventProcessorGrain
-type RoomEventProcessorGrainClient struct {
+// SequentialProcessorGrainClient holds the base data for the SequentialProcessorGrain
+type SequentialProcessorGrainClient struct {
 	Identity string
 	cluster  *cluster.Cluster
 }
 
 // Progress requests the execution on to the cluster with CallOptions
-func (g *RoomEventProcessorGrainClient) Progress(r *ProgressRequest, opts ...cluster.GrainCallOption) (*ProgressResponse, error) {
+func (g *SequentialProcessorGrainClient) Progress(r *ProgressRequest, opts ...cluster.GrainCallOption) (*ProgressResponse, error) {
 	if g.cluster.Config.RequestLog {
-		g.cluster.Logger().Info("Requesting", slog.String("identity", g.Identity), slog.String("kind", "RoomEventProcessor"), slog.String("method", "Progress"), slog.Any("request", r))
+		g.cluster.Logger().Info("Requesting", slog.String("identity", g.Identity), slog.String("kind", "SequentialProcessor"), slog.String("method", "Progress"), slog.Any("request", r))
 	}
 	bytes, err := proto.Marshal(r)
 	if err != nil {
 		return nil, err
 	}
 	reqMsg := &cluster.GrainRequest{MethodIndex: 0, MessageData: bytes}
-	resp, err := g.cluster.Request(g.Identity, "RoomEventProcessor", reqMsg, opts...)
+	resp, err := g.cluster.Request(g.Identity, "SequentialProcessor", reqMsg, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error request: %w", err)
 	}
@@ -98,20 +97,20 @@ func (g *RoomEventProcessorGrainClient) Progress(r *ProgressRequest, opts ...clu
 	}
 }
 
-// RoomEventProcessorActor represents the actor structure
-type RoomEventProcessorActor struct {
+// SequentialProcessorActor represents the actor structure
+type SequentialProcessorActor struct {
 	ctx     cluster.GrainContext
-	inner   RoomEventProcessor
+	inner   SequentialProcessor
 	Timeout time.Duration
 }
 
 // Receive ensures the lifecycle of the actor for the received message
-func (a *RoomEventProcessorActor) Receive(ctx actor.Context) {
+func (a *SequentialProcessorActor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	case *actor.Started: //pass
 	case *cluster.ClusterInit:
 		a.ctx = cluster.NewGrainContext(ctx, msg.Identity, msg.Cluster)
-		a.inner = xRoomEventProcessorFactory()
+		a.inner = xSequentialProcessorFactory()
 		a.inner.Init(a.ctx)
 
 		if a.Timeout > 0 {
@@ -154,7 +153,7 @@ func (a *RoomEventProcessorActor) Receive(ctx actor.Context) {
 
 // onError should be used in ctx.ReenterAfter
 // you can just return error in reenterable method for other errors
-func (a *RoomEventProcessorActor) onError(err error) {
+func (a *SequentialProcessorActor) onError(err error) {
 	resp := cluster.FromError(err)
 	a.ctx.Respond(resp)
 }

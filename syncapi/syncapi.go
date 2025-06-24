@@ -144,7 +144,7 @@ func AddPublicRoutes(
 	}
 
 	err = consumers.NewOutputSendToDeviceEventConsumer(
-		ctx, &cfgSyncAPI, qm, syncDB, userAPI, ntf, strms.SendToDeviceStreamProvider,
+		ctx, &cfgSyncAPI, qm, syncDB, am, userAPI, ntf, strms.SendToDeviceStreamProvider,
 	)
 	if err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to start send-to-device consumer")

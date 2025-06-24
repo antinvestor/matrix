@@ -14,6 +14,15 @@ const (
 	AppServiceIDToken = "appservice_id_token"
 )
 
+func EncodeUserID(userID *spec.UserID) string {
+	return base58.Encode([]byte(userID.String()))
+}
+
+func DecodeUserID(userID string) (*spec.UserID, error) {
+	decodedStr := base58.Decode(userID)
+	return spec.NewUserID(string(decodedStr), false)
+}
+
 func EncodeRoomID(roomID *spec.RoomID) string {
 	return base58.Encode([]byte(roomID.String()))
 }

@@ -46,7 +46,18 @@ func SendToDevice(
 		return *resErr
 	}
 
-	for userID, byUser := range httpReq.Messages {
+	for userIDStr, byUser := range httpReq.Messages {
+
+		userID, err0 := spec.NewUserID(userIDStr, false)
+		if err0 != nil {
+			util.Log(req.Context()).WithError(err0).Error("eduProducer.NewUserID invalid userID")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+
+
 		for deviceID, message := range byUser {
 			if err := syncProducer.SendToDevice(
 				req.Context(), device.UserID, userID, deviceID, eventType, message,

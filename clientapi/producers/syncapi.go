@@ -61,17 +61,15 @@ func (p *SyncAPIProducer) SendReceipt(
 }
 
 func (p *SyncAPIProducer) SendToDevice(
-	ctx context.Context, sender, userID, deviceID, eventType string,
+	ctx context.Context, sender string, userID *spec.UserID, deviceID, eventType string,
 	message json.RawMessage,
 ) error {
 
 	log := util.Log(ctx)
 
-	devices := []string{}
-	_, domain, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return err
-	}
+	var devices []string
+
+	domain := userID.Domain()
 
 	// If the event is targeted locally then we want to expand the wildcard
 	// out into individual device IDs so that we can send them to each respective
@@ -80,8 +78,8 @@ func (p *SyncAPIProducer) SendToDevice(
 	// as-is, so that the federation sender can send it on with the wildcard intact.
 	if domain == p.ServerName && deviceID == "*" {
 		var res userapi.QueryDevicesResponse
-		err = p.UserAPI.QueryDevices(ctx, &userapi.QueryDevicesRequest{
-			UserID: userID,
+		err := p.UserAPI.QueryDevices(ctx, &userapi.QueryDevicesRequest{
+			UserID: userID.String(),
 		}, &res)
 		if err != nil {
 			return err
@@ -100,7 +98,7 @@ func (p *SyncAPIProducer) SendToDevice(
 		Debug("Producing to topic '%s'", p.TopicSendToDeviceEvent)
 	for i, device := range devices {
 		ote := &types.OutputSendToDeviceEvent{
-			UserID:   userID,
+			UserID:   userID.String(),
 			DeviceID: device,
 			SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
 				Sender:  sender,
@@ -111,10 +109,11 @@ func (p *SyncAPIProducer) SendToDevice(
 
 		h := map[string]string{
 			"sender":         sender,
-			constants.UserID: userID,
+			constants.UserID: constants.EncodeUserID(userID),
 		}
 
-		if err = p.Qm.Publish(ctx, p.TopicSendToDeviceEvent, ote, h); err != nil {
+		err := p.Qm.Publish(ctx, p.TopicSendToDeviceEvent, ote, h)
+		if err != nil {
 			if i < len(devices)-1 {
 				log.WithError(err).Warn("sendToDevice failed to PublishMsg, trying further devices")
 				continue

@@ -72,20 +72,18 @@ func TestRoomActorIntegration(t *testing.T) {
 				am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
 				require.NoError(t, err, "Failed to create actor system manager")
 
-				am.EnableFunction(actorutil.ActorFunctionRoomServer, &roomCfg.Queues.InputRoomEvent, handlerFunc)
+				am.EnableFunction(actorutil.ActorFunctionRoomServerInputEvents, &roomCfg.Queues.InputRoomEvent, handlerFunc)
 				require.NoError(t, err, "Failed to enable actor system")
 
-				err = qm.EnsurePublisherOk(ctx, inputQOpts)
+				publisher, err := qm.GetOrCreatePublisher(ctx, inputQOpts)
 				require.NoError(t, err, "Failed to ensure publisher is available")
-
-				inputRoomEventsTopicRef := inputQOpts.Ref()
 
 				var roomID *spec.RoomID
 				// Create a room ID
 				roomID, err = spec.NewRoomID(tc.roomID)
 				require.NoError(t, err, "Failed to create room ID")
 
-				_, err = am.Progress(ctx, actorutil.ActorFunctionRoomServer, roomID)
+				_, err = am.Progress(ctx, actorutil.ActorFunctionRoomServerInputEvents, roomID)
 				require.NoError(t, err, "Failed to bootup room ID actor")
 
 				// Generate and push messages to the queue
@@ -102,7 +100,7 @@ func TestRoomActorIntegration(t *testing.T) {
 						"index":          fmt.Sprintf("%d", i),
 					}
 
-					err = qm.Publish(ctx, inputRoomEventsTopicRef, message, metadata)
+					err = publisher.Publish(ctx, message, metadata)
 					require.NoError(t, err, "Failed to publish message")
 
 					tc.sentMsgs = append(tc.sentMsgs, message)

@@ -7,12 +7,11 @@
 package v1
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -24,7 +23,7 @@ const (
 
 type ProgressRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Metadata      map[string]string      `protobuf:"bytes,2,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Payload       []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -61,9 +60,9 @@ func (*ProgressRequest) Descriptor() ([]byte, []int) {
 	return file_room_actor_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ProgressRequest) GetRoomId() string {
+func (x *ProgressRequest) GetId() string {
 	if x != nil {
-		return x.RoomId
+		return x.Id
 	}
 	return ""
 }
@@ -176,7 +175,7 @@ func (x *ProgressResponse) GetErrorCount() int64 {
 
 type WorkRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
+	QId           string                 `protobuf:"bytes,1,opt,name=qId,proto3" json:"qId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -211,34 +210,34 @@ func (*WorkRequest) Descriptor() ([]byte, []int) {
 	return file_room_actor_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *WorkRequest) GetRoomId() string {
+func (x *WorkRequest) GetQId() string {
 	if x != nil {
-		return x.RoomId
+		return x.QId
 	}
 	return ""
 }
 
-type StopRoomActor struct {
+type StopProcessor struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RoomId        string                 `protobuf:"bytes,1,opt,name=roomId,proto3" json:"roomId,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StopRoomActor) Reset() {
-	*x = StopRoomActor{}
+func (x *StopProcessor) Reset() {
+	*x = StopProcessor{}
 	mi := &file_room_actor_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StopRoomActor) String() string {
+func (x *StopProcessor) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StopRoomActor) ProtoMessage() {}
+func (*StopProcessor) ProtoMessage() {}
 
-func (x *StopRoomActor) ProtoReflect() protoreflect.Message {
+func (x *StopProcessor) ProtoReflect() protoreflect.Message {
 	mi := &file_room_actor_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -250,14 +249,14 @@ func (x *StopRoomActor) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StopRoomActor.ProtoReflect.Descriptor instead.
-func (*StopRoomActor) Descriptor() ([]byte, []int) {
+// Deprecated: Use StopProcessor.ProtoReflect.Descriptor instead.
+func (*StopProcessor) Descriptor() ([]byte, []int) {
 	return file_room_actor_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *StopRoomActor) GetRoomId() string {
+func (x *StopProcessor) GetId() string {
 	if x != nil {
-		return x.RoomId
+		return x.Id
 	}
 	return ""
 }
@@ -266,9 +265,9 @@ var File_room_actor_proto protoreflect.FileDescriptor
 
 const file_room_actor_proto_rawDesc = "" +
 	"\n" +
-	"\x10room_actor.proto\x12\x05actor\"\xc2\x01\n" +
-	"\x0fProgressRequest\x12\x16\n" +
-	"\x06roomId\x18\x01 \x01(\tR\x06roomId\x12@\n" +
+	"\x10room_actor.proto\x12\x05actor\"\xba\x01\n" +
+	"\x0fProgressRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12@\n" +
 	"\bmetadata\x18\x02 \x03(\v2$.actor.ProgressRequest.MetadataEntryR\bmetadata\x12\x18\n" +
 	"\apayload\x18\x03 \x01(\fR\apayload\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
@@ -283,12 +282,12 @@ const file_room_actor_proto_rawDesc = "" +
 	"\fMessageCount\x18\x06 \x01(\x03R\fMessageCount\x12\x1e\n" +
 	"\n" +
 	"ErrorCount\x18\a \x01(\x03R\n" +
-	"ErrorCount\"%\n" +
-	"\vWorkRequest\x12\x16\n" +
-	"\x06roomId\x18\x01 \x01(\tR\x06roomId\"'\n" +
-	"\rStopRoomActor\x12\x16\n" +
-	"\x06roomId\x18\x01 \x01(\tR\x06roomId2S\n" +
-	"\x12RoomEventProcessor\x12=\n" +
+	"ErrorCount\"\x1f\n" +
+	"\vWorkRequest\x12\x10\n" +
+	"\x03qId\x18\x01 \x01(\tR\x03qId\"\x1f\n" +
+	"\rStopProcessor\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id2T\n" +
+	"\x13SequentialProcessor\x12=\n" +
 	"\bProgress\x12\x16.actor.ProgressRequest\x1a\x17.actor.ProgressResponse\"\x00B|\n" +
 	"\tcom.actorB\x0eRoomActorProtoP\x01Z+github.com/antinvestor/matrix/apis/actor/v1\xa2\x02\x03AXX\xaa\x02\x05Actor\xca\x02\x05Actor\xe2\x02\x11Actor\\GPBMetadata\xea\x02\x05Actorb\x06proto3"
 
@@ -309,13 +308,13 @@ var file_room_actor_proto_goTypes = []any{
 	(*ProgressRequest)(nil),  // 0: actor.ProgressRequest
 	(*ProgressResponse)(nil), // 1: actor.ProgressResponse
 	(*WorkRequest)(nil),      // 2: actor.WorkRequest
-	(*StopRoomActor)(nil),    // 3: actor.StopRoomActor
+	(*StopProcessor)(nil),    // 3: actor.StopProcessor
 	nil,                      // 4: actor.ProgressRequest.MetadataEntry
 }
 var file_room_actor_proto_depIdxs = []int32{
 	4, // 0: actor.ProgressRequest.metadata:type_name -> actor.ProgressRequest.MetadataEntry
-	0, // 1: actor.RoomEventProcessor.Progress:input_type -> actor.ProgressRequest
-	1, // 2: actor.RoomEventProcessor.Progress:output_type -> actor.ProgressResponse
+	0, // 1: actor.SequentialProcessor.Progress:input_type -> actor.ProgressRequest
+	1, // 2: actor.SequentialProcessor.Progress:output_type -> actor.ProgressResponse
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name

@@ -78,7 +78,7 @@ func NewOutputRoomEventConsumer(
 		asProducer:   asProducer,
 	}
 
-	am.EnableFunction(actorutil.ActorFunctionSyncAPIServer, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
+	am.EnableFunction(actorutil.ActorFunctionSyncAPIOutputRoomEvents, &cfg.Queues.OutputRoomEvent, c.HandleRoomEvent)
 	c.am = am
 
 	outputQOpts := cfg.Queues.OutputRoomEvent
@@ -91,10 +91,11 @@ func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[strin
 
 	roomId, err := constants.DecodeRoomID(metadata[constants.RoomID])
 	if err != nil {
-		return err
+		util.Log(ctx).WithError(err).Error("roomserver output log: failed to decode room id")
+		return nil
 	}
 
-	_, err = s.am.Progress(ctx, actorutil.ActorFunctionSyncAPIServer, roomId)
+	_, err = s.am.Progress(ctx, actorutil.ActorFunctionSyncAPIOutputRoomEvents, roomId)
 	if err != nil {
 		return err
 	}

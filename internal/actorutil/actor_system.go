@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/antinvestor/gomatrixserverlib/spec"
 	actorV1 "github.com/antinvestor/matrix/apis/actor/v1"
 	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
@@ -100,8 +99,8 @@ func (m *manager) Start(ctx context.Context) error {
 	lookup := disthash.New()
 
 	// Create the room actor props for the cluster
-	roomProcessorKind := actorV1.NewRoomEventProcessorKind(func() actorV1.RoomEventProcessor {
-		return NewRoomActor(ctx, m.cluster, m.qm, m.processors)
+	roomProcessorKind := actorV1.NewSequentialProcessorKind(func() actorV1.SequentialProcessor {
+		return NewSeqActor(ctx, m.cluster, m.qm, m.processors)
 	}, 0)
 
 	// Create the cluster configuration
@@ -120,23 +119,29 @@ func (m *manager) Start(ctx context.Context) error {
 	return nil
 }
 
-func (m *manager) createRoomActor(_ context.Context, functionID ActorFunctionID, roomID *spec.RoomID) *actorV1.RoomEventProcessorGrainClient {
-
-	actorID := prefixRoomIDWithFunc(functionID, roomID)
-	roomActor := actorV1.GetRoomEventProcessorGrainClient(m.cluster, actorID)
-
-	return roomActor
+func (m *manager) createSecActor(_ context.Context, actorID string) *actorV1.SequentialProcessorGrainClient {
+	return actorV1.GetSequentialProcessorGrainClient(m.cluster, actorID)
 }
 
 // Progress obtains the subscription processing for a specific room
-func (m *manager) Progress(ctx context.Context, functionID ActorFunctionID, roomID *spec.RoomID) (*actorV1.ProgressResponse, error) {
-	roomActor := m.createRoomActor(ctx, functionID, roomID)
+func (m *manager) Progress(ctx context.Context, functionID ActorFunctionID, id any) (*actorV1.ProgressResponse, error) {
+
+	encodedIDStr, err := encodeID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	clusterIDStr := encodeIDToClusterID(functionID, encodedIDStr)
+
+	roomActor := m.createSecActor(ctx, clusterIDStr)
 
 	resp, err := roomActor.Progress(&actorV1.ProgressRequest{
-		RoomId: roomID.String(),
+		Id: clusterIDStr,
 	})
 	if err != nil {
-		m.cluster.Logger().With("room", roomID).With("error", err).Error(" Failed to get to Room actor progress")
+		m.cluster.Logger().
+			With("cluster id", clusterIDStr).
+			With("error", err).Error(" Failed to get to Room actor progress")
 		return nil, err
 	}
 	return resp, nil

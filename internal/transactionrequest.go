@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -141,7 +142,8 @@ func (t *TxnReq) ProcessTransaction(ctx context.Context) (*fclient.RespSend, *ut
 		}
 		event, err := verImpl.NewEventFromUntrustedJSON(pdu)
 		if err != nil {
-			if _, ok := err.(gomatrixserverlib.BadJSONError); ok {
+			var badJSONError gomatrixserverlib.BadJSONError
+			if errors.As(err, &badJSONError) {
 				// Room version 6 states that homeservers should strictly enforce canonical JSON
 				// on PDUs.
 				//
@@ -249,10 +251,18 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 			} else if serverName != t.Origin {
 				continue
 			}
-			for userID, byUser := range directPayload.Messages {
+			for userIDStr, byUser := range directPayload.Messages {
+
+				userID, err0 := spec.NewUserID(userIDStr, false)
+				if err0 != nil {
+					util.Log(ctx).WithError(err0).Error("processEDUs.NewUserID invalid userID")
+					continue
+				}
+
 				for deviceID, message := range byUser {
 					// TODO: check that the user and the device actually exist here
-					if err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
+					err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message)
+					if err != nil {
 
 						log.WithError(err).
 							WithField("sender", directPayload.Sender).
@@ -290,7 +300,8 @@ func (t *TxnReq) processEDUs(ctx context.Context) {
 							Debug("Dropping receipt event where sender domain doesn't match origin")
 						continue
 					}
-					if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs); err != nil {
+					err = t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs)
+					if err != nil {
 						log.WithError(err).
 							WithField("sender", t.Origin).
 							WithField("user_id", userID).

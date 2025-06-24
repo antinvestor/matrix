@@ -19,13 +19,13 @@ type QMsg struct {
 func MustPublishMsgs(ctx context.Context, t *testing.T, qopts *config.QueueOptions, qm queueutil.QueueManager, msgs ...*QMsg) error {
 	t.Helper()
 
-	err := qm.EnsurePublisherOk(ctx, qopts)
+	publisher, err := qm.GetOrCreatePublisher(ctx, qopts)
 	if err != nil {
 		return err
 	}
 
 	for _, msg := range msgs {
-		err = qm.Publish(ctx, qopts.Ref(), msg.Data, msg.Header)
+		err = publisher.Publish(ctx, msg.Data, msg.Header)
 		if err != nil {
 			t.Fatalf("MustPublishMsgs: failed to publish message: %s", err)
 		}

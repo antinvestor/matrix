@@ -21,17 +21,16 @@ type RoomActor struct {
 	cancelFunc context.CancelFunc
 
 	roomID *spec.RoomID
+	userID *spec.UserID
 
-	qm queueutil.QueueManager
-
-	processors map[ActorFunctionID]*functionOpt
-
+	processors      map[ActorFunctionID]*functionOpt
 	actorFunctionID ActorFunctionID
 
+	qm           queueutil.QueueManager
 	subscription frame.Subscriber
 
 	cluster *cluster.Cluster
-	cli     *actorV1.RoomEventProcessorGrainClient
+	cli     *actorV1.SequentialProcessorGrainClient
 
 	// Flag to track if job processing is active
 	jobProcessing atomic.Bool
@@ -70,8 +69,8 @@ func (ra *RoomActor) Progress(_ *actorV1.ProgressRequest, _ cluster.GrainContext
 	}, nil
 }
 
-// NewRoomActor creates a new room actor
-func NewRoomActor(ctx context.Context, cluster *cluster.Cluster, qm queueutil.QueueManager, processorMap map[ActorFunctionID]*functionOpt) *RoomActor {
+// NewSeqActor creates a new room actor
+func NewSeqActor(ctx context.Context, cluster *cluster.Cluster, qm queueutil.QueueManager, processorMap map[ActorFunctionID]*functionOpt) *RoomActor {
 
 	ictx, cancel := context.WithCancel(ctx)
 
@@ -88,28 +87,18 @@ func NewRoomActor(ctx context.Context, cluster *cluster.Cluster, qm queueutil.Qu
 	}
 }
 
-func (ra *RoomActor) setupSubscriber(qOpts *config.QueueOptions, roomID *spec.RoomID) error {
+func (ra *RoomActor) setupSubscriber(ctx context.Context, qm queueutil.QueueManager, qOpts *config.QueueOptions, encodedIDStr string) error {
 
-	ctx := ra.ctx
-	qm := ra.qm
-
-	opts := roomifyQOpts(ctx, qOpts, roomID)
-
-	// Register subscriber for this room
-	err := qm.RegisterSubscriber(ctx, opts)
-	if err != nil {
-
-		return err
-	}
+	var err error
+	opts := idifyQOpts(ctx, qOpts, encodedIDStr)
 
 	// Get the subscriber
-	ra.subscription, err = qm.GetSubscriber(opts.Ref())
+	ra.subscription, err = qm.GetOrCreateSubscriber(ctx, opts)
 	if err != nil {
 		return err
 	}
 
 	return nil
-
 }
 
 func (ra *RoomActor) Init(gctx cluster.GrainContext) {
@@ -118,10 +107,10 @@ func (ra *RoomActor) Init(gctx cluster.GrainContext) {
 
 	actorIdentity := gctx.Identity()
 
-	functionID, roomID, err := prefixedIDToRoomID(actorIdentity)
+	functionID, internalIDStr, err := decodeClusterIDToFunctionID(actorIdentity)
 	if err != nil {
-		ra.log.With("roomID", roomID).With("error", err).Error(" Invalid room ID  ")
-		gctx.Request(gctx.Self(), &actorV1.StopRoomActor{RoomId: actorIdentity})
+		ra.log.With("internalID", internalIDStr).With("error", err).Error(" Invalid room/user ID  ")
+		gctx.Request(gctx.Self(), &actorV1.StopProcessor{Id: actorIdentity})
 		return
 	}
 
@@ -129,22 +118,46 @@ func (ra *RoomActor) Init(gctx cluster.GrainContext) {
 
 	processor, ok := ra.processors[functionID]
 	if !ok {
-		ra.log.With("roomID", roomID).With("error", err).Error(" Invalid setup, no processor exists ")
-		gctx.Request(gctx.Self(), &actorV1.StopRoomActor{RoomId: actorIdentity})
+		ra.log.With("internalID", internalIDStr).With("error", err).Error(" Invalid setup, no processor exists ")
+		gctx.Request(gctx.Self(), &actorV1.StopProcessor{Id: actorIdentity})
 		return
 	}
 
-	ra.roomID = roomID
-	ra.cli = actorV1.GetRoomEventProcessorGrainClient(ra.cluster, roomID.String())
-	ra.log = ra.log.With("roomID", roomID.String())
+	queueIDStr := ""
 
-	err = ra.setupSubscriber(processor.qOpts, roomID)
+	if functionID == ActorFunctionSyncAPIOutputSendToDeviceEvents {
+		userID, err0 := decodeStrToUserID(internalIDStr)
+		if err0 != nil {
+			ra.log.With("internalID", internalIDStr).With("error", err).Error(" Invalid user id, processor couldn't startup ")
+			gctx.Request(gctx.Self(), &actorV1.StopProcessor{Id: actorIdentity})
+			return
+		}
+		ra.userID = userID
+		ra.log = ra.log.With("userID", userID.String())
+		queueIDStr = userID.String()
+
+	} else {
+		roomID, err0 := decodeStrToRoomID(internalIDStr)
+		if err0 != nil {
+			ra.log.With("internalID", internalIDStr).With("error", err).Error(" Invalid setup, no processor exists ")
+			gctx.Request(gctx.Self(), &actorV1.StopProcessor{Id: actorIdentity})
+			return
+		}
+		ra.roomID = roomID
+		ra.log = ra.log.With("roomID", roomID.String())
+		queueIDStr = roomID.String()
+
+	}
+
+	ra.cli = actorV1.GetSequentialProcessorGrainClient(ra.cluster, actorIdentity)
+
+	err = ra.setupSubscriber(ra.ctx, ra.qm, processor.qOpts, internalIDStr)
 	if err != nil {
-		log.With("roomID", roomID).With("error", err).Error(" Failed to setup subscriber     ")
+		log.With("internalID", internalIDStr).With("error", err).Error(" Failed to setup subscriber     ")
 		return
 	}
 
-	gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: roomID.String()})
+	gctx.Request(gctx.Self(), &actorV1.WorkRequest{QId: queueIDStr})
 }
 
 func (ra *RoomActor) Terminate(gctx cluster.GrainContext) {
@@ -166,7 +179,7 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 	msg := gctx.Message()
 
 	switch msgT := msg.(type) {
-	case *actorV1.StopRoomActor:
+	case *actorV1.StopProcessor:
 
 		gctx.Poison(gctx.Self())
 
@@ -181,7 +194,7 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 			defer func() {
 				// Reset processing flag when job completes
 				ra.jobProcessing.Swap(false)
-				gctx.Request(gctx.Self(), &actorV1.WorkRequest{RoomId: ra.roomID.String()})
+				gctx.Request(gctx.Self(), &actorV1.WorkRequest{QId: msgT.GetQId()})
 			}()
 
 			err := ra.pullNewMessage(ctx, msgT)
@@ -190,7 +203,7 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 				// Reset processing flag on error
 
 				if ra.subscription.IsIdle() {
-					gctx.Request(gctx.Self(), &actorV1.StopRoomActor{RoomId: ra.roomID.String()})
+					gctx.Request(gctx.Self(), &actorV1.StopProcessor{Id: gctx.Identity()})
 					return nil
 				}
 			}
@@ -210,8 +223,8 @@ func (ra *RoomActor) pullNewMessage(ctx context.Context, req *actorV1.WorkReques
 
 	// Check if subscription is active
 	if ra.subscription == nil {
-		log.Error(" no subscription initialised for room")
-		return fmt.Errorf("subscription not initialised for room %s", req.GetRoomId())
+		log.Error(" no subscription initialised")
+		return fmt.Errorf("subscription not initialised for room/user %s", req.GetQId())
 	}
 
 	requestCtx, cancelFn := context.WithTimeout(ctx, maximumIdlingTime)

@@ -24,12 +24,17 @@ func (q *queues) DiscardPublisher(ctx context.Context, ref string) error {
 	return q.service.DiscardPublisher(ctx, ref)
 }
 
-func (q *queues) EnsurePublisherOk(ctx context.Context, opts *config.QueueOptions) error {
-	_, err := q.GetPublisher(opts.Ref())
-	if err != nil {
-		return q.RegisterPublisher(ctx, opts)
+func (q *queues) GetOrCreatePublisher(ctx context.Context, opts *config.QueueOptions) (frame.Publisher, error) {
+	publisher, err := q.GetPublisher(opts.Ref())
+	if err == nil {
+		return publisher, nil
 	}
-	return nil
+	err = q.RegisterPublisher(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return q.GetPublisher(opts.Ref())
 }
 
 func (q *queues) Publish(ctx context.Context, reference string, payload any, headers ...map[string]string) error {
@@ -47,6 +52,19 @@ func (q *queues) RegisterSubscriber(ctx context.Context, opts *config.QueueOptio
 
 func (q *queues) GetSubscriber(ref string) (frame.Subscriber, error) {
 	return q.service.GetSubscriber(ref)
+}
+
+func (q *queues) GetOrCreateSubscriber(ctx context.Context, opts *config.QueueOptions) (frame.Subscriber, error) {
+	subscriber, err := q.GetSubscriber(opts.Ref())
+	if err == nil {
+		return subscriber, nil
+	}
+	err = q.RegisterSubscriber(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return q.GetSubscriber(opts.Ref())
 }
 
 func (q *queues) DiscardSubscriber(ctx context.Context, ref string) error {

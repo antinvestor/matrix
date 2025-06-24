@@ -120,10 +120,10 @@ func NewInputer(
 		EnableMetrics:   enableMetrics,
 	}
 
-	am.EnableFunction(actorutil.ActorFunctionRoomServer, &cfg.Queues.InputRoomEvent, c.HandleRoomEvent)
+	am.EnableFunction(actorutil.ActorFunctionRoomServerInputEvents, &cfg.Queues.InputRoomEvent, c.HandleRoomEvent)
 	c.Am = am
 
-	err := c.Qm.EnsurePublisherOk(ctx, &cfg.Queues.InputRoomEvent)
+	_, err := c.Qm.GetOrCreatePublisher(ctx, &cfg.Queues.InputRoomEvent)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func NewInputer(
 
 	replyPubOpts := replyQOpts(ctx, &cfg.Queues.InputRoomEvent, "", false)
 
-	err = c.Qm.EnsurePublisherOk(ctx, replyPubOpts)
+	_, err = c.Qm.GetOrCreatePublisher(ctx, replyPubOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (r *Inputer) Handle(ctx context.Context, metadata map[string]string, _ []by
 		return err
 	}
 
-	_, err = r.Am.Progress(ctx, actorutil.ActorFunctionRoomServer, roomId)
+	_, err = r.Am.Progress(ctx, actorutil.ActorFunctionRoomServerInputEvents, roomId)
 	if err != nil {
 		return err
 	}

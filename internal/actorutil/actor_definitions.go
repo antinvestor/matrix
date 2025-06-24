@@ -15,17 +15,18 @@ import (
 type ActorFunctionID string
 
 const (
-	ActorFunctionRoomServer          = ActorFunctionID("RoomServer")
-	ActorFunctionSyncAPIServer       = ActorFunctionID("SyncAPIServer")
-	ActorFunctionUserAPIServer       = ActorFunctionID("UserAPIServer")
-	ActorFunctionFederationAPIServer = ActorFunctionID("FederationAPIServer")
+	ActorFunctionRoomServerInputEvents           = ActorFunctionID("RoomServerInputEvts")
+	ActorFunctionSyncAPIOutputRoomEvents         = ActorFunctionID("SyncAPIOutputRoomEvts")
+	ActorFunctionSyncAPIOutputSendToDeviceEvents = ActorFunctionID("SyncAPIOutputSendToDeviceEvts")
+	ActorFunctionUserAPIOutputRoomEvents         = ActorFunctionID("UserAPIOutputRoomEvts")
+	ActorFunctionFederationAPIOutputRoomEvents   = ActorFunctionID("FederationAPIOutputRoomEvts")
 )
 
 const idPrefixSeparator = "___"
 
 type ActorManager interface {
 	EnableFunction(functionID ActorFunctionID, qOpts *config.QueueOptions, handlerFunc HandlerFunc)
-	Progress(ctx context.Context, functionID ActorFunctionID, roomID *spec.RoomID) (*actorV1.ProgressResponse, error)
+	Progress(ctx context.Context, functionID ActorFunctionID, id any) (*actorV1.ProgressResponse, error)
 }
 
 type HandlerFunc func(ctx context.Context, metadata map[string]string, message []byte) error
@@ -35,25 +36,47 @@ type functionOpt struct {
 	handlerFunc HandlerFunc
 }
 
-func prefixRoomIDWithFunc(funcPrefix ActorFunctionID, roomID *spec.RoomID) string {
-	return fmt.Sprintf("%s%s%s", funcPrefix, idPrefixSeparator, constants.EncodeRoomID(roomID))
+func encodeID(id any) (string, error) {
+
+	switch val := id.(type) {
+	case *spec.RoomID:
+		return constants.EncodeRoomID(val), nil
+	case *spec.UserID:
+		return constants.EncodeUserID(val), nil
+	default:
+		return "", fmt.Errorf("invalid id type, only *spec.RoomID/*spec.UserID is allowed")
+	}
 }
 
-func prefixedIDToRoomID(ID string) (ActorFunctionID, *spec.RoomID, error) {
+func encodeIDToClusterID(funcPrefix ActorFunctionID, encodedIDStr string) string {
+	return fmt.Sprintf("%s%s%s", funcPrefix, idPrefixSeparator, encodedIDStr)
+}
 
+func decodeClusterIDToFunctionID(ID string) (ActorFunctionID, string, error) {
 	idParts := strings.Split(ID, idPrefixSeparator)
 	if len(idParts) != 2 {
-		return "", nil, fmt.Errorf("invalid actor id: %s", ID)
+		return "", "", fmt.Errorf("invalid actor id: %s", ID)
 	}
 
 	funcPrefix := ActorFunctionID(idParts[0])
-	roomIDStr := idParts[1]
+	specID := idParts[1]
+	return funcPrefix, specID, nil
+}
 
-	roomID, err := constants.DecodeRoomID(roomIDStr)
+func decodeStrToRoomID(encodedID string) (*spec.RoomID, error) {
+	roomID, err := constants.DecodeRoomID(encodedID)
 	if err != nil {
-		return "", nil, fmt.Errorf("invalid room id: %s", ID)
+		return nil, fmt.Errorf("invalid room id: %s", encodedID)
 	}
-	return funcPrefix, roomID, nil
+	return roomID, nil
+}
+
+func decodeStrToUserID(encodedID string) (*spec.UserID, error) {
+	userID, err := constants.DecodeUserID(encodedID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid room id: %s", encodedID)
+	}
+	return userID, nil
 }
 
 // If a room consumer is inactive for a while then we will allow NATS
@@ -74,15 +97,13 @@ const maximumProcessingTime = time.Second * 15
 // again then we'll recreate the actor anyway.
 const maximumIdlingTime = time.Minute * 1
 
-func roomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.RoomID) *config.QueueOptions {
+func idifyQOpts(_ context.Context, opts *config.QueueOptions, encodedID string) *config.QueueOptions {
 
 	ds := opts.DS
 
-	encodedRoomID := constants.EncodeRoomID(roomId)
-
 	if ds.IsNats() {
 
-		subject := fmt.Sprintf("%s.%s", ds.GetQuery("subject"), encodedRoomID)
+		subject := fmt.Sprintf("%s.%s", ds.GetQuery("subject"), encodedID)
 		ds = ds.ExtendQuery("consumer_filter_subject", subject)
 		durable := strings.ReplaceAll(fmt.Sprintf("CnsDurable_%s", subject), ".", "_")
 
@@ -94,11 +115,11 @@ func roomifyQOpts(_ context.Context, opts *config.QueueOptions, roomId *spec.Roo
 		ds = ds.ExtendQuery("consumer_max_ack_pending", "1")
 
 	} else {
-		ds = ds.SuffixPath(encodedRoomID)
+		ds = ds.SuffixPath(encodedID)
 	}
 
 	return &config.QueueOptions{
-		QReference: fmt.Sprintf("%s%s", opts.QReference, encodedRoomID),
+		QReference: fmt.Sprintf("%s%s", opts.QReference, encodedID),
 		Prefix:     opts.Prefix,
 		DS:         ds,
 	}

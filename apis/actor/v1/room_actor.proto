@@ -5,7 +5,7 @@ package actor;
 option go_package = "github.com/antinvestor/matrix/apis/actor/v1;actorV1";
 
 message ProgressRequest {
-  string roomId = 1;
+  string id = 1;
   map<string, string> metadata = 2;
   bytes payload = 3;
 }
@@ -21,14 +21,14 @@ message ProgressResponse {
 }
 
 message WorkRequest {
-  string roomId = 1;
+  string qId = 1;
 }
 
-message StopRoomActor {
-  string roomId = 1;
+message StopProcessor {
+  string id = 1;
 }
 
 
-service RoomEventProcessor {
+service SequentialProcessor {
   rpc Progress (ProgressRequest) returns (ProgressResponse) {}
 }

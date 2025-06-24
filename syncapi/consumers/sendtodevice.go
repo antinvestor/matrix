@@ -17,6 +17,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"github.com/antinvestor/matrix/internal/actorutil"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
@@ -36,6 +37,8 @@ import (
 type OutputSendToDeviceEventConsumer struct {
 	qm                queueutil.QueueManager
 	db                storage.Database
+	am actorutil.ActorManager
+
 	userAPI           api.SyncKeyAPI
 	isLocalServerName func(spec.ServerName) bool
 	stream            streams.StreamProvider
@@ -49,7 +52,9 @@ func NewOutputSendToDeviceEventConsumer(
 	cfg *config.SyncAPI,
 	qm queueutil.QueueManager,
 	store storage.Database,
-	userAPI api.SyncKeyAPI,
+	am actorutil.ActorManager,
+
+userAPI api.SyncKeyAPI,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
 ) error {
@@ -62,20 +67,44 @@ func NewOutputSendToDeviceEventConsumer(
 		stream:            stream,
 	}
 
-	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputSendToDeviceEvent, c)
+	am.EnableFunction(actorutil.ActorFunctionSyncAPIOutputSendToDeviceEvents, &cfg.Queues.OutputSendToDeviceEvent, c.HandleUserEvent)
+	c.am = am
+
+	outputQOpts := cfg.Queues.OutputSendToDeviceEvent
+	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject")
+
+	return qm.RegisterSubscriber(ctx, &outputQOpts, c)
 }
 
-func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
+func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
+
+	userID, err := constants.DecodeUserID(metadata[constants.UserID])
+	if err != nil {
+		util.Log(ctx).WithError(err).Error("send-to-device: failed to decode user id, dropping message")
+		return nil
+	}
+
+	_, err = s.am.Progress(ctx, actorutil.ActorFunctionSyncAPIOutputSendToDeviceEvents, userID)
+	if err != nil {
+		util.Log(ctx).WithError(err).Error("send-to-device: failed to ping seq actor, dropping message")
+		return err
+	}
+
+	return nil
+}
+
+func (s *OutputSendToDeviceEventConsumer) HandleUserEvent(ctx context.Context, metadata map[string]string, message []byte) error {
 
 	log := util.Log(ctx)
 
-	userID := metadata[constants.UserID]
-	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	userID, err := constants.DecodeUserID(metadata[constants.UserID])
 	if err != nil {
-
-		log.WithError(err).Error("send-to-device: failed to split user id, dropping message")
+		log.WithError(err).Error("send-to-device: failed to decode user id, dropping message")
 		return nil
 	}
+
+	domain := userID.Domain()
+
 	if !s.isLocalServerName(domain) {
 		log.Debug("ignoring send-to-device event with destination %s", domain)
 		return nil

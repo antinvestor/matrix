@@ -93,7 +93,13 @@ func (q *SyncQueues) Defaults(opts DefaultOpts) {
 
 	q.OutputClientData = opts.defaultQ(constants.OutputClientData, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputClientDataEvent"})
 	q.OutputKeyChangeEvent = opts.defaultQ(constants.OutputKeyChangeEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputKeyChangeEvent"})
-	q.OutputSendToDeviceEvent = opts.defaultQ(constants.OutputSendToDeviceEvent, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputSendToDeviceEvent"})
+	q.OutputSendToDeviceEvent = opts.defaultQ(constants.OutputSendToDeviceEvent,
+		KVOpt{K: "stream_retention", V: "interest"},
+		KVOpt{K: "stream_subjects", V: fmt.Sprintf("%s.*", constants.OutputSendToDeviceEvent)},
+		KVOpt{K: "consumer_filter_subject", V: fmt.Sprintf("%s.*", constants.OutputSendToDeviceEvent)},
+		KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputSendToDeviceEvent"},
+		KVOpt{K: "consumer_headers_only", V: "true"},
+		KVOpt{K: constants.QueueHeaderToExtendSubject, V: constants.UserID})
 
 	q.OutputTypingEvent = opts.defaultQ(constants.OutputTypingEvent, KVOpt{K: "stream_storage", V: "memory"}, KVOpt{K: "consumer_durable_name", V: "CnsDurable_SyncAPIOutputTypingEvent"})
 

@@ -70,7 +70,7 @@ func NewRoomserverAPI(
 	serverACLs := acls.NewServerACLs(ctx, roomserverDB)
 
 	outputRoomEvtOpts := &cfg.SyncAPI.Queues.OutputRoomEvent
-	err := qm.EnsurePublisherOk(ctx, outputRoomEvtOpts)
+	_, err := qm.GetOrCreatePublisher(ctx, outputRoomEvtOpts)
 	if err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to register publisher for output room event")
 	}
