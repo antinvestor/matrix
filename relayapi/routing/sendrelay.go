@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/relayapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 // SendTransactionToRelay implements PUT /_matrix/federation/v1/send_relay/{txnID}/{userID}
@@ -35,11 +34,12 @@ func SendTransactionToRelay(
 	txnID gomatrixserverlib.TransactionID,
 	userID spec.UserID,
 ) util.JSONResponse {
-	logrus.Infof("Processing send_relay for %s", userID.String())
+	log := util.Log(httpReq.Context())
+	log.Info("Processing send_relay for %s", userID.String())
 
 	var txnEvents fclient.RelayEvents
 	if err := json.Unmarshal(fedReq.Content(), &txnEvents); err != nil {
-		logrus.Info("The request body could not be decoded into valid JSON." + err.Error())
+		log.Info("The request body could not be decoded into valid JSON." + err.Error())
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.NotJSON("The request body could not be decoded into valid JSON." + err.Error()),
@@ -62,7 +62,7 @@ func SendTransactionToRelay(
 	t.TransactionID = txnID
 	t.Destination = userID.Domain()
 
-	util.GetLogger(httpReq.Context()).Warnf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
+	util.Log(httpReq.Context()).Warn("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
 
 	err := relayAPI.PerformStoreTransaction(httpReq.Context(), t, userID)
 	if err != nil {

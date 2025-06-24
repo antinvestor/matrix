@@ -48,7 +48,7 @@ type configResponse struct {
 // nolint: gocyclo
 func Setup(
 	routers httputil.Routers,
-	cfg *config.Dendrite,
+	cfg *config.Matrix,
 	db storage.Database,
 	userAPI userapi.MediaUserAPI,
 	client *fclient.Client,
@@ -179,7 +179,7 @@ func makeDownloadAPI(
 	var counterVec *prometheus.CounterVec
 	var sizeVec *prometheus.HistogramVec
 	var requestType string
-	if cfg.Matrix.Metrics.Enabled {
+	if cfg.Global.Metrics.Enabled {
 		split := strings.Split(name, "_")
 		// The first part of the split is either "download" or "thumbnail"
 		name = split[0]
@@ -223,7 +223,7 @@ func makeDownloadAPI(
 		// false in the query string and the target server name isn't our own.
 		// https://github.com/matrix-org/matrix-doc/pull/1265
 		if allowRemote := req.URL.Query().Get("allow_remote"); strings.ToLower(allowRemote) == "false" {
-			if serverName != cfg.Matrix.ServerName {
+			if serverName != cfg.Global.ServerName {
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,17 +15,18 @@
 package util
 
 import (
+	"context"
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
-func getMemoryStats(p *phoneHomeStats) error {
+func getMemoryStats(ctx context.Context, p *phoneHomeStats) error {
 	oldUsage := p.prevData
 	newUsage := syscall.Rusage{}
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &newUsage); err != nil {
-		logrus.WithError(err).Error("unable to get usage")
+		util.Log(ctx).WithError(err).Error("unable to get usage")
 		return err
 	}
 	newData := timestampToRUUsage{timestamp: time.Now().Unix(), usage: newUsage}

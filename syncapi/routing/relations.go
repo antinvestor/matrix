@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,11 +18,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/internal"
@@ -30,6 +26,7 @@ import (
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 type RelationsResponse struct {
@@ -55,7 +52,7 @@ func Relations(
 
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
+		util.Log(req.Context()).WithError(err).Error("device.UserID invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -95,14 +92,12 @@ func Relations(
 
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
-		logrus.WithError(err).Error("Failed to get snapshot for relations")
+		util.Log(req.Context()).WithError(err).Error("Failed to get snapshot for relations")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	res := &RelationsResponse{
 		Chunk: []synctypes.ClientEvent{},
@@ -134,7 +129,7 @@ func Relations(
 			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 		})
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
+			util.Log(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
 			continue
 		}
 		res.Chunk = append(
@@ -143,7 +138,6 @@ func Relations(
 		)
 	}
 
-	succeeded = true
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,

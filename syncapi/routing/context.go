@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,7 @@ package routing
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -26,7 +24,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserver "github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
@@ -36,7 +34,6 @@ import (
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 type ContextRespsonse struct {
@@ -53,7 +50,7 @@ func Context(
 	rsAPI roomserver.SyncRoomserverAPI,
 	syncDB storage.Database,
 	roomID, eventID string,
-	lazyLoadCache caching.LazyLoadCache,
+	lazyLoadCache cacheutil.LazyLoadCache,
 ) util.JSONResponse {
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
@@ -62,8 +59,6 @@ func Context(
 			JSON: spec.InternalServerError{},
 		}
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	filter, err := parseRoomEventFilter(req)
 	if err != nil {
@@ -97,7 +92,7 @@ func Context(
 	membershipRes := roomserver.QueryMembershipForUserResponse{}
 	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: *userID, RoomID: roomID}
 	if err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
-		logrus.WithError(err).Error("unable to query membership")
+		util.Log(ctx).WithError(err).Error("unable to query membership")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -125,13 +120,13 @@ func Context(
 
 	id, requestedEvent, err := snapshot.SelectContextEvent(ctx, roomID, eventID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if sqlutil.ErrorIsNoRows(err) {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound(fmt.Sprintf("Event %s not found", eventID)),
 			}
 		}
-		logrus.WithError(err).WithField("eventID", eventID).Error("unable to find requested event")
+		util.Log(ctx).WithError(err).WithField("eventID", eventID).Error("unable to find requested event")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -142,16 +137,15 @@ func Context(
 	startTime := time.Now()
 	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, []*rstypes.HeaderedEvent{&requestedEvent}, nil, *userID, "context")
 	if err != nil {
-		logrus.WithError(err).Error("unable to apply history visibility filter")
+		util.Log(ctx).WithError(err).Error("unable to apply history visibility filter")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	logrus.WithFields(logrus.Fields{
-		"duration": time.Since(startTime),
-		"room_id":  roomID,
-	}).Debug("applied history visibility (context)")
+	util.Log(ctx).WithField("duration", time.Since(startTime)).
+		WithField("room_id", roomID).
+		Debug("applied history visibility (context)")
 	if len(filteredEvents) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -165,8 +159,8 @@ func Context(
 	}
 
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, roomID, filter)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		logrus.WithError(err).Error("unable to fetch before events")
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
+		util.Log(ctx).WithError(err).Error("unable to fetch before events")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -174,8 +168,8 @@ func Context(
 	}
 
 	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, roomID, filter)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		logrus.WithError(err).Error("unable to fetch after events")
+	if err != nil && !sqlutil.ErrorIsNoRows(err) {
+		util.Log(ctx).WithError(err).Error("unable to fetch after events")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -185,22 +179,21 @@ func Context(
 	startTime = time.Now()
 	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, snapshot, rsAPI, eventsBefore, eventsAfter, *userID)
 	if err != nil {
-		logrus.WithError(err).Error("unable to apply history visibility filter")
+		util.Log(ctx).WithError(err).Error("unable to apply history visibility filter")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"duration": time.Since(startTime),
-		"room_id":  roomID,
-	}).Debug("applied history visibility (context eventsBefore/eventsAfter)")
+	util.Log(ctx).WithField("duration", time.Since(startTime)).
+		WithField("room_id", roomID).
+		Debug("applied history visibility (context eventsBefore/eventsAfter)")
 
 	// TODO: Get the actual state at the last event returned by SelectContextAfterEvent
 	state, err := snapshot.CurrentState(ctx, roomID, &stateFilter, nil)
 	if err != nil {
-		logrus.WithError(err).Error("unable to fetch current room state")
+		util.Log(ctx).WithError(err).Error("unable to fetch current room state")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -223,7 +216,7 @@ func Context(
 		})
 		newState, err = applyLazyLoadMembers(ctx, device, snapshot, roomID, evs, lazyLoadCache)
 		if err != nil {
-			logrus.WithError(err).Error("unable to load membership events")
+			util.Log(ctx).WithError(err).Error("unable to load membership events")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -251,7 +244,7 @@ func Context(
 		response.End = end.String()
 		response.Start = start.String()
 	}
-	succeeded = true
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: response,
@@ -315,7 +308,7 @@ func applyLazyLoadMembers(
 	snapshot storage.DatabaseTransaction,
 	roomID string,
 	events []synctypes.ClientEvent,
-	lazyLoadCache caching.LazyLoadCache,
+	lazyLoadCache cacheutil.LazyLoadCache,
 ) ([]*rstypes.HeaderedEvent, error) {
 	eventSenders := make(map[string]struct{})
 	// get members who actually send an event

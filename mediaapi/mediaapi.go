@@ -25,23 +25,28 @@ import (
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
-	"github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the MediaAPI component.
 func AddPublicRoutes(
 	ctx context.Context,
 	routers httputil.Routers,
-	cm *sqlutil.Connections,
-	cfg *config.Dendrite,
+	cm sqlutil.ConnectionManager,
+	cfg *config.Matrix,
 	userAPI userapi.MediaUserAPI,
 	client *fclient.Client,
 	fedClient fclient.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 ) {
-	mediaDB, err := storage.NewMediaAPIDatasource(ctx, cm, &cfg.MediaAPI.Database)
+	mediaCm, err := cm.FromOptions(ctx, &cfg.MediaAPI.Database)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to media db")
+		util.Log(ctx).WithError(err).Panic("failed to obtain a media db connection manager :%v", err)
+	}
+
+	mediaDB, err := storage.NewMediaAPIDatasource(ctx, mediaCm)
+	if err != nil {
+		util.Log(ctx).WithError(err).Panic("failed to connect to media db")
 	}
 
 	routing.Setup(

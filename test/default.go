@@ -2,37 +2,46 @@ package test
 
 import (
 	"context"
+	"strings"
 
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
 )
 
-func PrepareDefaultDSConnections(ctx context.Context) (config.DefaultOpts, func(), error) {
+func PrepareDefaultDSConnections(ctx context.Context, testOpts DependancyOption) (config.DefaultOpts, func(ctx context.Context), error) {
 
-	cacheConnStr, closeCache, err := PrepareRedisDataSourceConnection(ctx)
-	if err != nil {
-		return config.DefaultOpts{}, nil, err
+	randomnessPrefix := strings.ToLower(util.RandomString(7))
+	configDefaults := config.DefaultOpts{
+		RandomnessPrefix: randomnessPrefix,
 	}
 
-	queueConnStr, closeQueue, err := PrepareNatsDataSourceConnection(ctx)
+	cacheConn, closeCache, err := PrepareCacheConnection(ctx, randomnessPrefix, testOpts)
 	if err != nil {
-		defer closeCache()
-		return config.DefaultOpts{}, nil, err
+		return configDefaults, nil, err
 	}
 
-	dbConnStr, closeDb, err := PrepareDatabaseDSConnection(ctx)
+	configDefaults.DSCacheConn = cacheConn
+
+	queueConn, closeQueue, err := PrepareQueueConnection(ctx, randomnessPrefix, testOpts)
 	if err != nil {
-		defer closeCache()
-		defer closeQueue()
-		return config.DefaultOpts{}, nil, err
+		defer closeCache(ctx)
+		return configDefaults, nil, err
 	}
 
-	return config.DefaultOpts{
-			DatabaseConnectionStr: dbConnStr,
-			QueueConnectionStr:    queueConnStr,
-			CacheConnectionStr:    cacheConnStr,
-		}, func() {
-			closeCache()
-			closeQueue()
-			closeDb()
-		}, nil
+	configDefaults.DSQueueConn = queueConn
+
+	dbConn, closeDb, err := PrepareDatabaseConnection(ctx, randomnessPrefix, testOpts)
+	if err != nil {
+		defer closeCache(ctx)
+		defer closeQueue(ctx)
+		return configDefaults, nil, err
+	}
+
+	configDefaults.DSDatabaseConn = dbConn
+
+	return configDefaults, func(ctx context.Context) {
+		closeCache(ctx)
+		closeQueue(ctx)
+		closeDb(ctx)
+	}, nil
 }

@@ -24,7 +24,7 @@ import (
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 	"gopkg.in/h2non/bimg.v1"
 )
 
@@ -37,11 +37,13 @@ func GenerateThumbnails(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *log.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
 	if err != nil {
-		logger.WithError(err).WithField("src", src).Error("Failed to read src file")
+		logger.WithError(err).
+			WithField("src", src).
+			Error("Failed to read src file")
 		return false, err
 	}
 	img := bimg.NewImage(buffer)
@@ -52,7 +54,9 @@ func GenerateThumbnails(
 			maxThumbnailGenerators, db, logger,
 		)
 		if err != nil {
-			logger.WithError(err).WithField("src", src).Error("Failed to generate thumbnails")
+			logger.WithError(err).
+				WithField("src", src).
+				Error("Failed to generate thumbnails")
 			return false, err
 		}
 		if busy {
@@ -71,13 +75,13 @@ func GenerateThumbnail(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *log.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
-			"src": src,
-		}).Error("Failed to read src file")
+		logger.WithError(err).
+			WithField("src", src).
+			Error("Failed to read src file")
 		return false, err
 	}
 	img := bimg.NewImage(buffer)
@@ -87,9 +91,9 @@ func GenerateThumbnail(
 		maxThumbnailGenerators, db, logger,
 	)
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
-			"src": src,
-		}).Error("Failed to generate thumbnails")
+		logger.WithError(err).
+			WithField("src", src).
+			Error("Failed to generate thumbnails")
 		return false, err
 	}
 	if busy {
@@ -109,13 +113,12 @@ func createThumbnail(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *log.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
-	logger = logger.WithFields(log.Fields{
-		"Width":        config.Width,
-		"Height":       config.Height,
-		"ResizeMethod": config.ResizeMethod,
-	})
+	logger = logger.
+		WithField("Width", config.Width).
+		WithField("Height", config.Height).
+		WithField("ResizeMethod", config.ResizeMethod)
 
 	// Check if request is larger than original
 	if isLargerThanOriginal(config, img) {
@@ -156,11 +159,11 @@ func createThumbnail(
 	if err != nil {
 		return false, err
 	}
-	logger.WithFields(log.Fields{
-		"ActualWidth":  width,
-		"ActualHeight": height,
-		"processTime":  time.Now().Sub(start),
-	}).Info("Generated thumbnail")
+	logger.
+		WithField("ActualWidth", width).
+		WithField("ActualHeight", height).
+		WithField("processTime", time.Now().Sub(start)).
+		Info("Generated thumbnail")
 
 	stat, err := os.Stat(string(dst))
 	if err != nil {
@@ -184,10 +187,10 @@ func createThumbnail(
 
 	err = db.StoreThumbnail(ctx, thumbnailMetadata)
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
-			"ActualWidth":  width,
-			"ActualHeight": height,
-		}).Error("Failed to store thumbnail metadata in database.")
+		logger.WithError(err).
+			WithField("ActualWidth", width).
+			WithField("ActualHeight", height).
+			Error("Failed to store thumbnail metadata in database.")
 		return false, err
 	}
 
@@ -205,7 +208,7 @@ func isLargerThanOriginal(config types.ThumbnailSize, img *bimg.Image) bool {
 // resize scales an image to fit within the provided width and height
 // If the source aspect ratio is different to the target dimensions, one edge will be smaller than requested
 // If crop is set to true, the image will be scaled to fill the width and height with any excess being cropped off
-func resize(dst types.Path, inImage *bimg.Image, w, h int, crop bool, logger *log.Entry) (int, int, error) {
+func resize(dst types.Path, inImage *bimg.Image, w, h int, crop bool, logger *util.LogEntry) (int, int, error) {
 	inSize, err := inImage.Size()
 	if err != nil {
 		return -1, -1, err

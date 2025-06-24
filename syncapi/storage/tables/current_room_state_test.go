@@ -2,55 +2,52 @@ package tables_test
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 )
 
-func newCurrentRoomStateTable(t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, *sql.DB, func()) {
+func newCurrentRoomStateTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) (tables.CurrentRoomState, sqlutil.ConnectionManager) {
 	t.Helper()
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
+
+	cm := sqlutil.NewConnectionManager(svc)
 
 	var tab tables.CurrentRoomState
-	tab, err = postgres.NewPostgresCurrentRoomStateTable(ctx, db)
+	tab, err := postgres.NewPostgresCurrentRoomStateTable(ctx, cm)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
-	return tab, db, closeDb
+
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate database: %s", err)
+	}
+	return tab, cm
 }
 
 func TestCurrentRoomStateTable(t *testing.T) {
-	ctx := testrig.NewContext(t)
+
 	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, db, closeDb := newCurrentRoomStateTable(t, testOpts)
-		defer closeDb()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		tab, cm := newCurrentRoomStateTable(ctx, svc, t, testOpts)
+
 		events := room.CurrentState()
-		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
+		err := cm.Do(ctx, func(ctx context.Context) error {
 			for i, ev := range events {
 				ev.StateKeyResolved = ev.StateKey()
 				userID, err := spec.NewUserID(string(ev.SenderID()), true)
@@ -58,7 +55,7 @@ func TestCurrentRoomStateTable(t *testing.T) {
 					return err
 				}
 				ev.UserID = *userID
-				err = tab.UpsertRoomState(ctx, txn, ev, nil, types.StreamPosition(i))
+				err = tab.UpsertRoomState(ctx, ev, nil, types.StreamPosition(i))
 				if err != nil {
 					return fmt.Errorf("failed to UpsertRoomState: %w", err)
 				}
@@ -66,7 +63,7 @@ func TestCurrentRoomStateTable(t *testing.T) {
 			wantEventIDs := []string{
 				events[0].EventID(), events[1].EventID(), events[2].EventID(), events[3].EventID(),
 			}
-			gotEvents, err := tab.SelectEventsWithEventIDs(ctx, txn, wantEventIDs)
+			gotEvents, err := tab.SelectEventsWithEventIDs(ctx, wantEventIDs)
 			if err != nil {
 				return fmt.Errorf("failed to SelectEventsWithEventIDs: %w", err)
 			}
@@ -86,7 +83,7 @@ func TestCurrentRoomStateTable(t *testing.T) {
 				}
 			}
 
-			testCurrentState(t, ctx, txn, tab, room)
+			testCurrentState(ctx, t, tab, room)
 
 			return nil
 		})
@@ -96,11 +93,11 @@ func TestCurrentRoomStateTable(t *testing.T) {
 	})
 }
 
-func testCurrentState(t *testing.T, ctx context.Context, txn *sql.Tx, tab tables.CurrentRoomState, room *test.Room) {
+func testCurrentState(ctx context.Context, t *testing.T, tab tables.CurrentRoomState, room *test.Room) {
 	t.Run("test currentState", func(t *testing.T) {
 		// returns the complete state of the room with a default filter
 		filter := synctypes.DefaultStateFilter()
-		evs, err := tab.SelectCurrentState(ctx, txn, room.ID, &filter, nil)
+		evs, err := tab.SelectCurrentState(ctx, room.ID, &filter, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,7 +108,7 @@ func testCurrentState(t *testing.T, ctx context.Context, txn *sql.Tx, tab tables
 		// When lazy loading, we expect no membership event, so only 4 events
 		filter.LazyLoadMembers = true
 		expectCount = 4
-		evs, err = tab.SelectCurrentState(ctx, txn, room.ID, &filter, nil)
+		evs, err = tab.SelectCurrentState(ctx, room.ID, &filter, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,7 +118,7 @@ func testCurrentState(t *testing.T, ctx context.Context, txn *sql.Tx, tab tables
 		// same as above, but with existing NotTypes defined
 		notTypes := []string{spec.MRoomMember}
 		filter.NotTypes = &notTypes
-		evs, err = tab.SelectCurrentState(ctx, txn, room.ID, &filter, nil)
+		evs, err = tab.SelectCurrentState(ctx, room.ID, &filter, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -20,12 +20,11 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 // NOTE: ALL FUNCTIONS IN THIS FILE PREFIXED WITH _ ARE NOT THREAD-SAFE
@@ -97,6 +96,9 @@ func (n *Notifier) OnNewEvent(
 	// This needs to be done PRIOR to waking up users as they will read this value.
 	n.lock.Lock()
 	defer n.lock.Unlock()
+
+	log := util.Log(ctx)
+
 	n.currPos.ApplyUpdates(posUpdate)
 	n._removeEmptyUserStreams()
 
@@ -109,13 +111,13 @@ func (n *Notifier) OnNewEvent(
 		if ev.Type() == "m.room.member" && ev.StateKey() != nil {
 			targetUserID, err := n.rsAPI.QueryUserIDForSender(ctx, ev.RoomID(), spec.SenderID(*ev.StateKey()))
 			if err != nil || targetUserID == nil {
-				log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
+				log.WithError(err).WithField("event_id", ev.EventID()).Error(
 					"Notifier.OnNewEvent: Failed to find the userID for this event",
 				)
 			} else {
 				membership, err := ev.Membership()
 				if err != nil {
-					log.WithError(err).WithField("event_id", ev.EventID()).Errorf(
+					log.WithError(err).WithField("event_id", ev.EventID()).Error(
 						"Notifier.OnNewEvent: Failed to unmarshal member event",
 					)
 				} else {
@@ -143,9 +145,8 @@ func (n *Notifier) OnNewEvent(
 	} else if len(userIDs) > 0 {
 		n._wakeupUsers(userIDs, nil, n.currPos)
 	} else {
-		log.WithFields(log.Fields{
-			"posUpdate": posUpdate.String,
-		}).Warn("Notifier.OnNewEvent called but caller supplied no user to wake up")
+		log.WithField("posUpdate", posUpdate.String).
+			Warn("Notifier.OnNewEvent called but caller supplied no user to wake up")
 	}
 }
 
@@ -332,48 +333,37 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	snapshot, err := db.NewDatabaseSnapshot(ctx)
+	txDB, err := db.NewDatabaseTransaction(ctx)
 	if err != nil {
 		return err
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
-	roomToUsers, err := snapshot.AllJoinedUsersInRooms(ctx)
+	roomToUsers, err := txDB.AllJoinedUsersInRooms(ctx)
 	if err != nil {
 		return err
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 
-	roomToPeekingDevices, err := snapshot.AllPeekingDevicesInRooms(ctx)
+	roomToPeekingDevices, err := txDB.AllPeekingDevicesInRooms(ctx)
 	if err != nil {
 		return err
 	}
 	n.setPeekingDevices(roomToPeekingDevices)
 
-	succeeded = true
 	return nil
 }
 
 // LoadRooms loads the membership states required to notify users correctly.
-func (n *Notifier) LoadRooms(ctx context.Context, db storage.Database, roomIDs []string) error {
+func (n *Notifier) LoadRooms(ctx context.Context, db storage.DatabaseTransaction, roomIDs []string) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	snapshot, err := db.NewDatabaseSnapshot(ctx)
-	if err != nil {
-		return err
-	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
-
-	roomToUsers, err := snapshot.AllJoinedUsersInRoom(ctx, roomIDs)
+	roomToUsers, err := db.AllJoinedUsersInRoom(ctx, roomIDs)
 	if err != nil {
 		return err
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 
-	succeeded = true
 	return nil
 }
 

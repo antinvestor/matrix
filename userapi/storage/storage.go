@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,15 +17,11 @@ package storage
 import (
 	"context"
 	"fmt"
-
-	profilev1 "github.com/antinvestor/apis/go/profile/v1"
-
 	"time"
 
+	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/storage/distributed"
 	"github.com/antinvestor/matrix/userapi/storage/postgres"
 )
@@ -35,18 +31,17 @@ import (
 func NewUserDatabase(
 	ctx context.Context,
 	profileCli *profilev1.ProfileClient,
-	conMan *sqlutil.Connections,
-	dbProperties *config.DatabaseOptions,
+	cm sqlutil.ConnectionManager,
 	serverName spec.ServerName,
 	bcryptCost int,
 	openIDTokenLifetimeMS int64,
 	loginTokenLifetime time.Duration,
 	serverNoticesLocalpart string,
 ) (UserDatabase, error) {
-	if !dbProperties.ConnectionString.IsPostgres() {
+	if !cm.DS().IsPostgres() {
 		return nil, fmt.Errorf("unexpected database type")
 	}
-	pgUserDb, err := postgres.NewDatabase(ctx, conMan, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+	pgUserDb, err := postgres.NewDatabase(ctx, cm, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +60,10 @@ func NewUserDatabase(
 
 // NewKeyDatabase opens a new Postgres database (base on dataSourceName) scheme)
 // and sets postgres connection parameters.
-func NewKeyDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (KeyDatabase, error) {
+func NewKeyDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (KeyDatabase, error) {
 	switch {
-	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewKeyDatabase(ctx, conMan, dbProperties)
+	case cm.DS().IsPostgres():
+		return postgres.NewKeyDatabase(ctx, cm)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

@@ -1,6 +1,6 @@
 // Copyright 2017 Vector Creations Ltd
 // Copyright 2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,16 +21,13 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/getsentry/sentry-go"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/internal"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/getsentry/sentry-go"
+	"github.com/pitabwire/util"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the
@@ -62,13 +59,10 @@ func (r *Inputer) updateLatestEvents(
 	trace, ctx := internal.StartRegion(ctx, "updateLatestEvents")
 	defer trace.EndRegion()
 
-	var succeeded bool
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
 	if err != nil {
-		return fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
+		return fmt.Errorf("r.Cm.GetRoomUpdater: %w", err)
 	}
-
-	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 
 	u := latestEventsUpdater{
 		ctx:               ctx,
@@ -83,11 +77,10 @@ func (r *Inputer) updateLatestEvents(
 		historyVisibility: historyVisibility,
 	}
 
-	if err = u.doUpdateLatestEvents(); err != nil {
+	if err = u.doUpdateLatestEvents(ctx); err != nil {
 		return fmt.Errorf("u.doUpdateLatestEvents: %w", err)
 	}
 
-	succeeded = true
 	return
 }
 
@@ -126,7 +119,7 @@ type latestEventsUpdater struct {
 	historyVisibility gomatrixserverlib.HistoryVisibility
 }
 
-func (u *latestEventsUpdater) doUpdateLatestEvents() error {
+func (u *latestEventsUpdater) doUpdateLatestEvents(ctx context.Context) error {
 	u.lastEventIDSent = u.updater.LastEventIDSent()
 
 	// If we are doing a regular event update then we will get the
@@ -143,7 +136,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 	// If the event has already been written to the output log then we
 	// don't need to do anything, as we've handled it already.
-	if hasBeenSent, err := u.updater.HasEventBeenSent(u.stateAtEvent.EventNID); err != nil {
+	if hasBeenSent, err := u.updater.HasEventBeenSent(ctx, u.stateAtEvent.EventNID); err != nil {
 		return fmt.Errorf("u.updater.HasEventBeenSent: %w", err)
 	} else if hasBeenSent {
 		return nil
@@ -151,7 +144,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 	// Work out what the latest events are. This will include the new
 	// event if it is not already referenced.
-	extremitiesChanged, err := u.calculateLatest(
+	extremitiesChanged, err := u.calculateLatest(ctx,
 		u.oldLatest, u.event,
 		types.StateAtEventAndReference{
 			EventID:      u.event.EventID(),
@@ -179,7 +172,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		u.newStateNID = u.oldStateNID
 	}
 
-	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
+	if err = u.updater.SetLatestEvents(ctx, u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
 		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
@@ -189,6 +182,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	}
 	updates = append(updates, *update)
 
+	roomID := u.event.RoomID()
+
 	// Send the event to the output logs.
 	// We do this inside the database transaction to ensure that we only mark an event as sent if we sent it.
 	// (n.b. this means that it's possible that the same event will be sent twice if the transaction fails but
@@ -197,11 +192,12 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID().String(), updates); err != nil {
+	err = u.api.OutputProducer.ProduceRoomEvents(ctx, &roomID, updates)
+	if err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}
 
-	if err = u.updater.MarkEventAsSent(u.stateAtEvent.EventNID); err != nil {
+	if err = u.updater.MarkEventAsSent(ctx, u.stateAtEvent.EventNID); err != nil {
 		return fmt.Errorf("u.updater.MarkEventAsSent: %w", err)
 	}
 
@@ -288,14 +284,14 @@ func (u *latestEventsUpdater) latestState() error {
 	}
 
 	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
-		logrus.WithFields(logrus.Fields{
-			"event_id":      u.event.EventID(),
-			"room_id":       u.event.RoomID().String(),
-			"old_state_nid": u.oldStateNID,
-			"new_state_nid": u.newStateNID,
-			"old_latest":    u.oldLatest.EventIDs(),
-			"new_latest":    u.latest.EventIDs(),
-		}).Warnf("State reset detected (removing %d events)", removed)
+		util.Log(ctx).
+			WithField("event_id", u.event.EventID()).
+			WithField("room_id", u.event.RoomID().String()).
+			WithField("old_state_nid", u.oldStateNID).
+			WithField("new_state_nid", u.newStateNID).
+			WithField("old_latest", u.oldLatest.EventIDs()).
+			WithField("new_latest", u.latest.EventIDs()).
+			Warn("State reset detected (removing %d events)", removed)
 		sentry.WithScope(func(scope *sentry.Scope) {
 			scope.SetLevel("warning")
 			scope.SetTag("room_id", u.event.RoomID().String())
@@ -325,7 +321,7 @@ func (u *latestEventsUpdater) latestState() error {
 
 // calculateLatest works out the new set of forward extremities. Returns
 // true if the new event is included in those extremites, false otherwise.
-func (u *latestEventsUpdater) calculateLatest(
+func (u *latestEventsUpdater) calculateLatest(ctx context.Context,
 	oldLatest []types.StateAtEventAndReference,
 	newEvent gomatrixserverlib.PDU,
 	newStateAndRef types.StateAtEventAndReference,
@@ -350,7 +346,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	// If the "new" event is already referenced by an existing event
 	// then do nothing - it's not a candidate to be a new extremity if
 	// it has been referenced.
-	if referenced, err := u.updater.IsReferenced(newEvent.EventID()); err != nil {
+	if referenced, err := u.updater.IsReferenced(ctx, newEvent.EventID()); err != nil {
 		return false, fmt.Errorf("u.updater.IsReferenced(new): %w", err)
 	} else if referenced {
 		u.latest = oldLatest
@@ -361,7 +357,7 @@ func (u *latestEventsUpdater) calculateLatest(
 	// have entries in the previous events table. If they do then we
 	// will no longer include them as forward extremities.
 	for k, l := range existingRefs {
-		referenced, err := u.updater.IsReferenced(l.EventID)
+		referenced, err := u.updater.IsReferenced(ctx, l.EventID)
 		if err != nil {
 			return false, fmt.Errorf("u.updater.IsReferenced: %w", err)
 		} else if referenced {

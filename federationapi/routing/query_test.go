@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,10 +27,11 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedAPI "github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/federationapi/routing"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/setup/signing"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
@@ -49,24 +50,30 @@ func (f *fakeFedClient) LookupRoomAlias(ctx context.Context, origin, s spec.Serv
 
 func TestHandleQueryDirectory(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		cm := sqlutil.NewConnectionManager(svc)
 		routers := httputil.NewRouters()
-		defer closeRig()
 
 		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+
 		routers.Federation = fedMux
-		cfg.FederationAPI.Matrix.ServerName = testOrigin
-		cfg.FederationAPI.Matrix.Metrics.Enabled = false
+		cfg.FederationAPI.Global.ServerName = testOrigin
+		cfg.FederationAPI.Global.Metrics.Enabled = false
 		fedClient := fakeFedClient{}
 		serverKeyAPI := &signing.YggdrasilKeys{}
 		keyRing := serverKeyAPI.KeyRing()
-		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, &natsInstance, &fedClient, nil, nil, keyRing, true)
+		fedapi := fedAPI.NewInternalAPI(ctx, cfg, cm, qm, am, &fedClient, nil, nil, keyRing, true, nil)
 		userapi := fakeUserAPI{}
 
-		routing.Setup(routers, cfg, nil, fedapi, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, caching.DisableMetrics)
+		routing.Setup(ctx, routers, cfg, nil, fedapi, keyRing, &fedClient, &userapi, &cfg.MSCs, nil, cacheutil.DisableMetrics)
 
 		handler := fedMux.Get(routing.QueryDirectoryRouteName).GetHandler().ServeHTTP
 		_, sk, _ := ed25519.GenerateKey(nil)
@@ -76,7 +83,7 @@ func TestHandleQueryDirectory(t *testing.T) {
 		req := fclient.NewFederationRequest("GET", serverName, testOrigin, "/query/directory?room_alias="+url.QueryEscape("#room:server"))
 		type queryContent struct{}
 		content := queryContent{}
-		err := req.SetContent(content)
+		err = req.SetContent(content)
 		if err != nil {
 			t.Fatalf("Error: %s", err.Error())
 		}

@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,8 +25,10 @@ import (
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
+// Schema defines the table schema for creating the account data tables
 const accountDataSchema = `
 -- This sequence is shared between all the tables generated from kafka logs.
 CREATE SEQUENCE IF NOT EXISTS syncapi_stream_id;
@@ -50,63 +52,89 @@ CREATE TABLE IF NOT EXISTS syncapi_account_data_type (
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_account_data_id_idx ON syncapi_account_data_type(id, type);
 `
 
-const insertAccountDataSQL = "" +
-	"INSERT INTO syncapi_account_data_type (user_id, room_id, type) VALUES ($1, $2, $3)" +
-	" ON CONFLICT ON CONSTRAINT syncapi_account_data_unique" +
-	" DO UPDATE SET id = nextval('syncapi_stream_id')" +
-	" RETURNING id"
+// Revert schema to be used for migration rollback
+const accountDataSchemaRevert = `
+DROP INDEX IF EXISTS syncapi_account_data_id_idx;
+DROP TABLE IF EXISTS syncapi_account_data_type;
+-- Don't drop the sequence as it might be used by other tables
+`
 
-const selectAccountDataInRangeSQL = "" +
-	"SELECT id, room_id, type FROM syncapi_account_data_type" +
-	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
-	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
-	" ORDER BY id ASC LIMIT $6"
+// SQL query to insert account data
+const insertAccountDataSQL = `
+INSERT INTO syncapi_account_data_type (user_id, room_id, type) VALUES ($1, $2, $3)
+ON CONFLICT ON CONSTRAINT syncapi_account_data_unique
+DO UPDATE SET id = nextval('syncapi_stream_id')
+RETURNING id
+`
 
-const selectMaxAccountDataIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_account_data_type"
+// SQL query to select account data in a range
+const selectAccountDataInRangeSQL = `
+SELECT id, room_id, type FROM syncapi_account_data_type
+WHERE user_id = $1 AND id > $2 AND id <= $3
+AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )
+AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )
+ORDER BY id ASC LIMIT $6
+`
 
-type accountDataStatements struct {
-	insertAccountDataStmt        *sql.Stmt
-	selectAccountDataInRangeStmt *sql.Stmt
-	selectMaxAccountDataIDStmt   *sql.Stmt
+// SQL query to get max account data ID
+const selectMaxAccountDataIDSQL = `
+SELECT MAX(id) FROM syncapi_account_data_type
+`
+
+// accountDataTable represents a table for storing account data
+type accountDataTable struct {
+	cm                          sqlutil.ConnectionManager
+	insertAccountDataSQL        string
+	selectAccountDataInRangeSQL string
+	selectMaxAccountDataIDSQL   string
 }
 
-func NewPostgresAccountDataTable(ctx context.Context, db *sql.DB) (tables.AccountData, error) {
-	s := &accountDataStatements{}
-	_, err := db.Exec(accountDataSchema)
+// NewPostgresAccountDataTable creates a new postgres account data table
+func NewPostgresAccountDataTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.AccountData, error) {
+	// Perform the migration
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "syncapi_account_data_table_schema_001",
+		Patch:       accountDataSchema,
+		RevertPatch: accountDataSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertAccountDataStmt, insertAccountDataSQL},
-		{&s.selectAccountDataInRangeStmt, selectAccountDataInRangeSQL},
-		{&s.selectMaxAccountDataIDStmt, selectMaxAccountDataIDSQL},
-	}.Prepare(db)
+
+	t := &accountDataTable{
+		cm:                          cm,
+		insertAccountDataSQL:        insertAccountDataSQL,
+		selectAccountDataInRangeSQL: selectAccountDataInRangeSQL,
+		selectMaxAccountDataIDSQL:   selectMaxAccountDataIDSQL,
+	}
+
+	return t, nil
 }
 
-func (s *accountDataStatements) InsertAccountData(
-	ctx context.Context, txn *sql.Tx,
-	userID, roomID, dataType string,
+func (t *accountDataTable) InsertAccountData(
+	ctx context.Context, userID, roomID, dataType string,
 ) (pos types.StreamPosition, err error) {
-	err = s.insertAccountDataStmt.QueryRowContext(ctx, userID, roomID, dataType).Scan(&pos)
+	db := t.cm.Connection(ctx, false)
+
+	row := db.Raw(t.insertAccountDataSQL, userID, roomID, dataType).Row()
+	err = row.Scan(&pos)
 	return
 }
 
-func (s *accountDataStatements) SelectAccountDataInRange(
-	ctx context.Context, txn *sql.Tx,
-	userID string,
-	r types.Range,
+func (t *accountDataTable) SelectAccountDataInRange(
+	ctx context.Context, userID string, r types.Range,
 	accountDataEventFilter *synctypes.EventFilter,
 ) (data map[string][]string, pos types.StreamPosition, err error) {
 	data = make(map[string][]string)
+	db := t.cm.Connection(ctx, true)
 
-	rows, err := sqlutil.TxStmt(txn, s.selectAccountDataInRangeStmt).QueryContext(
-		ctx, userID, r.Low(), r.High(),
+	rows, err := db.Raw(
+		t.selectAccountDataInRangeSQL,
+		userID, r.Low(), r.High(),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.NotTypes)),
 		accountDataEventFilter.Limit,
-	)
+	).Rows()
 	if err != nil {
 		return
 	}
@@ -136,12 +164,14 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	return data, pos, rows.Err()
 }
 
-func (s *accountDataStatements) SelectMaxAccountDataID(
-	ctx context.Context, txn *sql.Tx,
+func (t *accountDataTable) SelectMaxAccountDataID(
+	ctx context.Context,
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
-	stmt := sqlutil.TxStmt(txn, s.selectMaxAccountDataIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
+	db := t.cm.Connection(ctx, true)
+
+	row := db.Raw(t.selectMaxAccountDataIDSQL).Row()
+	err = row.Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
 	}

@@ -65,7 +65,7 @@ func Login(
 			return *authErr
 		}
 		// make a device/access token
-		authResponse := completeAuth(req.Context(), cfg.Matrix, userAPI, login, req.RemoteAddr, req.UserAgent())
+		authResponse := completeAuth(req.Context(), cfg.Global, userAPI, login, req.RemoteAddr, req.UserAgent())
 		cleanup(req.Context(), &authResponse)
 		return authResponse
 	}
@@ -82,7 +82,7 @@ func completeAuth(
 
 	token, err := auth.GenerateAccessToken()
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
+		util.Log(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -95,7 +95,7 @@ func completeAuth(
 
 	localpart, serverName, err := userutil.ParseUsernameParam(login.Username(), cfg)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
+		util.Log(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

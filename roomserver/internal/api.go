@@ -7,14 +7,11 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/getsentry/sentry-go"
-	"github.com/nats-io/nats.go"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-
 	asAPI "github.com/antinvestor/matrix/appservice/api"
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/roomserver/acls"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/input"
@@ -24,8 +21,8 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // RoomserverInternalAPI is an implementation of api.RoomserverInternalAPI
@@ -45,17 +42,15 @@ type RoomserverInternalAPI struct {
 	*perform.Admin
 	*perform.Creator
 	DB                     storage.Database
-	Cfg                    *config.Dendrite
-	Cache                  caching.RoomServerCaches
+	Cfg                    *config.Matrix
+	Cache                  cacheutil.RoomServerCaches
 	ServerName             spec.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
 	ServerACLs             *acls.ServerACLs
 	fsAPI                  fsAPI.RoomserverFederationAPI
 	asAPI                  asAPI.AppServiceInternalAPI
-	NATSClient             *nats.Conn
-	JetStream              nats.JetStreamContext
-	Durable                string
-	InputRoomEventTopic    string // JetStream topic for new input room events
+	Qm                     queueutil.QueueManager
+	Am                     actorutil.ActorManager
 	OutputProducer         *producers.RoomEventProducer
 	PerspectiveServerNames []spec.ServerName
 	enableMetrics          bool
@@ -63,40 +58,46 @@ type RoomserverInternalAPI struct {
 }
 
 func NewRoomserverAPI(
-	ctx context.Context, dendriteCfg *config.Dendrite, roomserverDB storage.Database,
-	js nats.JetStreamContext, nc *nats.Conn, caches caching.RoomServerCaches, enableMetrics bool,
+	ctx context.Context, cfg *config.Matrix,
+	roomserverDB storage.Database, qm queueutil.QueueManager, caches cacheutil.RoomServerCaches,
+	am actorutil.ActorManager, enableMetrics bool,
 ) *RoomserverInternalAPI {
 	var perspectiveServerNames []spec.ServerName
-	for _, kp := range dendriteCfg.FederationAPI.KeyPerspectives {
+	for _, kp := range cfg.FederationAPI.KeyPerspectives {
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
 	}
 
 	serverACLs := acls.NewServerACLs(ctx, roomserverDB)
+
+	outputRoomEvtOpts := &cfg.SyncAPI.Queues.OutputRoomEvent
+	_, err := qm.GetOrCreatePublisher(ctx, outputRoomEvtOpts)
+	if err != nil {
+		util.Log(ctx).WithError(err).Panic("failed to register publisher for output room event")
+	}
+
 	producer := &producers.RoomEventProducer{
-		Topic:     dendriteCfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		JetStream: js,
-		ACLs:      serverACLs,
+		OutputTopicRef: outputRoomEvtOpts.Ref(),
+		Qm:             qm,
+		ACLs:           serverACLs,
 	}
 	a := &RoomserverInternalAPI{
 		DB:                     roomserverDB,
-		Cfg:                    dendriteCfg,
+		Cfg:                    cfg,
 		Cache:                  caches,
-		ServerName:             dendriteCfg.Global.ServerName,
+		ServerName:             cfg.Global.ServerName,
 		PerspectiveServerNames: perspectiveServerNames,
-		InputRoomEventTopic:    dendriteCfg.Global.JetStream.Prefixed(jetstream.InputRoomEvent),
 		OutputProducer:         producer,
-		JetStream:              js,
-		NATSClient:             nc,
-		Durable:                dendriteCfg.Global.JetStream.Durable("RoomserverInputConsumer"),
+		Qm:                     qm,
+		Am:                     am,
 		ServerACLs:             serverACLs,
 		enableMetrics:          enableMetrics,
-		defaultRoomVersion:     dendriteCfg.RoomServer.DefaultRoomVersion,
+		defaultRoomVersion:     cfg.RoomServer.DefaultRoomVersion,
 		// perform-er structs + queryer struct get initialised when we have a federation sender to use
 	}
 	return a
 }
 
-// SetFederationInputAPI passes in a federation input API reference so that we can
+// SetFederationAPI passes in a federation input API reference so that we can
 // avoid the chicken-and-egg problem of both the roomserver input API and the
 // federation input API being interdependent.
 func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
@@ -112,23 +113,19 @@ func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAP
 		FSAPI:             fsAPI,
 	}
 
-	r.Inputer = &input.Inputer{
-		Cfg:                 &r.Cfg.RoomServer,
-		DB:                  r.DB,
-		InputRoomEventTopic: r.InputRoomEventTopic,
-		OutputProducer:      r.OutputProducer,
-		JetStream:           r.JetStream,
-		NATSClient:          r.NATSClient,
-		Durable:             nats.Durable(r.Durable),
-		ServerName:          r.ServerName,
-		SigningIdentity:     r.SigningIdentityFor,
-		FSAPI:               fsAPI,
-		RSAPI:               r,
-		KeyRing:             keyRing,
-		ACLs:                r.ServerACLs,
-		Queryer:             r.Queryer,
-		EnableMetrics:       r.enableMetrics,
+	inputer, err := input.NewInputer(
+		ctx, &r.Cfg.RoomServer, r.DB, r.Qm, r.Am,
+		r.ServerName,
+		r.SigningIdentityFor,
+		fsAPI, r,
+		keyRing, r.ServerACLs, r.OutputProducer,
+		r.Queryer, nil, r.enableMetrics)
+	if err != nil {
+		util.Log(ctx).WithError(err).Panic("failed to start roomserver input API")
 	}
+
+	r.Inputer = inputer
+
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,
 		Cfg:     &r.Cfg.RoomServer,
@@ -201,10 +198,6 @@ func (r *RoomserverInternalAPI) SetFederationAPI(ctx context.Context, fsAPI fsAP
 		Cfg:   &r.Cfg.RoomServer,
 		RSAPI: r,
 	}
-
-	if err := r.Start(ctx); err != nil {
-		logrus.WithError(err).Panic("failed to start roomserver input API")
-	}
 }
 
 func (r *RoomserverInternalAPI) SetUserAPI(_ context.Context, userAPI userapi.RoomserverUserAPI) {
@@ -235,7 +228,8 @@ func (r *RoomserverInternalAPI) HandleInvite(
 	if err != nil {
 		return err
 	}
-	return r.OutputProducer.ProduceRoomEvents(inviteEvent.RoomID().String(), outputEvents)
+	roomID := inviteEvent.RoomID()
+	return r.OutputProducer.ProduceRoomEvents(ctx, &roomID, outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformCreateRoom(
@@ -258,13 +252,20 @@ func (r *RoomserverInternalAPI) PerformLeave(
 ) error {
 	outputEvents, err := r.Leaver.PerformLeave(ctx, req, res)
 	if err != nil {
-		sentry.CaptureException(err)
+
 		return err
 	}
 	if len(outputEvents) == 0 {
 		return nil
 	}
-	return r.OutputProducer.ProduceRoomEvents(req.RoomID, outputEvents)
+
+	roomID, err := spec.NewRoomID(req.RoomID)
+	if err != nil {
+
+		return err
+	}
+
+	return r.OutputProducer.ProduceRoomEvents(ctx, roomID, outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformForget(

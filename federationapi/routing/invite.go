@@ -48,7 +48,7 @@ func InviteV3(
 			JSON: spec.BadJSON(err.Error()),
 		}
 	}
-	if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
+	if !cfg.Global.IsLocalServerName(invitedUser.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
@@ -60,8 +60,8 @@ func InviteV3(
 			RoomVersion:       inviteReq.RoomVersion(),
 			RoomID:            roomID,
 			InvitedUser:       invitedUser,
-			KeyID:             cfg.Matrix.KeyID,
-			PrivateKey:        cfg.Matrix.PrivateKey,
+			KeyID:             cfg.Global.KeyID,
+			PrivateKey:        cfg.Global.PrivateKey,
 			Verifier:          keys,
 			RoomQuerier:       rsAPI,
 			MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
@@ -137,7 +137,7 @@ func InviteV2(
 				JSON: spec.InvalidParam("The user ID is invalid"),
 			}
 		}
-		if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
+		if !cfg.Global.IsLocalServerName(invitedUser.Domain()) {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
@@ -155,8 +155,8 @@ func InviteV2(
 			RoomVersion:       inviteReq.RoomVersion(),
 			RoomID:            roomID,
 			InvitedUser:       *invitedUser,
-			KeyID:             cfg.Matrix.KeyID,
-			PrivateKey:        cfg.Matrix.PrivateKey,
+			KeyID:             cfg.Global.KeyID,
+			PrivateKey:        cfg.Global.PrivateKey,
 			Verifier:          keys,
 			RoomQuerier:       rsAPI,
 			MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
@@ -213,7 +213,7 @@ func InviteV1(
 	var strippedState []gomatrixserverlib.InviteStrippedState
 	if jsonErr := json.Unmarshal(event.Unsigned(), &strippedState); jsonErr != nil {
 		// just warn, they may not have added any.
-		util.GetLogger(httpReq.Context()).Warnf("failed to extract stripped state from invite event")
+		util.Log(httpReq.Context()).Warn("failed to extract stripped state from invite event")
 	}
 
 	if event.StateKey() == nil {
@@ -230,7 +230,7 @@ func InviteV1(
 			JSON: spec.InvalidParam("The user ID is invalid"),
 		}
 	}
-	if !cfg.Matrix.IsLocalServerName(invitedUser.Domain()) {
+	if !cfg.Global.IsLocalServerName(invitedUser.Domain()) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam("The invited user domain does not belong to this server"),
@@ -248,8 +248,8 @@ func InviteV1(
 		RoomVersion:       roomVer,
 		RoomID:            roomID,
 		InvitedUser:       *invitedUser,
-		KeyID:             cfg.Matrix.KeyID,
-		PrivateKey:        cfg.Matrix.PrivateKey,
+		KeyID:             cfg.Global.KeyID,
+		PrivateKey:        cfg.Global.PrivateKey,
 		Verifier:          keys,
 		RoomQuerier:       rsAPI,
 		MembershipQuerier: &api.MembershipQuerier{Roomserver: rsAPI},
@@ -284,13 +284,13 @@ func handleInviteResult(ctx context.Context, inviteEvent gomatrixserverlib.PDU, 
 	switch e := err.(type) {
 	case nil:
 	case spec.InternalServerError:
-		util.GetLogger(ctx).WithError(err)
+		util.Log(ctx).WithError(err)
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	case spec.MatrixError:
-		util.GetLogger(ctx).WithError(err)
+		util.Log(ctx).WithError(err)
 		code := http.StatusInternalServerError
 		switch e.ErrCode {
 		case spec.ErrorForbidden:
@@ -306,7 +306,7 @@ func handleInviteResult(ctx context.Context, inviteEvent gomatrixserverlib.PDU, 
 			JSON: e,
 		}
 	default:
-		util.GetLogger(ctx).WithError(err)
+		util.Log(ctx).WithError(err)
 		return nil, &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.Unknown("unknown error"),
@@ -315,7 +315,7 @@ func handleInviteResult(ctx context.Context, inviteEvent gomatrixserverlib.PDU, 
 
 	headeredInvite := &types.HeaderedEvent{PDU: inviteEvent}
 	if err = rsAPI.HandleInvite(ctx, headeredInvite); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("HandleInvite failed")
+		util.Log(ctx).WithError(err).Error("HandleInvite failed")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

@@ -42,8 +42,8 @@ type EventFieldsToVerify struct {
 	Type           string
 	OriginServerTS spec.Timestamp
 	StateKey       *string
-	Content        spec.RawJSON
-	Unsigned       spec.RawJSON
+	Content        json.RawMessage
+	Unsigned       json.RawMessage
 	Sender         string
 	Depth          int64
 	PrevEvents     []string

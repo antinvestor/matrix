@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,9 +19,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-
 	"github.com/antinvestor/matrix/internal/eventutil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage/shared"
@@ -31,7 +29,6 @@ import (
 )
 
 type DatabaseTransaction interface {
-	sqlutil.Transaction
 	SharedUsers
 
 	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)
@@ -72,7 +69,7 @@ type DatabaseTransaction interface {
 
 	ExcludeEventsFromSearchIndex(ctx context.Context, events []string) error
 
-	// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
+	// GetStateEvent returns the Global state event of a given type for a given room with a given state key
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
 	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*rstypes.HeaderedEvent, error)
@@ -113,7 +110,7 @@ type DatabaseTransaction interface {
 	// returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
 	// string as the membership.
 	SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int64, err error)
-	// getUserUnreadNotificationCountsForRooms returns the unread notifications for the given rooms
+	// GetUserUnreadNotificationCountsForRooms returns the unread notifications for the given rooms
 	GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, roomIDs map[string]string) (map[string]*eventutil.NotificationData, error)
 	GetPresences(ctx context.Context, userID []string) ([]*types.PresenceInternal, error)
 	PresenceAfter(ctx context.Context, after types.StreamPosition, filter synctypes.EventFilter) (map[string]*types.PresenceInternal, error)
@@ -164,7 +161,7 @@ type Database interface {
 	// RetireInviteEvent removes an old invite event from the database. Returns the new position of the retired invite.
 	// Returns an error if there was a problem communicating with the database.
 	RetireInviteEvent(ctx context.Context, inviteEventID string) (types.StreamPosition, error)
-	// AddPeek adds a new peek to our DB for a given room by a given user's device.
+	// AddPeek adds a new peek to our Cm for a given room by a given user's device.
 	// Returns an error if there was a problem communicating with the database.
 	AddPeek(ctx context.Context, RoomID, UserID, DeviceID string) (types.StreamPosition, error)
 	// DeletePeek removes an existing peek from the database for a given room by a user's device.

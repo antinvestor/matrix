@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,27 +20,25 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/getsentry/sentry-go"
-	"github.com/nats-io/nats.go"
-	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
-
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 // OutputSendToDeviceEventConsumer consumes events that originated in the EDU server.
 type OutputSendToDeviceEventConsumer struct {
-	jetstream         nats.JetStreamContext
-	durable           string
-	topic             string
-	db                storage.Database
+	qm queueutil.QueueManager
+	db storage.Database
+	am actorutil.ActorManager
+
 	userAPI           api.SyncKeyAPI
 	isLocalServerName func(spec.ServerName) bool
 	stream            streams.StreamProvider
@@ -50,63 +48,81 @@ type OutputSendToDeviceEventConsumer struct {
 // NewOutputSendToDeviceEventConsumer creates a new OutputSendToDeviceEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputSendToDeviceEventConsumer(
-	_ context.Context,
+	ctx context.Context,
 	cfg *config.SyncAPI,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
 	store storage.Database,
+	am actorutil.ActorManager,
+
 	userAPI api.SyncKeyAPI,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
-) *OutputSendToDeviceEventConsumer {
-	return &OutputSendToDeviceEventConsumer{
-		jetstream:         js,
-		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		durable:           cfg.Matrix.JetStream.Durable("SyncAPISendToDeviceConsumer"),
+) error {
+	c := &OutputSendToDeviceEventConsumer{
+		qm:                qm,
 		db:                store,
 		userAPI:           userAPI,
-		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		isLocalServerName: cfg.Global.IsLocalServerName,
 		notifier:          notifier,
 		stream:            stream,
 	}
+
+	am.EnableFunction(actorutil.ActorFunctionSyncAPIOutputSendToDeviceEvents, &cfg.Queues.OutputSendToDeviceEvent, c.HandleUserEvent)
+	c.am = am
+
+	outputQOpts := cfg.Queues.OutputSendToDeviceEvent
+	outputQOpts.DS = outputQOpts.DS.RemoveQuery("subject")
+
+	return qm.RegisterSubscriber(ctx, &outputQOpts, c)
 }
 
-// Start consuming send-to-device events.
-func (s *OutputSendToDeviceEventConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
+func (s *OutputSendToDeviceEventConsumer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
 
-func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
-	userID := msg.Header.Get(jetstream.UserID)
-	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	userID, err := constants.DecodeUserID(metadata[constants.UserID])
 	if err != nil {
-		sentry.CaptureException(err)
-		log.WithError(err).Errorf("send-to-device: failed to split user id, dropping message")
-		return true
+		util.Log(ctx).WithError(err).Error("send-to-device: failed to decode user id, dropping message")
+		return nil
 	}
+
+	_, err = s.am.Progress(ctx, actorutil.ActorFunctionSyncAPIOutputSendToDeviceEvents, userID)
+	if err != nil {
+		util.Log(ctx).WithError(err).Error("send-to-device: failed to ping seq actor, dropping message")
+		return err
+	}
+
+	return nil
+}
+
+func (s *OutputSendToDeviceEventConsumer) HandleUserEvent(ctx context.Context, metadata map[string]string, message []byte) error {
+
+	log := util.Log(ctx)
+
+	userID, err := constants.DecodeUserID(metadata[constants.UserID])
+	if err != nil {
+		log.WithError(err).Error("send-to-device: failed to decode user id, dropping message")
+		return nil
+	}
+
+	domain := userID.Domain()
+
 	if !s.isLocalServerName(domain) {
-		log.Tracef("ignoring send-to-device event with destination %s", domain)
-		return true
+		log.Debug("ignoring send-to-device event with destination %s", domain)
+		return nil
 	}
 
 	var output types.OutputSendToDeviceEvent
-	if err = json.Unmarshal(msg.Data, &output); err != nil {
+	if err = json.Unmarshal(message, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("send-to-device: message parse failure")
-		sentry.CaptureException(err)
-		return true
+		log.WithError(err).Error("send-to-device: message parse failure")
+		return err
 	}
 
-	logger := util.GetLogger(ctx).WithFields(log.Fields{
-		"sender":     output.Sender,
-		"user_id":    output.UserID,
-		"device_id":  output.DeviceID,
-		"event_type": output.Type,
-	})
-	logger.Debugf("sync API received send-to-device event from the clientapi/federationsender")
+	log = log.
+		WithField("sender", output.Sender).
+		WithField("user_id", output.UserID).
+		WithField("device_id", output.DeviceID).
+		WithField("event_type", output.Type)
+	log.Debug("sync API received send-to-device event from the clientapi/federationsender")
 
 	// Check we actually got the requesting device in our store, if we receive a room key request
 	if output.Type == "m.room_key_request" {
@@ -117,8 +133,8 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 			if err = s.userAPI.PerformMarkAsStaleIfNeeded(ctx, &api.PerformMarkAsStaleRequest{
 				UserID: output.Sender, Domain: senderDomain, DeviceID: requestingDeviceID,
 			}, &struct{}{}); err != nil {
-				logger.WithError(err).Errorf("failed to mark as stale if needed")
-				return false
+				log.WithError(err).Error("failed to mark as stale if needed")
+				return err
 			}
 		}
 	}
@@ -127,9 +143,9 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 		ctx, output.UserID, output.DeviceID, output.SendToDeviceEvent,
 	)
 	if err != nil {
-		sentry.CaptureException(err)
-		log.WithError(err).Errorf("send-to-device: failed to store message")
-		return false
+
+		log.WithError(err).Error("send-to-device: failed to store message")
+		return err
 	}
 
 	s.stream.Advance(streamPos)
@@ -139,5 +155,5 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 		types.StreamingToken{SendToDevicePosition: streamPos},
 	)
 
-	return true
+	return nil
 }

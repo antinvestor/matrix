@@ -9,13 +9,13 @@ import (
 )
 
 type DefaultStreamProvider struct {
-	DB          storage.Database
+	DB          storage.DatabaseTransaction
 	latest      types.StreamPosition
 	latestMutex sync.RWMutex
 }
 
 func (p *DefaultStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseTransaction,
+	ctx context.Context,
 ) {
 }
 

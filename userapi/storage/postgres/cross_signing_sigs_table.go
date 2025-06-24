@@ -1,4 +1,4 @@
-// Copyright 2021 The Matrix.org Foundation C.I.C.
+// Copyright 2021 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib"
@@ -25,9 +24,11 @@ import (
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/antinvestor/matrix/userapi/types"
+	"github.com/pitabwire/frame"
 )
 
-var crossSigningSigsSchema = `
+// crossSigningSigsSchema defines the schema for the cross signing signatures table.
+const crossSigningSigsSchema = `
 CREATE TABLE IF NOT EXISTS keyserver_cross_signing_sigs (
     origin_user_id TEXT NOT NULL,
 	origin_key_id TEXT NOT NULL,
@@ -40,54 +41,66 @@ CREATE TABLE IF NOT EXISTS keyserver_cross_signing_sigs (
 CREATE INDEX IF NOT EXISTS keyserver_cross_signing_sigs_idx ON keyserver_cross_signing_sigs (origin_user_id, target_user_id, target_key_id);
 `
 
+// crossSigningSigsSchemaRevert defines how to revert the cross signing signatures table schema.
+const crossSigningSigsSchemaRevert = `
+DROP TABLE IF EXISTS keyserver_cross_signing_sigs;
+`
+
+// selectCrossSigningSigsForTargetSQL is used to retrieve cross signing signatures for a specific target.
 const selectCrossSigningSigsForTargetSQL = "" +
 	"SELECT origin_user_id, origin_key_id, signature FROM keyserver_cross_signing_sigs" +
 	" WHERE (origin_user_id = $1 OR origin_user_id = $2) AND target_user_id = $2 AND target_key_id = $3"
 
+// upsertCrossSigningSigsForTargetSQL is used to insert or update cross signing signatures for a specific target.
 const upsertCrossSigningSigsForTargetSQL = "" +
 	"INSERT INTO keyserver_cross_signing_sigs (origin_user_id, origin_key_id, target_user_id, target_key_id, signature)" +
 	" VALUES($1, $2, $3, $4, $5)" +
 	" ON CONFLICT (origin_user_id, origin_key_id, target_user_id, target_key_id) DO UPDATE SET signature = $5"
 
+// deleteCrossSigningSigsForTargetSQL is used to delete cross signing signatures for a specific target.
 const deleteCrossSigningSigsForTargetSQL = "" +
 	"DELETE FROM keyserver_cross_signing_sigs WHERE target_user_id=$1 AND target_key_id=$2"
 
-type crossSigningSigsStatements struct {
-	db                                  *sql.DB
-	selectCrossSigningSigsForTargetStmt *sql.Stmt
-	upsertCrossSigningSigsForTargetStmt *sql.Stmt
-	deleteCrossSigningSigsForTargetStmt *sql.Stmt
+type crossSigningSigsTable struct {
+	cm                                 sqlutil.ConnectionManager
+	selectCrossSigningSigsForTargetSQL string
+	upsertCrossSigningSigsForTargetSQL string
+	deleteCrossSigningSigsForTargetSQL string
 }
 
-func NewPostgresCrossSigningSigsTable(ctx context.Context, db *sql.DB) (tables.CrossSigningSigs, error) {
-	s := &crossSigningSigsStatements{
-		db: db,
+// NewPostgresCrossSigningSigsTable creates a new postgres cross signing signatures table.
+func NewPostgresCrossSigningSigsTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.CrossSigningSigs, error) {
+	t := &crossSigningSigsTable{
+		cm:                                 cm,
+		selectCrossSigningSigsForTargetSQL: selectCrossSigningSigsForTargetSQL,
+		upsertCrossSigningSigsForTargetSQL: upsertCrossSigningSigsForTargetSQL,
+		deleteCrossSigningSigsForTargetSQL: deleteCrossSigningSigsForTargetSQL,
 	}
-	_, err := db.Exec(crossSigningSigsSchema)
+
+	// Perform schema migration
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "keyserver_cross_signing_sigs_table_schema_001",
+		Patch:       crossSigningSigsSchema,
+		RevertPatch: crossSigningSigsSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	m := sqlutil.NewMigrator(db)
-	if err = m.Up(ctx); err != nil {
-		return nil, err
-	}
-
-	return s, sqlutil.StatementList{
-		{&s.selectCrossSigningSigsForTargetStmt, selectCrossSigningSigsForTargetSQL},
-		{&s.upsertCrossSigningSigsForTargetStmt, upsertCrossSigningSigsForTargetSQL},
-		{&s.deleteCrossSigningSigsForTargetStmt, deleteCrossSigningSigsForTargetSQL},
-	}.Prepare(db)
+	return t, nil
 }
 
-func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
-	ctx context.Context, txn *sql.Tx, originUserID, targetUserID string, targetKeyID gomatrixserverlib.KeyID,
+// SelectCrossSigningSigsForTarget retrieves cross signing signatures for a specific target.
+func (t *crossSigningSigsTable) SelectCrossSigningSigsForTarget(
+	ctx context.Context, originUserID, targetUserID string, targetKeyID gomatrixserverlib.KeyID,
 ) (r types.CrossSigningSigMap, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningSigsForTargetStmt).QueryContext(ctx, originUserID, targetUserID, targetKeyID)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectCrossSigningSigsForTargetSQL, originUserID, targetUserID, targetKeyID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningSigsForTargetStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningSigsForTarget: rows.close() failed")
+
 	r = types.CrossSigningSigMap{}
 	for rows.Next() {
 		var userID string
@@ -105,24 +118,28 @@ func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
 	return
 }
 
-func (s *crossSigningSigsStatements) UpsertCrossSigningSigsForTarget(
-	ctx context.Context, txn *sql.Tx,
+// UpsertCrossSigningSigsForTarget inserts or updates cross signing signatures for a specific target.
+func (t *crossSigningSigsTable) UpsertCrossSigningSigsForTarget(
+	ctx context.Context,
 	originUserID string, originKeyID gomatrixserverlib.KeyID,
 	targetUserID string, targetKeyID gomatrixserverlib.KeyID,
 	signature spec.Base64Bytes,
 ) error {
-	if _, err := sqlutil.TxStmt(txn, s.upsertCrossSigningSigsForTargetStmt).ExecContext(ctx, originUserID, originKeyID, targetUserID, targetKeyID, signature); err != nil {
-		return fmt.Errorf("s.upsertCrossSigningSigsForTargetStmt: %w", err)
+	db := t.cm.Connection(ctx, false)
+	if err := db.Exec(t.upsertCrossSigningSigsForTargetSQL, originUserID, originKeyID, targetUserID, targetKeyID, signature).Error; err != nil {
+		return fmt.Errorf("failed to upsert cross signing signatures: %w", err)
 	}
 	return nil
 }
 
-func (s *crossSigningSigsStatements) DeleteCrossSigningSigsForTarget(
-	ctx context.Context, txn *sql.Tx,
+// DeleteCrossSigningSigsForTarget deletes cross signing signatures for a specific target.
+func (t *crossSigningSigsTable) DeleteCrossSigningSigsForTarget(
+	ctx context.Context,
 	targetUserID string, targetKeyID gomatrixserverlib.KeyID,
 ) error {
-	if _, err := sqlutil.TxStmt(txn, s.deleteCrossSigningSigsForTargetStmt).ExecContext(ctx, targetUserID, targetKeyID); err != nil {
-		return fmt.Errorf("s.deleteCrossSigningSigsForTargetStmt: %w", err)
+	db := t.cm.Connection(ctx, false)
+	if err := db.Exec(t.deleteCrossSigningSigsForTargetSQL, targetUserID, targetKeyID).Error; err != nil {
+		return fmt.Errorf("failed to delete cross signing signatures: %w", err)
 	}
 	return nil
 }

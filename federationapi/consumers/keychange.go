@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,72 +20,58 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/getsentry/sentry-go"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/federationapi/queue"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/types"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // KeyChangeConsumer consumes events that originate in key server.
 type KeyChangeConsumer struct {
-	jetstream         nats.JetStreamContext
-	durable           string
+	qm                queueutil.QueueManager
 	db                storage.Database
 	queues            *queue.OutgoingQueues
 	isLocalServerName func(spec.ServerName) bool
 	rsAPI             roomserverAPI.FederationRoomserverAPI
-	topic             string
 }
 
 // NewKeyChangeConsumer creates a new KeyChangeConsumer. Call Start() to begin consuming from key servers.
 func NewKeyChangeConsumer(
-	_ context.Context,
+	ctx context.Context,
 	cfg *config.KeyServer,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
-) *KeyChangeConsumer {
-	return &KeyChangeConsumer{
-		jetstream:         js,
-		durable:           cfg.Matrix.JetStream.Prefixed("FederationAPIKeyChangeConsumer"),
-		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
+) error {
+	c := &KeyChangeConsumer{
+		qm:                qm,
 		queues:            queues,
 		db:                store,
-		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		isLocalServerName: cfg.Global.IsLocalServerName,
 		rsAPI:             rsAPI,
 	}
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputKeyChangeEvent, c)
 }
 
-// Start consuming from key servers
-func (t *KeyChangeConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		ctx, t.jetstream, t.topic, t.durable, 1,
-		t.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
-
-// onMessage is called in response to a message received on the
+// Handle is called in response to a message received on the
 // key change events topic from the key server.
-func (t *KeyChangeConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
+func (t *KeyChangeConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	var m api.DeviceMessage
-	if err := json.Unmarshal(msg.Data, &m); err != nil {
-		sentry.CaptureException(err)
-		logrus.WithError(err).Errorf("failed to read device message from key change topic")
-		return true
+	if err := json.Unmarshal(message, &m); err != nil {
+		util.Log(ctx).WithError(err).
+			WithField("component", "keychange_consumer").
+			Error("Failed to read device message from key change topic")
+		return nil
 	}
 	if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {
 		// This probably shouldn't happen but stops us from panicking if we come
 		// across an update that doesn't satisfy either types.
-		return true
+		return nil
 	}
 	switch m.Type {
 	case api.TypeCrossSigningUpdate:
@@ -97,35 +83,32 @@ func (t *KeyChangeConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) boo
 	}
 }
 
-func (t *KeyChangeConsumer) onDeviceKeyMessage(ctx context.Context, m api.DeviceMessage) bool {
+func (t *KeyChangeConsumer) onDeviceKeyMessage(ctx context.Context, m api.DeviceMessage) error {
 	if m.DeviceKeys == nil {
-		return true
+		return nil
 	}
-	logger := logrus.WithField("user_id", m.UserID)
+	logger := util.Log(ctx).WithField("user_id", m.UserID).WithField("component", "keychange_consumer")
 
 	// only send key change events which originated from us
 	_, originServerName, err := gomatrixserverlib.SplitID('@', m.UserID)
 	if err != nil {
-		sentry.CaptureException(err)
 		logger.WithError(err).Error("Failed to extract domain from key change event")
-		return true
+		return nil
 	}
 	if !t.isLocalServerName(originServerName) {
-		return true
+		return nil
 	}
 
 	userID, err := spec.NewUserID(m.UserID, true)
 	if err != nil {
-		sentry.CaptureException(err)
 		logger.WithError(err).Error("invalid user ID")
-		return true
+		return nil
 	}
 
 	roomIDs, err := t.rsAPI.QueryRoomsForUser(ctx, *userID, "join")
 	if err != nil {
-		sentry.CaptureException(err)
 		logger.WithError(err).Error("failed to calculate joined rooms for user")
-		return true
+		return nil
 	}
 
 	roomIDStrs := make([]string, len(roomIDs))
@@ -136,13 +119,12 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(ctx context.Context, m api.Device
 	// send this key change to all servers who share rooms with this user.
 	destinations, err := t.db.GetJoinedHostsForRooms(ctx, roomIDStrs, true, true)
 	if err != nil {
-		sentry.CaptureException(err)
 		logger.WithError(err).Error("failed to calculate joined hosts for rooms user is in")
-		return true
+		return nil
 	}
 
 	if len(destinations) == 0 {
-		return true
+		return nil
 	}
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
@@ -159,43 +141,41 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(ctx context.Context, m api.Device
 		Keys:              m.KeyJSON,
 	}
 	if edu.Content, err = json.Marshal(event); err != nil {
-		sentry.CaptureException(err)
+
 		logger.WithError(err).Error("failed to marshal EDU JSON")
-		return true
+		return nil
 	}
 
-	logger.Debugf("Sending device list update message to %q", destinations)
-	err = t.queues.SendEDU(ctx, edu, originServerName, destinations)
-	return err == nil
+	logger.WithField("destinations", destinations).Debug("Sending device list update message")
+	return t.queues.SendEDU(ctx, edu, originServerName, destinations)
 }
 
-func (t *KeyChangeConsumer) onCrossSigningMessage(ctx context.Context, m api.DeviceMessage) bool {
+func (t *KeyChangeConsumer) onCrossSigningMessage(ctx context.Context, m api.DeviceMessage) error {
 	output := m.CrossSigningKeyUpdate
 	_, host, err := gomatrixserverlib.SplitID('@', output.UserID)
 	if err != nil {
-		sentry.CaptureException(err)
-		logrus.WithError(err).Errorf("fedsender key change consumer: user ID parse failure")
-		return true
+		util.Log(ctx).WithError(err).
+			WithField("component", "keychange_consumer").
+			Error("fedsender key change consumer: user ID parse failure")
+		return nil
 	}
 	if !t.isLocalServerName(host) {
 		// Ignore any messages that didn't originate locally, otherwise we'll
 		// end up parroting information we received from other servers.
-		return true
+		return nil
 	}
-	logger := logrus.WithField("user_id", output.UserID)
+	logger := util.Log(ctx).WithField("user_id", output.UserID).WithField("component", "keychange_consumer")
 
 	outputUserID, err := spec.NewUserID(output.UserID, true)
 	if err != nil {
-		sentry.CaptureException(err)
-		logrus.WithError(err).Errorf("invalid user ID")
-		return true
+		logger.WithError(err).Error("invalid user ID")
+		return nil
 	}
 
 	rooms, err := t.rsAPI.QueryRoomsForUser(ctx, *outputUserID, "join")
 	if err != nil {
-		sentry.CaptureException(err)
 		logger.WithError(err).Error("fedsender key change consumer: failed to calculate joined rooms for user")
-		return true
+		return nil
 	}
 
 	roomIDStrs := make([]string, len(rooms))
@@ -206,13 +186,13 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(ctx context.Context, m api.Dev
 	// send this key change to all servers who share rooms with this user.
 	destinations, err := t.db.GetJoinedHostsForRooms(ctx, roomIDStrs, true, true)
 	if err != nil {
-		sentry.CaptureException(err)
+
 		logger.WithError(err).Error("fedsender key change consumer: failed to calculate joined hosts for rooms user is in")
-		return true
+		return nil
 	}
 
 	if len(destinations) == 0 {
-		return true
+		return nil
 	}
 
 	// Pack the EDU and marshal it
@@ -221,14 +201,13 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(ctx context.Context, m api.Dev
 		Origin: string(host),
 	}
 	if edu.Content, err = json.Marshal(output); err != nil {
-		sentry.CaptureException(err)
+
 		logger.WithError(err).Error("fedsender key change consumer: failed to marshal output, dropping")
-		return true
+		return nil
 	}
 
-	logger.Debugf("Sending cross-signing update message to %q", destinations)
-	err = t.queues.SendEDU(ctx, edu, host, destinations)
-	return err == nil
+	logger.WithField("destinations", destinations).Debug("Sending cross-signing update message")
+	return t.queues.SendEDU(ctx, edu, host, destinations)
 }
 
 func prevID(streamID int64) []int64 {

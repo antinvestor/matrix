@@ -21,7 +21,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -33,16 +32,15 @@ func TestLoadConfigRelative(t *testing.T) {
 		}.readFile,
 	)
 	if err != nil {
-		t.Error("failed to load config:", err)
+		t.Fatalf("failed to load config: %v", err)
 	}
 
-	configErrors := &ConfigErrors{}
+	configErrors := &Errors{}
 	cfg.Verify(configErrors)
 	if len(*configErrors) > 0 {
-		for _, err := range *configErrors {
-			logrus.Errorf("Configuration error: %s", err)
+		for _, errStr := range *configErrors {
+			t.Errorf("Configuration error: %v", errStr)
 		}
-		t.Error("configuration verification failed")
 	}
 }
 
@@ -58,18 +56,18 @@ global:
   trusted_third_party_id_servers:
   - matrix.org
   - vector.im
+  embedded_config:
+    database_url: 
+      - postgres://user:password@localhost/matrix?sslmode=disable
+    replica_database_url: 
+      - postgres://user:password@localhost/matrix?sslmode=disable
   kafka:
     addresses:
     - localhost:2181
-    topic_prefix: Dendrite
+    topic_prefix: Matrix
     use_naffka: true
-  database:
-      connection_string: postgres://user:password@localhost/matrix?sslmode=disable
-      max_open_conns: 100
-      max_idle_conns: 2
-      conn_max_lifetime: -1
   cache:
-    connection_string: redis://user:password@localhost:6379/0?protocol=3
+    cache_uri: redis://user:password@localhost:6379/0?protocol=3
   metrics:
     enabled: false
     basic_auth:
@@ -84,7 +82,7 @@ global:
     addresses: ["test"]
 app_service_api:
   database:
-    connection_string: file:appservice.db
+    database_uri: file:appservice.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -114,16 +112,16 @@ client_api:
     turn_password: ""
 federation_api:
   database:
-    connection_string: file:federationapi.db
+    database_uri: file:federationapi.db
 key_server:
   database:
-    connection_string: file:keyserver.db
+    database_uri: file:keyserver.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
 media_api:
   database:
-    connection_string: file:mediaapi.db
+    database_uri: file:mediaapi.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -143,13 +141,13 @@ media_api:
     method: scale
 room_server:
   database:
-    connection_string: file:roomserver.db
+    database_uri: file:roomserver.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
 server_key_api:
   database:
-    connection_string: file:serverkeyapi.db
+    database_uri: file:serverkeyapi.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -162,7 +160,7 @@ server_key_api:
       public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
 sync_api:
   database:
-    connection_string: file:syncapi.db
+    database_uri: file:syncapi.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -172,21 +170,21 @@ user_api:
     audience: service_matrix
     oauth2_well_known_jwk_uri: https://www.googleapis.com/oauth2/v3/certs
   account_database:
-    connection_string: file:userapi_accounts.db
+    database_uri: file:userapi_accounts.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
   pusher_database:
-    connection_string: file:pushserver.db
+    database_uri: file:pushserver.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
 relay_api:
   database:
-    connection_string: file:relayapi.db
+    database_uri: file:relayapi.db
 mscs:
   database:
-    connection_string: file:mscs.db
+    database_uri: file:mscs.db
 tracing:
   enabled: false
   jaeger:
@@ -219,7 +217,7 @@ func (m mockReadFile) readFile(path string) ([]byte, error) {
 func TestReadKey(t *testing.T) {
 	keyID, _, err := readKeyPEM("path/to/key", []byte(testKey), true)
 	if err != nil {
-		t.Error("failed to load private key:", err)
+		t.Errorf("failed to load private key: %v", err)
 	}
 	wantKeyID := testKeyID
 	if wantKeyID != string(keyID) {
@@ -231,7 +229,7 @@ const testKeyID = "ed25519:c8NsuQ"
 
 const testKey = `
 -----BEGIN MATRIX PRIVATE KEY-----
-Key-ID: ` + testKeyID + `
+K-ID: ` + testKeyID + `
 7KRZiZ2sTyRR8uqqUjRwczuwRXXkUMYIUHq4Mc3t4bE=
 -----END MATRIX PRIVATE KEY-----
 `

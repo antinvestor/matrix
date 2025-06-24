@@ -23,14 +23,13 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/federationapi/producers"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	userAPI "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 const (
@@ -119,22 +118,22 @@ func Send(
 	t := internal.NewTxnReq(
 		rsAPI,
 		keyAPI,
-		cfg.Matrix.ServerName,
+		cfg.Global.ServerName,
 		keys,
 		mu,
 		producer,
-		cfg.Matrix.Presence.EnableInbound,
+		cfg.Global.Presence.EnableInbound,
 		txnEvents.PDUs,
 		txnEvents.EDUs,
 		request.Origin(),
 		txnID,
-		cfg.Matrix.ServerName)
+		cfg.Global.ServerName)
 
-	util.GetLogger(httpReq.Context()).Debugf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, request.Origin(), len(t.PDUs), len(t.EDUs))
+	util.Log(httpReq.Context()).Debug("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, request.Origin(), len(t.PDUs), len(t.EDUs))
 
 	resp, jsonErr := t.ProcessTransaction(httpReq.Context())
 	if jsonErr != nil {
-		util.GetLogger(httpReq.Context()).WithField("jsonErr", jsonErr).Error("t.processTransaction failed")
+		util.Log(httpReq.Context()).WithField("jsonErr", jsonErr).Error("t.processTransaction failed")
 		return *jsonErr
 	}
 

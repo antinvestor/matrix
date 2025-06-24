@@ -1,4 +1,4 @@
-// Copyright 2023 The Matrix.org Foundation C.I.C.
+// Copyright 2023 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -88,7 +88,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 			var createContent gomatrixserverlib.CreateContent
 			err := json.Unmarshal(create.Content(), &createContent)
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).WithField("create_content", create.Content()).Warn("failed to unmarshal m.room.create event")
+				util.Log(ctx).WithError(err).WithField("create_content", create.Content()).Warn("failed to unmarshal m.room.create event")
 			}
 			roomType = createContent.RoomType
 		}
@@ -118,7 +118,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 			// Get all `m.space.child` state events for this room
 			events, err := childReferences(ctx, querier, walker.SuggestedOnly, queuedRoom.RoomID)
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).WithField("room_id", queuedRoom.RoomID).Error("failed to extract references for room")
+				util.Log(ctx).WithError(err).WithField("room_id", queuedRoom.RoomID).Error("failed to extract references for room")
 				continue
 			}
 			discoveredChildEvents = events
@@ -126,7 +126,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 			pubRoom := publicRoomsChunk(ctx, querier, queuedRoom.RoomID)
 
 			if pubRoom == nil {
-				util.GetLogger(ctx).WithField("room_id", queuedRoom.RoomID).Debug("unable to get publicRoomsChunk")
+				util.Log(ctx).WithField("room_id", queuedRoom.RoomID).Debug("unable to get publicRoomsChunk")
 				continue
 			}
 
@@ -170,7 +170,7 @@ func (querier *Queryer) QueryNextRoomHierarchyPage(ctx context.Context, walker r
 			childRoomID, err := spec.NewRoomID(ev.StateKey)
 
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).WithField("invalid_room_id", ev.StateKey).WithField("parent_room_id", queuedRoom.RoomID).Warn("Invalid room ID in m.space.child state event")
+				util.Log(ctx).WithError(err).WithField("invalid_room_id", ev.StateKey).WithField("parent_room_id", queuedRoom.RoomID).Warn("Invalid room ID in m.space.child state event")
 			} else {
 				// Make sure not to queue inaccessible rooms
 				for _, inaccessibleRoomID := range inaccessible {
@@ -238,7 +238,7 @@ func authorisedServer(ctx context.Context, querier *Queryer, roomID spec.RoomID,
 		},
 	}, &queryRoomRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to QueryCurrentState")
+		util.Log(ctx).WithError(err).Error("failed to QueryCurrentState")
 		return false, []string{}
 	}
 	hisVisEv := queryRoomRes.StateEvents[hisVisTuple]
@@ -257,7 +257,7 @@ func authorisedServer(ctx context.Context, querier *Queryer, roomID spec.RoomID,
 	if joinRuleEv != nil {
 		rule, ruleErr := joinRuleEv.JoinRule()
 		if ruleErr != nil {
-			util.GetLogger(ctx).WithError(ruleErr).WithField("parent_room_id", roomID).Warn("failed to get join rule")
+			util.Log(ctx).WithError(ruleErr).WithField("parent_room_id", roomID).Warn("failed to get join rule")
 			return false, []string{}
 		}
 
@@ -281,7 +281,7 @@ func authorisedServer(ctx context.Context, querier *Queryer, roomID spec.RoomID,
 			RoomID: allowedRoomID.String(),
 		}, &queryRes)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("failed to QueryJoinedHostServerNamesInRoom")
+			util.Log(ctx).WithError(err).Error("failed to QueryJoinedHostServerNamesInRoom")
 			continue
 		}
 		for _, srv := range queryRes.ServerNames {
@@ -318,7 +318,7 @@ func authorisedUser(ctx context.Context, querier *Queryer, clientCaller *userapi
 		},
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to QueryCurrentState")
+		util.Log(ctx).WithError(err).Error("failed to QueryCurrentState")
 		return false, false, resultAllowedRoomIDs
 	}
 	memberEv := queryRes.StateEvents[roomMemberTuple]
@@ -340,7 +340,7 @@ func authorisedUser(ctx context.Context, querier *Queryer, clientCaller *userapi
 		var allowed bool
 		rule, ruleErr := joinRuleEv.JoinRule()
 		if ruleErr != nil {
-			util.GetLogger(ctx).WithError(ruleErr).WithField("parent_room_id", parentRoomID).Warn("failed to get join rule")
+			util.Log(ctx).WithError(ruleErr).WithField("parent_room_id", parentRoomID).Warn("failed to get join rule")
 		} else if rule == spec.Public || rule == spec.Knock {
 			allowed = true
 		} else if rule == spec.Restricted {
@@ -364,7 +364,7 @@ func authorisedUser(ctx context.Context, querier *Queryer, clientCaller *userapi
 				},
 			}, &queryRes2)
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).WithField("parent_room_id", parentRoomID).Warn("failed to check user is joined to parent room")
+				util.Log(ctx).WithError(err).WithField("parent_room_id", parentRoomID).Warn("failed to check user is joined to parent room")
 			} else {
 				memberEv = queryRes2.StateEvents[roomMemberTuple]
 				if memberEv != nil {
@@ -404,7 +404,7 @@ func roomExists(ctx context.Context, querier *Queryer, roomID spec.RoomID) bool 
 		ServerName: querier.Cfg.Global.ServerName,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to QueryServerJoinedToRoom")
+		util.Log(ctx).WithError(err).Error("failed to QueryServerJoinedToRoom")
 		return false
 	}
 	// if the room exists but we aren't in the room then we might have stale data so we want to fetch
@@ -421,10 +421,10 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 	}
 	resp, ok := querier.Cache.GetRoomHierarchy(ctx, roomID.String())
 	if ok {
-		util.GetLogger(ctx).Debugf("Returning cached response for %s", roomID)
+		util.Log(ctx).WithField("room_id", roomID).Debug("Returning cached response")
 		return &resp
 	}
-	util.GetLogger(ctx).Debugf("Querying %s via %+v", roomID, vias)
+	util.Log(ctx).WithField("room_id", roomID).WithField("vias", vias).Debug("Querying via federation")
 	// query more of the spaces graph using these servers
 	for _, serverName := range vias {
 		if serverName == string(querier.Cfg.Global.ServerName) {
@@ -432,7 +432,7 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 		}
 		res, err := querier.FSAPI.RoomHierarchies(ctx, querier.Cfg.Global.ServerName, spec.ServerName(serverName), roomID.String(), suggestedOnly)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Warnf("failed to call RoomHierarchies on server %s", serverName)
+			util.Log(ctx).WithError(err).WithField("server_name", serverName).Warn("failed to call RoomHierarchies")
 			continue
 		}
 		// ensure nil slices are empty as we send this to the client sometimes
@@ -448,7 +448,7 @@ func federatedRoomInfo(ctx context.Context, querier *Queryer, caller types.Devic
 		}
 		err = querier.Cache.StoreRoomHierarchy(ctx, roomID.String(), res)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Warnf("failed to cache RoomHierarchies on server %s", serverName)
+			util.Log(ctx).WithError(err).WithField("server_name", serverName).Warn("failed to cache RoomHierarchies")
 		}
 
 		return &res
@@ -482,7 +482,7 @@ func childReferences(ctx context.Context, querier *Queryer, suggestedOnly bool, 
 		var createContent gomatrixserverlib.CreateContent
 		err := json.Unmarshal(create.Content(), &createContent)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).WithField("create_content", create.Content()).Warn("failed to unmarshal m.room.create event")
+			util.Log(ctx).WithError(err).WithField("create_content", create.Content()).Warn("failed to unmarshal m.room.create event")
 		}
 		roomType := createContent.RoomType
 		if roomType != spec.MSpace {
@@ -522,7 +522,7 @@ func childReferences(ctx context.Context, querier *Queryer, suggestedOnly bool, 
 func publicRoomsChunk(ctx context.Context, querier *Queryer, roomID spec.RoomID) *fclient.PublicRoom {
 	pubRooms, err := roomserver.PopulatePublicRooms(ctx, []string{roomID.String()}, querier)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to PopulatePublicRooms")
+		util.Log(ctx).WithError(err).Error("failed to PopulatePublicRooms")
 		return nil
 	}
 	if len(pubRooms) == 0 {
@@ -552,14 +552,14 @@ func restrictedJoinRuleAllowedRooms(ctx context.Context, joinRuleEv *types.Heade
 	}
 	var jrContent gomatrixserverlib.JoinRuleContent
 	if err := json.Unmarshal(joinRuleEv.Content(), &jrContent); err != nil {
-		util.GetLogger(ctx).Warnf("failed to check join_rule on room %s: %s", joinRuleEv.RoomID().String(), err)
+		util.Log(ctx).WithError(err).WithField("room_id", joinRuleEv.RoomID().String()).Warn("failed to check join_rule on room")
 		return nil
 	}
 	for _, allow := range jrContent.Allow {
 		if allow.Type == spec.MRoomMembership {
 			allowedRoomID, err := spec.NewRoomID(allow.RoomID)
 			if err != nil {
-				util.GetLogger(ctx).Warnf("invalid room ID '%s' found in join_rule on room %s: %s", allow.RoomID, joinRuleEv.RoomID().String(), err)
+				util.Log(ctx).WithError(err).WithField("invalid_room_id", allow.RoomID).WithField("room_id", joinRuleEv.RoomID().String()).Warn("invalid room ID found in join_rule on room")
 			} else {
 				allows = append(allows, *allowedRoomID)
 			}

@@ -37,7 +37,7 @@ func GetUserDevices(
 		return util.ErrorResponse(err)
 	}
 	if res.Error != nil {
-		util.GetLogger(req.Context()).WithError(res.Error).Error("keyAPI.QueryDeviceMessages failed")
+		util.Log(req.Context()).WithError(res.Error).Error("keyAPI.QueryDeviceMessages failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -72,7 +72,7 @@ func GetUserDevices(
 		var key fclient.RespUserDeviceKeys
 		err := json.Unmarshal(dev.KeyJSON, &key)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Warnf("malformed device key: %s", string(dev.KeyJSON))
+			util.Log(req.Context()).WithError(err).WithField("data", string(dev.KeyJSON)).Warn("malformed device key")
 			continue
 		}
 

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,10 +23,8 @@ import (
 	"time"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
-
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/matrix/setup/config"
+	"golang.org/x/oauth2"
 )
 
 // maxHTTPTimeout is an upper bound on an HTTP request to an LoginSSO

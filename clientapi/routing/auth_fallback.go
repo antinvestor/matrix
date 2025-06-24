@@ -152,7 +152,7 @@ func AuthFallback(
 		clientIP := req.RemoteAddr
 		err := req.ParseForm()
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("req.ParseForm failed")
+			util.Log(req.Context()).WithError(err).Error("req.ParseForm failed")
 			w.WriteHeader(http.StatusBadRequest)
 			serveRecaptcha()
 			return
@@ -171,7 +171,7 @@ func AuthFallback(
 			return
 		case nil:
 		default: // something else failed
-			util.GetLogger(req.Context()).WithError(err).Error("failed to validate recaptcha")
+			util.Log(req.Context()).WithError(err).Error("failed to validate recaptcha")
 			serveRecaptcha()
 			return
 		}
@@ -194,6 +194,6 @@ func writeHTTPMessage(
 	w.WriteHeader(header)
 	_, err := w.Write([]byte(message))
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("w.Write failed")
+		util.Log(req.Context()).WithError(err).Error("w.Write failed")
 	}
 }

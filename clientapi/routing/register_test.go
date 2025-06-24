@@ -30,11 +30,12 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/internal"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi"
@@ -71,7 +72,7 @@ func TestFlowCheckingCompleteFlowOrdered(t *testing.T) {
 	}
 
 	if !checkFlowCompleted(testFlow, allowedFlows) {
-		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be true.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be true.", testFlow, allowedFlows)
 	}
 }
 
@@ -83,7 +84,7 @@ func TestFlowCheckingStagesFromDifferentFlows(t *testing.T) {
 	}
 
 	if checkFlowCompleted(testFlow, allowedFlows) {
-		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be false.", testFlow, allowedFlows)
 	}
 }
 
@@ -97,7 +98,7 @@ func TestFlowCheckingCompleteOrderedExtraneous(t *testing.T) {
 		authtypes.LoginType("stage5"),
 	}
 	if !checkFlowCompleted(testFlow, allowedFlows) {
-		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be true.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be true.", testFlow, allowedFlows)
 	}
 }
 
@@ -105,7 +106,7 @@ func TestFlowCheckingCompleteOrderedExtraneous(t *testing.T) {
 func TestFlowCheckingEmptyFlow(t *testing.T) {
 	testFlow := []authtypes.LoginType{}
 	if checkFlowCompleted(testFlow, allowedFlows) {
-		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be false.", testFlow, allowedFlows)
 	}
 }
 
@@ -115,7 +116,7 @@ func TestFlowCheckingInvalidStage(t *testing.T) {
 		authtypes.LoginType("stage8"),
 	}
 	if checkFlowCompleted(testFlow, allowedFlows) {
-		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be false.", testFlow, allowedFlows)
 	}
 }
 
@@ -130,7 +131,7 @@ func TestFlowCheckingExtraneousUnordered(t *testing.T) {
 		authtypes.LoginType("stage1"),
 	}
 	if !checkFlowCompleted(testFlow, allowedFlows) {
-		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be true.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be true.", testFlow, allowedFlows)
 	}
 }
 
@@ -140,7 +141,7 @@ func TestFlowCheckingShortIncorrectInput(t *testing.T) {
 		authtypes.LoginType("stage8"),
 	}
 	if checkFlowCompleted(testFlow, allowedFlows) {
-		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be false.", testFlow, allowedFlows)
 	}
 }
 
@@ -153,7 +154,7 @@ func TestFlowCheckingExtraneousIncorrectInput(t *testing.T) {
 		authtypes.LoginType("stage11"),
 	}
 	if checkFlowCompleted(testFlow, allowedFlows) {
-		t.Error("Incorrect registration flow verification: ", testFlow, ", from allowed flows: ", allowedFlows, ". Should be false.")
+		t.Errorf("Incorrect registration flow verification: %v from allowed flows %v Should be false.", testFlow, allowedFlows)
 	}
 }
 
@@ -166,7 +167,7 @@ func TestEmptyCompletedFlows(t *testing.T) {
 
 	// check for []
 	if ret == nil || len(ret) != 0 {
-		t.Error("Empty Completed Flow Stages should be a empty slice: returned ", ret, ". Should be []")
+		t.Errorf("Empty Completed Flow Stages should be a empty slice: returned %v. Should be []", ret)
 	}
 }
 
@@ -200,9 +201,8 @@ func TestValidationOfApplicationServices(t *testing.T) {
 		},
 	}
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
-	defer closeRig()
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
 	cfg.Global.ServerName = "localhost"
 	cfg.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService}
@@ -273,13 +273,13 @@ func TestSessionCleanUp(t *testing.T) {
 			t.Errorf("expected session to be deleted: %+v", data)
 		}
 		if _, ok := s.timer[dummySession]; ok {
-			t.Error("expected timer to be delete")
+			t.Errorf("expected timer to be delete")
 		}
 		if _, ok := s.sessions[dummySession]; ok {
-			t.Error("expected session to be delete")
+			t.Errorf("expected session to be delete")
 		}
 		if _, ok := s.getDeviceToDelete(dummySession); ok {
-			t.Error("expected session to device to be delete")
+			t.Errorf("expected session to device to be delete")
 		}
 	})
 }
@@ -417,20 +417,23 @@ func Test_register(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		cm := sqlutil.NewConnectionManager(svc)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -593,20 +596,24 @@ func Test_register(t *testing.T) {
 
 func TestRegisterUserWithDisplayName(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
 		cfg.Global.ServerName = "server"
 
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+		cm := sqlutil.NewConnectionManager(svc)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		deviceName, deviceID := "deviceName", "deviceID"
 		expectedDisplayName := "DisplayName"
 		response := completeRegistration(
@@ -636,22 +643,26 @@ func TestRegisterUserWithDisplayName(t *testing.T) {
 
 func TestRegisterAdminUsingSharedSecret(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
-		natsInstance := jetstream.NATSInstance{}
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
 		cfg.Global.ServerName = "server"
 		sharedSecret := "dendritetest"
 		cfg.ClientAPI.RegistrationSharedSecret = sharedSecret
 
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, &natsInstance, caches, caching.DisableMetrics)
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, rsAPI, nil, nil, caching.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		expectedDisplayName := "rabbit"
 		jsonStr := []byte(`{"admin":true,"mac":"24dca3bba410e43fe64b9b5c28306693bf3baa9f","nonce":"759f047f312b99ff428b21d581256f8592b8976e58bc1b543972dc6147e529a79657605b52d7becd160ff5137f3de11975684319187e06901955f79e5a6c5a79","password":"wonderland","username":"alice","displayname":"rabbit"}`)

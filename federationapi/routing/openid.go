@@ -1,4 +1,4 @@
-// Copyright 2021 The Matrix.org Foundation C.I.C.
+// Copyright 2021 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ func GetOpenIDUserInfo(
 	var openIDTokenAttrResponse userapi.QueryOpenIDTokenResponse
 	err := userAPI.QueryOpenIDToken(httpReq.Context(), &req, &openIDTokenAttrResponse)
 	if err != nil {
-		util.GetLogger(httpReq.Context()).WithError(err).Error("userAPI.QueryOpenIDToken failed")
+		util.Log(httpReq.Context()).WithError(err).Error("userAPI.QueryOpenIDToken failed")
 	}
 
 	var res interface{} = openIDUserInfoResponse{Sub: openIDTokenAttrResponse.Sub}

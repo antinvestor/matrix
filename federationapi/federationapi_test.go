@@ -16,24 +16,24 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/federationapi/routing"
-	"github.com/antinvestor/matrix/internal/caching"
-	"github.com/antinvestor/matrix/internal/httputil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/nats-io/nats.go"
-	"github.com/pitabwire/util"
-	"github.com/stretchr/testify/assert"
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/matrix/federationapi"
 	"github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/federationapi/internal"
+	"github.com/antinvestor/matrix/federationapi/routing"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/httputil"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/gjson"
 )
 
 type fedRoomserverAPI struct {
@@ -133,7 +133,7 @@ func (f *fedClient) MakeJoin(ctx context.Context, origin, s spec.ServerName, roo
 				RoomID:     roomID,
 				Type:       "m.room.member",
 				StateKey:   &senderIDString,
-				Content:    spec.RawJSON([]byte(`{"membership":"join"}`)),
+				Content:    json.RawMessage([]byte(`{"membership":"join"}`)),
 				PrevEvents: r.ForwardExtremities(),
 			}
 			var needed gomatrixserverlib.StateNeeded
@@ -183,19 +183,23 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 }
 
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOption) {
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-	cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-	caches, err := caching.NewCache(&cfg.Global.Cache)
+	ctx, svc, cfg := testrig.Init(t, testOpts)
+	defer svc.Stop(ctx)
+
+	cm := sqlutil.NewConnectionManager(svc)
+	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("failed to create a cache: %v", err)
 	}
-	natsInstance := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
+
+	am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+	if err != nil {
+		t.Fatalf("failed to create an actor manager: %v", err)
+	}
+
 	cfg.FederationAPI.PreferDirectFetch = true
 	cfg.FederationAPI.KeyPerspectives = nil
-	defer closeRig()
-	jsctx, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-	defer jetstream.DeleteAllStreams(jsctx, &cfg.Global.JetStream)
 
 	serverA := spec.ServerName("server.a")
 	serverAKeyID := gomatrixserverlib.KeyID("ed25519:servera")
@@ -244,7 +248,7 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 			},
 		},
 	}
-	fsapi := federationapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, fc, fedRSApi, caches, nil, false)
+	fsapi := federationapi.NewInternalAPI(ctx, cfg, cm, qm, am, fc, fedRSApi, caches, nil, false, nil)
 
 	var resp api.PerformJoinResponse
 	fsapi.PerformJoin(ctx, &api.PerformJoinRequest{
@@ -271,19 +275,18 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, testOpts test.DependancyOp
 			KeyJSON:     []byte(`{}`),
 		},
 	}
-	b, err := json.Marshal(key)
+
+	msg := &testrig.QMsg{
+		Header: map[string]string{
+			constants.UserID: key.UserID,
+		},
+		Data: key,
+	}
+
+	err = testrig.MustPublishMsgs(ctx, t, &cfg.KeyServer.Queues.OutputKeyChangeEvent, qm, msg)
 	if err != nil {
-		t.Fatalf("Failed to marshal device message: %s", err)
+		t.Fatalf("MustPublishMsgs: failed to publish message: %s", err)
 	}
-
-	msg := &nats.Msg{
-		Subject: cfg.Global.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
-		Header:  nats.Header{},
-		Data:    b,
-	}
-	msg.Header.Set(jetstream.UserID, key.UserID)
-
-	testrig.MustPublishMsgs(t, jsctx, msg)
 	time.Sleep(500 * time.Millisecond)
 	fc.fedClientMutex.Lock()
 	defer fc.fedClientMutex.Unlock()
@@ -323,10 +326,9 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 		},
 	}
 
-	ctx := testrig.NewContext(t)
-	cfg, closeRig := testrig.CreateConfig(ctx, t, test.DependancyOption{})
+	ctx, svc, cfg := testrig.Init(t)
+	defer svc.Stop(ctx)
 
-	defer closeRig()
 	routers := httputil.NewRouters()
 
 	_, privKey, _ := ed25519.GenerateKey(nil)
@@ -334,10 +336,10 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.ServerName = spec.ServerName("localhost")
 	cfg.Global.PrivateKey = privKey
 	keyRing := &test.NopJSONVerifier{}
-	natsInstance := jetstream.NATSInstance{}
+	qm := queueutil.NewQueueManager(svc)
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(ctx, routers, cfg, &natsInstance, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, caching.DisableMetrics)
+	federationapi.AddPublicRoutes(ctx, routers, cfg, qm, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, cacheutil.DisableMetrics)
 	baseURL, cancel := test.ListenAndServe(ctx, t, routers.Federation, true)
 	defer cancel()
 	serverName := spec.ServerName(strings.TrimPrefix(baseURL, "https://"))
@@ -460,15 +462,21 @@ func TestNotaryServer(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		cm := sqlutil.NewConnectionManager(svc)
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		natsInstance := jetstream.NATSInstance{}
+		qm := queueutil.NewQueueManager(svc)
+
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+
 		fc := &fedClient{
 			keys: map[spec.ServerName]struct {
 				key   ed25519.PrivateKey
@@ -485,7 +493,7 @@ func TestNotaryServer(t *testing.T) {
 			},
 		}
 
-		fedAPI := federationapi.NewInternalAPI(ctx, cfg, cm, &natsInstance, fc, nil, caches, nil, true)
+		fedAPI := federationapi.NewInternalAPI(ctx, cfg, cm, qm, am, fc, nil, caches, nil, true, nil)
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {

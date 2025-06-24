@@ -27,18 +27,16 @@ import (
 
 	// Imported for png codec
 	_ "image/png"
-
-	// Imported for webp codec
-	_ "golang.org/x/image/webp"
-
 	"os"
 	"time"
 
+	// Imported for webp codec
 	"github.com/antinvestor/matrix/mediaapi/storage"
 	"github.com/antinvestor/matrix/mediaapi/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/nfnt/resize"
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
+	_ "golang.org/x/image/webp"
 )
 
 // GenerateThumbnails generates the configured thumbnail sizes for the source file
@@ -50,11 +48,13 @@ func GenerateThumbnails(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *log.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
 	img, err := readFile(string(src))
 	if err != nil {
-		logger.WithError(err).WithField("src", src).Error("Failed to read src file")
+		logger.WithError(err).
+			WithField("src", src).
+			Error("Failed to read src file")
 		return false, err
 	}
 	for _, singleConfig := range configs {
@@ -64,7 +64,9 @@ func GenerateThumbnails(
 			activeThumbnailGeneration, maxThumbnailGenerators, db, logger,
 		)
 		if err != nil {
-			logger.WithError(err).WithField("src", src).Error("Failed to generate thumbnails")
+			logger.WithError(err).
+				WithField("src", src).
+				Error("Failed to generate thumbnails")
 			return false, err
 		}
 		if busy {
@@ -83,13 +85,13 @@ func GenerateThumbnail(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *log.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
 	img, err := readFile(string(src))
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
-			"src": src,
-		}).Error("Failed to read src file")
+		logger.WithError(err).
+			WithField("src", src).
+			Error("Failed to read src file")
 		return false, err
 	}
 	// Note: createThumbnail does locking based on activeThumbnailGeneration
@@ -98,9 +100,9 @@ func GenerateThumbnail(
 		maxThumbnailGenerators, db, logger,
 	)
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
-			"src": src,
-		}).Error("Failed to generate thumbnails")
+		logger.WithError(err).
+			WithField("src", src).
+			Error("Failed to generate thumbnails")
 		return false, err
 	}
 	if busy {
@@ -147,13 +149,11 @@ func createThumbnail(
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
 	db storage.Database,
-	logger *log.Entry,
+	logger *util.LogEntry,
 ) (busy bool, errorReturn error) {
-	logger = logger.WithFields(log.Fields{
-		"Width":        config.Width,
-		"Height":       config.Height,
-		"ResizeMethod": config.ResizeMethod,
-	})
+	logger = logger.WithField("Width", config.Width).
+		WithField("Height", config.Height).
+		WithField("ResizeMethod", config.ResizeMethod)
 
 	// Check if request is larger than original
 	if config.Width >= img.Bounds().Dx() && config.Height >= img.Bounds().Dy() {
@@ -194,11 +194,10 @@ func createThumbnail(
 	if err != nil {
 		return false, err
 	}
-	logger.WithFields(log.Fields{
-		"ActualWidth":  width,
-		"ActualHeight": height,
-		"processTime":  time.Since(start),
-	}).Info("Generated thumbnail")
+	logger.WithField("ActualWidth", width).
+		WithField("ActualHeight", height).
+		WithField("processTime", time.Since(start)).
+		Info("Generated thumbnail")
 
 	stat, err := os.Stat(string(dst))
 	if err != nil {
@@ -222,10 +221,10 @@ func createThumbnail(
 
 	err = db.StoreThumbnail(ctx, thumbnailMetadata)
 	if err != nil {
-		logger.WithError(err).WithFields(log.Fields{
-			"ActualWidth":  width,
-			"ActualHeight": height,
-		}).Error("Failed to store thumbnail metadata in database.")
+		logger.WithError(err).
+			WithField("ActualWidth", width).
+			WithField("ActualHeight", height).
+			Error("Failed to store thumbnail metadata in database.")
 		return false, err
 	}
 
@@ -235,7 +234,7 @@ func createThumbnail(
 // adjustSize scales an image to fit within the provided width and height
 // If the source aspect ratio is different to the target dimensions, one edge will be smaller than requested
 // If crop is set to true, the image will be scaled to fill the width and height with any excess being cropped off
-func adjustSize(dst types.Path, img image.Image, w, h int, crop bool, logger *log.Entry) (int, int, error) {
+func adjustSize(dst types.Path, img image.Image, w, h int, crop bool, logger *util.LogEntry) (int, int, error) {
 	var out image.Image
 	var err error
 	if crop {

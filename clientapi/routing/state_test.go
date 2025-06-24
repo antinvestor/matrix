@@ -7,19 +7,16 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	rsapi "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/test/testrig"
 	uapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
 	"gotest.tools/v3/assert"
 )
-
-var ()
 
 type stateTestRoomserverAPI struct {
 	rsapi.RoomserverInternalAPI
@@ -133,7 +130,8 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 	}
 
 	t.Run("request simple state key", func(t *testing.T) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, _ := testrig.Init(t)
+		defer svc.Stop(ctx)
 
 		rsAPI := stateTestRoomserverAPI{
 			roomVersion: defaultRoomVersion,
@@ -153,12 +151,13 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 
 		assert.DeepEqual(t, jsonResp, util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: spec.RawJSON(`{"foo":"bar"}`),
+			JSON: json.RawMessage(`{"foo":"bar"}`),
 		})
 	})
 
 	t.Run("user ID key translated to room key in pseudo ID rooms", func(t *testing.T) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, _ := testrig.Init(t)
+		defer svc.Stop(ctx)
 
 		stateSenderUserID := "@sender:domain"
 		stateSenderRoomKey := "testsenderkey"
@@ -190,12 +189,13 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 
 		assert.DeepEqual(t, jsonResp, util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: spec.RawJSON(`{"foo":"bar"}`),
+			JSON: json.RawMessage(`{"foo":"bar"}`),
 		})
 	})
 
 	t.Run("user ID key not translated to room key in non-pseudo ID rooms", func(t *testing.T) {
-		ctx := testrig.NewContext(t)
+		ctx, svc, _ := testrig.Init(t)
+		defer svc.Stop(ctx)
 
 		stateSenderUserID := "@sender:domain"
 		stateSenderRoomKey := "testsenderkey"
@@ -227,7 +227,7 @@ func Test_OnIncomingStateTypeRequest(t *testing.T) {
 
 		assert.DeepEqual(t, jsonResp, util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: spec.RawJSON(`{"foo":"bar"}`),
+			JSON: json.RawMessage(`{"foo":"bar"}`),
 		})
 	})
 }

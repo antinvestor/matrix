@@ -1,4 +1,4 @@
-// Copyright 2021 The Matrix.org Foundation C.I.C.
+// Copyright 2021 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 
 	var res uapi.QueryLoginTokenResponse
 	if err := t.UserAPI.QueryLoginToken(ctx, &uapi.QueryLoginTokenRequest{Token: r.Token}, &res); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("UserAPI.QueryLoginToken failed")
+		util.Log(ctx).WithError(err).Error("UserAPI.QueryLoginToken failed")
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -66,13 +66,13 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 
 	cleanup := func(ctx context.Context, authRes *util.JSONResponse) {
 		if authRes == nil {
-			util.GetLogger(ctx).Error("No JSONResponse provided to LoginTokenType cleanup function")
+			util.Log(ctx).Error("missing JSONResponse in LoginTokenType cleanup")
 			return
 		}
 		if authRes.Code == http.StatusOK {
 			var res uapi.PerformLoginTokenDeletionResponse
 			if err := t.UserAPI.PerformLoginTokenDeletion(ctx, &uapi.PerformLoginTokenDeletionRequest{Token: r.Token}, &res); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("UserAPI.PerformLoginTokenDeletion failed")
+				util.Log(ctx).WithError(err).Error("UserAPI.PerformLoginTokenDeletion failed")
 			}
 		}
 	}

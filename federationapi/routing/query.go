@@ -28,7 +28,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 )
 
 // RoomAliasToID converts the queried alias into a room ID and returns it
@@ -56,14 +55,14 @@ func RoomAliasToID(
 
 	var resp fclient.RespDirectory
 
-	if domain == cfg.Matrix.ServerName {
+	if domain == cfg.Global.ServerName {
 		queryReq := &roomserverAPI.GetRoomIDForAliasRequest{
 			Alias:              roomAlias,
 			IncludeAppservices: true,
 		}
 		queryRes := &roomserverAPI.GetRoomIDForAliasResponse{}
 		if err = rsAPI.GetRoomIDForAlias(httpReq.Context(), queryReq, queryRes); err != nil {
-			util.GetLogger(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
+			util.Log(httpReq.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -74,7 +73,7 @@ func RoomAliasToID(
 			serverQueryReq := federationAPI.QueryJoinedHostServerNamesInRoomRequest{RoomID: queryRes.RoomID}
 			var serverQueryRes federationAPI.QueryJoinedHostServerNamesInRoomResponse
 			if err = senderAPI.QueryJoinedHostServerNamesInRoom(httpReq.Context(), &serverQueryReq, &serverQueryRes); err != nil {
-				util.GetLogger(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
+				util.Log(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -93,7 +92,7 @@ func RoomAliasToID(
 			}
 		}
 	} else {
-		resp, err = federation.LookupRoomAlias(httpReq.Context(), domain, cfg.Matrix.ServerName, roomAlias)
+		resp, err = federation.LookupRoomAlias(httpReq.Context(), domain, cfg.Global.ServerName, roomAlias)
 		if err != nil {
 			var x gomatrix.HTTPError
 			switch {
@@ -107,7 +106,7 @@ func RoomAliasToID(
 			}
 			// TODO: Return 502 if the remote server errored.
 			// TODO: Return 504 if the remote server timed out.
-			util.GetLogger(httpReq.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
+			util.Log(httpReq.Context()).WithError(err).Error("federation.LookupRoomAlias failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -125,6 +124,9 @@ func RoomAliasToID(
 //
 // Implements /_matrix/federation/v1/hierarchy/{roomID}
 func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationRequest, roomIDStr string, rsAPI roomserverAPI.FederationRoomserverAPI) util.JSONResponse {
+
+	ctx := httpReq.Context()
+
 	parsedRoomID, err := spec.NewRoomID(roomIDStr)
 	if err != nil {
 		return util.JSONResponse{
@@ -154,13 +156,13 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 		var errRoomUnknownOrNotAllowed roomserverAPI.ErrRoomUnknownOrNotAllowed
 		switch {
 		case errors.As(err, &errRoomUnknownOrNotAllowed):
-			util.GetLogger(httpReq.Context()).WithError(err).Debugln("room unknown/forbidden when handling SS room hierarchy request")
+			util.Log(ctx).WithError(err).Debug("room unknown/forbidden when handling SS room hierarchy request")
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound("room is unknown/forbidden"),
 			}
 		default:
-			log.WithError(err).Errorf("failed to fetch next page of room hierarchy (SS API)")
+			util.Log(ctx).WithError(err).Error("failed to fetch next page of room hierarchy (SS API)")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.Unknown("internal server error"),
@@ -169,7 +171,7 @@ func QueryRoomHierarchy(httpReq *http.Request, request *fclient.FederationReques
 	}
 
 	if len(discoveredRooms) == 0 {
-		util.GetLogger(httpReq.Context()).Debugln("no rooms found when handling SS room hierarchy request")
+		util.Log(httpReq.Context()).Debug("no rooms found when handling SS room hierarchy request")
 		return util.JSONResponse{
 			Code: 404,
 			JSON: spec.NotFound("room is unknown/forbidden"),

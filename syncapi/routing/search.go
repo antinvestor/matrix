@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,17 +22,14 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/matrix/clientapi/httputil"
-	"github.com/antinvestor/matrix/internal/sqlutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 // nolint:gocyclo
@@ -45,7 +42,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 	)
 	resErr := httputil.UnmarshalJSONRequest(req, &searchReq)
 	if resErr != nil {
-		logrus.Error("failed to unmarshal search request")
+		util.Log(ctx).Error("failed to unmarshal search request")
 		return *resErr
 	}
 
@@ -71,8 +68,6 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			JSON: spec.InternalServerError{},
 		}
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	// only search rooms the user is actually joined to
 	joinedRooms, err := snapshot.RoomIDsWithMembership(ctx, device.UserID, "join")
@@ -116,7 +111,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		searchReq.SearchCategories.RoomEvents.Filter.Limit, nextBatch,
 	)
 	if err != nil {
-		logrus.WithError(err).Error("failed to search fulltext")
+		util.Log(ctx).WithError(err).Error("failed fulltext search")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -151,21 +146,21 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 	groups := make(map[string]RoomResult)
 	knownUsersProfiles := make(map[string]ProfileInfoResponse)
 
-	//orderByTime := searchReq.SearchCategories.RoomEvents.OrderBy == "recent"
+	// orderByTime := searchReq.SearchCategories.RoomEvents.OrderBy == "recent"
 
 	// Sort the events by depth, as the returned values aren't ordered
-	//if orderByTime {
+	// if orderByTime {
 	//	sort.Slice(evs, func(i, j int) bool {
 	//		return evs[i].Depth() > evs[j].Depth()
 	//	})
-	//}
+	// }
 
 	stateForRooms := make(map[string][]synctypes.ClientEvent)
 	for _, hit := range result.Results {
 		event := hit.Event
 		eventsBefore, eventsAfter, err := contextEvents(ctx, snapshot, event, roomFilter, searchReq)
 		if err != nil {
-			logrus.WithError(err).Error("failed to get context events")
+			util.Log(ctx).WithError(err).Error("failed to get context events")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -173,7 +168,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		}
 		startToken, endToken, err := getStartEnd(ctx, snapshot, eventsBefore, eventsAfter)
 		if err != nil {
-			logrus.WithError(err).Error("failed to get start/end")
+			util.Log(ctx).WithError(err).Error("failed to get start/end")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -184,7 +179,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		for _, ev := range append(eventsBefore, eventsAfter...) {
 			userID, queryErr := rsAPI.QueryUserIDForSender(req.Context(), ev.RoomID(), ev.SenderID())
 			if queryErr != nil {
-				logrus.WithError(queryErr).WithField("sender_id", ev.SenderID()).Warn("failed to query userprofile")
+				util.Log(ctx).WithError(queryErr).WithField("sender_id", ev.SenderID()).Warn("failed to query userprofile")
 				continue
 			}
 
@@ -192,7 +187,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			if !ok {
 				stateEvent, stateErr := snapshot.GetStateEvent(ctx, ev.RoomID().String(), spec.MRoomMember, string(ev.SenderID()))
 				if stateErr != nil {
-					logrus.WithError(stateErr).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
+					util.Log(ctx).WithError(stateErr).WithField("sender_id", event.SenderID()).Warn("failed to query userprofile")
 					continue
 				}
 				if stateEvent == nil {
@@ -211,7 +206,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).WithField("senderID", event.SenderID()).Error("Failed converting to ClientEvent")
+			util.Log(req.Context()).WithError(err).WithField("senderID", event.SenderID()).Error("Failed converting to ClientEvent")
 			continue
 		}
 
@@ -242,7 +237,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			stateFilter := synctypes.DefaultStateFilter()
 			state, err := snapshot.CurrentState(ctx, event.RoomID().String(), &stateFilter, nil)
 			if err != nil {
-				logrus.WithError(err).Error("unable to get current state")
+				util.Log(ctx).WithError(err).Error("unable to get current state")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -277,9 +272,8 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 		},
 	}
 
-	logrus.Debugf("Full search request took %v", time.Since(start))
+	util.Log(ctx).Debug("Full search request took %v", time.Since(start))
 
-	succeeded = true
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,
@@ -296,19 +290,19 @@ func contextEvents(
 ) ([]*types.HeaderedEvent, []*types.HeaderedEvent, error) {
 	id, _, err := snapshot.SelectContextEvent(ctx, event.RoomID().String(), event.EventID())
 	if err != nil {
-		logrus.WithError(err).Error("failed to query context event")
+		util.Log(ctx).WithError(err).Error("failed to query context event")
 		return nil, nil, err
 	}
 	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.BeforeLimit
 	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, event.RoomID().String(), roomFilter)
 	if err != nil {
-		logrus.WithError(err).Error("failed to query before context event")
+		util.Log(ctx).WithError(err).Error("failed to query before context event")
 		return nil, nil, err
 	}
 	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.AfterLimit
 	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, event.RoomID().String(), roomFilter)
 	if err != nil {
-		logrus.WithError(err).Error("failed to query after context event")
+		util.Log(ctx).WithError(err).Error("failed to query after context event")
 		return nil, nil, err
 	}
 	return eventsBefore, eventsAfter, err

@@ -9,7 +9,7 @@ import (
 	"github.com/antinvestor/matrix/internal/pushgateway"
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 // NotifyUserCountsAsync sends notifications to a local user's
@@ -18,6 +18,8 @@ import (
 // gateways. There is no way to know when the background goroutine has
 // finished.
 func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, localpart string, serverName spec.ServerName, db storage.UserDatabase) error {
+	log := util.Log(ctx)
+
 	pusherDevices, err := GetPushDevices(ctx, localpart, serverName, nil, db)
 	if err != nil {
 		return err
@@ -32,11 +34,11 @@ func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, loc
 		return err
 	}
 
-	log.WithFields(log.Fields{
-		"localpart": localpart,
-		"app_id0":   pusherDevices[0].Device.AppID,
-		"pushkey":   pusherDevices[0].Device.PushKey,
-	}).Tracef("Notifying HTTP push gateway about notification counts")
+	log.
+		WithField("localpart", localpart).
+		WithField("app_id0", pusherDevices[0].Device.AppID).
+		WithField("pushkey", pusherDevices[0].Device.PushKey).
+		Debug("Notifying HTTP push gateway about notification counts")
 
 	// TODO: think about bounding this to one per user, and what
 	// ordering guarantees we must provide.
@@ -63,11 +65,11 @@ func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, loc
 				},
 			}
 			if err = pgClient.Notify(iCtx, pusherDevice.URL, &req, &pushgateway.NotifyResponse{}); err != nil {
-				log.WithFields(log.Fields{
-					"localpart": localpart,
-					"app_id0":   pusherDevice.Device.AppID,
-					"pushkey":   pusherDevice.Device.PushKey,
-				}).WithError(err).Error("HTTP push gateway request failed")
+				log.
+					WithField("localpart", localpart).
+					WithField("app_id0", pusherDevice.Device.AppID).
+					WithField("pushkey", pusherDevice.Device.PushKey).
+					WithError(err).Error("HTTP push gateway request failed")
 				return
 			}
 		}

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,13 +23,12 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
-
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // SyncAPIProducer produces events for the sync API server to consume
@@ -40,7 +39,7 @@ type SyncAPIProducer struct {
 	TopicPresenceEvent     string
 	TopicDeviceListUpdate  string
 	TopicSigningKeyUpdate  string
-	JetStream              nats.JetStreamContext
+	Qm                     queueutil.QueueManager
 	Config                 *config.FederationAPI
 	UserAPI                userapi.FederationUserAPI
 }
@@ -49,40 +48,38 @@ func (p *SyncAPIProducer) SendReceipt(
 	ctx context.Context,
 	userID, roomID, eventID, receiptType string, timestamp spec.Timestamp,
 ) error {
-	m := &nats.Msg{
-		Subject: p.TopicReceiptEvent,
-		Header:  nats.Header{},
+	h := map[string]string{
+		constants.UserID:  userID,
+		constants.RoomID:  roomID,
+		constants.EventID: eventID,
+		"type":            receiptType,
+		"timestamp":       fmt.Sprintf("%d", timestamp),
 	}
-	m.Header.Set(jetstream.UserID, userID)
-	m.Header.Set(jetstream.RoomID, roomID)
-	m.Header.Set(jetstream.EventID, eventID)
-	m.Header.Set("type", receiptType)
-	m.Header.Set("timestamp", fmt.Sprintf("%d", timestamp))
 
-	log.WithFields(log.Fields{}).Tracef("Producing to topic '%s'", p.TopicReceiptEvent)
-	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
-	return err
+	util.Log(ctx).
+		WithField("component", "syncapi_producer").
+		WithField("topic", p.TopicReceiptEvent).
+		Debug("Producing to topic")
+	return p.Qm.Publish(ctx, p.TopicReceiptEvent, "", h)
 }
 
 func (p *SyncAPIProducer) SendToDevice(
-	ctx context.Context, sender, userID, deviceID, eventType string,
+	ctx context.Context, sender string, userID *spec.UserID, deviceID, eventType string,
 	message json.RawMessage,
 ) error {
 	var devices []string
-	_, domain, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return err
-	}
+
+	domain := userID.Domain()
 
 	// If the event is targeted locally then we want to expand the wildcard
 	// out into individual device IDs so that we can send them to each respective
 	// device. If the event isn't targeted locally then we can't expand the
 	// wildcard as we don't know about the remote devices, so instead we leave it
 	// as-is, so that the federation sender can send it on with the wildcard intact.
-	if p.Config.Matrix.IsLocalServerName(domain) && deviceID == "*" {
+	if p.Config.Global.IsLocalServerName(domain) && deviceID == "*" {
 		var res userapi.QueryDevicesResponse
-		err = p.UserAPI.QueryDevices(ctx, &userapi.QueryDevicesRequest{
-			UserID: userID,
+		err := p.UserAPI.QueryDevices(ctx, &userapi.QueryDevicesRequest{
+			UserID: userID.String(),
 		}, &res)
 		if err != nil {
 			return err
@@ -94,14 +91,14 @@ func (p *SyncAPIProducer) SendToDevice(
 		devices = append(devices, deviceID)
 	}
 
-	log.WithFields(log.Fields{
-		"user_id":     userID,
-		"num_devices": len(devices),
-		"type":        eventType,
-	}).Tracef("Producing to topic '%s'", p.TopicSendToDeviceEvent)
+	util.Log(ctx).
+		WithField("user_id", userID).
+		WithField("num_devices", len(devices)).
+		WithField("type", eventType).
+		Debug("Producing to topic")
 	for i, device := range devices {
 		ote := &types.OutputSendToDeviceEvent{
-			UserID:   userID,
+			UserID:   userID.String(),
 			DeviceID: device,
 			SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
 				Sender:  sender,
@@ -110,22 +107,22 @@ func (p *SyncAPIProducer) SendToDevice(
 			},
 		}
 
-		eventJSON, err := json.Marshal(ote)
-		if err != nil {
-			log.WithError(err).Error("sendToDevice failed json.Marshal")
-			return err
+		h := map[string]string{
+			"sender":         sender,
+			constants.UserID: constants.EncodeUserID(userID),
 		}
-		m := nats.NewMsg(p.TopicSendToDeviceEvent)
-		m.Data = eventJSON
-		m.Header.Set("sender", sender)
-		m.Header.Set(jetstream.UserID, userID)
 
-		if _, err = p.JetStream.PublishMsg(m, nats.Context(ctx)); err != nil {
+		err := p.Qm.Publish(ctx, p.TopicSendToDeviceEvent, ote, h)
+		if err != nil {
 			if i < len(devices)-1 {
-				log.WithError(err).Warn("sendToDevice failed to PublishMsg, trying further devices")
+				util.Log(ctx).WithError(err).
+					WithField("component", "syncapi_producer").
+					Warn("sendToDevice failed to PublishMsg, trying further devices")
 				continue
 			}
-			log.WithError(err).Error("sendToDevice failed to PublishMsg for all devices")
+			util.Log(ctx).WithError(err).
+				WithField("component", "syncapi_producer").
+				Error("sendToDevice failed to PublishMsg for all devices")
 			return err
 		}
 	}
@@ -135,54 +132,64 @@ func (p *SyncAPIProducer) SendToDevice(
 func (p *SyncAPIProducer) SendTyping(
 	ctx context.Context, userID, roomID string, typing bool, timeoutMS int64,
 ) error {
-	m := &nats.Msg{
-		Subject: p.TopicTypingEvent,
-		Header:  nats.Header{},
+
+	h := map[string]string{
+		constants.UserID: userID,
+		constants.RoomID: roomID,
+		"typing":         strconv.FormatBool(typing),
+		"timeout_ms":     strconv.Itoa(int(timeoutMS)),
 	}
-	m.Header.Set(jetstream.UserID, userID)
-	m.Header.Set(jetstream.RoomID, roomID)
-	m.Header.Set("typing", strconv.FormatBool(typing))
-	m.Header.Set("timeout_ms", strconv.Itoa(int(timeoutMS)))
-	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
-	return err
+	util.Log(ctx).
+		WithField(
+			"component", "syncapi_producer").
+		WithField("topic", p.TopicTypingEvent).
+		Debug("Producing to topic")
+	return p.Qm.Publish(ctx, p.TopicTypingEvent, "", h)
 }
 
 func (p *SyncAPIProducer) SendPresence(
 	ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveAgo int64,
 ) error {
-	m := nats.NewMsg(p.TopicPresenceEvent)
-	m.Header.Set(jetstream.UserID, userID)
-	m.Header.Set("presence", presence.String())
+	h := map[string]string{
+		constants.UserID: userID,
+		"presence":       presence.String(),
+	}
 	if statusMsg != nil {
-		m.Header.Set("status_msg", *statusMsg)
+		h["status_msg"] = *statusMsg
 	}
 	lastActiveTS := spec.AsTimestamp(time.Now().Add(-(time.Duration(lastActiveAgo) * time.Millisecond)))
 
-	m.Header.Set("last_active_ts", strconv.Itoa(int(lastActiveTS)))
-	log.Tracef("Sending presence to syncAPI: %+v", m.Header)
-	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
-	return err
+	h["last_active_ts"] = strconv.Itoa(int(lastActiveTS))
+	util.Log(ctx).WithField(
+		"component", "syncapi_producer").
+		WithField("presence", h).
+		Debug("Sending presence to syncAPI")
+	return p.Qm.Publish(ctx, p.TopicPresenceEvent, "", h)
 }
 
 func (p *SyncAPIProducer) SendDeviceListUpdate(
-	ctx context.Context, deviceListUpdate spec.RawJSON, origin spec.ServerName,
+	ctx context.Context, deviceListUpdate json.RawMessage, origin spec.ServerName,
 ) (err error) {
-	m := nats.NewMsg(p.TopicDeviceListUpdate)
-	m.Header.Set("origin", string(origin))
-	m.Data = deviceListUpdate
-	log.Debugf("Sending device list update: %+v", m.Header)
-	_, err = p.JetStream.PublishMsg(m, nats.Context(ctx))
-	return err
+	h := map[string]string{
+		"origin": string(origin),
+	}
+
+	util.Log(ctx).
+		WithField("component", "syncapi_producer").
+		WithField("device_list_update", h).
+		Debug("Sending device list update")
+	return p.Qm.Publish(ctx, p.TopicDeviceListUpdate, deviceListUpdate, h)
 }
 
 func (p *SyncAPIProducer) SendSigningKeyUpdate(
-	ctx context.Context, data spec.RawJSON, origin spec.ServerName,
+	ctx context.Context, data json.RawMessage, origin spec.ServerName,
 ) (err error) {
-	m := nats.NewMsg(p.TopicSigningKeyUpdate)
-	m.Header.Set("origin", string(origin))
-	m.Data = data
+	h := map[string]string{
+		"origin": string(origin),
+	}
 
-	log.Debugf("Sending signing key update")
-	_, err = p.JetStream.PublishMsg(m, nats.Context(ctx))
-	return err
+	util.Log(ctx).WithField(
+		"component", "syncapi_producer").
+		Debug("Sending signing key update")
+	return p.Qm.Publish(ctx, p.TopicSigningKeyUpdate, data, h)
 }

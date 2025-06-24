@@ -24,11 +24,10 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/tidwall/gjson"
-
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/tidwall/gjson"
 )
 
 var (
@@ -395,7 +394,7 @@ func (r Response) MarshalJSON() ([]byte, error) {
 
 func (r *Response) HasUpdates() bool {
 	// purposefully exclude DeviceListsOTKCount as we always include them
-	return (len(r.AccountData.Events) > 0 ||
+	return len(r.AccountData.Events) > 0 ||
 		len(r.Presence.Events) > 0 ||
 		len(r.Rooms.Invite) > 0 ||
 		len(r.Rooms.Join) > 0 ||
@@ -403,7 +402,7 @@ func (r *Response) HasUpdates() bool {
 		len(r.Rooms.Peek) > 0 ||
 		len(r.ToDevice.Events) > 0 ||
 		len(r.DeviceLists.Changed) > 0 ||
-		len(r.DeviceLists.Left) > 0)
+		len(r.DeviceLists.Left) > 0
 }
 
 // NewResponse creates an empty response with initialised maps.

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,6 @@ package routing
 import (
 	"net/http"
 
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
@@ -27,6 +24,7 @@ import (
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 // GetEvent implements
@@ -45,10 +43,9 @@ func GetEvent(
 ) util.JSONResponse {
 	ctx := req.Context()
 	db, err := syncDB.NewDatabaseSnapshot(ctx)
-	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
-		"event_id": eventID,
-		"room_id":  rawRoomID,
-	})
+	logger := util.Log(ctx).
+		WithField("event_id", eventID).
+		WithField("room_id", rawRoomID)
 	if err != nil {
 		logger.WithError(err).Error("GetEvent: syncDB.NewDatabaseTransaction failed")
 		return util.JSONResponse{
@@ -56,7 +53,6 @@ func GetEvent(
 			JSON: spec.InternalServerError{},
 		}
 	}
-	defer db.Rollback() // nolint: errcheck
 
 	roomID, err := spec.NewRoomID(rawRoomID)
 	if err != nil {
@@ -77,7 +73,7 @@ func GetEvent(
 
 	// The requested event does not exist in our database
 	if len(events) == 0 {
-		logger.Debugf("GetEvent: requested event doesn't exist locally")
+		logger.Debug("GetEvent: requested event doesn't exist locally")
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: spec.NotFound("The event was not found or you do not have permission to read this event"),
@@ -92,7 +88,7 @@ func GetEvent(
 
 	userID, err := spec.NewUserID(rawUserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("invalid device.UserID")
+		util.Log(req.Context()).WithError(err).Error("invalid device.UserID")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -123,7 +119,7 @@ func GetEvent(
 		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
+		util.Log(req.Context()).WithError(err).WithField("senderID", events[0].SenderID()).WithField("roomID", *roomID).Error("Failed converting to ClientEvent")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),

@@ -8,7 +8,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 func (r *FederationInternalAPI) KeyRing() *gomatrixserverlib.KeyRing {
@@ -64,9 +64,9 @@ func (r *FederationInternalAPI) FetchKeys(
 
 		// Ask the fetcher to look up our keys.
 		if err := r.handleFetcherKeys(ctx, now, fetcher, requests, results); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"fetcher_name": fetcher.FetcherName(),
-			}).Errorf("Failed to retrieve %d key(s)", len(requests))
+			util.Log(ctx).WithError(err).
+				WithField("fetcher_name", fetcher.FetcherName()).
+				Error("Failed to retrieve %d key(s)", len(requests))
 			continue
 		}
 	}
@@ -78,7 +78,10 @@ func (r *FederationInternalAPI) FetchKeys(
 			// The results don't contain anything for this specific request, so
 			// we've failed to satisfy it from local keys, database keys or from
 			// all of the fetchers. Report an error.
-			logrus.Warnf("Failed to retrieve key %q for server %q", req.KeyID, req.ServerName)
+			util.Log(ctx).
+				WithField("key_id", req.KeyID).
+				WithField("server_name", req.ServerName).
+				Warn("Failed to retrieve key")
 		}
 	}
 
@@ -98,10 +101,10 @@ func (r *FederationInternalAPI) handleLocalKeys(
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) {
 	for req := range requests {
-		if !r.cfg.Matrix.IsLocalServerName(req.ServerName) {
+		if !r.cfg.Global.IsLocalServerName(req.ServerName) {
 			continue
 		}
-		if req.KeyID == r.cfg.Matrix.KeyID {
+		if req.KeyID == r.cfg.Global.KeyID {
 			// We found a key request that is supposed to be for our own
 			// keys. Remove it from the request list so we don't hit the
 			// database or the fetchers for it.
@@ -110,15 +113,15 @@ func (r *FederationInternalAPI) handleLocalKeys(
 			// Insert our own key into the response.
 			results[req] = gomatrixserverlib.PublicKeyLookupResult{
 				VerifyKey: gomatrixserverlib.VerifyKey{
-					Key: spec.Base64Bytes(r.cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)),
+					Key: spec.Base64Bytes(r.cfg.Global.PrivateKey.Public().(ed25519.PublicKey)),
 				},
 				ExpiredTS:    gomatrixserverlib.PublicKeyNotExpired,
-				ValidUntilTS: spec.AsTimestamp(time.Now().Add(r.cfg.Matrix.KeyValidityPeriod)),
+				ValidUntilTS: spec.AsTimestamp(time.Now().Add(r.cfg.Global.KeyValidityPeriod)),
 			}
 		} else {
 			// The key request doesn't match our current key. Let's see
 			// if it matches any of our old verify keys.
-			for _, oldVerifyKey := range r.cfg.Matrix.OldVerifyKeys {
+			for _, oldVerifyKey := range r.cfg.Global.OldVerifyKeys {
 				if req.KeyID == oldVerifyKey.KeyID {
 					// We found a key request that is supposed to be an expired
 					// key.
@@ -184,9 +187,8 @@ func (r *FederationInternalAPI) handleFetcherKeys(
 	requests map[gomatrixserverlib.PublicKeyLookupRequest]spec.Timestamp,
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) error {
-	logrus.WithFields(logrus.Fields{
-		"fetcher_name": fetcher.FetcherName(),
-	}).Infof("Fetching %d key(s)", len(requests))
+	log := util.Log(ctx).WithField("fetcher_name", fetcher.FetcherName())
+	log.WithField("key_count", len(requests)).Info("Fetching keys")
 
 	// Create a context that limits our requests to 30 seconds.
 	fetcherCtx, fetcherCancel := context.WithTimeout(ctx, time.Second*30)
@@ -230,17 +232,16 @@ func (r *FederationInternalAPI) handleFetcherKeys(
 
 	// Store the keys from our store map.
 	if err = r.keyRing.KeyDatabase.StoreKeys(ctx, storeResults); err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"fetcher_name":  fetcher.FetcherName(),
-			"database_name": r.keyRing.KeyDatabase.FetcherName(),
-		}).Errorf("Failed to store keys in the database")
+		log.WithError(err).
+			WithField("database_name", r.keyRing.KeyDatabase.FetcherName()).
+			Error("Failed to store keys in the database")
 		return fmt.Errorf("server key API failed to store retrieved keys: %w", err)
 	}
 
 	if len(storeResults) > 0 {
-		logrus.WithFields(logrus.Fields{
-			"fetcher_name": fetcher.FetcherName(),
-		}).Infof("Updated %d of %d key(s) in database (%d keys remaining)", len(storeResults), len(results), len(requests))
+		log.WithField("keys_updated", len(storeResults)).
+			WithField("total_keys", len(results)).
+			WithField("keys_remaining", len(requests)).Info("Updated keys in database")
 	}
 
 	return nil

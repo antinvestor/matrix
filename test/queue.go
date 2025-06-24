@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,30 +16,31 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 
 	"github.com/antinvestor/matrix/setup/config"
 )
 
-//const NatsImage = "nats:2.10"
+// const NatsImage = "nats:2.10"
 //
-//func setupNats(ctx context.Context) (*tcNats.NATSContainer, error) {
+// func setupNats(ctx context.Context) (*tcNats.NATSContainer, error) {
 //	return tcNats.Run(ctx, NatsImage)
-//}
+// }
 
-// PrepareNatsDataSourceConnection Prepare a nats connection string for testing.
+// PrepareQueueConnection Prepare a nats connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same connection, which will have data from previous tests
 // unless close() is called.
-//func PrepareNatsDataSourceConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
+// func PrepareQueueConnection(ctx context.Context) (dsConnection config.DataSource, close func(), err error) {
 //
 //	container, err := setupNats(ctx)
 //	if err != nil {
 //		return "", nil, err
 //	}
 //
-//	connStr, err := container.ConnectionString(ctx)
+//	connStr, err := container.DS(ctx)
 //	if err != nil {
 //		return "", nil, err
 //	}
@@ -48,30 +49,34 @@ import (
 //
 //		err = testcontainers.TerminateContainer(container)
 //		if err != nil {
-//			logrus.WithError(err).Error("failed to terminate container")
+//			util.Log(ctx).WithError(err).Error("failed to terminate container")
 //		}
 //
 //	}, nil
-//}
+// }
 
-// PrepareNatsDataSourceConnection Prepare a nats connection string for testing.
+// PrepareQueueConnection Prepare a nats connection string for testing.
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-func PrepareNatsDataSourceConnection(_ context.Context) (connStr config.DataSource, close func(), err error) {
+func PrepareQueueConnection(_ context.Context, randomnesPrefix string, testOpts DependancyOption) (connStr config.DataSource, close func(ctx context.Context), err error) {
+
+	if testOpts.Queue() != DefaultQueue {
+		return "", func(ctx context.Context) {}, fmt.Errorf(" %s is unsupported, only nats is the supported queue for now", testOpts.Queue())
+	}
 
 	natsUriStr := os.Getenv("TESTING_QUEUE_URI")
 	if natsUriStr == "" {
-		natsUriStr = "nats://localhost:4222"
+		natsUriStr = "nats://matrix:s3cr3t@localhost:4221"
 	}
 
 	parsedNatsUri, err := url.Parse(natsUriStr)
 	if err != nil {
-		return "", func() {}, err
+		return "", func(ctx context.Context) {}, err
 	}
 
 	natsUriStr = parsedNatsUri.String()
 
-	return config.DataSource(natsUriStr), func() {
+	return config.DataSource(natsUriStr), func(ctx context.Context) {
 	}, nil
 }

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-
 	"github.com/antinvestor/matrix/internal/eventutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 )
@@ -163,7 +162,7 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 		mod.origin = creator.srvName
 	}
 
-	var unsigned spec.RawJSON
+	var unsigned json.RawMessage
 	var err error
 	if mod.unsigned != nil {
 		unsigned, err = json.Marshal(mod.unsigned)

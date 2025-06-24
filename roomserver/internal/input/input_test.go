@@ -6,32 +6,42 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/actorutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver"
 	"github.com/antinvestor/matrix/roomserver/api"
-	"github.com/antinvestor/matrix/roomserver/internal/input"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/test"
 	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/antinvestor/matrix/userapi"
 )
 
 func TestSingleTransactionOnInput(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		cfg, closeRig := testrig.CreateConfig(ctx, t, testOpts)
-		defer closeRig()
-		cm := sqlutil.NewConnectionManager(ctx, cfg.Global.DatabaseOptions)
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
 
-		natsInstance := &jetstream.NATSInstance{}
-		js, jc := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
-		caches, err := caching.NewCache(&cfg.Global.Cache)
+		cm := sqlutil.NewConnectionManager(svc)
+
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
 			t.Fatalf("failed to create a cache: %v", err)
 		}
-		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, natsInstance, caches, caching.DisableMetrics)
+
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
+
+		// Needed to create accounts
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, nil)
+		rsAPI.SetUserAPI(ctx, userAPI)
 
 		deadline, _ := t.Deadline()
 		if maxVal := time.Now().Add(time.Second * 3); deadline.Before(maxVal) {
@@ -52,13 +62,8 @@ func TestSingleTransactionOnInput(t *testing.T) {
 			Event: &types.HeaderedEvent{PDU: event},
 		}
 
-		inputter := &input.Inputer{
-			JetStream:  js,
-			NATSClient: jc,
-			Cfg:        &cfg.RoomServer,
-		}
 		res := &api.InputRoomEventsResponse{}
-		inputter.InputRoomEvents(
+		rsAPI.InputRoomEvents(
 			ctx,
 			&api.InputRoomEventsRequest{
 				InputRoomEvents: []api.InputRoomEvent{in},
@@ -68,7 +73,8 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		)
 		// If we fail here then it's because we've hit the test deadline,
 		// so we probably deadlocked
-		if err := res.Err(); err != nil {
+		err = res.Err()
+		if err != nil {
 			t.Fatal(err)
 		}
 	})

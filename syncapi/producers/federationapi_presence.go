@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,34 +15,36 @@
 package producers
 
 import (
+	"context"
 	"strconv"
 	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/types"
-	"github.com/nats-io/nats.go"
 )
 
 // FederationAPIPresenceProducer produces events for the federation API server to consume
 type FederationAPIPresenceProducer struct {
-	Topic     string
-	JetStream nats.JetStreamContext
+	Topic *config.QueueOptions
+	Qm    queueutil.QueueManager
 }
 
-func (f *FederationAPIPresenceProducer) SendPresence(
+func (f *FederationAPIPresenceProducer) SendPresence(ctx context.Context,
 	userID string, presence types.Presence, statusMsg *string,
 ) error {
-	msg := nats.NewMsg(f.Topic)
-	msg.Header.Set(jetstream.UserID, userID)
-	msg.Header.Set("presence", presence.String())
-	msg.Header.Set("from_sync", "true") // only update last_active_ts and presence
-	msg.Header.Set("last_active_ts", strconv.Itoa(int(spec.AsTimestamp(time.Now()))))
 
+	header := map[string]string{
+		constants.UserID: userID,
+		"presence":       presence.String(),
+		"from_sync":      "true", // only update last_active_ts and presence
+		"last_active_ts": strconv.Itoa(int(spec.AsTimestamp(time.Now()))),
+	}
 	if statusMsg != nil {
-		msg.Header.Set("status_msg", *statusMsg)
+		header["status_msg"] = *statusMsg
 	}
 
-	_, err := f.JetStream.PublishMsg(msg)
-	return err
+	return f.Qm.Publish(ctx, f.Topic.Ref(), []byte{}, header)
 }

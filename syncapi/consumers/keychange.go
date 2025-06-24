@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,28 +18,24 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/antinvestor/matrix/internal/queueutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/getsentry/sentry-go"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 // OutputKeyChangeEventConsumer consumes events that originated in the key server.
 type OutputKeyChangeEventConsumer struct {
-	jetstream nats.JetStreamContext
-	durable   string
-	topic     string
-	db        storage.Database
-	notifier  *notifier.Notifier
-	stream    streams.StreamProvider
-	rsAPI     roomserverAPI.SyncRoomserverAPI
+	qm       queueutil.QueueManager
+	db       storage.Database
+	notifier *notifier.Notifier
+	stream   streams.StreamProvider
+	rsAPI    roomserverAPI.SyncRoomserverAPI
 }
 
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.
@@ -47,45 +43,34 @@ type OutputKeyChangeEventConsumer struct {
 func NewOutputKeyChangeEventConsumer(
 	ctx context.Context,
 	cfg *config.SyncAPI,
-	topic string,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
 	rsAPI roomserverAPI.SyncRoomserverAPI,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
-) *OutputKeyChangeEventConsumer {
+) error {
+
 	s := &OutputKeyChangeEventConsumer{
-		jetstream: js,
-		durable:   cfg.Matrix.JetStream.Durable("SyncAPIKeyChangeConsumer"),
-		topic:     topic,
-		db:        store,
-		rsAPI:     rsAPI,
-		notifier:  notifier,
-		stream:    stream,
+		qm:       qm,
+		db:       store,
+		rsAPI:    rsAPI,
+		notifier: notifier,
+		stream:   stream,
 	}
 
-	return s
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputKeyChangeEvent, s)
 }
 
-// Start consuming from the key server
-func (s *OutputKeyChangeEventConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
-
-func (s *OutputKeyChangeEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
+func (s *OutputKeyChangeEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	var m api.DeviceMessage
-	if err := json.Unmarshal(msg.Data, &m); err != nil {
-		logrus.WithError(err).Errorf("failed to read device message from key change topic")
-		return true
+	if err := json.Unmarshal(message, &m); err != nil {
+		util.Log(ctx).WithError(err).Error("failed to read device message from key change topic")
+		return nil
 	}
 	if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {
 		// This probably shouldn't happen but stops us from panicking if we come
 		// across an update that doesn't satisfy either types.
-		return true
+		return nil
 	}
 	switch m.Type {
 	case api.TypeCrossSigningUpdate:
@@ -97,9 +82,9 @@ func (s *OutputKeyChangeEventConsumer) onMessage(ctx context.Context, msgs []*na
 	}
 }
 
-func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(ctx context.Context, m api.DeviceMessage, deviceChangeID int64) bool {
+func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(ctx context.Context, m api.DeviceMessage, deviceChangeID int64) error {
 	if m.DeviceKeys == nil {
-		return true
+		return nil
 	}
 	output := m.DeviceKeys
 	// work out who we need to notify about the new key
@@ -109,9 +94,8 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(ctx context.Context, m
 		LocalOnly: true,
 	}, &queryRes)
 	if err != nil {
-		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
-		sentry.CaptureException(err)
-		return true
+		util.Log(ctx).WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
+		return err
 	}
 	// make sure we get our own key updates too!
 	queryRes.UserIDsToCount[output.UserID] = 1
@@ -122,10 +106,10 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(ctx context.Context, m
 		s.notifier.OnNewKeyChange(types.StreamingToken{DeviceListPosition: posUpdate}, userID, output.UserID)
 	}
 
-	return true
+	return nil
 }
 
-func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(ctx context.Context, m api.DeviceMessage, deviceChangeID int64) bool {
+func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(ctx context.Context, m api.DeviceMessage, deviceChangeID int64) error {
 	output := m.CrossSigningKeyUpdate
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
@@ -134,9 +118,8 @@ func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(ctx context.Context
 		LocalOnly: true,
 	}, &queryRes)
 	if err != nil {
-		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
-		sentry.CaptureException(err)
-		return true
+		util.Log(ctx).WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
+		return err
 	}
 	// make sure we get our own key updates too!
 	queryRes.UserIDsToCount[output.UserID] = 1
@@ -147,5 +130,5 @@ func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(ctx context.Context
 		s.notifier.OnNewKeyChange(types.StreamingToken{DeviceListPosition: posUpdate}, userID, output.UserID)
 	}
 
-	return true
+	return nil
 }

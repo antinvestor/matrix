@@ -12,7 +12,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 type newPasswordRequest struct {
@@ -37,10 +36,10 @@ func Password(
 	var r newPasswordRequest
 	r.LogoutDevices = true
 
-	logrus.WithFields(logrus.Fields{
-		"sessionId": device.SessionID,
-		"userId":    device.UserID,
-	}).Debug("Changing password")
+	util.Log(req.Context()).
+		WithField("sessionId", device.SessionID).
+		WithField("userId", device.UserID).
+		Debug("Changing password")
 
 	// Unmarshal the request.
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
@@ -89,7 +88,7 @@ func Password(
 	// Get the local part.
 	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		util.Log(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -104,14 +103,14 @@ func Password(
 	}
 	passwordRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), passwordReq, passwordRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("PerformPasswordUpdate failed")
+		util.Log(req.Context()).WithError(err).Error("PerformPasswordUpdate failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 	if !passwordRes.PasswordUpdated {
-		util.GetLogger(req.Context()).Error("Expected password to have been updated but wasn't")
+		util.Log(req.Context()).Error("Expected password to have been updated but wasn't")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -128,7 +127,7 @@ func Password(
 		}
 		logoutRes := &api.PerformDeviceDeletionResponse{}
 		if err := userAPI.PerformDeviceDeletion(req.Context(), logoutReq, logoutRes); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
+			util.Log(req.Context()).WithError(err).Error("PerformDeviceDeletion failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -141,7 +140,7 @@ func Password(
 			SessionID:  device.SessionID,
 		}
 		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
+			util.Log(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},

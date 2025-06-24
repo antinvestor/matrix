@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,19 +17,17 @@ package routing
 import (
 	"fmt"
 	"net/http"
-	"strconv"
-	"time"
 
+	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
+	presenceV1 "buf.build/gen/go/antinvestor/presence/protocolbuffers/go"
+	"connectrpc.com/connect"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/clientapi/producers"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/userapi/api"
-	"github.com/nats-io/nats.go"
 	"github.com/pitabwire/util"
-	log "github.com/sirupsen/logrus"
 )
 
 type presenceReq struct {
@@ -44,7 +42,7 @@ func SetPresence(
 	producer *producers.SyncAPIProducer,
 	userID string,
 ) util.JSONResponse {
-	if !cfg.Matrix.Presence.EnableOutbound {
+	if !cfg.Global.Presence.EnableOutbound {
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
@@ -71,7 +69,7 @@ func SetPresence(
 	}
 	err := producer.SendPresence(req.Context(), userID, presenceStatus, presence.StatusMsg)
 	if err != nil {
-		log.WithError(err).Errorf("failed to update presence")
+		util.Log(req.Context()).WithError(err).Error("failed to update presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -87,40 +85,27 @@ func SetPresence(
 func GetPresence(
 	req *http.Request,
 	device *api.Device,
-	natsClient *nats.Conn,
-	presenceTopic string,
+	client presencev1connect.PresenceServiceClient,
 	userID string,
 ) util.JSONResponse {
-	msg := nats.NewMsg(presenceTopic)
-	msg.Header.Set(jetstream.UserID, userID)
 
-	presence, err := natsClient.RequestMsg(msg, time.Second*10)
+	ctx := req.Context()
+
+	resp, err := client.GetPresence(ctx, connect.NewRequest(&presenceV1.GetPresenceRequest{
+		UserId: userID,
+	}))
+
 	if err != nil {
-		log.WithError(err).Errorf("unable to get presence")
+		util.Log(ctx).WithError(err).Error("unable to get presence")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 
-	statusMsg := presence.Header.Get("status_msg")
-	e := presence.Header.Get("error")
-	if e != "" {
-		log.Errorf("received error msg from nats: %s", e)
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: types.PresenceClientResponse{
-				Presence: types.PresenceUnavailable.String(),
-			},
-		}
-	}
-	lastActive, err := strconv.Atoi(presence.Header.Get("last_active_ts"))
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
-		}
-	}
+	presence := resp.Msg
+	statusMsg := presence.GetStatusMsg()
+	lastActive := presence.GetLastActiveTs()
 
 	p := types.PresenceInternal{LastActiveTS: spec.Timestamp(lastActive)}
 	currentlyActive := p.CurrentlyActive()
@@ -129,7 +114,7 @@ func GetPresence(
 		JSON: types.PresenceClientResponse{
 			CurrentlyActive: &currentlyActive,
 			LastActiveAgo:   p.LastActiveAgo(),
-			Presence:        presence.Header.Get("presence"),
+			Presence:        presence.GetPresence(),
 			StatusMsg:       &statusMsg,
 		},
 	}

@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,20 +19,20 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/syncapi/storage/postgres/deltas"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
+// SQL query definition constants
 const currentRoomStateSchema = `
 -- Stores the current room state for every room.
 CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
@@ -70,24 +70,34 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_current_room_state_eventid_idx ON sync
 CREATE INDEX IF NOT EXISTS syncapi_current_room_state_type_state_key_idx ON syncapi_current_room_state(type, state_key);
 `
 
+const currentRoomStateSchemaRevert = `
+DROP TABLE IF EXISTS syncapi_current_room_state;
+`
+
+// SQL query for upserting room state
 const upsertRoomStateSQL = "" +
 	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at, history_visibility)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
 	" ON CONFLICT ON CONSTRAINT syncapi_room_state_unique" +
 	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9"
 
+// SQL query for deleting room state by event ID
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
 
+// SQL query for deleting room state for a room
 const deleteRoomStateForRoomSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE room_id = $1"
 
+// SQL query for selecting room IDs with specific membership
 const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
+// SQL query for selecting room IDs with any membership
 const selectRoomIDsWithAnyMembershipSQL = "" +
 	"SELECT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1"
 
+// SQL query for selecting current state
 const selectCurrentStateSQL = "" +
 	"SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
 	" AND ( $2::text[] IS NULL OR     sender  = ANY($2)  )" +
@@ -97,25 +107,32 @@ const selectCurrentStateSQL = "" +
 	" AND ( $6::bool IS NULL   OR     contains_url = $6  )" +
 	" AND (event_id = ANY($7)) IS NOT TRUE"
 
+// SQL query for selecting joined users
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
+// SQL query for selecting joined users in a room
 const selectJoinedUsersInRoomSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join' AND room_id = ANY($1)"
 
+// SQL query for selecting a state event
 const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
+// SQL query for selecting events with event IDs
 const selectEventsWithEventIDsSQL = "" +
 	"SELECT event_id, added_at, headered_event_json, history_visibility FROM syncapi_current_room_state WHERE event_id = ANY($1)"
 
+// SQL query for selecting shared users
 const selectSharedUsersSQL = "" +
 	"SELECT state_key FROM syncapi_current_room_state WHERE room_id = ANY(" +
 	"	SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
 	") AND type = 'm.room.member' AND state_key = ANY($2) AND membership IN ('join', 'invite');"
 
+// SQL query for selecting membership count
 const selectMembershipCount = `SELECT count(*) FROM syncapi_current_room_state WHERE type = 'm.room.member' AND room_id = $1 AND membership = $2`
 
+// SQL query for selecting room heroes
 const selectRoomHeroes = `
 SELECT state_key FROM syncapi_current_room_state
 WHERE type = 'm.room.member' AND room_id = $1 AND membership = ANY($2) AND state_key != $3
@@ -123,61 +140,67 @@ ORDER BY added_at, state_key
 LIMIT 5
 `
 
-type currentRoomStateStatements struct {
-	upsertRoomStateStmt                *sql.Stmt
-	deleteRoomStateByEventIDStmt       *sql.Stmt
-	deleteRoomStateForRoomStmt         *sql.Stmt
-	selectRoomIDsWithMembershipStmt    *sql.Stmt
-	selectRoomIDsWithAnyMembershipStmt *sql.Stmt
-	selectCurrentStateStmt             *sql.Stmt
-	selectJoinedUsersStmt              *sql.Stmt
-	selectJoinedUsersInRoomStmt        *sql.Stmt
-	selectEventsWithEventIDsStmt       *sql.Stmt
-	selectStateEventStmt               *sql.Stmt
-	selectSharedUsersStmt              *sql.Stmt
-	selectMembershipCountStmt          *sql.Stmt
-	selectRoomHeroesStmt               *sql.Stmt
+// currentRoomStateTable implements tables.CurrentRoomState
+type currentRoomStateTable struct {
+	cm sqlutil.ConnectionManager
+
+	// SQL query fields
+	upsertRoomStateSQL                string
+	deleteRoomStateByEventIDSQL       string
+	deleteRoomStateForRoomSQL         string
+	selectRoomIDsWithMembershipSQL    string
+	selectRoomIDsWithAnyMembershipSQL string
+	selectCurrentStateSQL             string
+	selectJoinedUsersSQL              string
+	selectJoinedUsersInRoomSQL        string
+	selectEventsWithEventIDsSQL       string
+	selectStateEventSQL               string
+	selectSharedUsersSQL              string
+	selectMembershipCountSQL          string
+	selectRoomHeroesSQL               string
 }
 
-func NewPostgresCurrentRoomStateTable(ctx context.Context, db *sql.DB) (tables.CurrentRoomState, error) {
-	s := &currentRoomStateStatements{}
-	_, err := db.Exec(currentRoomStateSchema)
-	if err != nil {
-		return nil, err
-	}
+// NewPostgresCurrentRoomStateTable creates a new CurrentRoomState table
+func NewPostgresCurrentRoomStateTable(_ context.Context, cm sqlutil.ConnectionManager) (tables.CurrentRoomState, error) {
 
-	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "syncapi: add history visibility column (current_room_state)",
-		Up:      deltas.UpAddHistoryVisibilityColumnCurrentRoomState,
+	// Run migrations
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "syncapi_current_room_state_table_schema_001",
+		Patch:       currentRoomStateSchema,
+		RevertPatch: currentRoomStateSchemaRevert,
 	})
-	err = m.Up(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.upsertRoomStateStmt, upsertRoomStateSQL},
-		{&s.deleteRoomStateByEventIDStmt, deleteRoomStateByEventIDSQL},
-		{&s.deleteRoomStateForRoomStmt, deleteRoomStateForRoomSQL},
-		{&s.selectRoomIDsWithMembershipStmt, selectRoomIDsWithMembershipSQL},
-		{&s.selectRoomIDsWithAnyMembershipStmt, selectRoomIDsWithAnyMembershipSQL},
-		{&s.selectCurrentStateStmt, selectCurrentStateSQL},
-		{&s.selectJoinedUsersStmt, selectJoinedUsersSQL},
-		{&s.selectJoinedUsersInRoomStmt, selectJoinedUsersInRoomSQL},
-		{&s.selectEventsWithEventIDsStmt, selectEventsWithEventIDsSQL},
-		{&s.selectStateEventStmt, selectStateEventSQL},
-		{&s.selectSharedUsersStmt, selectSharedUsersSQL},
-		{&s.selectMembershipCountStmt, selectMembershipCount},
-		{&s.selectRoomHeroesStmt, selectRoomHeroes},
-	}.Prepare(db)
+	t := &currentRoomStateTable{
+		cm: cm,
+
+		// Initialise SQL query fields
+		upsertRoomStateSQL:                upsertRoomStateSQL,
+		deleteRoomStateByEventIDSQL:       deleteRoomStateByEventIDSQL,
+		deleteRoomStateForRoomSQL:         deleteRoomStateForRoomSQL,
+		selectRoomIDsWithMembershipSQL:    selectRoomIDsWithMembershipSQL,
+		selectRoomIDsWithAnyMembershipSQL: selectRoomIDsWithAnyMembershipSQL,
+		selectCurrentStateSQL:             selectCurrentStateSQL,
+		selectJoinedUsersSQL:              selectJoinedUsersSQL,
+		selectJoinedUsersInRoomSQL:        selectJoinedUsersInRoomSQL,
+		selectEventsWithEventIDsSQL:       selectEventsWithEventIDsSQL,
+		selectStateEventSQL:               selectStateEventSQL,
+		selectSharedUsersSQL:              selectSharedUsersSQL,
+		selectMembershipCountSQL:          selectMembershipCount,
+		selectRoomHeroesSQL:               selectRoomHeroes,
+	}
+
+	return t, nil
 }
 
 // SelectJoinedUsers returns a map of room ID to a list of joined user IDs.
-func (s *currentRoomStateStatements) SelectJoinedUsers(
-	ctx context.Context, txn *sql.Tx,
+func (t *currentRoomStateTable) SelectJoinedUsers(
+	ctx context.Context,
 ) (map[string][]string, error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectJoinedUsersStmt).QueryContext(ctx)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectJoinedUsersSQL).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -197,18 +220,20 @@ func (s *currentRoomStateStatements) SelectJoinedUsers(
 	return result, rows.Err()
 }
 
-// SelectJoinedUsersInRoom returns a map of room ID to a list of joined user IDs for a given room.
-func (s *currentRoomStateStatements) SelectJoinedUsersInRoom(
-	ctx context.Context, txn *sql.Tx, roomIDs []string,
+// SelectJoinedUsersInRoom returns a map of room ID to a list of joined user IDs for the given rooms.
+func (t *currentRoomStateTable) SelectJoinedUsersInRoom(
+	ctx context.Context, roomIDs []string,
 ) (map[string][]string, error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectJoinedUsersInRoomStmt).QueryContext(ctx, pq.StringArray(roomIDs))
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectJoinedUsersInRoomSQL, pq.Array(roomIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsers: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsersInRoom: rows.close() failed")
 
 	result := make(map[string][]string)
-	var userID, roomID string
+	var roomID string
+	var userID string
 	for rows.Next() {
 		if err := rows.Scan(&roomID, &userID); err != nil {
 			return nil, err
@@ -221,22 +246,21 @@ func (s *currentRoomStateStatements) SelectJoinedUsersInRoom(
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
-func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
+func (t *currentRoomStateTable) SelectRoomIDsWithMembership(
 	ctx context.Context,
-	txn *sql.Tx,
 	userID string,
 	membership string, // nolint: unparam
 ) ([]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
-	rows, err := stmt.QueryContext(ctx, userID, membership)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectRoomIDsWithMembershipSQL, userID, membership).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomIDsWithMembership: rows.close() failed")
 
 	var result []string
+	var roomID string
 	for rows.Next() {
-		var roomID string
 		if err := rows.Scan(&roomID); err != nil {
 			return nil, err
 		}
@@ -246,22 +270,21 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 }
 
 // SelectRoomIDsWithAnyMembership returns a map of all memberships for the given user.
-func (s *currentRoomStateStatements) SelectRoomIDsWithAnyMembership(
+func (t *currentRoomStateTable) SelectRoomIDsWithAnyMembership(
 	ctx context.Context,
-	txn *sql.Tx,
 	userID string,
 ) (map[string]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithAnyMembershipStmt)
-	rows, err := stmt.QueryContext(ctx, userID)
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectRoomIDsWithAnyMembershipSQL, userID).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomIDsWithAnyMembership: rows.close() failed")
 
-	result := map[string]string{}
+	result := make(map[string]string)
+	var roomID string
+	var membership string
 	for rows.Next() {
-		var roomID string
-		var membership string
 		if err := rows.Scan(&roomID, &membership); err != nil {
 			return nil, err
 		}
@@ -271,12 +294,13 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithAnyMembership(
 }
 
 // SelectCurrentState returns all the current state events for the given room.
-func (s *currentRoomStateStatements) SelectCurrentState(
-	ctx context.Context, txn *sql.Tx, roomID string,
+func (t *currentRoomStateTable) SelectCurrentState(
+	ctx context.Context, roomID string,
 	stateFilter *synctypes.StateFilter,
 	excludeEventIDs []string,
 ) ([]*rstypes.HeaderedEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
+	db := t.cm.Connection(ctx, true)
+
 	senders, notSenders := getSendersStateFilterFilter(stateFilter)
 	// We're going to query members later, so remove them from this request
 	if stateFilter.LazyLoadMembers && !stateFilter.IncludeRedundantMembers {
@@ -287,14 +311,14 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 			stateFilter.NotTypes = notTypes
 		}
 	}
-	rows, err := stmt.QueryContext(ctx, roomID,
+	rows, err := db.Raw(t.selectCurrentStateSQL, roomID,
 		pq.StringArray(senders),
 		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
 		stateFilter.ContainsURL,
 		pq.StringArray(excludeEventIDs),
-	)
+	).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -303,43 +327,51 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	return rowsToEvents(rows)
 }
 
-func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
-	ctx context.Context, txn *sql.Tx, eventID string,
+// DeleteRoomStateByEventID deletes the room state for a given event ID.
+func (t *currentRoomStateTable) DeleteRoomStateByEventID(
+	ctx context.Context, eventID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateByEventIDStmt)
-	_, err := stmt.ExecContext(ctx, eventID)
-	return err
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.deleteRoomStateByEventIDSQL, eventID)
+	return result.Error
 }
 
-func (s *currentRoomStateStatements) DeleteRoomStateForRoom(
-	ctx context.Context, txn *sql.Tx, roomID string,
+// DeleteRoomStateForRoom deletes the room state for a given room ID.
+func (t *currentRoomStateTable) DeleteRoomStateForRoom(
+	ctx context.Context, roomID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateForRoomStmt)
-	_, err := stmt.ExecContext(ctx, roomID)
-	return err
+	db := t.cm.Connection(ctx, false)
+	result := db.Exec(t.deleteRoomStateForRoomSQL, roomID)
+	return result.Error
 }
 
-func (s *currentRoomStateStatements) UpsertRoomState(
-	ctx context.Context, txn *sql.Tx,
+// UpsertRoomState upserts the room state for a given event.
+func (t *currentRoomStateTable) UpsertRoomState(
+	ctx context.Context,
 	event *rstypes.HeaderedEvent, membership *string, addedAt types.StreamPosition,
 ) error {
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
 	var content map[string]interface{}
-	if json.Unmarshal(event.Content(), &content) != nil {
-		// Set containsURL to true if url is present
+	if err := json.Unmarshal(event.Content(), &content); err != nil {
+		// Set containsURL to false if there was an error unmarshalling the content
+		// This means that we can't check whether the event contains a URL, so we
+		// shouldn't consider this event as one that contains a URL
+	} else {
+		// Contains url?
 		_, containsURL = content["url"]
 	}
 
+	// Marshall the event
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
 
 	// upsert state event
-	stmt := sqlutil.TxStmt(txn, s.upsertRoomStateStmt)
-	_, err = stmt.ExecContext(
-		ctx,
+	db := t.cm.Connection(ctx, false)
+	err = db.Exec(
+		t.upsertRoomStateSQL,
 		event.RoomID().String(),
 		event.EventID(),
 		event.Type(),
@@ -350,19 +382,21 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		membership,
 		addedAt,
 		event.Visibility,
-	)
+	).Error
 	return err
 }
 
-func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+// SelectEventsWithEventIDs returns the events for the given event IDs.
+func (t *currentRoomStateTable) SelectEventsWithEventIDs(
+	ctx context.Context, eventIDs []string,
 ) ([]types.StreamEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectEventsWithEventIDsStmt)
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectEventsWithEventIDsSQL, pq.Array(eventIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectEventsWithEventIDs: rows.close() failed")
+
 	return currentRoomStateRowsToStreamEvents(rows)
 }
 
@@ -410,76 +444,77 @@ func rowsToEvents(rows *sql.Rows) ([]*rstypes.HeaderedEvent, error) {
 		}
 		result = append(result, &ev)
 	}
-	return result, rows.Err()
+	return result, nil
 }
 
-func (s *currentRoomStateStatements) SelectStateEvent(
-	ctx context.Context, txn *sql.Tx, roomID, evType, stateKey string,
+// SelectStateEvent returns the current state event for the given event type and state key in the given room.
+func (t *currentRoomStateTable) SelectStateEvent(
+	ctx context.Context, roomID, evType, stateKey string,
 ) (*rstypes.HeaderedEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectStateEventStmt)
-	var res []byte
-	err := stmt.QueryRowContext(ctx, roomID, evType, stateKey).Scan(&res)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectStateEventSQL, roomID, evType, stateKey).Row()
+
+	var eventBytes []byte
+	err := row.Scan(&eventBytes)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
+
 	var ev rstypes.HeaderedEvent
-	if err = json.Unmarshal(res, &ev); err != nil {
+	if err = json.Unmarshal(eventBytes, &ev); err != nil {
 		return nil, err
 	}
-	return &ev, err
+
+	return &ev, nil
 }
 
-func (s *currentRoomStateStatements) SelectSharedUsers(
-	ctx context.Context, txn *sql.Tx, userID string, otherUserIDs []string,
+// SelectSharedUsers returns a subset of otherUserIDs that share a room with userID.
+func (t *currentRoomStateTable) SelectSharedUsers(
+	ctx context.Context, userID string, otherUserIDs []string,
 ) ([]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectSharedUsersStmt)
-	rows, err := stmt.QueryContext(ctx, userID, pq.Array(otherUserIDs))
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectSharedUsersSQL, userID, pq.Array(otherUserIDs)).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectSharedUsersStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectSharedUsers: rows.close() failed")
 
-	var stateKey string
-	result := make([]string, 0, len(otherUserIDs))
+	var result []string
+	var sharedUserID string
 	for rows.Next() {
-		if err := rows.Scan(&stateKey); err != nil {
+		if err = rows.Scan(&sharedUserID); err != nil {
 			return nil, err
 		}
-		result = append(result, stateKey)
+		result = append(result, sharedUserID)
 	}
 	return result, rows.Err()
 }
 
-func (s *currentRoomStateStatements) SelectRoomHeroes(ctx context.Context, txn *sql.Tx, roomID, excludeUserID string, memberships []string) ([]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomHeroesStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, pq.StringArray(memberships), excludeUserID)
+// SelectRoomHeroes returns up to 5 users joined or invited to a room.
+func (t *currentRoomStateTable) SelectRoomHeroes(ctx context.Context, roomID, excludeUserID string, memberships []string) ([]string, error) {
+	db := t.cm.Connection(ctx, true)
+	rows, err := db.Raw(t.selectRoomHeroesSQL, roomID, pq.Array(memberships), excludeUserID).Rows()
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomHeroesStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomHeroes: rows.close() failed")
 
-	var stateKey string
-	result := make([]string, 0, 5)
+	var heroes []string
 	for rows.Next() {
-		if err = rows.Scan(&stateKey); err != nil {
+		var hero string
+		if err = rows.Scan(&hero); err != nil {
 			return nil, err
 		}
-		result = append(result, stateKey)
+		heroes = append(heroes, hero)
 	}
-	return result, rows.Err()
+	return heroes, rows.Err()
 }
 
-func (s *currentRoomStateStatements) SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string) (count int, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMembershipCountStmt)
-	err = stmt.QueryRowContext(ctx, roomID, membership).Scan(&count)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, nil
-		}
-		return 0, err
-	}
-	return count, nil
+func (t *currentRoomStateTable) SelectMembershipCount(ctx context.Context, roomID, membership string) (count int, err error) {
+	db := t.cm.Connection(ctx, true)
+	err = db.Raw(t.selectMembershipCountSQL, roomID, membership).Row().Scan(&count)
+	return
 }

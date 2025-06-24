@@ -2,23 +2,23 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
-	log "github.com/sirupsen/logrus"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 )
 
+// openIDTokenSchema defines the schema for the openid tokens table.
 const openIDTokenSchema = `
 -- Stores data about openid tokens issued for accounts.
 CREATE TABLE IF NOT EXISTS userapi_openid_tokens (
 	-- The value of the token issued to a user
 	token TEXT NOT NULL PRIMARY KEY,
-    -- The Matrix user ID for this account
+    -- The Global user ID for this account
 	localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
 	-- When the token expires, as a unix timestamp (ms resolution).
@@ -26,65 +26,81 @@ CREATE TABLE IF NOT EXISTS userapi_openid_tokens (
 );
 `
 
+// openIDTokenSchemaRevert defines how to revert the openid tokens table schema.
+const openIDTokenSchemaRevert = `
+DROP TABLE IF EXISTS userapi_openid_tokens;
+`
+
+// insertOpenIDTokenSQL is used to insert a new token into the database.
 const insertOpenIDTokenSQL = "" +
 	"INSERT INTO userapi_openid_tokens(token, localpart, server_name, token_expires_at_ms) VALUES ($1, $2, $3, $4)"
 
+// selectOpenIDTokenSQL is used to retrieve a token from the database.
 const selectOpenIDTokenSQL = "" +
 	"SELECT localpart, server_name, token_expires_at_ms FROM userapi_openid_tokens WHERE token = $1"
 
-type openIDTokenStatements struct {
-	insertTokenStmt *sql.Stmt
-	selectTokenStmt *sql.Stmt
-	serverName      spec.ServerName
+type openIDTable struct {
+	cm             sqlutil.ConnectionManager
+	serverName     spec.ServerName
+	insertTokenSQL string
+	selectTokenSQL string
 }
 
-func NewPostgresOpenIDTable(db *sql.DB, serverName spec.ServerName) (tables.OpenIDTable, error) {
-	s := &openIDTokenStatements{
-		serverName: serverName,
+// NewPostgresOpenIDTable creates a new postgres openid table.
+func NewPostgresOpenIDTable(ctx context.Context, cm sqlutil.ConnectionManager, serverName spec.ServerName) (tables.OpenIDTable, error) {
+	t := &openIDTable{
+		cm:             cm,
+		serverName:     serverName,
+		insertTokenSQL: insertOpenIDTokenSQL,
+		selectTokenSQL: selectOpenIDTokenSQL,
 	}
-	_, err := db.Exec(openIDTokenSchema)
+
+	// Perform schema migration
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "userapi_openid_tokens_table_schema_001",
+		Patch:       openIDTokenSchema,
+		RevertPatch: openIDTokenSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertTokenStmt, insertOpenIDTokenSQL},
-		{&s.selectTokenStmt, selectOpenIDTokenSQL},
-	}.Prepare(db)
+
+	return t, nil
 }
 
-// insertToken inserts a new OpenID Connect token to the DB.
+// InsertOpenIDToken inserts a new OpenID Connect token to the DB.
 // Returns new token, otherwise returns error if the token already exists.
-func (s *openIDTokenStatements) InsertOpenIDToken(
+func (t *openIDTable) InsertOpenIDToken(
 	ctx context.Context,
-	txn *sql.Tx,
 	token, localpart string, serverName spec.ServerName,
 	expiresAtMS int64,
 ) (err error) {
-	stmt := sqlutil.TxStmt(txn, s.insertTokenStmt)
-	_, err = stmt.ExecContext(ctx, token, localpart, serverName, expiresAtMS)
+	db := t.cm.Connection(ctx, false)
+	err = db.Exec(t.insertTokenSQL, token, localpart, serverName, expiresAtMS).Error
 	return
 }
 
-// selectOpenIDTokenAtrributes gets the attributes associated with an OpenID token from the DB
+// SelectOpenIDTokenAtrributes gets the attributes associated with an OpenID token from the DB
 // Returns the existing token's attributes, or err if no token is found
-func (s *openIDTokenStatements) SelectOpenIDTokenAtrributes(
+func (t *openIDTable) SelectOpenIDTokenAtrributes(
 	ctx context.Context,
 	token string,
 ) (*api.OpenIDTokenAttributes, error) {
 	var openIDTokenAttrs api.OpenIDTokenAttributes
 	var localpart string
 	var serverName spec.ServerName
-	err := s.selectTokenStmt.QueryRowContext(ctx, token).Scan(
-		&localpart, &serverName,
-		&openIDTokenAttrs.ExpiresAtMS,
-	)
-	openIDTokenAttrs.UserID = fmt.Sprintf("@%s:%s", localpart, serverName)
+
+	db := t.cm.Connection(ctx, true)
+	row := db.Raw(t.selectTokenSQL, token).Row()
+	err := row.Scan(&localpart, &serverName, &openIDTokenAttrs.ExpiresAtMS)
+
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			log.WithError(err).Error("Unable to retrieve token from the db")
+		if !sqlutil.ErrorIsNoRows(err) {
+			util.Log(ctx).WithError(err).Error("Unable to retrieve token from the db")
 		}
 		return nil, err
 	}
 
+	openIDTokenAttrs.UserID = fmt.Sprintf("@%s:%s", localpart, serverName)
 	return &openIDTokenAttrs, nil
 }

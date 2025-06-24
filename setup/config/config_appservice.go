@@ -26,14 +26,15 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/antinvestor/matrix/setup/constants"
+	"github.com/pitabwire/util"
 	"gopkg.in/yaml.v3"
 )
 
 const UnixSocketPrefix = "unix://"
 
 type AppServiceAPI struct {
-	Matrix  *Global  `yaml:"-"`
+	Global  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
 
 	// DisableTLSValidation disables the validation of X.509 TLS certs
@@ -44,12 +45,15 @@ type AppServiceAPI struct {
 	LegacyPaths bool `yaml:"legacy_paths"`
 
 	ConfigFiles []string `yaml:"config_files"`
+
+	Queues AppServiceQueues `yaml:"queues"`
 }
 
 func (c *AppServiceAPI) Defaults(opts DefaultOpts) {
+	c.Queues.Defaults(opts)
 }
 
-func (c *AppServiceAPI) Verify(configErrs *ConfigErrors) {
+func (c *AppServiceAPI) Verify(configErrs *Errors) {
 }
 
 // ApplicationServiceNamespace is the namespace that a specific application
@@ -71,7 +75,7 @@ type ApplicationServiceNamespace struct {
 	RegexpObject *regexp.Regexp
 }
 
-// ApplicationService represents a Matrix application service.
+// ApplicationService represents a Global application service.
 // https://matrix.org/docs/spec/application_service/unstable.html
 type ApplicationService struct {
 	// User-defined, unique, persistent ID of the application service
@@ -84,7 +88,7 @@ type ApplicationService struct {
 	HSToken string `yaml:"hs_token"`
 	// Localpart of application service user
 	SenderLocalpart string `yaml:"sender_localpart"`
-	// Information about an application service's namespaces. Key is either
+	// Information about an application service's namespaces. K is either
 	// "users", "aliases" or "rooms"
 	NamespaceMap map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
 	// Whether rate limiting is applied to each application service user
@@ -246,7 +250,7 @@ func setupRegexps(asAPI *AppServiceAPI, derived *Derived) (err error) {
 		}
 		appservice.NamespaceMap["users"] = append(users, ApplicationServiceNamespace{
 			Exclusive: true,
-			Regex:     regexp.QuoteMeta(fmt.Sprintf("@%s:%s", appservice.SenderLocalpart, asAPI.Matrix.ServerName)),
+			Regex:     regexp.QuoteMeta(fmt.Sprintf("@%s:%s", appservice.SenderLocalpart, asAPI.Global.ServerName)),
 		})
 
 		for key, namespaceSlice := range appservice.NamespaceMap {
@@ -324,6 +328,9 @@ func compileNamespaceRegexes(namespaces []ApplicationServiceNamespace) (err erro
 // checkErrors checks for any configuration errors amongst the loaded
 // application services according to the application service spec.
 func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
+
+	log := util.Log(context.TODO())
+
 	var idMap = make(map[string]bool)
 	var tokenMap = make(map[string]bool)
 
@@ -343,16 +350,16 @@ func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
 
 		// Check required fields
 		if appservice.ID == "" {
-			return ConfigErrors([]string{"Application service ID is required"})
+			return Errors([]string{"Application service ID is required"})
 		}
 		if appservice.ASToken == "" {
-			return ConfigErrors([]string{"Application service Token is required"})
+			return Errors([]string{"Application service Token is required"})
 		}
 		if appservice.HSToken == "" {
-			return ConfigErrors([]string{"Homeserver Token is required"})
+			return Errors([]string{"Homeserver Token is required"})
 		}
 		if appservice.SenderLocalpart == "" {
-			return ConfigErrors([]string{"Sender Localpart is required"})
+			return Errors([]string{"Sender Localpart is required"})
 		}
 
 		// Check if the url has trailing /'s. If so, remove them
@@ -361,13 +368,13 @@ func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
 		// Check if we've already seen this ID. No two application services
 		// can have the same ID or token.
 		if idMap[appservice.ID] {
-			return ConfigErrors([]string{fmt.Sprintf(
+			return Errors([]string{fmt.Sprintf(
 				"Application service ID %s must be unique", appservice.ID,
 			)})
 		}
 		// Check if we've already seen this token
 		if tokenMap[appservice.ASToken] {
-			return ConfigErrors([]string{fmt.Sprintf(
+			return Errors([]string{fmt.Sprintf(
 				"Application service Token %s must be unique", appservice.ASToken,
 			)})
 		}
@@ -401,7 +408,7 @@ func validateNamespace(
 ) error {
 	// Check that namespace(s) are valid regex
 	if !IsValidRegex(namespace.Regex) {
-		return ConfigErrors([]string{fmt.Sprintf(
+		return Errors([]string{fmt.Sprintf(
 			"Invalid regex string for Application Service %s", appservice.ID,
 		)})
 	}
@@ -409,11 +416,11 @@ func validateNamespace(
 	// Check if GroupID for the users namespace is in the correct format
 	if key == "users" && namespace.GroupID != "" {
 		// TODO: Remove once group_id is implemented
-		log.Warn("WARNING: Application service option group_id is currently unimplemented")
+		util.Log(context.TODO()).Warn("WARNING: Application service option group_id is currently unimplemented")
 
 		correctFormat := groupIDRegexp.MatchString(namespace.GroupID)
 		if !correctFormat {
-			return ConfigErrors([]string{fmt.Sprintf(
+			return Errors([]string{fmt.Sprintf(
 				"Invalid user group_id field for application service %s.",
 				appservice.ID,
 			)})
@@ -429,4 +436,18 @@ func IsValidRegex(regexString string) bool {
 	_, err := regexp.Compile(regexString)
 
 	return err == nil
+}
+
+type AppServiceQueues struct {
+
+	// durable - Appservice_
+	OutputAppserviceEvent QueueOptions `yaml:"output_appservice_event"`
+}
+
+func (q *AppServiceQueues) Defaults(opts DefaultOpts) {
+	q.OutputAppserviceEvent = opts.defaultQ(constants.OutputAppserviceEvent)
+}
+
+func (q *AppServiceQueues) Verify(configErrs *Errors) {
+	checkNotEmpty(configErrs, "appservice.queues.output_appservice_event", string(q.OutputAppserviceEvent.DS))
 }

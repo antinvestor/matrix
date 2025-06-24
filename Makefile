@@ -1,4 +1,3 @@
-
 ENV_LOCAL_TEST=\
   TESTING_DATABASE_URI=postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable \
   POSTGRES_PASSWORD=s3cr3t \
@@ -16,13 +15,18 @@ FILES		?= $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 
 
-default: help
+default: generate-grpc format build
 
 help:   ## show this help
 	@echo 'usage: make [target] ...'
 	@echo ''
 	@echo 'targets:'
 	@egrep '^(.+)\:\ .*##\ (.+)' ${MAKEFILE_LIST} | sed 's/:.*##/#/' | column -t -c 2 -s '#'
+
+format:
+	find . -name '*.go' -not -path './.git/*' -exec sed -i '/^import (/,/^)/{/^$$/d}' {} +
+	find . -name '*.go' -not -path './.git/*' -exec goimports -w {} +
+	golangci-lint run --fix
 
 clean:  ## go clean
 	go clean
@@ -36,8 +40,12 @@ vet:    ## run go vet on the source files
 doc:    ## generate godocs and start a local documentation webserver on port 8085
 	godoc -http=:8085 -index
 
-goimports:
-	find . -name \*.go -not -path .git -exec goimports -w {} \;
+.PHONY: build generate-grpc
+
+generate-grpc:
+	@echo "Generating gRPC code..."
+	@cd apis && ./generate.sh
+	@echo "gRPC code generation completed"
 
 # this command will start docker components that we set in docker-compose.yml
 docker-setup: ## sets up docker container images

@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,21 +22,18 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrix"
-	"github.com/antinvestor/gomatrixserverlib/tokens"
-	"github.com/pitabwire/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
-
-	"github.com/antinvestor/matrix/roomserver/types"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/gomatrixserverlib/tokens"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/transactions"
 	"github.com/antinvestor/matrix/roomserver/api"
+	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Unspecced server notice request
@@ -65,6 +62,9 @@ func SendServerNotice(
 	txnID *string,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
+
+	log := util.Log(req.Context())
+
 	if device.AccountType != userapi.AccountTypeAdmin {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -114,7 +114,7 @@ func SendServerNotice(
 	}
 
 	// get rooms of the sender
-	senderUserID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName), true)
+	senderUserID, err := spec.NewUserID(fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Global.ServerName), true)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -149,15 +149,15 @@ func SendServerNotice(
 	if len(commonRooms) == 0 {
 		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID.String())
 		powerLevelContent.Users[r.UserID] = -10 // taken from Synapse
-		pl, err := json.Marshal(powerLevelContent)
-		if err != nil {
-			return util.ErrorResponse(err)
+		pl, err0 := json.Marshal(powerLevelContent)
+		if err0 != nil {
+			return util.ErrorResponse(err0)
 		}
 		createContent := map[string]interface{}{}
 		createContent["m.federate"] = false
-		cc, err := json.Marshal(createContent)
-		if err != nil {
-			return util.ErrorResponse(err)
+		cc, err0 := json.Marshal(createContent)
+		if err0 != nil {
+			return util.ErrorResponse(err0)
 		}
 		crReq := createRoomRequest{
 			Invite:                    []string{r.UserID},
@@ -181,8 +181,8 @@ func SendServerNotice(
 					Order: 1.0,
 				},
 			}}
-			if err = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("saveTagData failed")
+			if err0 = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err0 != nil {
+				util.Log(ctx).WithError(err0).Error("saveTagData failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -195,8 +195,8 @@ func SendServerNotice(
 		}
 	} else {
 		// we've found a room in common, check the membership
-		deviceUserID, err := spec.NewUserID(r.UserID, true)
-		if err != nil {
+		deviceUserID, err0 := spec.NewUserID(r.UserID, true)
+		if err0 != nil {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden("userID doesn't have power level to change visibility"),
@@ -205,17 +205,18 @@ func SendServerNotice(
 
 		roomID = commonRooms[0].String()
 		membershipRes := api.QueryMembershipForUserResponse{}
-		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("unable to query membership for user")
+		err0 = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: *deviceUserID, RoomID: roomID}, &membershipRes)
+		if err0 != nil {
+			util.Log(ctx).WithError(err0).Error("unable to query membership for user")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
 			}
 		}
 		if !membershipRes.IsInRoom {
+			var res util.JSONResponse
 			// re-invite the user
-			res, err := sendInvite(ctx, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, time.Now())
+			res, err = sendInvite(ctx, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, time.Now())
 			if err != nil {
 				return res
 			}
@@ -230,7 +231,7 @@ func SendServerNotice(
 	}
 	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, rsAPI, time.Now())
 	if resErr != nil {
-		logrus.Errorf("failed to send message: %+v", resErr)
+		log.WithField("error", resErr).Error("failed to send message")
 		return *resErr
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)
@@ -246,29 +247,25 @@ func SendServerNotice(
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	startedSubmittingEvent := time.Now()
-	if err := api.SendEvents(
+	if err = api.SendEvents(
 		ctx, rsAPI,
 		api.KindNew,
 		[]*types.HeaderedEvent{
 			{PDU: e},
 		},
 		device.UserDomain(),
-		cfgClient.Matrix.ServerName,
-		cfgClient.Matrix.ServerName,
+		cfgClient.Global.ServerName,
+		cfgClient.Global.ServerName,
 		txnAndSessionID,
 		false,
 	); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
+		log.WithError(err).Error("SendEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
-	util.GetLogger(ctx).WithFields(logrus.Fields{
-		"event_id":     e.EventID(),
-		"room_id":      roomID,
-		"room_version": roomVersion,
-	}).Info("Sent event to roomserver")
+	log.WithField("event_id", e.EventID()).WithField("room_id", roomID).WithField("room_version", roomVersion).Info("Sent event to roomserver")
 	timeToSubmitEvent := time.Since(startedSubmittingEvent)
 
 	res := util.JSONResponse{
@@ -310,8 +307,8 @@ func getSenderDevice(
 	// create account if it doesn't exist
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
 		AccountType: userapi.AccountTypeUser,
-		Localpart:   cfg.Matrix.ServerNotices.LocalPart,
-		ServerName:  cfg.Matrix.ServerName,
+		Localpart:   cfg.Global.ServerNotices.LocalPart,
+		ServerName:  cfg.Global.ServerName,
 		OnConflict:  userapi.ConflictUpdate,
 	}, &accRes)
 	if err != nil {
@@ -320,28 +317,28 @@ func getSenderDevice(
 
 	// Set the avatarurl for the user
 	profile, avatarChanged, err := userAPI.SetAvatarURL(ctx,
-		cfg.Matrix.ServerNotices.LocalPart,
-		cfg.Matrix.ServerName,
-		cfg.Matrix.ServerNotices.AvatarURL,
+		cfg.Global.ServerNotices.LocalPart,
+		cfg.Global.ServerName,
+		cfg.Global.ServerNotices.AvatarURL,
 	)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
+		util.Log(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
 		return nil, err
 	}
 
 	// Set the displayname for the user
 	_, displayNameChanged, err := userAPI.SetDisplayName(ctx,
-		cfg.Matrix.ServerNotices.LocalPart,
-		cfg.Matrix.ServerName,
-		cfg.Matrix.ServerNotices.DisplayName,
+		cfg.Global.ServerNotices.LocalPart,
+		cfg.Global.ServerName,
+		cfg.Global.ServerNotices.DisplayName,
 	)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
+		util.Log(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
 		return nil, err
 	}
 
 	if displayNameChanged {
-		profile.DisplayName = cfg.Matrix.ServerNotices.DisplayName
+		profile.DisplayName = cfg.Global.ServerNotices.DisplayName
 	}
 
 	// Check if we got existing devices
@@ -367,8 +364,8 @@ func getSenderDevice(
 
 	// create an AccessToken
 	token, err := tokens.GenerateLoginToken(tokens.TokenOptions{
-		ServerPrivateKey: cfg.Matrix.PrivateKey.Seed(),
-		ServerName:       string(cfg.Matrix.ServerName),
+		ServerPrivateKey: cfg.Global.PrivateKey.Seed(),
+		ServerName:       string(cfg.Global.ServerName),
 		UserID:           accRes.Account.UserID,
 	})
 	if err != nil {
@@ -378,9 +375,9 @@ func getSenderDevice(
 	// create a new device, if we didn't find any
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
-		Localpart:          cfg.Matrix.ServerNotices.LocalPart,
-		ServerName:         cfg.Matrix.ServerName,
-		DeviceDisplayName:  &cfg.Matrix.ServerNotices.LocalPart,
+		Localpart:          cfg.Global.ServerNotices.LocalPart,
+		ServerName:         cfg.Global.ServerName,
+		DeviceDisplayName:  &cfg.Global.ServerNotices.LocalPart,
 		AccessToken:        token,
 		NoDeviceListUpdate: true,
 	}, &devRes)

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 package httputil
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,17 +25,15 @@ import (
 	"os"
 	"strings"
 
+	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/clientapi/auth"
+	"github.com/antinvestor/matrix/internal"
+	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/getsentry/sentry-go"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
-
-	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/clientapi/auth"
-	"github.com/antinvestor/matrix/internal"
-	userapi "github.com/antinvestor/matrix/userapi/api"
 )
 
 // BasicAuth is used for authorization on /metrics handlers
@@ -73,15 +72,15 @@ func MakeAuthAPI(
 	checks ...AuthAPIOption,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
-		logger := util.GetLogger(req.Context())
+		log := util.Log(req.Context())
 		device, err := auth.VerifyUserFromRequest(req, userAPI)
 		if err != nil {
-			logger.Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
+			log.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
 			return *err
 		}
-		// add the user ID to the logger
-		logger = logger.WithField("user_id", device.UserID)
-		req = req.WithContext(util.ContextWithLogger(req.Context(), logger))
+		// add the user ID to the log
+		log = log.WithField("user_id", device.UserID)
+		req = req.WithContext(util.ContextWithLogger(req.Context(), log))
 		// add the user to Sentry, if enabled
 		hub := sentry.GetHubFromContext(req.Context())
 		if hub != nil {
@@ -155,7 +154,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		nextWriter := w
 		if verbose {
-			logger := logrus.NewEntry(logrus.StandardLogger())
+			logger := util.Log(req.Context())
 			// Log outgoing response
 			rec := httptest.NewRecorder()
 			nextWriter = rec
@@ -163,7 +162,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 				resp := rec.Result()
 				dump, err := httputil.DumpResponse(resp, true)
 				if err != nil {
-					logger.Debugf("Failed to dump outgoing response: %s", err)
+					logger.Debug("Failed to dump outgoing response: %s", err)
 				} else {
 					strSlice := strings.Split(string(dump), "\n")
 					for _, s := range strSlice {
@@ -185,7 +184,7 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 			// Log incoming request
 			dump, err := httputil.DumpRequest(req, true)
 			if err != nil {
-				logger.Debugf("Failed to dump incoming request: %s", err)
+				logger.Debug("Failed to dump incoming request: %s", err)
 			} else {
 				strSlice := strings.Split(string(dump), "\n")
 				for _, s := range strSlice {
@@ -225,7 +224,7 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 		}
 
 		if opts.WithAuth {
-			logger := util.GetLogger(req.Context())
+			logger := util.Log(req.Context())
 			_, jsonErr := auth.VerifyUserFromRequest(req, userAPI)
 			if jsonErr != nil {
 				w.WriteHeader(jsonErr.Code)
@@ -258,8 +257,10 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics
 func WrapHandlerInBasicAuth(h http.Handler, b BasicAuth) http.HandlerFunc {
+	logger := util.Log(context.TODO())
+
 	if b.Username == "" || b.Password == "" {
-		logrus.Warn("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
+		logger.Warn("Metrics are exposed without protection. Make sure you set up protection at proxy level.")
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Serve without authorization if either Username or Password is unset

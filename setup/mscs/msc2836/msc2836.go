@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -105,10 +105,15 @@ func toClientResponse(ctx context.Context, res *MSC2836EventRelationshipsRespons
 
 // Enable this MSC
 func Enable(
-	ctx context.Context, cfg *config.Dendrite, cm *sqlutil.Connections, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
+	ctx context.Context, cfg *config.Matrix, cm sqlutil.ConnectionManager, routers httputil.Routers, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
-	db, err := NewDatabase(ctx, cm, &cfg.MSCs.Database)
+	mscCm, err := cm.FromOptions(ctx, &cfg.MSCs.Database)
+	if err != nil {
+		return fmt.Errorf("cannot obtain  MSC2836 connection manager: %w", err)
+	}
+
+	db, err := NewDatabase(ctx, mscCm)
 	if err != nil {
 		return fmt.Errorf("cannot enable MSC2836: %w", err)
 	}
@@ -117,7 +122,7 @@ func Enable(
 		he := headeredEvent.(*types.HeaderedEvent)
 		hookErr := db.StoreRelation(ctx, he)
 		if hookErr != nil {
-			util.GetLogger(ctx).WithError(hookErr).WithField("event_id", he.EventID()).Error(
+			util.Log(ctx).WithError(hookErr).WithField("event_id", he.EventID()).Error(
 				"failed to StoreRelation",
 			)
 		}
@@ -125,7 +130,7 @@ func Enable(
 		// so we catch child metadata originating from /send transactions
 		hookErr = db.UpdateChildMetadata(ctx, he)
 		if hookErr != nil {
-			util.GetLogger(ctx).WithError(err).WithField("event_id", he.EventID()).Warn(
+			util.Log(ctx).WithError(err).WithField("event_id", he.EventID()).Warn(
 				"failed to update child metadata for event",
 			)
 		}
@@ -166,7 +171,7 @@ func eventRelationshipHandler(db Database, rsAPI roomserver.RoomserverInternalAP
 	return func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		relation, err := NewEventRelationshipRequest(req.Body)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("failed to decode HTTP request as JSON")
+			util.Log(req.Context()).WithError(err).Error("failed to decode HTTP request as JSON")
 			return util.JSONResponse{
 				Code: 400,
 				JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
@@ -204,7 +209,7 @@ func federatedEventRelationship(
 ) util.JSONResponse {
 	relation, err := NewEventRelationshipRequest(bytes.NewBuffer(fedReq.Content()))
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to decode HTTP request as JSON")
+		util.Log(ctx).WithError(err).Error("failed to decode HTTP request as JSON")
 		return util.JSONResponse{
 			Code: 400,
 			JSON: spec.BadJSON(fmt.Sprintf("invalid json: %s", err)),
@@ -241,7 +246,7 @@ func federatedEventRelationship(
 	}, &queryRes)
 	if err != nil {
 		// they may already have the auth events so don't fail this request
-		util.GetLogger(ctx).WithError(err).Error("Failed to QueryAuthChain")
+		util.Log(ctx).WithError(err).Error("Failed to QueryAuthChain")
 	}
 	res.AuthChain = make(gomatrixserverlib.EventJSONs, len(queryRes.AuthChain))
 	for i := range queryRes.AuthChain {
@@ -329,7 +334,7 @@ func (rc *reqCtx) fetchUnknownEvent(ctx context.Context, eventID, roomID string)
 		// we don't do fed hits for fed requests, and we can't ask servers without a room ID!
 		return nil
 	}
-	logger := util.GetLogger(ctx).WithField("room_id", roomID)
+	logger := util.Log(ctx).WithField("room_id", roomID)
 	// if they supplied a room_id, check the room exists.
 
 	roomVersion, err := rc.rsAPI.QueryRoomVersionForRoom(ctx, roomID)
@@ -414,7 +419,7 @@ func (rc *reqCtx) includeChildren(ctx context.Context, db Database, parentID str
 				RecentFirst: true,
 			}, rc.roomVersion)
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).WithField("server", srv).Error("includeChildren: failed to call MSC2836EventRelationships")
+				util.Log(ctx).WithError(err).WithField("server", srv).Error("includeChildren: failed to call MSC2836EventRelationships")
 			} else {
 				mscRes := &MSC2836EventRelationshipsResponse{
 					MSC2836EventRelationshipsResponse: res,
@@ -428,11 +433,11 @@ func (rc *reqCtx) includeChildren(ctx context.Context, db Database, parentID str
 		if result != nil {
 			rc.injectResponseToRoomserver(ctx, result)
 		}
-		// fallthrough to pull these new events from the DB
+		// fallthrough to pull these new events from the Cm
 	}
 	children, err := db.ChildrenForParent(ctx, parentID, constRelType, recentFirst)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to get ChildrenForParent")
+		util.Log(ctx).WithError(err).Error("failed to get ChildrenForParent")
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -476,7 +481,7 @@ func walkThread(
 			// if event is not found, use remoteEventRelationships to explore that part of the thread remotely.
 			// This will probably be easiest if the event relationships response is directly pumped into the database
 			// so the next walk will do the right thing. This requires those events to be authed and likely injected as
-			// outliers into the roomserver DB, which will de-dupe appropriately.
+			// outliers into the roomserver Cm, which will de-dupe appropriately.
 			event := rc.lookForEvent(ctx, wi.EventID)
 			if event != nil {
 				result = append(result, event)
@@ -487,7 +492,7 @@ func walkThread(
 	}
 	limited, err := eventWalker.WalkFrom(rc.req.EventID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("Failed to WalkFrom %s", rc.req.EventID)
+		util.Log(ctx).WithError(err).Error("Failed to WalkFrom %s", rc.req.EventID)
 	}
 	return result, limited
 }
@@ -504,7 +509,7 @@ func (rc *reqCtx) MSC2836EventRelationships(ctx context.Context, eventID string,
 		RecentFirst: rc.req.RecentFirst,
 	}, ver)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to call MSC2836EventRelationships")
+		util.Log(ctx).WithError(err).Error("Failed to call MSC2836EventRelationships")
 		return nil, err
 	}
 	mscRes := &MSC2836EventRelationshipsResponse{
@@ -526,7 +531,7 @@ func (rc *reqCtx) authorisedToSeeEvent(ctx context.Context, event *types.Headere
 			RoomID: event.RoomID().String(),
 		}, &res)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("authorisedToSeeEvent: failed to QueryJoinedHostServerNamesInRoom")
+			util.Log(ctx).WithError(err).Error("authorisedToSeeEvent: failed to QueryJoinedHostServerNamesInRoom")
 			return false
 		}
 		for _, srv := range res.ServerNames {
@@ -546,7 +551,7 @@ func (rc *reqCtx) authorisedToSeeEvent(ctx context.Context, event *types.Headere
 		UserID: rc.userID,
 	}, &queryMembershipRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("authorisedToSeeEvent: failed to QueryMembershipForUser")
+		util.Log(ctx).WithError(err).Error("authorisedToSeeEvent: failed to QueryMembershipForUser")
 		return false
 	}
 	return queryMembershipRes.IsInRoom
@@ -554,14 +559,14 @@ func (rc *reqCtx) authorisedToSeeEvent(ctx context.Context, event *types.Headere
 
 func (rc *reqCtx) getServersForEventID(ctx context.Context, eventID string) []spec.ServerName {
 	if rc.req.RoomID == "" {
-		util.GetLogger(ctx).WithField("event_id", eventID).Error(
+		util.Log(ctx).WithField("event_id", eventID).Error(
 			"getServersForEventID: event exists in unknown room",
 		)
 		return nil
 	}
 	if rc.roomVersion == "" {
-		util.GetLogger(ctx).WithField("event_id", eventID).Errorf(
-			"getServersForEventID: event exists in %s with unknown room version", rc.req.RoomID,
+		util.Log(ctx).WithField("event_id", eventID).WithField("room_id", rc.req.RoomID).Error(
+			"getServersForEventID: event exists in room with unknown room version",
 		)
 		return nil
 	}
@@ -570,7 +575,7 @@ func (rc *reqCtx) getServersForEventID(ctx context.Context, eventID string) []sp
 		RoomID: rc.req.RoomID,
 	}, &queryRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("getServersForEventID: failed to QueryJoinedHostServerNamesInRoom")
+		util.Log(ctx).WithError(err).Error("getServersForEventID: failed to QueryJoinedHostServerNamesInRoom")
 		return nil
 	}
 	// query up to 5 servers
@@ -591,7 +596,7 @@ func (rc *reqCtx) remoteEventRelationships(ctx context.Context, eventID string) 
 	for _, srv := range serversToQuery {
 		res, err = rc.MSC2836EventRelationships(ctx, eventID, srv, rc.roomVersion)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).WithField("server", srv).Error("remoteEventRelationships: failed to call MSC2836EventRelationships")
+			util.Log(ctx).WithError(err).WithField("server", srv).Error("remoteEventRelationships: failed to call MSC2836EventRelationships")
 		} else {
 			break
 		}
@@ -622,7 +627,7 @@ func (rc *reqCtx) lookForEvent(ctx context.Context, eventID string) *types.Heade
 			rc.injectResponseToRoomserver(ctx, queryRes)
 			err := rc.db.MarkChildrenExplored(ctx, eventID)
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).Warnf("failed to mark children of %s as explored", eventID)
+				util.Log(ctx).WithError(err).Warn("failed to mark children of %s as explored", eventID)
 			}
 		}
 	}
@@ -639,11 +644,11 @@ func (rc *reqCtx) getLocalEvent(ctx context.Context, roomID, eventID string) *ty
 		EventIDs: []string{eventID},
 	}, &queryEventsRes)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("getLocalEvent: failed to QueryEventsByID")
+		util.Log(ctx).WithError(err).Error("getLocalEvent: failed to QueryEventsByID")
 		return nil
 	}
 	if len(queryEventsRes.Events) == 0 {
-		util.GetLogger(ctx).WithField("event_id", eventID).Infof("getLocalEvent: event does not exist")
+		util.Log(ctx).WithField("event_id", eventID).Info("getLocalEvent: event does not exist")
 		return nil // event does not exist
 	}
 	return queryEventsRes.Events[0]
@@ -678,7 +683,7 @@ func (rc *reqCtx) injectResponseToRoomserver(ctx context.Context, res *MSC2836Ev
 	// we've got the data by this point so use a background context
 	err := roomserver.SendInputRoomEvents(ctx, rc.rsAPI, rc.serverName, ires, false)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error("failed to inject MSC2836EventRelationshipsResponse into the roomserver")
+		util.Log(ctx).WithError(err).Error("failed to inject MSC2836EventRelationshipsResponse into the roomserver")
 	}
 	// update the child count / hash columns for these nodes. We need to do this here because not all events will make it
 	// through to the KindNewEventPersisted hook because the roomserver will ignore duplicates. Duplicates have meaning though
@@ -686,7 +691,7 @@ func (rc *reqCtx) injectResponseToRoomserver(ctx context.Context, res *MSC2836Ev
 	for _, ev := range ires {
 		err = rc.db.UpdateChildMetadata(ctx, ev.Event)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).WithField("event_id", ev.Event.EventID()).Warn("failed to update child metadata for event")
+			util.Log(ctx).WithError(err).WithField("event_id", ev.Event.EventID()).Warn("failed to update child metadata for event")
 		}
 	}
 }
@@ -698,20 +703,20 @@ func (rc *reqCtx) addChildMetadata(ctx context.Context, ev *types.HeaderedEvent)
 	}
 	err := ev.SetUnsignedField("children_hash", spec.Base64Bytes(hash))
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Warn("Failed to set children_hash")
+		util.Log(ctx).WithError(err).Warn("Failed to set children_hash")
 	}
 	err = ev.SetUnsignedField("children", map[string]int{
 		constRelType: count,
 	})
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Warn("Failed to set children count")
+		util.Log(ctx).WithError(err).Warn("Failed to set children count")
 	}
 }
 
 func (rc *reqCtx) getChildMetadata(ctx context.Context, eventID string) (count int, hash []byte) {
 	children, err := rc.db.ChildrenForParent(ctx, eventID, constRelType, false)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).Warn("Failed to get ChildrenForParent for getting child metadata")
+		util.Log(ctx).WithError(err).Warn("Failed to get ChildrenForParent for getting child metadata")
 		return
 	}
 	if len(children) == 0 {
@@ -744,7 +749,7 @@ func (rc *reqCtx) hasUnexploredChildren(ctx context.Context, eventID string) boo
 	// extract largest child count from event
 	eventCount, eventHash, explored, err := rc.db.ChildMetadata(ctx, eventID)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("event_id", eventID).Warn(
+		util.Log(ctx).WithError(err).WithField("event_id", eventID).Warn(
 			"failed to get ChildMetadata from db",
 		)
 		return false
@@ -786,7 +791,7 @@ type walker struct {
 func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
 	children, err := w.childrenForParent(eventID)
 	if err != nil {
-		util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
+		util.Log(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
 		return false, err
 	}
 	var next *walkInfo
@@ -800,7 +805,7 @@ func (w *walker) WalkFrom(eventID string) (limited bool, err error) {
 		// find the children's children
 		children, err = w.childrenForParent(next.EventID)
 		if err != nil {
-			util.GetLogger(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
+			util.Log(w.ctx).WithError(err).Error("WalkFrom() childrenForParent failed, cannot walk")
 			return false, err
 		}
 		toWalk = w.addChildren(toWalk, children, next.Depth+1)

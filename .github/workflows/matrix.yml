@@ -78,6 +78,7 @@ jobs:
 
       - name: Install dependencies
         run: go mod tidy
+
       - name: Run unit tests
         env:
           TESTING_QUEUE_URI: nats://matrix:s3cr3t@localhost:4221
@@ -85,7 +86,7 @@ jobs:
           TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable
         run: |
           set -euo pipefail
-          go test -json -parallel 8 -v ./... | tee /tmp/gotest.log | gotestfmt -hide all
+          go test -json -v ./... | tee /tmp/gotest.log | gotestfmt -hide all
       - name: Tear down test containers
         run: docker compose down --remove-orphans
 

@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,31 +17,34 @@ package postgres
 
 import (
 	"context"
+
+	_ "github.com/lib/pq"
+
 	// Import the postgres database driver.
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/mediaapi/storage/shared"
-	"github.com/antinvestor/matrix/setup/config"
-	_ "github.com/lib/pq"
 )
 
 // NewDatabase opens a postgres database.
-func NewDatabase(ctx context.Context, conMan *sqlutil.Connections, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
-	db, writer, err := conMan.Connection(ctx, dbProperties)
+func NewDatabase(ctx context.Context, cm sqlutil.ConnectionManager) (*shared.Database, error) {
+
+	mediaRepo, err := NewPostgresMediaRepositoryTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	mediaRepo, err := NewPostgresMediaRepositoryTable(ctx, db)
+	thumbnails, err := NewPostgresThumbnailsTable(ctx, cm)
 	if err != nil {
 		return nil, err
 	}
-	thumbnails, err := NewPostgresThumbnailsTable(ctx, db)
+
+	err = cm.Migrate(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	return &shared.Database{
 		MediaRepository: mediaRepo,
 		Thumbnails:      thumbnails,
-		DB:              db,
-		Writer:          writer,
+		Cm:              cm,
 	}, nil
 }

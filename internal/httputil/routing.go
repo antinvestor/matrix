@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"connectrpc.com/connect"
+	"connectrpc.com/validate"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/gorilla/mux"
 )
@@ -40,6 +42,7 @@ func URLDecodeMapValues(vmap map[string]string) (map[string]string, error) {
 }
 
 type Routers struct {
+	Validator     connect.Interceptor
 	Client        *mux.Router
 	Federation    *mux.Router
 	Keys          *mux.Router
@@ -51,7 +54,15 @@ type Routers struct {
 }
 
 func NewRouters() Routers {
+
+	// Create the validation interceptor provided by connectrpc.com/validate.
+	validator, err := validate.NewInterceptor()
+	if err != nil {
+		panic("error creating validation interceptor: " + err.Error())
+	}
+
 	r := Routers{
+		Validator:     validator,
 		Client:        mux.NewRouter().SkipClean(true).PathPrefix(PublicClientPathPrefix).Subrouter().UseEncodedPath(),
 		Federation:    mux.NewRouter().SkipClean(true).PathPrefix(PublicFederationPathPrefix).Subrouter().UseEncodedPath(),
 		Keys:          mux.NewRouter().SkipClean(true).PathPrefix(PublicKeyPathPrefix).Subrouter().UseEncodedPath(),

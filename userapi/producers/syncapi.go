@@ -2,60 +2,67 @@ package producers
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/matrix/internal/eventutil"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/internal/queueutil"
+	"github.com/antinvestor/matrix/setup/config"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/userapi/storage"
+	"github.com/pitabwire/util"
 )
-
-type JetStreamPublisher interface {
-	PublishMsg(*nats.Msg, ...nats.PubOpt) (*nats.PubAck, error)
-}
 
 // SyncAPI produces messages for the Sync API server to consume.
 type SyncAPI struct {
 	db                    storage.Notification
-	producer              JetStreamPublisher
-	clientDataTopic       string
-	notificationDataTopic string
+	qm                    queueutil.QueueManager
+	clientDataTopic       *config.QueueOptions
+	notificationDataTopic *config.QueueOptions
 }
 
-func NewSyncAPI(db storage.UserDatabase, js JetStreamPublisher, clientDataTopic string, notificationDataTopic string) *SyncAPI {
+func NewSyncAPI(ctx context.Context, cfg *config.SyncAPI, db storage.UserDatabase, qm queueutil.QueueManager) (*SyncAPI, error) {
+
+	// TODO: user API should handle syncs for account data. Right now,
+	// it's handled by clientapi, and hence uses its topic. When user
+	// API handles it for all account data, we can remove it from
+	// here.
+
+	err := qm.RegisterPublisher(ctx, &cfg.Queues.OutputClientData)
+	if err != nil {
+		return nil, err
+	}
+
+	err = qm.RegisterPublisher(ctx, &cfg.Queues.OutputNotificationData)
+	if err != nil {
+		return nil, err
+	}
+
 	return &SyncAPI{
 		db:                    db,
-		producer:              js,
-		clientDataTopic:       clientDataTopic,
-		notificationDataTopic: notificationDataTopic,
-	}
+		qm:                    qm,
+		clientDataTopic:       &cfg.Queues.OutputClientData,
+		notificationDataTopic: &cfg.Queues.OutputNotificationData,
+	}, nil
 }
 
 // SendAccountData sends account data to the Sync API server.
-func (p *SyncAPI) SendAccountData(userID string, data eventutil.AccountData) error {
-	m := &nats.Msg{
-		Subject: p.clientDataTopic,
-		Header:  nats.Header{},
-	}
-	m.Header.Set(jetstream.UserID, userID)
+func (p *SyncAPI) SendAccountData(ctx context.Context, userID string, data eventutil.AccountData) error {
 
-	var err error
-	m.Data, err = json.Marshal(data)
+	util.Log(ctx).
+		WithField("user_id", userID).
+		WithField("room_id", data.RoomID).
+		WithField("data_type", data.Type).
+		Debug("Producing to topic '%s'", p.clientDataTopic)
+
+	header := map[string]string{
+		constants.UserID: userID,
+	}
+
+	err := p.qm.Publish(ctx, p.clientDataTopic.Ref(), data, header)
 	if err != nil {
 		return err
 	}
-
-	log.WithFields(log.Fields{
-		"user_id":   userID,
-		"room_id":   data.RoomID,
-		"data_type": data.Type,
-	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
-
-	_, err = p.producer.PublishMsg(m)
-	return err
+	return nil
 }
 
 // GetAndSendNotificationData reads the database and sends data about unread
@@ -71,7 +78,7 @@ func (p *SyncAPI) GetAndSendNotificationData(ctx context.Context, userID, roomID
 		return err
 	}
 
-	return p.sendNotificationData(userID, &eventutil.NotificationData{
+	return p.sendNotificationData(ctx, userID, &eventutil.NotificationData{
 		RoomID:                  roomID,
 		UnreadHighlightCount:    int(nhighlight),
 		UnreadNotificationCount: int(ntotal),
@@ -79,24 +86,20 @@ func (p *SyncAPI) GetAndSendNotificationData(ctx context.Context, userID, roomID
 }
 
 // sendNotificationData sends data about unread notifications to the Sync API server.
-func (p *SyncAPI) sendNotificationData(userID string, data *eventutil.NotificationData) error {
-	m := &nats.Msg{
-		Subject: p.notificationDataTopic,
-		Header:  nats.Header{},
-	}
-	m.Header.Set(jetstream.UserID, userID)
+func (p *SyncAPI) sendNotificationData(ctx context.Context, userID string, data *eventutil.NotificationData) error {
 
-	var err error
-	m.Data, err = json.Marshal(data)
+	util.Log(ctx).
+		WithField("user_id", userID).
+		WithField("room_id", data.RoomID).
+		Debug("Producing to topic '%s'", p.notificationDataTopic)
+
+	header := map[string]string{
+		constants.UserID: userID,
+	}
+
+	err := p.qm.Publish(ctx, p.notificationDataTopic.Ref(), data, header)
 	if err != nil {
 		return err
 	}
-
-	log.WithFields(log.Fields{
-		"user_id": userID,
-		"room_id": data.RoomID,
-	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
-
-	_, err = p.producer.PublishMsg(m)
-	return err
+	return nil
 }

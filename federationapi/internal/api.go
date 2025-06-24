@@ -17,10 +17,10 @@ import (
 	"github.com/antinvestor/matrix/federationapi/statistics"
 	"github.com/antinvestor/matrix/federationapi/storage"
 	"github.com/antinvestor/matrix/federationapi/storage/cache"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/sirupsen/logrus"
+	"github.com/pitabwire/util"
 )
 
 // FederationInternalAPI is an implementation of api.FederationInternalAPI
@@ -36,17 +36,18 @@ type FederationInternalAPI struct {
 }
 
 func NewFederationInternalAPI(
+	ctx context.Context,
 	db storage.Database, cfg *config.FederationAPI,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	federation fclient.FederationClient,
 	statistics *statistics.Statistics,
-	caches *caching.Caches,
+	caches *cacheutil.Caches,
 	queues *queue.OutgoingQueues,
 	keyRing *gomatrixserverlib.KeyRing,
 ) *FederationInternalAPI {
 	serverKeyDB, err := cache.NewKeyDatabase(db, caches)
 	if err != nil {
-		logrus.WithError(err).Panicf("failed to set up caching wrapper for server key database")
+		util.Log(ctx).WithError(err).Panic("failed to set up caching wrapper for server key database")
 	}
 
 	if keyRing == nil {
@@ -55,13 +56,13 @@ func NewFederationInternalAPI(
 			KeyDatabase: serverKeyDB,
 		}
 
-		pubKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
+		pubKey := cfg.Global.PrivateKey.Public().(ed25519.PublicKey)
 		addDirectFetcher := func() {
 			keyRing.KeyFetchers = append(
 				keyRing.KeyFetchers,
 				&gomatrixserverlib.DirectKeyFetcher{
 					Client:            federation,
-					IsLocalServerName: cfg.Matrix.IsLocalServerName,
+					IsLocalServerName: cfg.Global.IsLocalServerName,
 					LocalPublicKey:    []byte(pubKey),
 				},
 			)
@@ -84,10 +85,10 @@ func NewFederationInternalAPI(
 			for _, key := range ps.Keys {
 				rawkey, err := b64e.DecodeString(key.PublicKey)
 				if err != nil {
-					logrus.WithError(err).WithFields(logrus.Fields{
-						"server_name": ps.ServerName,
-						"public_key":  key.PublicKey,
-					}).Warn("Couldn't parse perspective key")
+					util.Log(ctx).WithError(err).
+						WithField("server_name", ps.ServerName).
+						WithField("public_key", key.PublicKey).
+						Warn("Couldn't parse perspective key")
 					continue
 				}
 				perspective.PerspectiveServerKeys[key.KeyID] = rawkey
@@ -95,10 +96,10 @@ func NewFederationInternalAPI(
 
 			keyRing.KeyFetchers = append(keyRing.KeyFetchers, perspective)
 
-			logrus.WithFields(logrus.Fields{
-				"server_name":     ps.ServerName,
-				"num_public_keys": len(ps.Keys),
-			}).Info("Enabled perspective key fetcher")
+			util.Log(ctx).
+				WithField("server_name", ps.ServerName).
+				WithField("num_public_keys", len(ps.Keys)).
+				Info("Enabled perspective key fetcher")
 		}
 	}
 
@@ -140,7 +141,7 @@ func failBlacklistableError(ctx context.Context, err error, stats *statistics.Se
 	if !ok {
 		return stats.Failure(ctx)
 	}
-	if mxerr.Code == 401 { // invalid signature in X-Matrix header
+	if mxerr.Code == 401 { // invalid signature in X-Global header
 		return stats.Failure(ctx)
 	}
 	if mxerr.Code >= 500 && mxerr.Code < 600 { // internal server errors

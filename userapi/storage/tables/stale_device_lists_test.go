@@ -1,50 +1,45 @@
 package tables_test
 
 import (
+	"context"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/userapi/storage/postgres"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
-	"github.com/antinvestor/matrix/setup/config"
-
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/antinvestor/matrix/userapi/storage/postgres"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/pitabwire/frame"
 )
 
-func mustCreateTable(t *testing.T, _ test.DependancyOption) (tab tables.StaleDeviceLists, closeDb func()) {
-	ctx := testrig.NewContext(t)
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, nil)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	tab, err = postgres.NewPostgresStaleDeviceListsTable(ctx, db)
+func mustCreateTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) tables.StaleDeviceLists {
+
+	cm := sqlutil.NewConnectionManager(svc)
+
+	tab, err := postgres.NewPostgresStaleDeviceListsTable(ctx, cm)
 
 	if err != nil {
 		t.Fatalf("failed to create new table: %s", err)
 	}
-	return tab, closeDb
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate stale device lists table: %s", err)
+	}
+	return tab
 }
 
 func TestStaleDeviceLists(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 	charlie := "@charlie:localhost"
-	ctx := testrig.NewContext(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		tab, closeDB := mustCreateTable(t, testOpts)
-		defer closeDB()
+
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		tab := mustCreateTable(ctx, svc, t, testOpts)
 
 		if err := tab.InsertStaleDeviceList(ctx, alice.ID, true); err != nil {
 			t.Fatalf("failed to insert stale device: %s", err)
@@ -78,7 +73,7 @@ func TestStaleDeviceLists(t *testing.T) {
 
 		// Delete stale devices
 		deleteUsers := []string{alice.ID, bob.ID}
-		if err = tab.DeleteStaleDeviceLists(ctx, nil, deleteUsers); err != nil {
+		if err = tab.DeleteStaleDeviceLists(ctx, deleteUsers); err != nil {
 			t.Fatalf("failed to delete stale device lists: %s", err)
 		}
 

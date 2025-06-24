@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ package perform
 import (
 	"context"
 	"crypto/ed25519"
-	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -26,13 +24,9 @@ import (
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/getsentry/sentry-go"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
-
 	fsAPI "github.com/antinvestor/matrix/federationapi/api"
 	"github.com/antinvestor/matrix/internal/eventutil"
+	"github.com/antinvestor/matrix/internal/sqlutil"
 	rsAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/internal/input"
@@ -40,6 +34,8 @@ import (
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/util"
+	"github.com/tidwall/gjson"
 )
 
 type Joiner struct {
@@ -57,16 +53,15 @@ func (r *Joiner) PerformJoin(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
 ) (roomID string, joinedVia spec.ServerName, err error) {
-	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
-		"room_id": req.RoomIDOrAlias,
-		"user_id": req.UserID,
-		"servers": req.ServerNames,
-	})
+	logger := util.Log(ctx).WithContext(ctx).
+		WithField("room_id", req.RoomIDOrAlias).
+		WithField("user_id", req.UserID).
+		WithField("servers", req.ServerNames)
 	logger.Info("User requested to room join")
 	roomID, joinedVia, err = r.performJoin(ctx, req)
 	if err != nil {
 		logger.WithError(err).Error("Failed to join room")
-		sentry.CaptureException(err)
+
 		return "", "", err
 	}
 	logger.Info("User joined room successfully")
@@ -82,7 +77,7 @@ func (r *Joiner) performJoin(
 	if err != nil {
 		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("supplied user ID %q in incorrect format", req.UserID)}
 	}
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		return "", "", rsAPI.ErrInvalidID{Err: fmt.Errorf("user %q does not belong to this homeserver", req.UserID)}
 	}
 	if strings.HasPrefix(req.RoomIDOrAlias, "!") {
@@ -108,7 +103,7 @@ func (r *Joiner) performJoinRoomByAlias(
 	// Check if this alias matches our own server configuration. If it
 	// doesn't then we'll need to try a federated join.
 	var roomID string
-	if !r.Cfg.Matrix.IsLocalServerName(domain) {
+	if !r.Cfg.Global.IsLocalServerName(domain) {
 		// The alias isn't owned by us, so we will need to try joining using
 		// a remote server.
 		dirReq := fsAPI.PerformDirectoryLookupRequest{
@@ -118,7 +113,7 @@ func (r *Joiner) performJoinRoomByAlias(
 		dirRes := fsAPI.PerformDirectoryLookupResponse{}
 		err = r.FSAPI.PerformDirectoryLookup(ctx, &dirReq, &dirRes)
 		if err != nil {
-			logrus.WithError(err).Errorf("error looking up alias %q", req.RoomIDOrAlias)
+			util.Log(ctx).WithError(err).WithField("room_alias", req.RoomIDOrAlias).Error("error looking up alias")
 			return "", "", fmt.Errorf("looking up alias %q over federation failed: %w", req.RoomIDOrAlias, err)
 		}
 		roomID = dirRes.RoomID
@@ -156,7 +151,7 @@ func (r *Joiner) performJoinRoomByID(
 	// The original client request ?server_name=... may include this HS so filter that out so we
 	// don't attempt to make_join with ourselves
 	for i := 0; i < len(req.ServerNames); i++ {
-		if r.Cfg.Matrix.IsLocalServerName(req.ServerNames[i]) {
+		if r.Cfg.Global.IsLocalServerName(req.ServerNames[i]) {
 			// delete this entry
 			req.ServerNames = append(req.ServerNames[:i], req.ServerNames[i+1:]...)
 			i--
@@ -172,7 +167,7 @@ func (r *Joiner) performJoinRoomByID(
 	// If the server name in the room ID isn't ours then it's a
 	// possible candidate for finding the room via federation. Add
 	// it to the list of servers to try.
-	if !r.Cfg.Matrix.IsLocalServerName(roomID.Domain()) {
+	if !r.Cfg.Global.IsLocalServerName(roomID.Domain()) {
 		req.ServerNames = append(req.ServerNames, roomID.Domain())
 	}
 
@@ -208,7 +203,7 @@ func (r *Joiner) performJoinRoomByID(
 				// create user room key if needed
 				key, keyErr := r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
 				if keyErr != nil {
-					util.GetLogger(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
+					util.Log(ctx).WithError(keyErr).Error("GetOrCreateUserRoomPrivateKey failed")
 					return "", "", fmt.Errorf("GetOrCreateUserRoomPrivateKey failed: %w", keyErr)
 				}
 				senderID = spec.SenderIDFromPseudoIDKey(key)
@@ -235,7 +230,7 @@ func (r *Joiner) performJoinRoomByID(
 
 			// If we were invited by someone from another server then we can
 			// assume they are in the room so we can join via them.
-			if inviter != nil && !r.Cfg.Matrix.IsLocalServerName(inviter.Domain()) {
+			if inviter != nil && !r.Cfg.Global.IsLocalServerName(inviter.Domain()) {
 				req.ServerNames = append(req.ServerNames, inviter.Domain())
 				forceFederatedJoin = true
 				memberEvent := gjson.Parse(string(inviteEvent.JSON()))
@@ -258,8 +253,8 @@ func (r *Joiner) performJoinRoomByID(
 		var guestAccessEvent *types.HeaderedEvent
 		guestAccess := "forbidden"
 		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, spec.MRoomGuestAccess, "")
-		if (err != nil && !errors.Is(err, sql.ErrNoRows)) || guestAccessEvent == nil {
-			logrus.WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
+		if (err != nil && !sqlutil.ErrorIsNoRows(err)) || guestAccessEvent == nil {
+			util.Log(ctx).WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
 		}
 		if guestAccessEvent != nil {
 			guestAccess = gjson.GetBytes(guestAccessEvent.Content(), "guest_access").String()
@@ -286,14 +281,14 @@ func (r *Joiner) performJoinRoomByID(
 	// but everyone has since left. I suspect it does the wrong thing.
 
 	var buildRes rsAPI.QueryLatestEventsAndStateResponse
-	identity := r.Cfg.Matrix.SigningIdentity
+	identity := r.Cfg.Global.SigningIdentity
 
 	// at this point we know we have an existing room
 	if inRoomRes.RoomVersion == gomatrixserverlib.RoomVersionPseudoIDs {
 		var pseudoIDKey ed25519.PrivateKey
 		pseudoIDKey, err = r.RSAPI.GetOrCreateUserRoomPrivateKey(ctx, *userID, *roomID)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
+			util.Log(ctx).WithError(err).Error("GetOrCreateUserRoomPrivateKey failed")
 			return "", "", err
 		}
 
@@ -380,7 +375,7 @@ func (r *Joiner) performJoinRoomByID(
 		// The room doesn't exist locally. If the room ID looks like it should
 		// be ours then this probably means that we've nuked our database at
 		// some point.
-		if r.Cfg.Matrix.IsLocalServerName(roomID.Domain()) {
+		if r.Cfg.Global.IsLocalServerName(roomID.Domain()) {
 			// If there are no more server names to try then give up here.
 			// Otherwise we'll try a federated join as normal, since it's quite
 			// possible that the room still exists on other servers.

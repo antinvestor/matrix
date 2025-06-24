@@ -4,12 +4,12 @@ import (
 	"testing"
 
 	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTracing(t *testing.T) {
-	inctx := testrig.NewContext(t)
+	inctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(inctx)
 
 	task, ctx := StartTask(inctx, "testing")
 	assert.NotNil(t, ctx)

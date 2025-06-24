@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,19 +16,17 @@ package tables_test
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"testing"
-
-	"github.com/antinvestor/matrix/test/testrig"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/relayapi/storage/postgres"
 	"github.com/antinvestor/matrix/relayapi/storage/tables"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -47,46 +45,35 @@ func mustCreateTransaction() gomatrixserverlib.Transaction {
 }
 
 type RelayQueueJSONDatabase struct {
-	DB     *sql.DB
-	Writer sqlutil.Writer
-	Table  tables.RelayQueueJSON
+	Cm    sqlutil.ConnectionManager
+	Table tables.RelayQueueJSON
 }
 
 func mustCreateQueueJSONTable(
-	ctx context.Context,
-	t *testing.T,
+	ctx context.Context, svc *frame.Service, t *testing.T,
 	_ test.DependancyOption,
-) (database RelayQueueJSONDatabase, closeDb func()) {
+) *RelayQueueJSONDatabase {
 	t.Helper()
 
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	assert.NoError(t, err)
+	cm := sqlutil.NewConnectionManager(svc)
 	var tab tables.RelayQueueJSON
-	tab, err = postgres.NewPostgresRelayQueueJSONTable(ctx, db)
+	tab, err := postgres.NewPostgresRelayQueueJSONTable(ctx, cm)
 	assert.NoError(t, err)
 
+	err = cm.Migrate(ctx)
 	assert.NoError(t, err)
 
-	database = RelayQueueJSONDatabase{
-		DB:     db,
-		Writer: sqlutil.NewDummyWriter(),
-		Table:  tab,
+	return &RelayQueueJSONDatabase{
+		Cm:    cm,
+		Table: tab,
 	}
-	return database, closeDb
 }
 
 func TestShoudInsertTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateQueueJSONTable(ctx, svc, t, testOpts)
 
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)
@@ -94,7 +81,7 @@ func TestShoudInsertTransaction(t *testing.T) {
 			t.Fatalf("Invalid transaction: %s", err.Error())
 		}
 
-		_, err = db.Table.InsertQueueJSON(ctx, nil, string(tx))
+		_, err = db.Table.InsertQueueJSON(ctx, string(tx))
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
@@ -103,9 +90,9 @@ func TestShoudInsertTransaction(t *testing.T) {
 
 func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateQueueJSONTable(ctx, svc, t, testOpts)
 
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)
@@ -113,14 +100,14 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 			t.Fatalf("Invalid transaction: %s", err.Error())
 		}
 
-		nid, err := db.Table.InsertQueueJSON(ctx, nil, string(tx))
+		nid, err := db.Table.InsertQueueJSON(ctx, string(tx))
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
 		var storedJSON map[int64][]byte
-		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			storedJSON, err = db.Table.SelectQueueJSON(ctx, txn, []int64{nid})
+		_ = db.Cm.Do(ctx, func(ctx context.Context) error {
+			storedJSON, err = db.Table.SelectQueueJSON(ctx, []int64{nid})
 			return err
 		})
 		if err != nil {
@@ -141,9 +128,9 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 
 func TestShouldDeleteTransaction(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateQueueJSONTable(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateQueueJSONTable(ctx, svc, t, testOpts)
 
 		transaction := mustCreateTransaction()
 		tx, err := json.Marshal(transaction)
@@ -151,14 +138,14 @@ func TestShouldDeleteTransaction(t *testing.T) {
 			t.Fatalf("Invalid transaction: %s", err.Error())
 		}
 
-		nid, err := db.Table.InsertQueueJSON(ctx, nil, string(tx))
+		nid, err := db.Table.InsertQueueJSON(ctx, string(tx))
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
 		storedJSON := map[int64][]byte{}
-		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			err = db.Table.DeleteQueueJSON(ctx, txn, []int64{nid})
+		_ = db.Cm.Do(ctx, func(ctx context.Context) error {
+			err = db.Table.DeleteQueueJSON(ctx, []int64{nid})
 			return err
 		})
 		if err != nil {
@@ -166,8 +153,8 @@ func TestShouldDeleteTransaction(t *testing.T) {
 		}
 
 		storedJSON = map[int64][]byte{}
-		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			storedJSON, err = db.Table.SelectQueueJSON(ctx, txn, []int64{nid})
+		_ = db.Cm.Do(ctx, func(ctx context.Context) error {
+			storedJSON, err = db.Table.SelectQueueJSON(ctx, []int64{nid})
 			return err
 		})
 		if err != nil {

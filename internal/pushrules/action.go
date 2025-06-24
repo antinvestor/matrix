@@ -80,7 +80,7 @@ const (
 	// implementation-specific.
 	CoalesceAction ActionKind = "coalesce"
 
-	// SetTweakAction uses the Tweak and Value fields to add a
+	// SetTweakAction uses the Tweak and V fields to add a
 	// tweak. Multiple SetTweakAction can be provided in a rule,
 	// combined with NotifyAction or CoalesceAction.
 	SetTweakAction ActionKind = "set_tweak"

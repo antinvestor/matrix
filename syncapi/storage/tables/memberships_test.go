@@ -2,44 +2,33 @@ package tables_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
-
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
-	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/syncapi/storage/postgres"
 	"github.com/antinvestor/matrix/syncapi/storage/tables"
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 )
 
-func newMembershipsTable(ctx context.Context, t *testing.T, _ test.DependancyOption) (tables.Memberships, *sql.DB, func()) {
+func newMembershipsTable(ctx context.Context, svc *frame.Service, t *testing.T, _ test.DependancyOption) tables.Memberships {
 	t.Helper()
-	connStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
-	db, err := sqlutil.Open(&config.DatabaseOptions{
-		ConnectionString:   connStr,
-		MaxOpenConnections: 10,
-	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
-
-	var tab tables.Memberships
-	tab, err = postgres.NewPostgresMembershipsTable(ctx, db)
+	cm := sqlutil.NewConnectionManager(svc)
+	tab, err := postgres.NewPostgresMembershipsTable(ctx, cm)
 
 	if err != nil {
 		t.Fatalf("failed to make new table: %s", err)
 	}
-	return tab, db, closeDb
+	err = cm.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("failed to migrate membership table: %s", err)
+	}
+	return tab
 }
 
 func TestMembershipsTable(t *testing.T) {
@@ -75,16 +64,16 @@ func TestMembershipsTable(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		table, _, closeDb := newMembershipsTable(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, _ := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		table := newMembershipsTable(ctx, svc, t, testOpts)
 
 		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()
 
 		for _, ev := range userEvents {
 			ev.StateKeyResolved = ev.StateKey()
-			if err := table.UpsertMembership(ctx, nil, ev, types.StreamPosition(ev.Depth()), 1); err != nil {
+			if err := table.UpsertMembership(ctx, ev, types.StreamPosition(ev.Depth()), 1); err != nil {
 				t.Fatalf("failed to upsert membership: %s", err)
 			}
 		}
@@ -97,7 +86,7 @@ func TestMembershipsTable(t *testing.T) {
 func testMembershipCount(t *testing.T, ctx context.Context, table tables.Memberships, room *test.Room) {
 	t.Run("membership counts are correct", func(t *testing.T) {
 		// After 10 events, we should have 6 users (5 create related [incl. one member event], 5 member events = 6 users)
-		count, err := table.SelectMembershipCount(ctx, nil, room.ID, spec.Join, 10)
+		count, err := table.SelectMembershipCount(ctx, room.ID, spec.Join, 10)
 		if err != nil {
 			t.Fatalf("failed to get membership count: %s", err)
 		}
@@ -107,7 +96,7 @@ func testMembershipCount(t *testing.T, ctx context.Context, table tables.Members
 		}
 
 		// After 100 events, we should have all 11 users
-		count, err = table.SelectMembershipCount(ctx, nil, room.ID, spec.Join, 100)
+		count, err = table.SelectMembershipCount(ctx, room.ID, spec.Join, 100)
 		if err != nil {
 			t.Fatalf("failed to get membership count: %s", err)
 		}
@@ -120,10 +109,10 @@ func testMembershipCount(t *testing.T, ctx context.Context, table tables.Members
 
 func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, membershipEvent *rstypes.HeaderedEvent, user *test.User, room *test.Room) {
 	t.Run("upserting works as expected", func(t *testing.T) {
-		if err := table.UpsertMembership(ctx, nil, membershipEvent, 1, 1); err != nil {
+		if err := table.UpsertMembership(ctx, membershipEvent, 1, 1); err != nil {
 			t.Fatalf("failed to upsert membership: %s", err)
 		}
-		membership, pos, err := table.SelectMembershipForUser(ctx, nil, room.ID, user.ID, 1)
+		membership, pos, err := table.SelectMembershipForUser(ctx, room.ID, user.ID, 1)
 		if err != nil {
 			t.Fatalf("failed to select membership: %s", err)
 		}
@@ -140,12 +129,12 @@ func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, mem
 		}, test.WithStateKey(user.ID))
 		ev.StateKeyResolved = ev.StateKey()
 		// Insert the same event again, but with different positions, which should get updated
-		if err = table.UpsertMembership(ctx, nil, ev, 2, 2); err != nil {
+		if err = table.UpsertMembership(ctx, ev, 2, 2); err != nil {
 			t.Fatalf("failed to upsert membership: %s", err)
 		}
 
 		// Verify the position got updated
-		membership, pos, err = table.SelectMembershipForUser(ctx, nil, room.ID, user.ID, 10)
+		membership, pos, err = table.SelectMembershipForUser(ctx, room.ID, user.ID, 10)
 		if err != nil {
 			t.Fatalf("failed to select membership: %s", err)
 		}
@@ -158,7 +147,7 @@ func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, mem
 		}
 
 		// If we can't find a membership, it should default to leave
-		if membership, _, err = table.SelectMembershipForUser(ctx, nil, room.ID, user.ID, 1); err != nil {
+		if membership, _, err = table.SelectMembershipForUser(ctx, room.ID, user.ID, 1); err != nil {
 			t.Fatalf("failed to select membership: %s", err)
 		}
 		if membership != spec.Leave {

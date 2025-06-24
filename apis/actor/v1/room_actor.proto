@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package actor;
+
+option go_package = "github.com/antinvestor/matrix/apis/actor/v1;actorV1";
+
+message ProgressRequest {
+  string id = 1;
+  map<string, string> metadata = 2;
+  bytes payload = 3;
+}
+
+message ProgressResponse {
+  string message = 1;
+  string state = 2;
+  int64  ActiveMessages = 3;// Currently active messages being processed
+  int64   LastActivity = 4;// Last activity timestamp in UnixNano
+  int64    ProcessingTime = 5;  // Total processing time in nanoseconds
+  int64    MessageCount = 6;   // Total messages processed
+  int64      ErrorCount = 7;
+}
+
+message WorkRequest {
+  string qId = 1;
+}
+
+message StopProcessor {
+  string id = 1;
+}
+
+
+service SequentialProcessor {
+  rpc Progress (ProgressRequest) returns (ProgressResponse) {}
+}

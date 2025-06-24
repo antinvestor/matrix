@@ -24,11 +24,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
-
-	"github.com/antinvestor/matrix/internal/caching"
-	"github.com/antinvestor/matrix/internal/sqlutil"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/roomserver/api"
 	rstypes "github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
@@ -38,6 +34,7 @@ import (
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/syncapi/types"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 type messagesReq struct {
@@ -74,13 +71,15 @@ func OnIncomingMessagesRequest(
 	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
 	srp *sync.RequestPool,
-	lazyLoadCache caching.LazyLoadCache,
+	lazyLoadCache cacheutil.LazyLoadCache,
 ) util.JSONResponse {
 	var err error
 
+	ctx := req.Context()
+
 	deviceUserID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("device.UserID invalid")
+		util.Log(req.Context()).WithError(err).Error("device.UserID invalid")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -97,8 +96,6 @@ func OnIncomingMessagesRequest(
 			JSON: spec.InternalServerError{},
 		}
 	}
-	var succeeded bool
-	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	// check if the user has already forgotten about this room
 	membershipResp, err := getMembershipForUser(req.Context(), roomID, device.UserID, rsAPI)
@@ -146,7 +143,7 @@ func OnIncomingMessagesRequest(
 	}
 	// A boolean is easier to handle in this case, especially since dir is sure
 	// to have one of the two accepted values (so dir == "f" <=> !backwardOrdering).
-	backwardOrdering := (dir == "b")
+	backwardOrdering := dir == "b"
 
 	emptyFromSupplied := fromQuery == ""
 	if emptyFromSupplied {
@@ -177,7 +174,7 @@ func OnIncomingMessagesRequest(
 			fromStream = &streamToken
 			from, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
 			if err != nil {
-				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
+				util.Log(ctx).WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -202,7 +199,7 @@ func OnIncomingMessagesRequest(
 			} else {
 				to, err = snapshot.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
 				if err != nil {
-					logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
+					util.Log(ctx).WithError(err).Error("Failed to get topological position for streaming token %v", streamToken)
 					return util.JSONResponse{
 						Code: http.StatusInternalServerError,
 						JSON: spec.InternalServerError{},
@@ -265,7 +262,7 @@ func OnIncomingMessagesRequest(
 
 	clientEvents, start, end, err := mReq.retrieveEvents(req.Context(), rsAPI)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
+		util.Log(req.Context()).WithError(err).Error("mreq.retrieveEvents failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -278,15 +275,15 @@ func OnIncomingMessagesRequest(
 		end = types.TopologyToken{}
 	}
 
-	util.GetLogger(req.Context()).WithFields(logrus.Fields{
-		"request_from":   from.String(),
-		"request_to":     to.String(),
-		"limit":          filter.Limit,
-		"backwards":      backwardOrdering,
-		"response_start": start.String(),
-		"response_end":   end.String(),
-		"backfilled":     mReq.didBackfill,
-	}).Info("Responding")
+	util.Log(req.Context()).
+		WithField("request_from", from.String()).
+		WithField("request_to", to.String()).
+		WithField("limit", filter.Limit).
+		WithField("backwards", backwardOrdering).
+		WithField("response_start", start.String()).
+		WithField("response_end", end.String()).
+		WithField("backfilled", mReq.didBackfill).
+		Info("Responding")
 
 	res := messagesResp{
 		Chunk: clientEvents,
@@ -296,7 +293,7 @@ func OnIncomingMessagesRequest(
 	if filter.LazyLoadMembers {
 		membershipEvents, err := applyLazyLoadMembers(req.Context(), device, snapshot, roomID, clientEvents, lazyLoadCache)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("failed to apply lazy loading")
+			util.Log(req.Context()).WithError(err).Error("failed to apply lazy loading")
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
 				JSON: spec.InternalServerError{},
@@ -312,7 +309,6 @@ func OnIncomingMessagesRequest(
 	}
 
 	// Respond with the events.
-	succeeded = true
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,
@@ -354,11 +350,11 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	end.Decrement()
 
 	var events []*rstypes.HeaderedEvent
-	util.GetLogger(r.ctx).WithFields(logrus.Fields{
-		"start":     r.from,
-		"end":       r.to,
-		"backwards": r.backwardOrdering,
-	}).Infof("Fetched %d events locally", len(streamEvents))
+	util.Log(r.ctx).
+		WithField("start", r.from).
+		WithField("end", r.to).
+		WithField("backwards", r.backwardOrdering).
+		Info("Fetched %d events locally", len(streamEvents))
 
 	// There can be two reasons for streamEvents to be empty: either we've
 	// reached the oldest event in the room (or the most recent one, depending
@@ -384,12 +380,12 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 	if err != nil {
 		return []synctypes.ClientEvent{}, *r.from, *r.to, nil
 	}
-	logrus.WithFields(logrus.Fields{
-		"duration":      time.Since(startTime),
-		"room_id":       r.roomID,
-		"events_before": len(events),
-		"events_after":  len(filteredEvents),
-	}).Debug("applied history visibility (messages)")
+	util.Log(ctx).
+		WithField("duration", time.Since(startTime)).
+		WithField("room_id", r.roomID).
+		WithField("events_before", len(events)).
+		WithField("events_after", len(filteredEvents)).
+		Debug("applied history visibility (messages)")
 
 	// No events left after applying history visibility
 	if len(filteredEvents) == 0 {
@@ -508,11 +504,11 @@ func (r *messagesReq) handleNonEmptyEventsSlice(ctx context.Context, streamEvent
 				// The condition in the SQL query is a strict "greater than" so
 				// we need to check against to-1.
 				streamPos := types.StreamPosition(streamEvents[len(streamEvents)-1].StreamPosition)
-				isSetLargeEnough = (r.to.PDUPosition-1 == streamPos)
+				isSetLargeEnough = r.to.PDUPosition-1 == streamPos
 			}
 		} else {
 			streamPos := types.StreamPosition(streamEvents[0].StreamPosition)
-			isSetLargeEnough = (r.from.PDUPosition-1 == streamPos)
+			isSetLargeEnough = r.from.PDUPosition-1 == streamPos
 		}
 	}
 
@@ -570,13 +566,13 @@ func (r *messagesReq) backfill(ctx context.Context, roomID string, backwardsExtr
 		RoomID:               roomID,
 		BackwardsExtremities: backwardsExtremities,
 		Limit:                limit,
-		ServerName:           r.cfg.Matrix.ServerName,
+		ServerName:           r.cfg.Global.ServerName,
 		VirtualHost:          r.device.UserDomain(),
 	}, &res)
 	if err != nil {
 		return nil, fmt.Errorf("PerformBackfill failed: %w", err)
 	}
-	util.GetLogger(r.ctx).WithField("new_events", len(res.Events)).Info("Storing new events from backfill")
+	util.Log(r.ctx).WithField("new_events", len(res.Events)).Info("Storing new events from backfill")
 
 	// TODO: we should only be inserting events into the database from the roomserver's kafka output stream.
 	// Currently, this can race with live events for the room and cause problems. It's also just a bit unclear

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,11 +19,10 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
+	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -51,22 +50,22 @@ func TestOpenACLsWithBlacklist(t *testing.T) {
 	}
 
 	if acls.IsServerBannedFromRoom("1.2.3.4", roomID) {
-		t.Fatal("Expected 1.2.3.4 to be allowed but wasn't")
+		t.Fatalf("Expected 1.2.3.4 to be allowed but wasn't")
 	}
 	if acls.IsServerBannedFromRoom("1.2.3.4:2345", roomID) {
-		t.Fatal("Expected 1.2.3.4:2345 to be allowed but wasn't")
+		t.Fatalf("Expected 1.2.3.4:2345 to be allowed but wasn't")
 	}
 	if !acls.IsServerBannedFromRoom("foo.com", roomID) {
-		t.Fatal("Expected foo.com to be banned but wasn't")
+		t.Fatalf("Expected foo.com to be banned but wasn't")
 	}
 	if !acls.IsServerBannedFromRoom("foo.com:3456", roomID) {
-		t.Fatal("Expected foo.com:3456 to be banned but wasn't")
+		t.Fatalf("Expected foo.com:3456 to be banned but wasn't")
 	}
 	if acls.IsServerBannedFromRoom("bar.com", roomID) {
-		t.Fatal("Expected bar.com to be allowed but wasn't")
+		t.Fatalf("Expected bar.com to be allowed but wasn't")
 	}
 	if acls.IsServerBannedFromRoom("bar.com:4567", roomID) {
-		t.Fatal("Expected bar.com:4567 to be allowed but wasn't")
+		t.Fatalf("Expected bar.com:4567 to be allowed but wasn't")
 	}
 }
 
@@ -90,25 +89,25 @@ func TestDefaultACLsWithWhitelist(t *testing.T) {
 	}
 
 	if !acls.IsServerBannedFromRoom("1.2.3.4", roomID) {
-		t.Fatal("Expected 1.2.3.4 to be banned but wasn't")
+		t.Fatalf("Expected 1.2.3.4 to be banned but wasn't")
 	}
 	if !acls.IsServerBannedFromRoom("1.2.3.4:2345", roomID) {
-		t.Fatal("Expected 1.2.3.4:2345 to be banned but wasn't")
+		t.Fatalf("Expected 1.2.3.4:2345 to be banned but wasn't")
 	}
 	if acls.IsServerBannedFromRoom("foo.com", roomID) {
-		t.Fatal("Expected foo.com to be allowed but wasn't")
+		t.Fatalf("Expected foo.com to be allowed but wasn't")
 	}
 	if acls.IsServerBannedFromRoom("foo.com:3456", roomID) {
-		t.Fatal("Expected foo.com:3456 to be allowed but wasn't")
+		t.Fatalf("Expected foo.com:3456 to be allowed but wasn't")
 	}
 	if !acls.IsServerBannedFromRoom("bar.com", roomID) {
-		t.Fatal("Expected bar.com to be allowed but wasn't")
+		t.Fatalf("Expected bar.com to be allowed but wasn't")
 	}
 	if !acls.IsServerBannedFromRoom("baz.com", roomID) {
-		t.Fatal("Expected baz.com to be allowed but wasn't")
+		t.Fatalf("Expected baz.com to be allowed but wasn't")
 	}
 	if !acls.IsServerBannedFromRoom("qux.com:4567", roomID) {
-		t.Fatal("Expected qux.com:4567 to be allowed but wasn't")
+		t.Fatalf("Expected qux.com:4567 to be allowed but wasn't")
 	}
 }
 
@@ -137,7 +136,8 @@ func (d dummyACLDB) GetBulkStateContent(ctx context.Context, roomIDs []string, t
 
 func TestCachedRegex(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	db := dummyACLDB{}
 	wantBannedServer := spec.ServerName("hello.world")
 

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,17 +21,15 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/oauth2"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/syncapi/synctypes"
-	"github.com/antinvestor/matrix/userapi/types"
-
 	clientapi "github.com/antinvestor/matrix/clientapi/api"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/internal/pushrules"
+	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/antinvestor/matrix/userapi/types"
+	"golang.org/x/oauth2"
 )
 
 // UserInternalAPI is the internal API for information about users and devices.
@@ -44,7 +42,7 @@ type UserInternalAPI interface {
 	QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) (err error)
 }
 
-// api functions required by the appservice api
+// AppserviceUserAPI api functions required by the appservice api
 type AppserviceUserAPI interface {
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
@@ -55,12 +53,12 @@ type RoomserverUserAPI interface {
 	QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) (err error)
 }
 
-// api functions required by the media api
+// MediaUserAPI api functions required by the media api
 type MediaUserAPI interface {
 	QueryAcccessTokenAPI
 }
 
-// api functions required by the federation api
+// FederationUserAPI api functions required by the federation api
 type FederationUserAPI interface {
 	UploadDeviceKeysAPI
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
@@ -72,7 +70,7 @@ type FederationUserAPI interface {
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 }
 
-// api functions required by the sync api
+// SyncUserAPI api functions required by the sync api
 type SyncUserAPI interface {
 	QueryAcccessTokenAPI
 	SyncKeyAPI
@@ -426,7 +424,7 @@ type QueryOpenIDTokenRequest struct {
 
 // QueryOpenIDTokenResponse is the response for QueryOpenIDToken
 type QueryOpenIDTokenResponse struct {
-	Sub         string // The Matrix User ID that generated the token
+	Sub         string // The Global User ID that generated the token
 	ExpiresAtMS int64
 }
 
@@ -463,7 +461,7 @@ func (d *Device) UserDomain() spec.ServerName {
 	return domain
 }
 
-// Account represents a Matrix account on this home server.
+// Account represents a Global account on this home server.
 type Account struct {
 	UserID       string
 	Localpart    string
@@ -488,7 +486,7 @@ type OpenIDTokenAttributes struct {
 
 // UserInfo is for returning information about the user an OpenID token was issued for
 type UserInfo struct {
-	Sub string // The Matrix user's ID who generated the token
+	Sub string // The Global user's ID who generated the token
 }
 
 // ErrorForbidden is an error indicating that the supplied access token is forbidden

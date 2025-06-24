@@ -1,5 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2019-2020 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,15 +17,16 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage/tables"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
+// Schema for the event state keys table
 const eventStateKeysSchema = `
 -- Numeric versions of the event "state_key"s. State keys tend to be reused so
 -- assigning each string a numeric ID should reduce the amount of data that
@@ -47,76 +48,99 @@ INSERT INTO roomserver_event_state_keys (event_state_key_nid, event_state_key) V
     (1, '') ON CONFLICT DO NOTHING;
 `
 
-// Same as insertEventTypeNIDSQL
+// Schema revert script for migration purposes
+const eventStateKeysSchemaRevert = `DROP TABLE IF EXISTS roomserver_event_state_keys;`
+
+// SQL to insert a new event state key and return its numeric ID
 const insertEventStateKeyNIDSQL = "" +
 	"INSERT INTO roomserver_event_state_keys (event_state_key) VALUES ($1)" +
 	" ON CONFLICT ON CONSTRAINT roomserver_event_state_key_unique" +
 	" DO NOTHING RETURNING (event_state_key_nid)"
 
+// SQL to select a numeric ID for an event state key
 const selectEventStateKeyNIDSQL = "" +
 	"SELECT event_state_key_nid FROM roomserver_event_state_keys" +
 	" WHERE event_state_key = $1"
 
-// Bulk lookup from string state key to numeric ID for that state key.
+// SQL to bulk select numeric IDs for event state keys
 // Takes an array of strings as the query parameter.
 const bulkSelectEventStateKeyNIDSQL = "" +
 	"SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys" +
 	" WHERE event_state_key = ANY($1)"
 
-// Bulk lookup from numeric ID to string state key for that state key.
-// Takes an array of strings as the query parameter.
+// SQL to bulk select event state keys for numeric IDs
+// Takes an array of numeric IDs as the query parameter.
 const bulkSelectEventStateKeySQL = "" +
 	"SELECT event_state_key, event_state_key_nid FROM roomserver_event_state_keys" +
 	" WHERE event_state_key_nid = ANY($1)"
 
-type eventStateKeyStatements struct {
-	insertEventStateKeyNIDStmt     *sql.Stmt
-	selectEventStateKeyNIDStmt     *sql.Stmt
-	bulkSelectEventStateKeyNIDStmt *sql.Stmt
-	bulkSelectEventStateKeyStmt    *sql.Stmt
+// eventStateKeysTable implements the tables.EventStateKeys interface using GORM
+type eventStateKeysTable struct {
+	cm sqlutil.ConnectionManager
+
+	// SQL query strings loaded from constants
+	insertEventStateKeyNIDSQL     string
+	selectEventStateKeyNIDSQL     string
+	bulkSelectEventStateKeyNIDSQL string
+	bulkSelectEventStateKeySQL    string
 }
 
-func CreateEventStateKeysTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.Exec(eventStateKeysSchema)
-	return err
+// NewPostgresEventStateKeysTable creates a new event state keys table
+func NewPostgresEventStateKeysTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.EventStateKeys, error) {
+	// Create the table if it doesn't exist using migration
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "roomserver_event_state_keys_table_schema_001",
+		Patch:       eventStateKeysSchema,
+		RevertPatch: eventStateKeysSchemaRevert,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialise the table struct with just the connection manager
+	t := &eventStateKeysTable{
+		cm: cm,
+
+		// Initialise SQL query strings from constants
+		insertEventStateKeyNIDSQL:     insertEventStateKeyNIDSQL,
+		selectEventStateKeyNIDSQL:     selectEventStateKeyNIDSQL,
+		bulkSelectEventStateKeyNIDSQL: bulkSelectEventStateKeyNIDSQL,
+		bulkSelectEventStateKeySQL:    bulkSelectEventStateKeySQL,
+	}
+
+	return t, nil
 }
 
-func PrepareEventStateKeysTable(ctx context.Context, db *sql.DB) (tables.EventStateKeys, error) {
-	s := &eventStateKeyStatements{}
-
-	return s, sqlutil.StatementList{
-		{&s.insertEventStateKeyNIDStmt, insertEventStateKeyNIDSQL},
-		{&s.selectEventStateKeyNIDStmt, selectEventStateKeyNIDSQL},
-		{&s.bulkSelectEventStateKeyNIDStmt, bulkSelectEventStateKeyNIDSQL},
-		{&s.bulkSelectEventStateKeyStmt, bulkSelectEventStateKeySQL},
-	}.Prepare(db)
-}
-
-func (s *eventStateKeyStatements) InsertEventStateKeyNID(
-	ctx context.Context, txn *sql.Tx, eventStateKey string,
+func (t *eventStateKeysTable) InsertEventStateKeyNID(
+	ctx context.Context, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
+	db := t.cm.Connection(ctx, false)
+
 	var eventStateKeyNID int64
-	stmt := sqlutil.TxStmt(txn, s.insertEventStateKeyNIDStmt)
-	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
+	row := db.Raw(t.insertEventStateKeyNIDSQL, eventStateKey).Row()
+	err := row.Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) SelectEventStateKeyNID(
-	ctx context.Context, txn *sql.Tx, eventStateKey string,
+func (t *eventStateKeysTable) SelectEventStateKeyNID(
+	ctx context.Context, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
+	db := t.cm.Connection(ctx, true)
+
 	var eventStateKeyNID int64
-	stmt := sqlutil.TxStmt(txn, s.selectEventStateKeyNIDStmt)
-	err := stmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID)
+	row := db.Raw(t.selectEventStateKeyNIDSQL, eventStateKey).Row()
+	err := row.Scan(&eventStateKeyNID)
 	return types.EventStateKeyNID(eventStateKeyNID), err
 }
 
-func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
-	ctx context.Context, txn *sql.Tx, eventStateKeys []string,
+func (t *eventStateKeysTable) BulkSelectEventStateKeyNID(
+	ctx context.Context, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventStateKeyNIDStmt)
-	rows, err := stmt.QueryContext(
-		ctx, pq.StringArray(eventStateKeys),
-	)
+	db := t.cm.Connection(ctx, true)
+
+	rows, err := db.Raw(
+		t.bulkSelectEventStateKeyNIDSQL, pq.StringArray(eventStateKeys),
+	).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +150,7 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
 	var stateKey string
 	var stateKeyNID int64
 	for rows.Next() {
-		if err := rows.Scan(&stateKey, &stateKeyNID); err != nil {
+		if err = rows.Scan(&stateKey, &stateKeyNID); err != nil {
 			return nil, err
 		}
 		result[stateKey] = types.EventStateKeyNID(stateKeyNID)
@@ -134,15 +158,17 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
 	return result, rows.Err()
 }
 
-func (s *eventStateKeyStatements) BulkSelectEventStateKey(
-	ctx context.Context, txn *sql.Tx, eventStateKeyNIDs []types.EventStateKeyNID,
+func (t *eventStateKeysTable) BulkSelectEventStateKey(
+	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
+	db := t.cm.Connection(ctx, true)
+
 	nIDs := make(pq.Int64Array, len(eventStateKeyNIDs))
 	for i := range eventStateKeyNIDs {
 		nIDs[i] = int64(eventStateKeyNIDs[i])
 	}
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventStateKeyStmt)
-	rows, err := stmt.QueryContext(ctx, nIDs)
+
+	rows, err := db.Raw(t.bulkSelectEventStateKeySQL, nIDs).Rows()
 	if err != nil {
 		return nil, err
 	}

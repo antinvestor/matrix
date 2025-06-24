@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -8,12 +9,11 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -45,7 +45,7 @@ type Global struct {
 	// component does not specify any database options of its own, then this pool of
 	// connections will be used instead. This way we don't have to manage connection
 	// counts on a per-component basis, but can instead do it for the entire monolith.
-	DatabaseOptions DatabaseOptions `yaml:"database,omitempty"`
+	// DatabaseOptions DatabaseOptions `yaml:"database,omitempty"`
 
 	// The server name to delegate server-server communications to, with optional port
 	WellKnownServerName string `yaml:"well_known_server_name"`
@@ -57,7 +57,7 @@ type Global struct {
 	// Requires `well_known_client_name` to also be configured.
 	WellKnownSlidingSyncProxy string `yaml:"well_known_sliding_sync_proxy"`
 
-	// Disables federation. Dendrite will not be able to make any outbound HTTP requests
+	// Disables federation. Matrix will not be able to make any outbound HTTP requests
 	// to other servers and the federation API will not be exposed.
 	DisableFederation bool `yaml:"disable_federation"`
 
@@ -68,9 +68,6 @@ type Global struct {
 	// verify third-party identifiers.
 	// Defaults to an empty array.
 	TrustedIDServers []string `yaml:"trusted_third_party_id_servers"`
-
-	// JetStream configuration
-	JetStream JetStream `yaml:"jetstream"`
 
 	// Metrics configuration
 	Metrics Metrics `yaml:"metrics"`
@@ -90,7 +87,14 @@ type Global struct {
 	// Configuration for the caches.
 	Cache CacheOptions `yaml:"cache"`
 
+	Queue QueueOptions `yaml:"queue"`
+
 	DistributedAPI DistributedAPI `yaml:"distributed_api"`
+
+	SyncAPIPresenceURI string `yaml:"sync_api_presence_uri"`
+
+	// Actors contains configuration for the Proto.Actor based distributed event processing system
+	Actors ActorOptions `yaml:"actors,omitempty"`
 }
 
 func (c *Global) Defaults(opts DefaultOpts) {
@@ -106,8 +110,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	}
 
 	c.KeyValidityPeriod = time.Hour * 24 * 7
-	c.DatabaseOptions.Defaults(opts)
-	c.JetStream.Defaults(opts)
+	// c.DatabaseOptions.Defaults(opts)
 	c.Metrics.Defaults(opts)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
@@ -115,18 +118,14 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	c.ReportStats.Defaults()
 	c.Cache.Defaults(opts)
 	c.DistributedAPI.Defaults()
+
+	c.SyncAPIPresenceURI = fmt.Sprintf("http://localhost%s", c.Port())
+	c.Actors.Defaults(opts)
 }
 
 func (c *Global) LoadEnv() error {
-	err := frame.ConfigFillFromEnv(c)
-	if err != nil {
-		return err
-	}
-	err = c.DatabaseOptions.LoadEnv()
-	if err != nil {
-		return err
-	}
-	err = c.JetStream.LoadEnv()
+
+	err := frame.ConfigFillEnv(c)
 	if err != nil {
 		return err
 	}
@@ -137,7 +136,7 @@ func (c *Global) LoadEnv() error {
 	return nil
 }
 
-func (c *Global) Verify(configErrs *ConfigErrors) {
+func (c *Global) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
 
@@ -150,14 +149,14 @@ func (c *Global) Verify(configErrs *ConfigErrors) {
 		v.Verify(configErrs)
 	}
 
-	c.DatabaseOptions.Verify(configErrs)
-	c.JetStream.Verify(configErrs)
+	// c.DatabaseOptions.Verify(configErrs)
 	c.Metrics.Verify(configErrs)
 	c.Sentry.Verify(configErrs)
 	c.DNSCache.Verify(configErrs)
 	c.ServerNotices.Verify(configErrs)
 	c.ReportStats.Verify(configErrs)
 	c.Cache.Verify(configErrs)
+	c.Actors.Verify(configErrs)
 }
 
 func (c *Global) IsLocalServerName(serverName spec.ServerName) bool {
@@ -252,7 +251,7 @@ type VirtualHost struct {
 	AllowGuests bool `yaml:"allow_guests"`
 }
 
-func (v *VirtualHost) Verify(configErrs *ConfigErrors) {
+func (v *VirtualHost) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "virtual_host.*.server_name", string(v.ServerName))
 }
 
@@ -304,7 +303,7 @@ func (c *Metrics) Defaults(opts DefaultOpts) {
 
 }
 
-func (c *Metrics) Verify(configErrs *ConfigErrors) {
+func (c *Metrics) Verify(configErrs *Errors) {
 }
 
 // ServerNotices defines the configuration used for sending server notices
@@ -328,11 +327,11 @@ func (c *ServerNotices) Defaults(opts DefaultOpts) {
 	c.AvatarURL = ""
 }
 
-func (c *ServerNotices) Verify(errors *ConfigErrors) {}
+func (c *ServerNotices) Verify(errors *Errors) {}
 
 type CacheOptions struct {
 	// The connection string,
-	ConnectionString DataSource `env:"CACHE_URI" yaml:"connection_string"`
+	CacheURI DataSource `env:"CACHE_URI" yaml:"cache_uri"`
 
 	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
 	MaxAge           time.Duration `yaml:"max_age"`
@@ -341,32 +340,97 @@ type CacheOptions struct {
 
 func (c *CacheOptions) LoadEnv() error {
 
-	err := frame.ConfigFillFromEnv(c)
-	if err != nil {
-		c.ConnectionString = DataSource(os.Getenv("CACHE_URI"))
-	}
-
-	if !c.ConnectionString.IsRedis() {
-		log.WithField("cache_uri", c.ConnectionString).Warn("Invalid cache uri in the config")
+	cacheURI := os.Getenv("CACHE_URI")
+	if cacheURI != "" {
+		c.CacheURI = DataSource(cacheURI)
 	}
 	return nil
 }
 
 func (c *CacheOptions) Defaults(opts DefaultOpts) {
-	connectionUriStr := string(opts.CacheConnectionStr)
+	connectionUriStr := string(opts.DSCacheConn)
 	if connectionUriStr != "" {
-		c.ConnectionString = DataSource(connectionUriStr)
+		c.CacheURI = DataSource(connectionUriStr)
 	}
 
-	c.ConnectionString = opts.CacheConnectionStr
+	c.CacheURI = opts.DSCacheConn
 	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
 	c.MaxAge = time.Hour
 }
 
-func (c *CacheOptions) Verify(configErrs *ConfigErrors) {
+func (c *CacheOptions) Verify(configErrs *Errors) {
 	checkPositive(configErrs, "max_size_estimated", int64(c.EstimatedMaxSize))
 
-	checkNotEmpty(configErrs, "global.cache.connection_string", string(c.ConnectionString))
+	checkNotEmpty(configErrs, "global.cache.cache_uri", string(c.CacheURI))
+}
+
+type QueueOptions struct {
+	Prefix     string `yaml:"prefix"`
+	QReference string `yaml:"reference"`
+	// The connection string,
+	DS DataSource `yaml:"queue_uri"`
+}
+
+func (q *QueueOptions) Ref() string {
+	return fmt.Sprintf("%s%s", q.Prefix, q.QReference)
+}
+
+func (q *QueueOptions) DSrc() DataSource {
+	pp := q.DS.PrefixPath(q.Prefix)
+	if !pp.IsNats() {
+		return pp
+	}
+
+	uri, _ := pp.ToURI()
+	query := uri.Query()
+	if query.Has("subject") {
+		query.Set("subject", fmt.Sprintf("%s%s", q.Prefix, query.Get("subject")))
+	}
+
+	if query.Has("stream_name") {
+		query.Set("stream_name", fmt.Sprintf("%s%s", q.Prefix, query.Get("stream_name")))
+	}
+
+	if query.Has("stream_subjects") {
+		query.Set("stream_subjects", fmt.Sprintf("%s%s", q.Prefix, query.Get("stream_subjects")))
+	}
+
+	if query.Has("consumer_durable_name") {
+		query.Set("consumer_durable_name", fmt.Sprintf("%s%s", q.Prefix, query.Get("consumer_durable_name")))
+	}
+
+	if query.Has("consumer_filter_subject") {
+		query.Set("consumer_filter_subject", fmt.Sprintf("%s%s", q.Prefix, query.Get("consumer_filter_subject")))
+	}
+
+	uri.RawQuery = query.Encode()
+
+	return DataSource(uri.String())
+}
+
+func (q *QueueOptions) LoadEnv(ctx context.Context) error {
+
+	q.DS = DataSource(os.Getenv("QUEUE_URI"))
+	if !q.DS.IsQueue() {
+		util.Log(ctx).WithField("queue_uri", q.DS).Warn("Invalid queue uri in the config")
+	}
+	return nil
+}
+
+func (q *QueueOptions) Defaults(opts DefaultOpts) {
+	connectionUriStr := string(opts.DSQueueConn)
+	if connectionUriStr != "" {
+		q.DS = DataSource(connectionUriStr)
+	}
+
+	q.DS = opts.DSCacheConn
+	q.Prefix = "Matrix_"
+}
+
+func (q *QueueOptions) Verify(configErrs *Errors) {
+	checkNotEmpty(configErrs, "global.queue.topic_prefix", q.Prefix)
+
+	checkNotEmpty(configErrs, "global.queue.queue_uri", string(q.DS))
 }
 
 // ReportStats configures opt-in phone-home statistics reporting.
@@ -383,7 +447,7 @@ func (c *ReportStats) Defaults() {
 	c.Endpoint = "https://panopticon.matrix.org/push"
 }
 
-func (c *ReportStats) Verify(configErrs *ConfigErrors) {
+func (c *ReportStats) Verify(configErrs *Errors) {
 	// We prefer to hit panopticon (https://github.com/matrix-org/panopticon) directly over
 	// the "old" matrix.org endpoint.
 	if c.Endpoint == "https://matrix.org/report-usage-stats/push" {
@@ -409,38 +473,40 @@ func (c *Sentry) Defaults() {
 	c.Enabled = false
 }
 
-func (c *Sentry) Verify(configErrs *ConfigErrors) {
+func (c *Sentry) Verify(configErrs *Errors) {
 }
 
 type DatabaseOptions struct {
+	Prefix    string `yaml:"prefix"`
+	Reference string `yaml:"reference"`
 	// The connection string, file:filename.db or postgres://server....
-	ConnectionString DataSource `env:"DATABASE_URI"  yaml:"connection_string"`
-	// Maximum open connections to the DB (0 = use default, negative means unlimited)
+	DatabaseURI DataSource `env:"DATABASE_URI"  yaml:"database_uri"`
+	// Maximum open connections to the Cm (0 = use default, negative means unlimited)
 	MaxOpenConnections int `yaml:"max_open_conns"`
-	// Maximum idle connections to the DB (0 = use default, negative means unlimited)
+	// Maximum idle connections to the Cm (0 = use default, negative means unlimited)
 	MaxIdleConnections int `yaml:"max_idle_conns"`
 	// maximum amount of time (in seconds) a connection may be reused (<= 0 means unlimited)
 	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
 }
 
-func (c *DatabaseOptions) LoadEnv() error {
+func (c *DatabaseOptions) Ref() string {
+	return fmt.Sprintf("%s%s", c.Prefix, c.Reference)
+}
 
-	err := frame.ConfigFillFromEnv(c)
-	if err != nil {
-		c.ConnectionString = DataSource(os.Getenv("DATABASE_URI"))
-	}
+func (c *DatabaseOptions) LoadEnv(ctx context.Context) error {
 
-	if !c.ConnectionString.IsPostgres() {
-		log.WithField("db_uri", c.ConnectionString).Warn("Invalid database uri in the config")
+	c.DatabaseURI = DataSource(os.Getenv("DATABASE_URI"))
+	if !c.DatabaseURI.IsPostgres() {
+		util.Log(ctx).WithField("database_uri", c.DatabaseURI).Warn("Invalid database uri in the config")
 	}
 	return nil
 }
 
 func (c *DatabaseOptions) Defaults(opts DefaultOpts) {
 
-	databaseUriStr := string(opts.DatabaseConnectionStr)
+	databaseUriStr := string(opts.DSDatabaseConn)
 	if databaseUriStr != "" {
-		c.ConnectionString = DataSource(databaseUriStr)
+		c.DatabaseURI = DataSource(databaseUriStr)
 	}
 
 	c.MaxOpenConnections = 90
@@ -448,22 +514,22 @@ func (c *DatabaseOptions) Defaults(opts DefaultOpts) {
 	c.ConnMaxLifetimeSeconds = -1
 }
 
-func (c *DatabaseOptions) Verify(configErrs *ConfigErrors) {
+func (c *DatabaseOptions) Verify(configErrs *Errors) {
 
-	if c.ConnectionString != "" {
+	if c.DatabaseURI != "" {
 		return
 	}
 
-	checkNotEmpty(configErrs, "global.database.connection_string", string(c.ConnectionString))
+	checkNotEmpty(configErrs, "global.database.database_uri", string(c.DatabaseURI))
 
 }
 
-// MaxIdleConns returns maximum idle connections to the DB
+// MaxIdleConns returns maximum idle connections to the Cm
 func (c *DatabaseOptions) MaxIdleConns() int {
 	return c.MaxIdleConnections
 }
 
-// MaxOpenConns returns maximum open connections to the DB
+// MaxOpenConns returns maximum open connections to the Cm
 func (c *DatabaseOptions) MaxOpenConns() int {
 	return c.MaxOpenConnections
 }
@@ -488,7 +554,7 @@ func (c *DNSCacheOptions) Defaults() {
 	c.CacheLifetime = time.Minute * 5
 }
 
-func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors) {
+func (c *DNSCacheOptions) Verify(configErrs *Errors) {
 	checkPositive(configErrs, "cache_size", int64(c.CacheSize))
 	checkPositive(configErrs, "cache_lifetime", int64(c.CacheLifetime))
 }
@@ -526,6 +592,65 @@ func (d *DataUnit) UnmarshalText(text []byte) error {
 	return nil
 }
 
+// ActorOptions contains configuration for the Proto.Actor system used for distributed event processing
+type ActorOptions struct {
+	// Enabled determines whether the actor system is enabled
+	Enabled bool `yaml:"enabled"`
+
+	// Host to use for the actor system
+	Host string `yaml:"host"`
+
+	// Port to use for the actor system
+	Port int `yaml:"port"`
+
+	// ClusterMode specifies the clustering mode: "kubernetes", "automanaged", or "none"
+	ClusterMode string `yaml:"cluster_mode"`
+
+	// ClusterSeeds is a list of cluster seed nodes in the format "host:port"
+	ClusterSeeds []string `yaml:"cluster_seeds"`
+
+	// IdleTimeout is the duration after which a room actor will stop if no messages are received
+	IdleTimeout time.Duration `yaml:"idle_timeout"`
+
+	// FunctionPrefix represents the prefix to use for prefixing room id actor based on function
+	FunctionPrefix string `yaml:"function_prefix"`
+}
+
+func (c *ActorOptions) Defaults(opts DefaultOpts) {
+	// Default ActorSystem configuration
+	c.Enabled = false // Disabled by default for backward compatibility
+	c.Host = "localhost"
+	c.Port = 8090
+	c.ClusterMode = "none" // Default to no clustering
+	c.ClusterSeeds = []string{"127.0.0.1:8090"}
+	c.IdleTimeout = 1 * time.Minute
+	c.FunctionPrefix = "RoomServer"
+
+}
+
+func (c *ActorOptions) Verify(configErrs *Errors) {
+	// Only verify if the actor system is enabled
+	if !c.Enabled {
+		return
+	}
+
+	// Verify actor system configuration
+	if c.Port <= 0 || c.Port > 65535 {
+		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.actor_system.port': %d, must be between 1 and 65535", c.Port))
+	}
+
+	// Verify cluster mode
+	validModes := map[string]bool{"none": true, "kubernetes": true}
+	if _, valid := validModes[c.ClusterMode]; !valid {
+		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.actor_system.cluster_mode': %s, must be one of 'none' or 'kubernetes'", c.ClusterMode))
+	}
+
+	// Verify idle timeout
+	if c.IdleTimeout < 10*time.Second {
+		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.actor_system.idle_timeout': %s, must be at least 10 seconds", c.IdleTimeout))
+	}
+}
+
 // DistributedAPI The configuration to enable the use of distributed stores of data
 type DistributedAPI struct {
 	Enabled             bool   `yaml:"enabled"`
@@ -537,5 +662,5 @@ func (d *DistributedAPI) Defaults() {
 	d.Enabled = false
 }
 
-func (d *DistributedAPI) Verify(configErrs *ConfigErrors) {
+func (d *DistributedAPI) Verify(configErrs *Errors) {
 }

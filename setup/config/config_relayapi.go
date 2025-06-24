@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Global.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 package config
 
 type RelayAPI struct {
-	Matrix *Global `yaml:"-"`
+	Global *Global `yaml:"-"`
 
 	// The database stores information used by the relay queue to
 	// forward transactions to remote servers.
@@ -23,11 +23,13 @@ type RelayAPI struct {
 }
 
 func (c *RelayAPI) Defaults(opts DefaultOpts) {
-	c.Database.ConnectionString = opts.DatabaseConnectionStr
+	c.Database.Reference = "RelayAPI"
+	c.Database.Prefix = opts.RandomnessPrefix
+	c.Database.DatabaseURI = opts.DSDatabaseConn
 }
 
-func (c *RelayAPI) Verify(configErrs *ConfigErrors) {
-	if c.Database.ConnectionString == "" {
-		checkNotEmpty(configErrs, "relay_api.database.connection_string", string(c.Database.ConnectionString))
+func (c *RelayAPI) Verify(configErrs *Errors) {
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "relay_api.database.database_uri", string(c.Database.DatabaseURI))
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,18 +17,19 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"encoding/json"
 	"time"
-
-	"github.com/lib/pq"
 
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/lib/pq"
+	"github.com/pitabwire/frame"
 )
 
-var deviceKeysSchema = `
+// deviceKeysSchema defines the schema for device keys storage
+const deviceKeysSchema = `
 -- Stores device keys for users
 CREATE TABLE IF NOT EXISTS keyserver_device_keys (
     user_id TEXT NOT NULL,
@@ -46,146 +47,212 @@ CREATE TABLE IF NOT EXISTS keyserver_device_keys (
 );
 `
 
-const upsertDeviceKeysSQL = "" +
-	"INSERT INTO keyserver_device_keys (user_id, device_id, ts_added_secs, key_json, stream_id, display_name)" +
-	" VALUES ($1, $2, $3, $4, $5, $6)" +
-	" ON CONFLICT ON CONSTRAINT keyserver_device_keys_unique" +
-	" DO UPDATE SET key_json = $4, stream_id = $5, display_name = $6"
+// deviceKeysSchemaRevert defines the revert operation for the device keys schema
+const deviceKeysSchemaRevert = `
+DROP TABLE IF EXISTS keyserver_device_keys;
+`
 
-const selectDeviceKeysSQL = "" +
-	"SELECT key_json, stream_id, display_name FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
+// SQL query constants
+const upsertDeviceKeysSQL = `
+INSERT INTO keyserver_device_keys (user_id, device_id, ts_added_secs, key_json, stream_id, display_name)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (user_id, device_id)
+DO UPDATE SET key_json = $4, stream_id = $5, display_name = $6
+`
 
-const selectBatchDeviceKeysSQL = "" +
-	"SELECT device_id, key_json, stream_id, display_name FROM keyserver_device_keys WHERE user_id=$1 AND key_json <> ''"
+const selectDeviceKeysSQL = `
+SELECT device_id, key_json FROM keyserver_device_keys
+WHERE user_id = $1 AND device_id = ANY($2)
+`
 
-const selectBatchDeviceKeysWithEmptiesSQL = "" +
-	"SELECT device_id, key_json, stream_id, display_name FROM keyserver_device_keys WHERE user_id=$1"
+const selectBatchDeviceKeysSQL = `
+SELECT device_id, key_json, stream_id, display_name FROM keyserver_device_keys
+WHERE user_id = $1 AND key_json <> ''
+`
 
-const selectMaxStreamForUserSQL = "" +
-	"SELECT MAX(stream_id) FROM keyserver_device_keys WHERE user_id=$1"
+const selectBatchDeviceKeysWithEmptiesSQL = `
+SELECT
+    device_id, key_json, stream_id, display_name
+    FROM keyserver_device_keys WHERE user_id = $1
+`
 
-const countStreamIDsForUserSQL = "" +
-	"SELECT COUNT(*) FROM keyserver_device_keys WHERE user_id=$1 AND stream_id = ANY($2)"
+const selectMaxStreamForUserSQL = `
+SELECT MAX(stream_id) FROM keyserver_device_keys WHERE user_id = $1
+`
 
-const deleteDeviceKeysSQL = "" +
-	"DELETE FROM keyserver_device_keys WHERE user_id=$1 AND device_id=$2"
+const countStreamIDsForUserSQL = `
+SELECT COUNT(*) FROM keyserver_device_keys WHERE user_id = $1 AND stream_id = ANY($2)
+`
 
-const deleteAllDeviceKeysSQL = "" +
-	"DELETE FROM keyserver_device_keys WHERE user_id=$1"
+const deleteDeviceKeysSQL = `
+DELETE FROM keyserver_device_keys WHERE user_id = $1 AND device_id = $2
+`
 
-type deviceKeysStatements struct {
-	db                                   *sql.DB
-	upsertDeviceKeysStmt                 *sql.Stmt
-	selectDeviceKeysStmt                 *sql.Stmt
-	selectBatchDeviceKeysStmt            *sql.Stmt
-	selectBatchDeviceKeysWithEmptiesStmt *sql.Stmt
-	selectMaxStreamForUserStmt           *sql.Stmt
-	countStreamIDsForUserStmt            *sql.Stmt
-	deleteDeviceKeysStmt                 *sql.Stmt
-	deleteAllDeviceKeysStmt              *sql.Stmt
+const deleteAllDeviceKeysSQL = `
+DELETE FROM keyserver_device_keys WHERE user_id = $1
+`
+
+type deviceKeysTable struct {
+	cm                                  sqlutil.ConnectionManager
+	upsertDeviceKeysSQL                 string
+	selectDeviceKeysSQL                 string
+	selectBatchDeviceKeysSQL            string
+	selectBatchDeviceKeysWithEmptiesSQL string
+	selectMaxStreamForUserSQL           string
+	countStreamIDsForUserSQL            string
+	deleteDeviceKeysSQL                 string
+	deleteAllDeviceKeysSQL              string
 }
 
-func NewPostgresDeviceKeysTable(ctx context.Context, db *sql.DB) (tables.DeviceKeys, error) {
-	s := &deviceKeysStatements{
-		db: db,
+// NewPostgresDeviceKeysTable creates a new postgres device keys table
+func NewPostgresDeviceKeysTable(ctx context.Context, cm sqlutil.ConnectionManager) (tables.DeviceKeys, error) {
+	t := &deviceKeysTable{
+		cm:                                  cm,
+		upsertDeviceKeysSQL:                 upsertDeviceKeysSQL,
+		selectDeviceKeysSQL:                 selectDeviceKeysSQL,
+		selectBatchDeviceKeysSQL:            selectBatchDeviceKeysSQL,
+		selectBatchDeviceKeysWithEmptiesSQL: selectBatchDeviceKeysWithEmptiesSQL,
+		selectMaxStreamForUserSQL:           selectMaxStreamForUserSQL,
+		countStreamIDsForUserSQL:            countStreamIDsForUserSQL,
+		deleteDeviceKeysSQL:                 deleteDeviceKeysSQL,
+		deleteAllDeviceKeysSQL:              deleteAllDeviceKeysSQL,
 	}
-	_, err := db.Exec(deviceKeysSchema)
+
+	// Perform schema migration
+	err := cm.Collect(&frame.MigrationPatch{
+		Name:        "keyserver_device_keys_table_schema_001",
+		Patch:       deviceKeysSchema,
+		RevertPatch: deviceKeysSchemaRevert,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.upsertDeviceKeysStmt, upsertDeviceKeysSQL},
-		{&s.selectDeviceKeysStmt, selectDeviceKeysSQL},
-		{&s.selectBatchDeviceKeysStmt, selectBatchDeviceKeysSQL},
-		{&s.selectBatchDeviceKeysWithEmptiesStmt, selectBatchDeviceKeysWithEmptiesSQL},
-		{&s.selectMaxStreamForUserStmt, selectMaxStreamForUserSQL},
-		{&s.countStreamIDsForUserStmt, countStreamIDsForUserSQL},
-		{&s.deleteDeviceKeysStmt, deleteDeviceKeysSQL},
-		{&s.deleteAllDeviceKeysStmt, deleteAllDeviceKeysSQL},
-	}.Prepare(db)
+
+	return t, nil
 }
 
-func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error {
-	for i, key := range keys {
-		var keyJSONStr string
-		var streamID int64
-		var displayName sql.NullString
-		err := s.selectDeviceKeysStmt.QueryRowContext(ctx, key.UserID, key.DeviceID).Scan(&keyJSONStr, &streamID, &displayName)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+// SelectDeviceKeysJSON populates the KeyJSON for the given keys. If any keys aren't found, they are simply not modified.
+func (s *deviceKeysTable) SelectDeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error {
+	// If there are no keys then there is nothing to do
+	if len(keys) == 0 {
+		return nil
+	}
+
+	deviceIDs := make([]string, len(keys))
+	for i := range keys {
+		deviceIDs[i] = keys[i].DeviceID
+	}
+
+	db := s.cm.Connection(ctx, true)
+	rows, err := db.Raw(s.selectDeviceKeysSQL, keys[0].UserID, pq.StringArray(deviceIDs)).Rows()
+	if err != nil {
+		return err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectDeviceKeysJSON: rows.close() failed")
+
+	for rows.Next() {
+		var deviceID string
+		var keyJSON string
+		if err = rows.Scan(&deviceID, &keyJSON); err != nil {
 			return err
 		}
-		// this will be '' when there is no device
-		keys[i].Type = api.TypeDeviceKeyUpdate
-		keys[i].KeyJSON = []byte(keyJSONStr)
-		keys[i].StreamID = streamID
-		if displayName.Valid {
-			keys[i].DisplayName = displayName.String
+
+		// Find which element this corresponds to in the input
+		for i := range keys {
+			if keys[i].DeviceID == deviceID {
+				if err = json.Unmarshal([]byte(keyJSON), &keys[i].KeyJSON); err != nil {
+					return err
+				}
+				break
+			}
 		}
 	}
-	return nil
+
+	return rows.Err()
 }
 
-func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int64, err error) {
-	// nullable if there are no results
-	var nullStream sql.NullInt64
-	err = sqlutil.TxStmt(txn, s.selectMaxStreamForUserStmt).QueryRowContext(ctx, userID).Scan(&nullStream)
-	if errors.Is(err, sql.ErrNoRows) {
-		err = nil
+// SelectMaxStreamIDForUser returns the maximum stream ID for the given user.
+func (s *deviceKeysTable) SelectMaxStreamIDForUser(ctx context.Context, userID string) (streamID int64, err error) {
+	db := s.cm.Connection(ctx, true)
+
+	var nullableStreamId sql.NullInt64
+
+	row := db.Raw(s.selectMaxStreamForUserSQL, userID).Row()
+	err = row.Scan(&nullableStreamId)
+	if err != nil {
+		if sqlutil.ErrorIsNoRows(err) {
+			return 0, nil
+		}
+		return 0, err
 	}
-	if nullStream.Valid {
-		streamID = nullStream.Int64
+
+	if nullableStreamId.Valid {
+		streamID = nullableStreamId.Int64
 	}
 	return
 }
 
-func (s *deviceKeysStatements) CountStreamIDsForUser(ctx context.Context, userID string, streamIDs []int64) (int, error) {
-	// nullable if there are no results
-	var count sql.NullInt32
-	err := s.countStreamIDsForUserStmt.QueryRowContext(ctx, userID, pq.Int64Array(streamIDs)).Scan(&count)
+// CountStreamIDsForUser counts the number of stream IDs that exist for a user which are in the supplied list.
+func (s *deviceKeysTable) CountStreamIDsForUser(ctx context.Context, userID string, streamIDs []int64) (int, error) {
+	db := s.cm.Connection(ctx, true)
+	var count int
+	err := db.Raw(s.countStreamIDsForUserSQL, userID, pq.Int64Array(streamIDs)).Row().Scan(&count)
 	if err != nil {
 		return 0, err
 	}
-	if count.Valid {
-		return int(count.Int32), nil
-	}
-	return 0, nil
+	return count, nil
 }
 
-func (s *deviceKeysStatements) InsertDeviceKeys(ctx context.Context, txn *sql.Tx, keys []api.DeviceMessage) error {
+// InsertDeviceKeys inserts the given keys. Keys with the same user ID and device ID will be replaced.
+func (s *deviceKeysTable) InsertDeviceKeys(ctx context.Context, keys []api.DeviceMessage) error {
+	if len(keys) == 0 {
+		return nil
+	}
+
+	db := s.cm.Connection(ctx, false)
+
 	for _, key := range keys {
 		now := time.Now().Unix()
-		_, err := sqlutil.TxStmt(txn, s.upsertDeviceKeysStmt).ExecContext(
-			ctx, key.UserID, key.DeviceID, now, string(key.KeyJSON), key.StreamID, key.DisplayName,
-		)
+		err := db.Exec(
+			s.upsertDeviceKeysSQL,
+			key.UserID, key.DeviceID, now, string(key.KeyJSON), key.StreamID, key.DisplayName,
+		).Error
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
-func (s *deviceKeysStatements) DeleteDeviceKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error {
-	_, err := sqlutil.TxStmt(txn, s.deleteDeviceKeysStmt).ExecContext(ctx, userID, deviceID)
-	return err
+// DeleteDeviceKeys removes the keys for a given user and device. If the device doesn't exist, no error is returned.
+func (s *deviceKeysTable) DeleteDeviceKeys(ctx context.Context, userID, deviceID string) error {
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.deleteDeviceKeysSQL, userID, deviceID).Error
 }
 
-func (s *deviceKeysStatements) DeleteAllDeviceKeys(ctx context.Context, txn *sql.Tx, userID string) error {
-	_, err := sqlutil.TxStmt(txn, s.deleteAllDeviceKeysStmt).ExecContext(ctx, userID)
-	return err
+// DeleteAllDeviceKeys removes all keys for a given user. If the user doesn't exist, no error is returned.
+func (s *deviceKeysTable) DeleteAllDeviceKeys(ctx context.Context, userID string) error {
+	db := s.cm.Connection(ctx, false)
+	return db.Exec(s.deleteAllDeviceKeysSQL, userID).Error
 }
 
-func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string, includeEmpty bool) ([]api.DeviceMessage, error) {
-	var stmt *sql.Stmt
+// SelectBatchDeviceKeys returns a map of device keys for the given user and device IDs.
+func (s *deviceKeysTable) SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string, includeEmpty bool) ([]api.DeviceMessage, error) {
+	db := s.cm.Connection(ctx, true)
+	var rows *sql.Rows
+	var err error
+
 	if includeEmpty {
-		stmt = s.selectBatchDeviceKeysWithEmptiesStmt
+		rows, err = db.Raw(s.selectBatchDeviceKeysWithEmptiesSQL, userID).Rows()
 	} else {
-		stmt = s.selectBatchDeviceKeysStmt
+		rows, err = db.Raw(s.selectBatchDeviceKeysSQL, userID).Rows()
 	}
-	rows, err := stmt.QueryContext(ctx, userID)
+
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectBatchDeviceKeysStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectBatchDeviceKeys: rows.close() failed")
 	deviceIDMap := make(map[string]bool)
 	for _, d := range deviceIDs {
 		deviceIDMap[d] = true
@@ -199,8 +266,9 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 				UserID: userID,
 			},
 		}
-		if err := rows.Scan(&dk.DeviceID, &dk.KeyJSON, &dk.StreamID, &displayName); err != nil {
-			return nil, err
+		err0 := rows.Scan(&dk.DeviceID, &dk.KeyJSON, &dk.StreamID, &displayName)
+		if err0 != nil {
+			return nil, err0
 		}
 		if displayName.Valid {
 			dk.DisplayName = displayName.String

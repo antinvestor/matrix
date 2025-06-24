@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,72 +18,58 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/getsentry/sentry-go"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/antinvestor/gomatrixserverlib/spec"
+	"github.com/antinvestor/matrix/internal/queueutil"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/antinvestor/matrix/setup/jetstream"
+	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/notifier"
 	"github.com/antinvestor/matrix/syncapi/storage"
 	"github.com/antinvestor/matrix/syncapi/streams"
 	"github.com/antinvestor/matrix/syncapi/types"
+	"github.com/pitabwire/util"
 )
 
 // OutputReceiptEventConsumer consumes events that originated in the EDU server.
 type OutputReceiptEventConsumer struct {
-	jetstream nats.JetStreamContext
-	durable   string
-	topic     string
-	db        storage.Database
-	stream    streams.StreamProvider
-	notifier  *notifier.Notifier
+	qm       queueutil.QueueManager
+	db       storage.Database
+	stream   streams.StreamProvider
+	notifier *notifier.Notifier
 }
 
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
 // Call Start() to begin consuming from the EDU server.
 func NewOutputReceiptEventConsumer(
-	_ context.Context,
+	ctx context.Context,
 	cfg *config.SyncAPI,
-	js nats.JetStreamContext,
+	qm queueutil.QueueManager,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream streams.StreamProvider,
-) *OutputReceiptEventConsumer {
-	return &OutputReceiptEventConsumer{
-		jetstream: js,
-		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		durable:   cfg.Matrix.JetStream.Durable("SyncAPIReceiptConsumer"),
-		db:        store,
-		notifier:  notifier,
-		stream:    stream,
+) error {
+	c := &OutputReceiptEventConsumer{
+		qm:       qm,
+		db:       store,
+		notifier: notifier,
+		stream:   stream,
 	}
+
+	return qm.RegisterSubscriber(ctx, &cfg.Queues.OutputReceiptEvent, c)
 }
 
-// Start consuming receipts events.
-func (s *OutputReceiptEventConsumer) Start(ctx context.Context) error {
-	return jetstream.Consumer(
-		ctx, s.jetstream, s.topic, s.durable, 1,
-		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
-	)
-}
-
-func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
-	msg := msgs[0] // Guaranteed to exist if onMessage is called
+func (s *OutputReceiptEventConsumer) Handle(ctx context.Context, metadata map[string]string, message []byte) error {
 	output := types.OutputReceiptEvent{
-		UserID:  msg.Header.Get(jetstream.UserID),
-		RoomID:  msg.Header.Get(jetstream.RoomID),
-		EventID: msg.Header.Get(jetstream.EventID),
-		Type:    msg.Header.Get("type"),
+		UserID:  metadata[constants.UserID],
+		RoomID:  metadata[constants.RoomID],
+		EventID: metadata[constants.EventID],
+		Type:    metadata["type"],
 	}
 
-	timestamp, err := strconv.ParseUint(msg.Header.Get("timestamp"), 10, 64)
+	timestamp, err := strconv.ParseUint(metadata["timestamp"], 10, 64)
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("output log: message parse failure")
-		sentry.CaptureException(err)
-		return true
+		util.Log(ctx).WithError(err).Error("output log: message parse failure")
+		return err
 	}
 
 	output.Timestamp = spec.Timestamp(timestamp)
@@ -97,12 +83,11 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 		output.Timestamp,
 	)
 	if err != nil {
-		sentry.CaptureException(err)
-		return true
+		return err
 	}
 
 	s.stream.Advance(streamPos)
 	s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
 
-	return true
+	return nil
 }

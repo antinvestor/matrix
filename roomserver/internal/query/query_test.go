@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,16 +19,16 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/antinvestor/matrix/test/testrig"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal/caching"
+	"github.com/antinvestor/matrix/internal/cacheutil"
 	"github.com/antinvestor/matrix/internal/sqlutil"
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
+	"github.com/antinvestor/matrix/test/testrig"
+	"github.com/pitabwire/frame"
 )
 
 // used to implement RoomserverInternalAPIEventDB to test getAuthChain
@@ -97,7 +97,8 @@ func (db *getEventDB) EventsFromIDs(_ context.Context, _ *types.RoomInfo, eventI
 }
 
 func TestGetAuthChainSingle(t *testing.T) {
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	db := createEventDB()
 
 	err := db.addFakeEvents(map[string][]string{
@@ -131,7 +132,8 @@ func TestGetAuthChainSingle(t *testing.T) {
 
 func TestGetAuthChainMultiple(t *testing.T) {
 
-	ctx := testrig.NewContext(t)
+	ctx, svc, _ := testrig.Init(t)
+	defer svc.Stop(ctx)
 	db := createEventDB()
 
 	err := db.addFakeEvents(map[string][]string{
@@ -164,42 +166,29 @@ func TestGetAuthChainMultiple(t *testing.T) {
 	}
 }
 
-func mustCreateDatabase(ctx context.Context, t *testing.T, _ test.DependancyOption) (storage.Database, func()) {
+func mustCreateDatabase(ctx context.Context, svc *frame.Service, cfg *config.Matrix, t *testing.T, _ test.DependancyOption) storage.Database {
 
-	conStr, closeDb, err := test.PrepareDatabaseDSConnection(ctx)
-	if err != nil {
-		t.Fatalf("failed to open database: %s", err)
-	}
+	cm := sqlutil.NewConnectionManager(svc)
 
-	cacheConnStr, closeCache, err := test.PrepareRedisDataSourceConnection(context.TODO())
+	caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 	if err != nil {
 		t.Fatalf("Could not create redis container %s", err)
 	}
 
-	caches, err := caching.NewCache(&config.CacheOptions{
-		ConnectionString: cacheConnStr,
-	})
-	if err != nil {
-		t.Fatalf("Could not create redis container %s", err)
-	}
-
-	cm := sqlutil.NewConnectionManager(ctx, config.DatabaseOptions{ConnectionString: conStr})
-	db, err := storage.Open(ctx, cm, &config.DatabaseOptions{ConnectionString: conStr}, caches)
+	db, err := storage.NewDatabase(ctx, cm, caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}
-	return db, func() {
-		closeCache()
-		closeDb()
-	}
+	return db
 }
 
 func TestCurrentEventIsNil(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 
-		ctx := testrig.NewContext(t)
-		db, closeDb := mustCreateDatabase(ctx, t, testOpts)
-		defer closeDb()
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+		db := mustCreateDatabase(ctx, svc, cfg, t, testOpts)
+
 		querier := Queryer{
 			DB: db,
 		}
@@ -207,7 +196,7 @@ func TestCurrentEventIsNil(t *testing.T) {
 		roomID, _ := spec.NewRoomID("!room:server")
 		event, _ := querier.CurrentStateEvent(ctx, *roomID, spec.MRoomMember, "@user:server")
 		if event != nil {
-			t.Fatal("Event should equal nil, most likely this is failing because the interface type is not nil, but the value is.")
+			t.Fatalf("Event should equal nil, most likely this is failing because the interface type is not nil, but the value is.")
 		}
 	})
 }

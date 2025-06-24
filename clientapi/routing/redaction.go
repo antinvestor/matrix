@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2025 Ant Investor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,8 +21,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/pitabwire/util"
-
 	"github.com/antinvestor/matrix/clientapi/httputil"
 	"github.com/antinvestor/matrix/internal/eventutil"
 	"github.com/antinvestor/matrix/internal/transactions"
@@ -30,6 +28,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/util"
 )
 
 type redactionContent struct {
@@ -80,7 +79,7 @@ func SendRedaction(
 	// if user is member of room, and sender ID is nil, then this user doesn't have a pseudo ID for some reason,
 	// which is unexpected.
 	if senderID == nil {
-		util.GetLogger(req.Context()).WithField("userID", *deviceUserID).WithField("roomID", roomID).Error("missing sender ID for user, despite having membership")
+		util.Log(req.Context()).WithField("userID", *deviceUserID).WithField("roomID", roomID).Error("missing sender ID for user, despite having membership")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("internal server error"),
@@ -161,7 +160,7 @@ func SendRedaction(
 
 	err = proto.SetContent(r)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("proto.SetContent failed")
+		util.Log(req.Context()).WithError(err).Error("proto.SetContent failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -186,7 +185,7 @@ func SendRedaction(
 	}
 	domain := device.UserDomain()
 	if err = roomserverAPI.SendEvents(ctx, rsAPI, roomserverAPI.KindNew, []*types.HeaderedEvent{e}, device.UserDomain(), domain, domain, nil, false); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
+		util.Log(req.Context()).WithError(err).Error("failed to SendEvents")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},

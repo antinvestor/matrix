@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package antinvestor.matrix.apis.presence.v1;
+
+option go_package = "github.com/antinvestor/matrix/apis/presence/v1;presenceV1";
+
+import "buf/validate/validate.proto";
+
+// PresenceService defines the gRPC service for handling presence information
+service PresenceService {
+  // GetPresence retrieves the presence information for a given user
+  rpc GetPresence(GetPresenceRequest) returns (GetPresenceResponse) {}
+
+}
+
+// GetPresenceRequest is used to request presence information for a user
+message GetPresenceRequest {
+  // User ID for whom to retrieve presence information
+  string user_id = 1;
+}
+
+// GetPresenceResponse contains the presence information for a user
+message GetPresenceResponse {
+  // User ID
+  string user_id = 1;
+
+  // Presence state (online, offline, unavailable)
+  string presence = 2 [(buf.validate.field).string.in = "online", (buf.validate.field).string.in = "offline", (buf.validate.field).string.in = "unavailable"];
+
+  // Status message set by the user
+  optional string status_msg = 3;
+
+  // Whether the user is currently active
+  bool currently_active = 4;
+
+  // Time since last activity in milliseconds
+  int64 last_active_ago = 5;
+
+  // Timestamp of last activity (milliseconds since epoch)
+  int64 last_active_ts = 6;
+}
