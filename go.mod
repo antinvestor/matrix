@@ -33,7 +33,7 @@ require (
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
-	go.mau.fi/util v0.8.7
+	go.mau.fi/util v0.8.8
 	golang.org/x/crypto v0.39.0
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	golang.org/x/image v0.28.0
@@ -45,7 +45,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/gorm v1.30.0
 	gotest.tools/v3 v3.5.2
-	maunium.net/go/mautrix v0.24.0
+	maunium.net/go/mautrix v0.24.1
 )
 
 require (
