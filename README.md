@@ -14,26 +14,20 @@ It intends to provide an **efficient**, **reliable** and **scalable** matrix ser
 
 If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or join us in:
 
-This project is a fork of: https://github.com/antinvestor/matrix
+This project is a fork of Dendrite : https://github.com/matrix-org/dendrite
 
 ## Requirements
 
 See the [Planning your Installation](https://matrix-org.github.io/dendrite/installation/planning) page for
 more information on requirements.
 
-To build Matrix, you will need Go 1.23 or later.
+To build Matrix, you will need Go 1.24 or later.
 
 For a usable federating Matrix deployment, you will also need:
 
 - A domain name (or subdomain)
 - A valid TLS certificate issued by a trusted authority for that domain
 - SRV records or a well-known file pointing to your deployment
-
-Also recommended are:
-
-- A PostgreSQL database engine, which will perform better than SQLite with many users and/or larger rooms
-- A reverse proxy server, such as nginx,
-  configured [like this sample](https://github.com/antinvestor/matrix/blob/main/docs/nginx/dendrite-sample.conf)
 
 The [Federation Tester](https://federationtester.matrix.org) can be used to verify your deployment.
 
@@ -72,21 +66,6 @@ $ ./bin/create-account --config matrix.yaml --username alice
 
 Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
 
-## Progress
-
-We use a script called "Are We Synapse Yet" which checks Sytest compliance rates. Sytest is a black-box homeserver
-test rig with around 900 tests. The script works out how many of these tests are passing on matrix and it
-updates with CI. As of January 2023, we have 100% server-server parity with Synapse, and the client-server parity is at
-93% ,
-though check CI for the latest numbers.
-
-In practice, this means you can communicate locally and via federation with Synapse servers such as matrix.org
-reasonably well,
-although there are still some missing features (like SSO and Third-party ID APIs).
-
-We are prioritising features that will benefit single-user home servers first (e.g Receipts, E2E) rather
-than features that massive deployments may be interested in (OpenID, Guests, Admin APIs, AS API).
-
 This means Matrix support amongst others:
 
 - Core room functionality (creating rooms, invites, auth rules)
@@ -109,10 +88,14 @@ This means Matrix support amongst others:
 
 ## Contributing
 
-We would be grateful for any help on issues marked
-as [Are We Synapse Yet](https://github.com/antinvestor/matrix/labels/are-we-synapse-yet). These issues all have related
-Sytests which need to pass in order for the issue to be closed. Once you've written your code,
-you can quickly run Sytest to ensure that the test names are now passing.
+We would be grateful for any help on any issues you can contribute to.
+
+We are prioritising features that will benefit massive deployments rather than homeservers.
+More effort is required on features including :
+  - OpenID, 
+  - Guests 
+  - Admin APIs
+  - AS API 
 
 If you're new to the project, see our
 [Contributing page](https://matrix-org.github.io/dendrite/development/contributing) to get up to speed, then
