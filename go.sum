@@ -55,6 +55,8 @@ github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRF
 github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk541a8SKzHPHnH3zbiI+7dagKZ0cgpgrD7Fyho=
 github.com/antinvestor/apis/go/common v1.34.17 h1:w0dMbBQl3QCKxsDL5sIjEtsI2OkgWnd+drZP3+irX7E=
 github.com/antinvestor/apis/go/common v1.34.17/go.mod h1:WPCnhJSJgilXI7jGQyu01DU/eE2dD3drUoiLFK0haPk=
+github.com/antinvestor/apis/go/common v1.35.2 h1:rDQIo1T3IK4QQzGh4qBgD2+0VCUjh0FLVc7qjNQ8h5c=
+github.com/antinvestor/apis/go/common v1.35.2/go.mod h1:WPCnhJSJgilXI7jGQyu01DU/eE2dD3drUoiLFK0haPk=
 github.com/antinvestor/apis/go/partition v1.34.19 h1:ZDfzJyp4GgL4MeDFHzY9EQGEUjeCCTZJ5Etb/QEjRQY=
 github.com/antinvestor/apis/go/partition v1.34.19/go.mod h1:vdw5/Gle8O6pIT+78x/3DWX9PzPR0iID3o+iBf8xTUg=
 github.com/antinvestor/apis/go/profile v1.34.19 h1:s72QANDu3vryws4IV9L7XnD3/kK3GAYg8vN+gHlDEEU=
