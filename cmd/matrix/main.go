@@ -167,7 +167,7 @@ func main() {
 			apis.WithAudiences(audienceList...))
 
 		if err != nil {
-log.WithError(err).Panic("failed to initialise notification api client")
+			log.WithError(err).Panic("failed to initialise notification api client")
 		}
 	}
 
