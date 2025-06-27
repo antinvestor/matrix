@@ -46,7 +46,7 @@ type Events interface {
 	) (types.EventNID, types.StateSnapshotNID, error)
 	SelectEvent(ctx context.Context, eventID string) (types.EventNID, types.StateSnapshotNID, error)
 	BulkSelectSnapshotsFromEventIDs(ctx context.Context, eventIDs []string) (map[types.StateSnapshotNID][]string, error)
-	// bulkSelectStateEventByID lookups a list of state events by event ID.
+	// BulkSelectStateEventByID lookups a list of state events by event ID.
 	// If any of the requested events are missing from the database it returns a types.MissingEventError
 	BulkSelectStateEventByID(ctx context.Context, eventIDs []string, excludeRejected bool) ([]types.StateEntry, error)
 	BulkSelectStateEventByNID(ctx context.Context, eventNIDs []types.EventNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntry, error)

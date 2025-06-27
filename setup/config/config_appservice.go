@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -82,6 +84,8 @@ type ApplicationService struct {
 	ID string `yaml:"id"`
 	// Base URL of the application service
 	URL string `yaml:"url"`
+	// Base URL of the application service
+	IsDistributed bool `yaml:"is_distributed"`
 	// Application service token provided in requests to a homeserver
 	ASToken string `yaml:"as_token"`
 	// Homeserver token provided in requests to an application service
@@ -98,6 +102,7 @@ type ApplicationService struct {
 	HTTPClient   *http.Client
 	isUnixSocket bool
 	unixSocket   string
+	reversedUri  string
 }
 
 func (a *ApplicationService) CreateHTTPClient(insecureSkipVerify bool) {
@@ -193,6 +198,38 @@ func (a *ApplicationService) IsInterestedInRoomAlias(
 	}
 
 	return false
+}
+
+func (a *ApplicationService) IsInterestedInEventType(eventType string) bool {
+
+	reversedHost, err := a.ReverseURI()
+	if err != nil {
+		return false
+	}
+	if strings.HasPrefix(eventType, reversedHost) {
+		return true
+	}
+
+	return false
+}
+
+func (a *ApplicationService) ReverseURI() (string, error) {
+
+	if a.reversedUri == "" {
+
+		asUri, err := url.Parse(a.URL)
+		if err != nil {
+			return "", err
+		}
+
+		asHostName := asUri.Hostname()
+		hostParts := strings.Split(asHostName, ".")
+		slices.Reverse(hostParts)
+		a.reversedUri = strings.Join(hostParts, ".")
+
+	}
+
+	return a.reversedUri, nil
 }
 
 // loadAppServices iterates through all application service config files
@@ -445,7 +482,7 @@ type AppServiceQueues struct {
 }
 
 func (q *AppServiceQueues) Defaults(opts DefaultOpts) {
-	q.OutputAppserviceEvent = opts.defaultQ(constants.OutputAppserviceEvent)
+	q.OutputAppserviceEvent = opts.defaultQ(constants.OutputAppserviceEvent, KVOpt{K: "stream_retention", V: "interest"})
 }
 
 func (q *AppServiceQueues) Verify(configErrs *Errors) {

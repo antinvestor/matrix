@@ -17,6 +17,7 @@ package synctypes
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -261,6 +262,9 @@ func userIDForSender(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, 
 }
 
 func TestToClientEventsFormatSyncFederation(t *testing.T) { // nolint: gocyclo
+
+	ctx := context.TODO()
+
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
         "state_key": "testSenderID",
@@ -319,7 +323,7 @@ func TestToClientEventsFormatSyncFederation(t *testing.T) { // nolint: gocyclo
 		t.Fatalf("failed to create Event: %s", err)
 	}
 
-	clientEvents := ToClientEvents([]gomatrixserverlib.PDU{ev, ev2}, FormatSyncFederation, userIDForSender)
+	clientEvents := ToClientEvents(ctx, []gomatrixserverlib.PDU{ev, ev2}, FormatSyncFederation, userIDForSender)
 	ce := clientEvents[0]
 	sk := testSenderID
 	verifyEventFields(t,
@@ -377,6 +381,9 @@ func TestToClientEventsFormatSyncFederation(t *testing.T) { // nolint: gocyclo
 }
 
 func TestToClientEventsFormatSync(t *testing.T) { // nolint: gocyclo
+
+	ctx := context.TODO()
+
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
         "state_key": "testSenderID",
@@ -418,7 +425,7 @@ func TestToClientEventsFormatSync(t *testing.T) { // nolint: gocyclo
 		t.Fatalf("failed to create Event: %s", err)
 	}
 
-	clientEvents := ToClientEvents([]gomatrixserverlib.PDU{ev, ev2}, FormatSync, userIDForSender)
+	clientEvents := ToClientEvents(ctx, []gomatrixserverlib.PDU{ev, ev2}, FormatSync, userIDForSender)
 	ce := clientEvents[0]
 	sk := testUserID
 	verifyEventFields(t,
@@ -469,6 +476,9 @@ func TestToClientEventsFormatSync(t *testing.T) { // nolint: gocyclo
 }
 
 func TestToClientEventsFormatSyncUnknownPrevSender(t *testing.T) { // nolint: gocyclo
+
+	ctx := context.TODO()
+
 	ev, err := gomatrixserverlib.MustGetRoomVersion(gomatrixserverlib.RoomVersionPseudoIDs).NewEventFromTrustedJSON([]byte(`{
 		"type": "m.room.name",
         "state_key": "testSenderID",
@@ -510,7 +520,7 @@ func TestToClientEventsFormatSyncUnknownPrevSender(t *testing.T) { // nolint: go
 		t.Fatalf("failed to create Event: %s", err)
 	}
 
-	clientEvents := ToClientEvents([]gomatrixserverlib.PDU{ev, ev2}, FormatSync, userIDForSender)
+	clientEvents := ToClientEvents(ctx, []gomatrixserverlib.PDU{ev, ev2}, FormatSync, userIDForSender)
 	ce := clientEvents[0]
 	sk := testUserID
 	verifyEventFields(t,

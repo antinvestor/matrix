@@ -40,6 +40,9 @@ func GetMemberships(
 	syncDB storage.Database, rsAPI api.SyncRoomserverAPI,
 	membership, notMembership *string, at string,
 ) util.JSONResponse {
+
+	ctx := req.Context()
+
 	userID, err := spec.NewUserID(device.UserID, true)
 	if err != nil {
 		return util.JSONResponse{
@@ -54,7 +57,7 @@ func GetMemberships(
 
 	var queryRes api.QueryMembershipForUserResponse
 	if queryErr := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); queryErr != nil {
-		util.Log(req.Context()).WithError(queryErr).Error("rsAPI.QueryMembershipsForRoom failed")
+		util.Log(ctx).WithError(queryErr).Error("rsAPI.QueryMembershipsForRoom failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -68,7 +71,7 @@ func GetMemberships(
 		}
 	}
 
-	db, err := syncDB.NewDatabaseSnapshot(req.Context())
+	db, err := syncDB.NewDatabaseSnapshot(ctx)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -81,9 +84,9 @@ func GetMemberships(
 		atToken = types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
 		if queryRes.HasBeenInRoom && !queryRes.IsInRoom {
 			// If you have left the room then this will be the members of the room when you left.
-			atToken, err = db.EventPositionInTopology(req.Context(), queryRes.EventID)
+			atToken, err = db.EventPositionInTopology(ctx, queryRes.EventID)
 			if err != nil {
-				util.Log(req.Context()).WithError(err).Error("unable to get 'atToken'")
+				util.Log(ctx).WithError(err).Error("unable to get 'atToken'")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: spec.InternalServerError{},
@@ -92,9 +95,9 @@ func GetMemberships(
 		}
 	}
 
-	eventIDs, err := db.SelectMemberships(req.Context(), roomID, atToken, membership, notMembership)
+	eventIDs, err := db.SelectMemberships(ctx, roomID, atToken, membership, notMembership)
 	if err != nil {
-		util.Log(req.Context()).WithError(err).Error("db.SelectMemberships failed")
+		util.Log(ctx).WithError(err).Error("db.SelectMemberships failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -102,8 +105,8 @@ func GetMemberships(
 	}
 
 	qryRes := &api.QueryEventsByIDResponse{}
-	if err := rsAPI.QueryEventsByID(req.Context(), &api.QueryEventsByIDRequest{EventIDs: eventIDs, RoomID: roomID}, qryRes); err != nil {
-		util.Log(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
+	if err := rsAPI.QueryEventsByID(ctx, &api.QueryEventsByIDRequest{EventIDs: eventIDs, RoomID: roomID}, qryRes); err != nil {
+		util.Log(ctx).WithError(err).Error("rsAPI.QueryEventsByID failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -114,8 +117,8 @@ func GetMemberships(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getMembershipResponse{synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(result), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
-			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
+		JSON: getMembershipResponse{synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(result), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})},
 	}
 }

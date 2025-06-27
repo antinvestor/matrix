@@ -18,6 +18,7 @@ import (
 	"context"
 	"sync"
 
+	notificationv1 "github.com/antinvestor/apis/go/notification/v1"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
 	"github.com/antinvestor/matrix/appservice/consumers"
@@ -37,6 +38,7 @@ func NewInternalAPI(
 	qm queueutil.QueueManager,
 	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
+	notificationCli *notificationv1.NotificationClient,
 ) appserviceAPI.AppServiceInternalAPI {
 
 	// Create appserivce query API with an HTTP client that will be used for all
@@ -67,7 +69,7 @@ func NewInternalAPI(
 	// We can't add ASes at runtime so this is safe to do.
 	err := consumers.NewOutputRoomEventConsumer(
 		ctx, &cfg.AppServiceAPI,
-		qm, rsAPI,
+		qm, rsAPI, notificationCli,
 	)
 	if err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to start appservice roomserver consumer")

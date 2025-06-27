@@ -480,7 +480,7 @@ func TestSetDisplayname(t *testing.T) {
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
-		asPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI)
+		asPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI, nil)
 
 		AddPublicRoutes(ctx, routers, cfg, qm, base.CreateFederationClient(cfg, nil), rsAPI, asPI, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 
@@ -600,7 +600,7 @@ func TestSetAvatarURL(t *testing.T) {
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
-		asPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI)
+		asPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI, nil)
 
 		AddPublicRoutes(ctx, routers, cfg, qm, base.CreateFederationClient(cfg, nil), rsAPI, asPI, nil, nil, userAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
 

@@ -75,7 +75,7 @@ type ClientEvent struct {
 }
 
 // ToClientEvents converts server events to client events.
-func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat, userIDForSender spec.UserIDForSender) []ClientEvent {
+func ToClientEvents(ctx context.Context, serverEvs []gomatrixserverlib.PDU, format ClientEventFormat, userIDForSender spec.UserIDForSender) []ClientEvent {
 	evs := make([]ClientEvent, 0, len(serverEvs))
 	for _, se := range serverEvs {
 		if se == nil {
@@ -83,7 +83,7 @@ func ToClientEvents(serverEvs []gomatrixserverlib.PDU, format ClientEventFormat,
 		}
 		ev, err := ToClientEvent(se, format, userIDForSender)
 		if err != nil {
-			util.Log(context.TODO()).WithError(err).Warn("Failed converting event to ClientEvent")
+			util.Log(ctx).WithError(err).Warn("Failed converting event to ClientEvent")
 			continue
 		}
 		evs = append(evs, *ev)
@@ -174,15 +174,16 @@ func updatePseudoIDs(ce *ClientEvent, se gomatrixserverlib.PDU, userIDForSender 
 
 	sk := se.StateKey()
 	if sk != nil && *sk != "" {
-		skUserID, err := userIDForSender(se.RoomID(), spec.SenderID(*sk))
-		if err == nil && skUserID != nil {
+		skUserID, err0 := userIDForSender(se.RoomID(), spec.SenderID(*sk))
+		if err0 == nil && skUserID != nil {
 			skString := skUserID.String()
 			ce.StateKey = &skString
 		}
 	}
 
 	var prev PrevEventRef
-	if err := json.Unmarshal(se.Unsigned(), &prev); err == nil && prev.PrevSenderID != "" {
+	err = json.Unmarshal(se.Unsigned(), &prev)
+	if err == nil && prev.PrevSenderID != "" {
 		prevUserID, err := userIDForSender(se.RoomID(), spec.SenderID(prev.PrevSenderID))
 		if err == nil && userID != nil {
 			prev.PrevSenderID = prevUserID.String()

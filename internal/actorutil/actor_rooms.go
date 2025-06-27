@@ -15,8 +15,8 @@ import (
 	"github.com/pitabwire/util"
 )
 
-// RoomActor is an actor that processes messages for a specific room
-type RoomActor struct {
+// SequentialActor is an actor that processes messages for a specific room
+type SequentialActor struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 
@@ -38,7 +38,7 @@ type RoomActor struct {
 	log *util.LogEntry
 }
 
-func (ra *RoomActor) Progress(_ *actorV1.ProgressRequest, _ cluster.GrainContext) (*actorV1.ProgressResponse, error) {
+func (ra *SequentialActor) Progress(_ *actorV1.ProgressRequest, _ cluster.GrainContext) (*actorV1.ProgressResponse, error) {
 
 	if ra.subscription == nil {
 		return nil, errors.New("no subscription available")
@@ -70,11 +70,11 @@ func (ra *RoomActor) Progress(_ *actorV1.ProgressRequest, _ cluster.GrainContext
 }
 
 // NewSeqActor creates a new room actor
-func NewSeqActor(ctx context.Context, cluster *cluster.Cluster, qm queueutil.QueueManager, processorMap map[ActorFunctionID]*functionOpt) *RoomActor {
+func NewSeqActor(ctx context.Context, cluster *cluster.Cluster, qm queueutil.QueueManager, processorMap map[ActorFunctionID]*functionOpt) *SequentialActor {
 
 	ictx, cancel := context.WithCancel(ctx)
 
-	return &RoomActor{
+	return &SequentialActor{
 		ctx:        ictx,
 		cancelFunc: cancel,
 
@@ -87,7 +87,7 @@ func NewSeqActor(ctx context.Context, cluster *cluster.Cluster, qm queueutil.Que
 	}
 }
 
-func (ra *RoomActor) setupSubscriber(ctx context.Context, qm queueutil.QueueManager, qOpts *config.QueueOptions, encodedIDStr string) error {
+func (ra *SequentialActor) setupSubscriber(ctx context.Context, qm queueutil.QueueManager, qOpts *config.QueueOptions, encodedIDStr string) error {
 
 	var err error
 	opts := idifyQOpts(ctx, qOpts, encodedIDStr)
@@ -101,7 +101,7 @@ func (ra *RoomActor) setupSubscriber(ctx context.Context, qm queueutil.QueueMana
 	return nil
 }
 
-func (ra *RoomActor) Init(gctx cluster.GrainContext) {
+func (ra *SequentialActor) Init(gctx cluster.GrainContext) {
 
 	log := gctx.Logger()
 
@@ -160,7 +160,7 @@ func (ra *RoomActor) Init(gctx cluster.GrainContext) {
 	gctx.Request(gctx.Self(), &actorV1.WorkRequest{QId: queueIDStr})
 }
 
-func (ra *RoomActor) Terminate(gctx cluster.GrainContext) {
+func (ra *SequentialActor) Terminate(gctx cluster.GrainContext) {
 	var err error
 	// First cancel any ongoing operations
 	ra.cancelFunc()
@@ -174,7 +174,7 @@ func (ra *RoomActor) Terminate(gctx cluster.GrainContext) {
 	}
 }
 
-func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
+func (ra *SequentialActor) ReceiveDefault(gctx cluster.GrainContext) {
 
 	msg := gctx.Message()
 
@@ -217,7 +217,7 @@ func (ra *RoomActor) ReceiveDefault(gctx cluster.GrainContext) {
 
 // pullNewMessage pulls a message from the queue and processes it
 // returns message ID if a message was processed, empty string if no message was available
-func (ra *RoomActor) pullNewMessage(ctx context.Context, req *actorV1.WorkRequest) error {
+func (ra *SequentialActor) pullNewMessage(ctx context.Context, req *actorV1.WorkRequest) error {
 
 	log := ra.log.WithContext(ctx)
 
@@ -236,7 +236,16 @@ func (ra *RoomActor) pullNewMessage(ctx context.Context, req *actorV1.WorkReques
 
 	// Process the message
 	processor := ra.processors[ra.actorFunctionID]
-	err = processor.handlerFunc(ctx, msg.Metadata, msg.Body)
+
+	authClaim := frame.ClaimsFromMap(msg.Metadata)
+	var authCtx context.Context
+	if authClaim != nil {
+		authCtx = authClaim.ClaimsToContext(ctx)
+	} else {
+		authCtx = ctx
+	}
+
+	err = processor.handlerFunc(authCtx, msg.Metadata, msg.Body)
 	if err != nil {
 		log.WithError(err).Error(" failed to process event")
 		msg.Nack()
