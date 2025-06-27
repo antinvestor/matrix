@@ -6,6 +6,8 @@ import (
 )
 
 const (
+	IDKey = "id"
+
 	UserID        = "user_id"
 	RoomID        = "room_id"
 	EventID       = "event_id"

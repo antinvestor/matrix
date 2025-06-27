@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antinvestor/apis/go/common"
+	notificationv1 "github.com/antinvestor/apis/go/notification/v1"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/appservice"
@@ -36,9 +39,13 @@ import (
 	"github.com/antinvestor/matrix/test/testrig"
 	"github.com/antinvestor/matrix/userapi"
 	uapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
+	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 var testIsBlacklistedOrBackingOff = func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error) {
@@ -131,7 +138,6 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
 		ctx, svc, cfg := testrig.Init(t, testOpts)
 		defer svc.Stop(ctx)
-
 		// Create a dummy application service
 		as := &config.ApplicationService{
 			ID:              "someID",
@@ -165,7 +171,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
-		asAPI := appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
+		asAPI := appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI, nil)
 
 		runCases(t, asAPI)
 	})
@@ -263,7 +269,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
 	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
-	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI, nil)
 
 	t.Run("UserIDExists", func(t *testing.T) {
 		testUserIDExists(t, asAPI, "@as-testing:test", true)
@@ -416,7 +422,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		// start the consumer
-		appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
+		appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI, nil)
 
 		// Create the room
 		if err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
@@ -444,7 +450,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 // This makes syncAPI unhappy, as it is unable to write to the database.
 func TestOutputAppserviceEvent(t *testing.T) {
 
-	t.Skip("test is flacky in CI")
+	// t.Skip("test is flacky in CI")
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 
@@ -461,6 +467,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		}
 
 		evChan := make(chan struct{})
+		t.Cleanup(func() { close(evChan) })
 
 		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
 		if err != nil {
@@ -561,9 +568,9 @@ func TestOutputAppserviceEvent(t *testing.T) {
 		syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, am, usrAPI, rsAPI, caches, cacheutil.DisableMetrics)
 
 		// start the consumer
-		appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI)
+		appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI, nil)
 
-		// Create the room, this triggers the AS to receive an invite for Bob.
+		// Create the room
 		err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false)
 		if err != nil {
 			t.Fatalf("failed to send events: %v", err)
@@ -576,8 +583,163 @@ func TestOutputAppserviceEvent(t *testing.T) {
 			t.Errorf("Timed out waiting for join event")
 		case <-evChan:
 		}
-		close(evChan)
 	})
+}
+
+func TestDistributedOutputAppserviceEvent(t *testing.T) {
+
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+
+	test.WithAllDatabases(t, func(t *testing.T, testOpts test.DependancyOption) {
+
+		ctx, svc, cfg := testrig.Init(t, testOpts)
+		defer svc.Stop(ctx)
+
+		cm := sqlutil.NewConnectionManager(svc)
+		qm := queueutil.NewQueueManager(svc)
+		am, err := actorutil.NewManager(ctx, &cfg.Global.Actors, qm)
+		if err != nil {
+			t.Fatalf("failed to create an actor manager: %v", err)
+		}
+
+		evChan := make(chan struct{})
+		t.Cleanup(func() { close(evChan) })
+
+		caches, err := cacheutil.NewCache(&cfg.Global.Cache)
+		if err != nil {
+			t.Fatalf("failed to create a cache: %v", err)
+		}
+		// Create required internal APIs
+		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
+		rsAPI.SetFederationAPI(ctx, nil, nil)
+
+		// Create the router, so we can hit `/joined_members`
+		routers := httputil.NewRouters()
+
+		accessTokens := map[*test.User]userDevice{
+			bob: {},
+		}
+
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		rsAPI.SetUserAPI(ctx, usrAPI)
+
+		clientapi.AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, usrAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
+		createAccessTokens(t, accessTokens, usrAPI, ctx, routers)
+
+		room := test.NewRoom(t, alice)
+
+		// Invite Bob
+		room.CreateAndInsert(t, alice, spec.MRoomMember, map[string]any{
+			"membership": "invite",
+		}, test.WithStateKey(bob.ID))
+
+		room.CreateAndInsert(t, alice, "com.antinvestor.messages", map[string]any{
+			"command": "test message",
+		})
+
+		as := &config.ApplicationService{
+			ID:              "someID",
+			URL:             "antinvestor.com",
+			IsDistributed:   true,
+			SenderLocalpart: "senderLocalPart",
+			NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+				"users":   {{RegexpObject: regexp.MustCompile(bob.ID)}},
+				"aliases": {{RegexpObject: regexp.MustCompile(room.ID)}},
+			},
+		}
+
+		// Create a dummy application service
+		cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{*as}
+
+		// Start the syncAPI to have `/joined_members` available
+		syncapi.AddPublicRoutes(ctx, routers, cfg, cm, qm, am, usrAPI, rsAPI, caches, cacheutil.DisableMetrics)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		nCliMock := notificationv1.NewMockNotificationServiceClient(ctrl)
+
+		// Mock the Receive method to return a channel of responses
+		nCliMock.EXPECT().Receive(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(ctx context.Context, req *notificationv1.ReceiveRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[notificationv1.ReceiveResponse], error) {
+
+				// Signal the test that the method was called
+				evChan <- struct{}{}
+
+				// Create a mock StreamingClient that will be immediately closed
+				// This simulates a successful stream with no errors
+				return &mockNotificationReceiveClient{}, nil
+			}).AnyTimes()
+
+		notificationCli := notificationv1.Init(&common.GrpcClientBase{}, nCliMock)
+
+		// start the consumer
+		appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI, notificationCli)
+
+		claims := frame.AuthenticationClaims{
+			Ext:         nil,
+			TenantID:    "tenant1",
+			PartitionID: "partition2",
+			AccessID:    "access3",
+			ContactID:   "contact5",
+			DeviceID:    "device6",
+			ServiceName: "matrix",
+		}
+
+		authCtx := claims.ClaimsToContext(ctx)
+
+		// Create the room, this triggers the AS to receive an invite for Bob.
+		err = rsapi.SendEvents(authCtx, rsAPI, rsapi.KindNew, room.Events(), "test", "test", "test", nil, false)
+		if err != nil {
+			t.Fatalf("failed to send events: %v", err)
+		}
+
+		select {
+		// Pretty generous timeout duration...
+		case <-time.After(time.Second * 10):
+			// wait for the AS to process the events
+			t.Errorf("Timed out waiting for join event")
+		case <-evChan:
+		}
+
+	})
+}
+
+type mockNotificationReceiveClient struct {
+	recvCalled bool
+}
+
+func (m *mockNotificationReceiveClient) Recv() (*notificationv1.ReceiveResponse, error) {
+	if !m.recvCalled {
+		m.recvCalled = true
+		return &notificationv1.ReceiveResponse{}, nil
+	}
+	return nil, io.EOF
+}
+
+func (m *mockNotificationReceiveClient) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (m *mockNotificationReceiveClient) Trailer() metadata.MD {
+	return nil
+}
+
+func (m *mockNotificationReceiveClient) CloseSend() error {
+	return nil
+}
+
+func (m *mockNotificationReceiveClient) Context() context.Context {
+	return context.Background()
+}
+
+func (m *mockNotificationReceiveClient) SendMsg(interface{}) error {
+	return nil
+}
+
+func (m *mockNotificationReceiveClient) RecvMsg(interface{}) error {
+	return nil
 }
 
 type userDevice struct {

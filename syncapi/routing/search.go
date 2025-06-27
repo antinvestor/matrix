@@ -219,10 +219,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 			Context: SearchContextResponse{
 				Start: startToken.String(),
 				End:   endToken.String(),
-				EventsAfter: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsAfter), synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				EventsAfter: synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(eventsAfter), synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 					return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 				}),
-				EventsBefore: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(eventsBefore), synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+				EventsBefore: synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(eventsBefore), synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 					return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 				}),
 				ProfileInfo: profileInfos,
@@ -243,7 +243,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, from
 					JSON: spec.InternalServerError{},
 				}
 			}
-			stateForRooms[event.RoomID().String()] = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(state), synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			stateForRooms[event.RoomID().String()] = synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(state), synctypes.FormatSync, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 			})
 		}

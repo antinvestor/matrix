@@ -19,12 +19,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/url"
-	"strconv"
+	"strings"
 	"time"
 
+	commonv1 "github.com/antinvestor/apis/go/common/v1"
+	notificationv1 "github.com/antinvestor/apis/go/notification/v1"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/queueutil"
@@ -33,6 +36,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/constants"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
@@ -45,14 +49,17 @@ type ApplicationServiceTransaction struct {
 type appserviceState struct {
 	*config.ApplicationService
 	backoff int
+
+	handler *OutputRoomEventConsumer
 }
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	cfg           *config.AppServiceAPI
-	qm            queueutil.QueueManager
-	rsAPI         api.AppserviceRoomserverAPI
-	appServiceMap map[string]*appserviceState
+	cfg             *config.AppServiceAPI
+	qm              queueutil.QueueManager
+	rsAPI           api.AppserviceRoomserverAPI
+	appServiceMap   map[string]*appserviceState
+	notificationCli *notificationv1.NotificationClient
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call
@@ -62,11 +69,13 @@ func NewOutputRoomEventConsumer(
 	cfg *config.AppServiceAPI,
 	qm queueutil.QueueManager,
 	rsAPI api.AppserviceRoomserverAPI,
+	notificationCli *notificationv1.NotificationClient,
 ) error {
 	c := &OutputRoomEventConsumer{
-		cfg:   cfg,
-		qm:    qm,
-		rsAPI: rsAPI,
+		cfg:             cfg,
+		qm:              qm,
+		rsAPI:           rsAPI,
+		notificationCli: notificationCli,
 	}
 
 	return c.Start(ctx)
@@ -78,25 +87,34 @@ func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 	s.appServiceMap = make(map[string]*appserviceState)
 	for _, as := range s.cfg.Derived.ApplicationServices {
 		token := queueutil.Tokenise(as.ID)
-		s.appServiceMap[token] = &appserviceState{&as, 0}
+		appSvc := &appserviceState{ApplicationService: &as, backoff: 0, handler: s}
+
+		cfg := s.cfg.Queues.OutputAppserviceEvent
+		cfg.QReference = fmt.Sprintf("%s_%s", cfg.QReference, token)
+		cfg.DS = cfg.DS.ExtendQuery("consumer_durable_name", fmt.Sprintf("%s_%s", cfg.DS.GetQuery("consumer_durable_name"), token))
+
+		err := s.qm.RegisterSubscriber(ctx, &cfg, appSvc)
+		if err != nil {
+			return err
+		}
+
+		s.appServiceMap[token] = appSvc
 	}
 
-	return s.qm.RegisterSubscriber(ctx, &s.cfg.Queues.OutputAppserviceEvent, s)
+	return nil
 }
 
 // Handle is called when the appservice component receives a new event from
 // the room server output log.
-func (s *OutputRoomEventConsumer) Handle(
+func (s *appserviceState) Handle(
 	ctx context.Context, metadata map[string]string, message []byte,
 ) error {
 
-	for _, state := range s.appServiceMap {
-		err := s.filterEventsForAppservice(ctx, state, metadata, message)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	claims := frame.ClaimsFromContext(ctx)
+
+	util.Log(ctx).WithField("claims", claims).Info("  ------------------- Check received claims")
+
+	return s.handler.filterEventsForAppservice(ctx, s, metadata, message)
 }
 
 // filterEventsForAppservice is called when the appservice component receives a new event from
@@ -106,7 +124,6 @@ func (s *OutputRoomEventConsumer) filterEventsForAppservice(
 ) error {
 	logger := util.Log(ctx)
 
-	logger.WithField("appservice", state.ID).Info("Appservice worker received a message from roomserver")
 	events := make([]*types.HeaderedEvent, 0, 1)
 
 	// Only handle events we care about
@@ -159,14 +176,13 @@ func (s *OutputRoomEventConsumer) filterEventsForAppservice(
 		return nil
 	}
 
-	txnID := ""
-	// TODO: Switch to something stable. Try to get the message metadata, if we're able to, use the timestamp as the txnID
-	txnID = strconv.Itoa(int(time.Now().Unix()))
-
 	// Send event to any relevant application services. If we hit
 	// an error here, return false, so that we negatively ack.
-	logger.WithField("appservice", state.ID).Debug("Appservice worker sending %d events(s) from roomserver", len(events))
-	return s.sendEvents(ctx, state, events, txnID)
+	if state.IsDistributed {
+		return s.sendDistributedEvents(ctx, state, events)
+	} else {
+		return s.sendEvents(ctx, state, events)
+	}
 }
 
 // sendEvents passes events to the appservice by using the transactions
@@ -174,12 +190,11 @@ func (s *OutputRoomEventConsumer) filterEventsForAppservice(
 func (s *OutputRoomEventConsumer) sendEvents(
 	ctx context.Context, state *appserviceState,
 	events []*types.HeaderedEvent,
-	txnID string,
 ) error {
 	// Create the transaction body.
 	transaction, err := json.Marshal(
 		ApplicationServiceTransaction{
-			Events: synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+			Events: synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(events), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 				return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 			}),
 		},
@@ -188,10 +203,8 @@ func (s *OutputRoomEventConsumer) sendEvents(
 		return err
 	}
 
-	// If txnID is not defined, generate one from the events.
-	if txnID == "" {
-		txnID = fmt.Sprintf("%d_%d", events[0].OriginServerTS(), len(transaction))
-	}
+	// TODO: Switch to something stable. Try to get the message metadata, if we're able to, use the timestamp as the txnID
+	txnID := fmt.Sprintf("%d_%d", events[0].OriginServerTS(), len(events))
 
 	// Send the transaction to the appservice.
 	// https://spec.matrix.org/v1.9/application-service-api/#pushing-events
@@ -222,6 +235,95 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	default:
 		return state.backoffAndPause(ctx, fmt.Errorf("received HTTP status code %d from appservice url %s", resp.StatusCode, address))
 	}
+	return nil
+}
+
+func (s *OutputRoomEventConsumer) toNotification(ctx context.Context, event synctypes.ClientEvent) *notificationv1.Notification {
+
+	roomProfileID := ""
+	roomID, err := spec.NewRoomID(event.RoomID)
+	if err == nil {
+		roomProfileID = roomID.OpaqueID()
+	}
+
+	language := ""
+	languages := frame.LanguageFromContext(ctx)
+	if languages != nil {
+		language = strings.Join(languages, ",")
+	}
+
+	profileID := ""
+	contactID := ""
+
+	sender := event.SenderKey
+	if sender != "" {
+		userID := sender.ToUserID()
+		profileID = userID.Local()
+	}
+
+	claims := frame.ClaimsFromContext(ctx)
+	if claims != nil {
+
+		if profileID != "" && claims.Subject != "" {
+			if profileID != claims.Subject {
+				util.Log(ctx).WithField("claim subject", claims.Subject).WithField("profileid", profileID).Error("For some reason profile and claim subject don't match")
+			}
+		}
+		contactID = claims.GetContactID()
+	}
+
+	data := ""
+	var payload map[string]string
+	err = json.Unmarshal(event.Content, &payload)
+	if err != nil {
+		payload = map[string]string{}
+		data = string(event.Content)
+	}
+
+	return &notificationv1.Notification{
+		Id: payload[constants.IDKey],
+		Source: &commonv1.ContactLink{
+			ProfileId: profileID,
+			ContactId: contactID,
+		},
+		Recipient: &commonv1.ContactLink{
+			ProfileId: roomProfileID,
+		},
+		Type:     "json",
+		Payload:  payload,
+		Data:     data,
+		Language: language,
+	}
+}
+
+// sendDistributedEvents passes events to the appservice by using the transactions
+// endpoint. It will block for the backoff period if necessary.
+func (s *OutputRoomEventConsumer) sendDistributedEvents(
+	ctx context.Context, _ *appserviceState,
+	events []*types.HeaderedEvent,
+) error {
+	// Create the transaction body.
+	clientEvents := synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(events), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		return s.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
+	})
+
+	notificationList := make([]*notificationv1.Notification, 0, len(events))
+
+	for _, cl := range clientEvents {
+		notificationList = append(notificationList, s.toNotification(ctx, cl))
+	}
+
+	responsesChan, err := s.notificationCli.Receive(ctx, notificationList)
+	if err != nil {
+		return err
+	}
+
+	for response := range responsesChan {
+		if response.Error != nil && response.Error != io.EOF {
+			return response.Error
+		}
+	}
+
 	return nil
 }
 
@@ -256,6 +358,8 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 	switch {
 	case appservice.URL == "":
 		return false
+	case appservice.IsInterestedInEventType(event.Type()):
+		return true
 	case appservice.IsInterestedInUserID(user):
 		return true
 	case appservice.IsInterestedInRoomID(event.RoomID().String()):

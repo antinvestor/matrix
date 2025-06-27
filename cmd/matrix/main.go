@@ -21,6 +21,7 @@ import (
 
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	apis "github.com/antinvestor/apis/go/common"
+	notificationv1 "github.com/antinvestor/apis/go/notification/v1"
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/gomatrixserverlib/fclient"
@@ -107,8 +108,9 @@ func main() {
 	}
 
 	var (
-		profileCli   *profilev1.ProfileClient
-		partitionCli *partitionv1.PartitionClient
+		profileCli      *profilev1.ProfileClient
+		partitionCli    *partitionv1.PartitionClient
+		notificationCli *notificationv1.NotificationClient
 	)
 
 	log.
@@ -156,6 +158,17 @@ func main() {
 		if err != nil {
 			log.WithError(err).Panic("failed to initialise partition api client")
 		}
+
+		notificationCli, err = notificationv1.NewNotificationClient(ctx,
+			apis.WithEndpoint(apiConfig.NotificationServiceUri),
+			apis.WithTokenEndpoint(oauth2ServiceURL),
+			apis.WithTokenUsername(service.JwtClientID()),
+			apis.WithTokenPassword(service.JwtClientSecret()),
+			apis.WithAudiences(audienceList...))
+
+		if err != nil {
+			log.WithError(err).Panic("failed to initialise partition api client")
+		}
 	}
 
 	federationClient := basepkg.CreateFederationClient(cfg, dnsCache)
@@ -195,7 +208,7 @@ func main() {
 	rsAPI.SetFederationAPI(ctx, fsAPI, keyRing)
 
 	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, federationClient, profileCli, cacheutil.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
-	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI, notificationCli)
 
 	rsAPI.SetAppserviceAPI(ctx, asAPI)
 	rsAPI.SetUserAPI(ctx, userAPI)

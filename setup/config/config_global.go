@@ -653,9 +653,10 @@ func (c *ActorOptions) Verify(configErrs *Errors) {
 
 // DistributedAPI The configuration to enable the use of distributed stores of data
 type DistributedAPI struct {
-	Enabled             bool   `yaml:"enabled"`
-	ProfileServiceUri   string `yaml:"profile_service_uri"`
-	PartitionServiceUri string `yaml:"partition_service_uri"`
+	Enabled                bool   `yaml:"enabled"`
+	ProfileServiceUri      string `yaml:"profile_service_uri"`
+	PartitionServiceUri    string `yaml:"partition_service_uri"`
+	NotificationServiceUri string `yaml:"notification_service_uri"`
 }
 
 func (d *DistributedAPI) Defaults() {

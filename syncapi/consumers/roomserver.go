@@ -297,7 +297,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		log.WithField("event_id", ev.EventID()).
 			WithField("event", string(ev.JSON())).
 			WithError(err).
-			Panic("roomserver output log: write new event failure")
+			Error("roomserver output log: write new event failure")
 		return nil
 	}
 

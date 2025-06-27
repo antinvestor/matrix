@@ -299,7 +299,7 @@ func OnIncomingMessagesRequest(
 				JSON: spec.InternalServerError{},
 			}
 		}
-		res.State = append(res.State, synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(membershipEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		res.State = append(res.State, synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(membershipEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return rsAPI.QueryUserIDForSender(req.Context(), roomID, senderID)
 		})...)
 	}
@@ -422,7 +422,7 @@ func (r *messagesReq) retrieveEvents(ctx context.Context, rsAPI api.SyncRoomserv
 
 	start = *r.from
 
-	return synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(filteredEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	return synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(filteredEvents), synctypes.FormatAll, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	}), start, end, nil
 }

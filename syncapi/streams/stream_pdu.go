@@ -445,13 +445,13 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 			}
 		}
 		jr.Timeline.PrevBatch = &prevBatch
-		jr.Timeline.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		jr.Timeline.Events = synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(events), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return p.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		// If we are limited by the filter AND the history visibility filter
 		// didn't "remove" events, return that the response is limited.
 		jr.Timeline.Limited = (limited && len(events) == len(recentEvents)) || delta.NewlyJoined
-		jr.State.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(delta.StateEvents), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		jr.State.Events = synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(delta.StateEvents), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return p.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		req.Response.Rooms.Join[delta.RoomID] = jr
@@ -460,11 +460,11 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = &prevBatch
 		// TODO: Apply history visibility on peeked rooms
-		jr.Timeline.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(recentEvents), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		jr.Timeline.Events = synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(recentEvents), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return p.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		jr.Timeline.Limited = limited
-		jr.State.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(delta.StateEvents), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		jr.State.Events = synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(delta.StateEvents), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return p.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		req.Response.Rooms.Peek[delta.RoomID] = jr
@@ -475,13 +475,13 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	case spec.Ban:
 		lr := types.NewLeaveResponse()
 		lr.Timeline.PrevBatch = &prevBatch
-		lr.Timeline.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		lr.Timeline.Events = synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(events), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return p.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		// If we are limited by the filter AND the history visibility filter
 		// didn't "remove" events, return that the response is limited.
 		lr.Timeline.Limited = limited && len(events) == len(recentEvents)
-		lr.State.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(delta.StateEvents), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+		lr.State.Events = synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(delta.StateEvents), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 			return p.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 		})
 		req.Response.Rooms.Leave[delta.RoomID] = lr
@@ -640,13 +640,13 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	}
 
 	jr.Timeline.PrevBatch = prevBatch
-	jr.Timeline.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(events), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	jr.Timeline.Events = synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(events), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return p.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 	// If we are limited by the filter AND the history visibility filter
 	// didn't "remove" events, return that the response is limited.
 	jr.Timeline.Limited = limited && len(events) == len(recentEvents)
-	jr.State.Events = synctypes.ToClientEvents(gomatrixserverlib.ToPDUs(stateEvents), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
+	jr.State.Events = synctypes.ToClientEvents(ctx, gomatrixserverlib.ToPDUs(stateEvents), eventFormat, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
 		return p.rsAPI.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 	return jr, nil
