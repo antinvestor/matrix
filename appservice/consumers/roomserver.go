@@ -266,7 +266,7 @@ func (s *OutputRoomEventConsumer) toNotification(ctx context.Context, event sync
 
 		if profileID != "" && claims.Subject != "" {
 			if profileID != claims.Subject {
-				util.Log(ctx).WithField("claim subject", claims.Subject).WithField("profileid", profileID).Error("For some reason profile and claim subject don't match")
+util.Log(ctx).WithField("claim_subject", claims.Subject).WithField("profile_id", profileID).Error("Profile ID from event sender does not match subject in claims")
 			}
 		}
 		contactID = claims.GetContactID()
