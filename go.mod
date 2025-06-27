@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	buf.build/gen/go/antinvestor/presence/connectrpc/go v1.18.1-20250520083445-2d0e51ca1296.1
 	buf.build/gen/go/antinvestor/presence/protocolbuffers/go v1.36.6-20250520083445-2d0e51ca1296.1
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250613105001-9f2d3c737feb.1
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250625184727-c923a0c2a132.1
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/validate v0.3.0
 	github.com/antinvestor/apis/go/common v1.35.2
