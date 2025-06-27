@@ -109,11 +109,6 @@ func (s *OutputRoomEventConsumer) Start(ctx context.Context) error {
 func (s *appserviceState) Handle(
 	ctx context.Context, metadata map[string]string, message []byte,
 ) error {
-
-	claims := frame.ClaimsFromContext(ctx)
-
-	util.Log(ctx).WithField("claims", claims).Info("  ------------------- Check received claims")
-
 	return s.handler.filterEventsForAppservice(ctx, s, metadata, message)
 }
 
