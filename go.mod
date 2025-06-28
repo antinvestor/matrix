@@ -25,7 +25,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pitabwire/frame v1.48.0
+	github.com/pitabwire/frame v1.49.0
 	github.com/pitabwire/util v0.2.5
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
@@ -76,7 +76,6 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
-	github.com/go-sql-driver/mysql v1.9.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
@@ -146,8 +145,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gorm.io/datatypes v1.2.5 // indirect
-	gorm.io/driver/mysql v1.5.7 // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
 	k8s.io/api v0.28.4 // indirect
 	k8s.io/apimachinery v0.28.4 // indirect
