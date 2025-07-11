@@ -13,7 +13,7 @@ require (
 	github.com/antinvestor/apis/go/partition v1.35.3
 	github.com/antinvestor/apis/go/profile v1.35.3
 	github.com/antinvestor/gomatrix v0.1.4
-	github.com/antinvestor/gomatrixserverlib v0.2.3
+	github.com/antinvestor/gomatrixserverlib v0.2.4
 	github.com/asynkron/protoactor-go v0.0.0-20240822202345-3c0e61ca19c9
 	github.com/getsentry/sentry-go v0.34.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
@@ -26,7 +26,7 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pitabwire/frame v1.49.1
-	github.com/pitabwire/util v0.2.5
+	github.com/pitabwire/util v0.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redis/go-redis/v9 v9.11.0
