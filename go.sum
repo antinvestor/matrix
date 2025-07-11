@@ -63,6 +63,8 @@ github.com/antinvestor/gomatrix v0.1.4 h1:VAnFZlZJfKRRvZNlYIHjPoPeekPjfpsAtQ6Fap
 github.com/antinvestor/gomatrix v0.1.4/go.mod h1:AWqCA5n5cpLwbde76MeSLBod5Lb4H2rSqvLVNgRCZ0Q=
 github.com/antinvestor/gomatrixserverlib v0.2.3 h1:mxQSGPELCKMm4+5O1VnfQHQd2CcnQyf4aH93zeuBv8Y=
 github.com/antinvestor/gomatrixserverlib v0.2.3/go.mod h1:H9GZUkWmDikqq+uxlWub2p3Em4jnJM0iY1KYxPhNqSM=
+github.com/antinvestor/gomatrixserverlib v0.2.4 h1:aYpuqfabDa4nZ8IPJiBEmS+djV7o/aGkUB+iqRlzhTw=
+github.com/antinvestor/gomatrixserverlib v0.2.4/go.mod h1:JbClRgJjcVUhPD09Hd7uAK1SsplEgdCXLtzfmu6KbXY=
 github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8TVTI=
 github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
 github.com/apache/thrift v0.12.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb+bacwQ=
@@ -480,6 +482,8 @@ github.com/pitabwire/natspubsub v0.6.9 h1:+1yd80fnj9lz9V7SIyr3kmn2TtMeB1ZM1TOaoN
 github.com/pitabwire/natspubsub v0.6.9/go.mod h1:fxAKe9c9Kf0NIxZZ7tLM7DXuq1OGv4+AsaoaWOPScrI=
 github.com/pitabwire/util v0.2.5 h1:UsxC8T2CmQgNVyi5sYYfpQiyoj5wQIySO9mPLxzJBoA=
 github.com/pitabwire/util v0.2.5/go.mod h1:WZczgF9qnAKM5jzzweeiWBdSi5cVEBjl7V9LI55q6xs=
+github.com/pitabwire/util v0.3.0 h1:eQYvEuGDBimBYj0gdIZSlwvF33HYfatsMk3PPLudkw4=
+github.com/pitabwire/util v0.3.0/go.mod h1:LjCZEToLP6DaOkiMBmRn0uWxFEDmPkrO9kKxY1/f4pI=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
