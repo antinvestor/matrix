@@ -16,7 +16,7 @@ require (
 	github.com/antinvestor/gomatrixserverlib v0.2.3
 	github.com/asynkron/protoactor-go v0.0.0-20240822202345-3c0e61ca19c9
 	github.com/getsentry/sentry-go v0.34.1
-	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
