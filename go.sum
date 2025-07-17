@@ -65,6 +65,8 @@ github.com/antinvestor/apis/go/partition v1.35.3 h1:JsGw9r/yIUrCLEOgvTMm9QjkF108
 github.com/antinvestor/apis/go/partition v1.35.3/go.mod h1:DiwjKom3bmVrCTa0Hcp+mxzgbXDaewkYoK/4Lh8Tm+M=
 github.com/antinvestor/apis/go/profile v1.35.3 h1:e9jsDSQeVp8febmcAVNNhQj3Ad0HMabkTTu4ed+VvOQ=
 github.com/antinvestor/apis/go/profile v1.35.3/go.mod h1:sfUZNZh+smRPQp0t1a0kjDMc4f5RAF13vMbQ5nkze44=
+github.com/antinvestor/apis/go/profile v1.36.4 h1:6foTpi6UkdOx1k9h5C+aMBC3W01R+JGrw7iwhl5aRfg=
+github.com/antinvestor/apis/go/profile v1.36.4/go.mod h1:IDwN2dEXMrJ6HWWM4owExAGUTMX1hhveIVKMftcWG78=
 github.com/antinvestor/gomatrix v0.1.4 h1:VAnFZlZJfKRRvZNlYIHjPoPeekPjfpsAtQ6Fapf1c1M=
 github.com/antinvestor/gomatrix v0.1.4/go.mod h1:AWqCA5n5cpLwbde76MeSLBod5Lb4H2rSqvLVNgRCZ0Q=
 github.com/antinvestor/gomatrixserverlib v0.2.3 h1:mxQSGPELCKMm4+5O1VnfQHQd2CcnQyf4aH93zeuBv8Y=
