@@ -65,6 +65,8 @@ github.com/antinvestor/gomatrix v0.1.4 h1:VAnFZlZJfKRRvZNlYIHjPoPeekPjfpsAtQ6Fap
 github.com/antinvestor/gomatrix v0.1.4/go.mod h1:AWqCA5n5cpLwbde76MeSLBod5Lb4H2rSqvLVNgRCZ0Q=
 github.com/antinvestor/gomatrixserverlib v0.2.3 h1:mxQSGPELCKMm4+5O1VnfQHQd2CcnQyf4aH93zeuBv8Y=
 github.com/antinvestor/gomatrixserverlib v0.2.3/go.mod h1:H9GZUkWmDikqq+uxlWub2p3Em4jnJM0iY1KYxPhNqSM=
+github.com/antinvestor/gomatrixserverlib v0.2.4 h1:aYpuqfabDa4nZ8IPJiBEmS+djV7o/aGkUB+iqRlzhTw=
+github.com/antinvestor/gomatrixserverlib v0.2.4/go.mod h1:JbClRgJjcVUhPD09Hd7uAK1SsplEgdCXLtzfmu6KbXY=
 github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8TVTI=
 github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
 github.com/apache/thrift v0.12.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb+bacwQ=
