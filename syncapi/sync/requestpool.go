@@ -81,10 +81,10 @@ func NewRequestPool(
 		)
 	}
 
-	workPool, err := queueutil.NewWorkManagerWithContext[types.StreamPosition](ctx)
-	if err != nil {
-		util.Log(ctx).WithError(err).Fatal("could not initiate work pool")
-	}
+	svc := frame.Svc(ctx)
+
+	workPool := queueutil.NewWorkManager[types.StreamPosition](svc)
+
 	rp := &RequestPool{
 		db:       db,
 		wp:       workPool,

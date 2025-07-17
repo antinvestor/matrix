@@ -2,8 +2,6 @@ package queueutil
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/pitabwire/frame"
 )
 
@@ -24,14 +22,4 @@ func NewWorkManager[T any](service *frame.Service) WorkPoolManager[T] {
 	return &worker[T]{
 		service: service,
 	}
-}
-
-func NewWorkManagerWithContext[T any](ctx context.Context) (WorkPoolManager[T], error) {
-
-	svc := frame.Svc(ctx)
-	if svc == nil {
-		return nil, fmt.Errorf("supplied context does not have service")
-	}
-
-	return NewWorkManager[T](svc), nil
 }
