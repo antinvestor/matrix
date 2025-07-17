@@ -45,7 +45,7 @@ import (
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
 	db       storage.Database
-	wp       queueutil.WorkPookManager
+	wp       queueutil.WorkPoolManager[types.StreamPosition]
 	cfg      *config.SyncAPI
 	userAPI  userapi.SyncUserAPI
 	rsAPI    roomserverAPI.SyncRoomserverAPI
@@ -69,7 +69,6 @@ type PresenceConsumer interface {
 func NewRequestPool(
 	ctx context.Context,
 	db storage.Database,
-	wp queueutil.WorkPookManager,
 	cfg *config.SyncAPI,
 	userAPI userapi.SyncUserAPI,
 	rsAPI roomserverAPI.SyncRoomserverAPI,
@@ -81,9 +80,14 @@ func NewRequestPool(
 			activeSyncRequests, waitingSyncRequests,
 		)
 	}
+
+	workPool, err := queueutil.NewWorkManagerWithContext[types.StreamPosition](ctx)
+	if err != nil {
+		util.Log(ctx).WithError(err).Fatal("could not initiate work pool")
+	}
 	rp := &RequestPool{
 		db:       db,
-		wp:       wp,
+		wp:       workPool,
 		cfg:      cfg,
 		userAPI:  userAPI,
 		rsAPI:    rsAPI,
@@ -488,8 +492,8 @@ func (rp *RequestPool) handleIncrementalRequest(
 }
 
 // executeWorkerPoolJob runs a function on a worker pool and returns the result through a channel
-func (rp *RequestPool) executeWorkerPoolJob(ctx context.Context, f func(ctx context.Context) types.StreamPosition) <-chan frame.JobResult {
-	poolRequestJob := frame.NewJob(func(ctx context.Context, result frame.JobResultPipe) error {
+func (rp *RequestPool) executeWorkerPoolJob(ctx context.Context, f func(ctx context.Context) types.StreamPosition) <-chan frame.JobResult[types.StreamPosition] {
+	poolRequestJob := frame.NewJob(func(ctx context.Context, result frame.JobResultPipe[types.StreamPosition]) error {
 		// Execute the function with the transaction
 		streamPos := f(ctx)
 		return result.WriteResult(ctx, streamPos)
@@ -504,7 +508,7 @@ func (rp *RequestPool) collectStreamResults(ctx context.Context,
 	syncReq *types.SyncRequest,
 	token types.StreamingToken,
 	deviceListCh, pduCh, typingCh, receiptCh, inviteCh, sendToDeviceCh,
-	accountDataCh, notificationDataCh, presenceCh <-chan frame.JobResult,
+	accountDataCh, notificationDataCh, presenceCh <-chan frame.JobResult[types.StreamPosition],
 ) types.StreamingToken {
 	log := util.Log(ctx)
 
@@ -517,7 +521,7 @@ func (rp *RequestPool) collectStreamResults(ctx context.Context,
 			token.DeviceListPosition = syncReq.Since.DeviceListPosition
 		}
 	} else {
-		token.DeviceListPosition = deviceListResult.Item().(types.StreamPosition)
+		token.DeviceListPosition = deviceListResult.Item()
 	}
 
 	pduResult := <-pduCh
@@ -527,7 +531,7 @@ func (rp *RequestPool) collectStreamResults(ctx context.Context,
 			token.PDUPosition = syncReq.Since.PDUPosition
 		}
 	} else {
-		token.PDUPosition = pduResult.Item().(types.StreamPosition)
+		token.PDUPosition = pduResult.Item()
 	}
 
 	typingResult := <-typingCh
@@ -537,7 +541,7 @@ func (rp *RequestPool) collectStreamResults(ctx context.Context,
 			token.TypingPosition = syncReq.Since.TypingPosition
 		}
 	} else {
-		token.TypingPosition = typingResult.Item().(types.StreamPosition)
+		token.TypingPosition = typingResult.Item()
 	}
 
 	receiptResult := <-receiptCh
@@ -547,7 +551,7 @@ func (rp *RequestPool) collectStreamResults(ctx context.Context,
 			token.ReceiptPosition = syncReq.Since.ReceiptPosition
 		}
 	} else {
-		token.ReceiptPosition = receiptResult.Item().(types.StreamPosition)
+		token.ReceiptPosition = receiptResult.Item()
 	}
 
 	inviteResult := <-inviteCh
@@ -557,7 +561,7 @@ func (rp *RequestPool) collectStreamResults(ctx context.Context,
 			token.InvitePosition = syncReq.Since.InvitePosition
 		}
 	} else {
-		token.InvitePosition = inviteResult.Item().(types.StreamPosition)
+		token.InvitePosition = inviteResult.Item()
 	}
 
 	sendToDeviceResult := <-sendToDeviceCh
@@ -567,7 +571,7 @@ func (rp *RequestPool) collectStreamResults(ctx context.Context,
 			token.SendToDevicePosition = syncReq.Since.SendToDevicePosition
 		}
 	} else {
-		token.SendToDevicePosition = sendToDeviceResult.Item().(types.StreamPosition)
+		token.SendToDevicePosition = sendToDeviceResult.Item()
 	}
 
 	accountDataResult := <-accountDataCh
@@ -577,7 +581,7 @@ func (rp *RequestPool) collectStreamResults(ctx context.Context,
 			token.AccountDataPosition = syncReq.Since.AccountDataPosition
 		}
 	} else {
-		token.AccountDataPosition = accountDataResult.Item().(types.StreamPosition)
+		token.AccountDataPosition = accountDataResult.Item()
 	}
 
 	notificationDataResult := <-notificationDataCh
@@ -587,7 +591,7 @@ func (rp *RequestPool) collectStreamResults(ctx context.Context,
 			token.NotificationDataPosition = syncReq.Since.NotificationDataPosition
 		}
 	} else {
-		token.NotificationDataPosition = notificationDataResult.Item().(types.StreamPosition)
+		token.NotificationDataPosition = notificationDataResult.Item()
 	}
 
 	presenceResult := <-presenceCh
@@ -597,7 +601,7 @@ func (rp *RequestPool) collectStreamResults(ctx context.Context,
 			token.PresencePosition = syncReq.Since.PresencePosition
 		}
 	} else {
-		token.PresencePosition = presenceResult.Item().(types.StreamPosition)
+		token.PresencePosition = presenceResult.Item()
 	}
 
 	return token

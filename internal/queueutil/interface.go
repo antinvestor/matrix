@@ -8,8 +8,6 @@ import (
 )
 
 type QueueManager interface {
-	WorkPookManager
-
 	RegisterPublisher(ctx context.Context, opts *config.QueueOptions) error
 	GetPublisher(ref string) (frame.Publisher, error)
 	GetOrCreatePublisher(ctx context.Context, opts *config.QueueOptions) (frame.Publisher, error)
@@ -23,6 +21,6 @@ type QueueManager interface {
 	DiscardSubscriber(ctx context.Context, ref string) error
 }
 
-type WorkPookManager interface {
-	Submit(ctx context.Context, job frame.Job)
+type WorkPoolManager[T any] interface {
+	Submit(ctx context.Context, job frame.Job[T])
 }

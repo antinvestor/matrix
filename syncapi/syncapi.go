@@ -90,7 +90,7 @@ func AddPublicRoutes(
 		Qm:    qm,
 	}
 
-	requestPool := sync.NewRequestPool(ctx, syncDB, qm, &cfgSyncAPI, userAPI, rsAPI, strms, ntf, federationPresenceProducer, presenceConsumer, enableMetrics)
+	requestPool := sync.NewRequestPool(ctx, syncDB, &cfgSyncAPI, userAPI, rsAPI, strms, ntf, federationPresenceProducer, presenceConsumer, enableMetrics)
 
 	err = consumers.NewOutputKeyChangeEventConsumer(
 		ctx, &cfgSyncAPI, qm, rsAPI, syncDB, ntf,

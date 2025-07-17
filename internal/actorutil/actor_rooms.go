@@ -27,6 +27,7 @@ type SequentialActor struct {
 	actorFunctionID ActorFunctionID
 
 	qm           queueutil.QueueManager
+	wpm          queueutil.WorkPoolManager[any]
 	subscription frame.Subscriber
 
 	cluster *cluster.Cluster
@@ -70,7 +71,7 @@ func (ra *SequentialActor) Progress(_ *actorV1.ProgressRequest, _ cluster.GrainC
 }
 
 // NewSeqActor creates a new room actor
-func NewSeqActor(ctx context.Context, cluster *cluster.Cluster, qm queueutil.QueueManager, processorMap map[ActorFunctionID]*functionOpt) *SequentialActor {
+func NewSeqActor(ctx context.Context, cluster *cluster.Cluster, qm queueutil.QueueManager, wpm queueutil.WorkPoolManager[any], processorMap map[ActorFunctionID]*functionOpt) *SequentialActor {
 
 	ictx, cancel := context.WithCancel(ctx)
 
@@ -81,8 +82,8 @@ func NewSeqActor(ctx context.Context, cluster *cluster.Cluster, qm queueutil.Que
 		cluster:    cluster,
 		processors: processorMap,
 
-		qm: qm,
-
+		qm:  qm,
+		wpm: wpm,
 		log: util.Log(ictx),
 	}
 }
@@ -190,7 +191,7 @@ func (ra *SequentialActor) ReceiveDefault(gctx cluster.GrainContext) {
 		}
 
 		// Process the next message and determine whether there are more to process
-		eventWork := frame.NewJob(func(ctx context.Context, _ frame.JobResultPipe) error {
+		eventWork := frame.NewJob(func(ctx context.Context, _ frame.JobResultPipe[any]) error {
 			defer func() {
 				// Reset processing flag when job completes
 				ra.jobProcessing.Swap(false)
@@ -211,7 +212,7 @@ func (ra *SequentialActor) ReceiveDefault(gctx cluster.GrainContext) {
 			return nil
 		})
 
-		ra.qm.Submit(ra.ctx, eventWork)
+		ra.wpm.Submit(ra.ctx, eventWork)
 	}
 }
 

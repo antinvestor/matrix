@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -35,7 +34,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	}
 
 	maxSize := config.FileSizeBytes(8)
-	logger := util.NewLogger(context.TODO(), util.DefaultLogOptions()).WithField("mediaapi", "test")
+	logger := util.NewLogger(t.Context()).WithField("mediaapi", "test")
 	testdataPath := filepath.Join(wd, "./testdata")
 
 	cfg := &config.MediaAPI{

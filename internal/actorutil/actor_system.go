@@ -24,6 +24,7 @@ const (
 type manager struct {
 	config      *config.ActorOptions
 	qm          queueutil.QueueManager
+	wpm         queueutil.WorkPoolManager[any]
 	actorSystem *actor.ActorSystem
 
 	processors  map[ActorFunctionID]*functionOpt
@@ -47,6 +48,7 @@ func NewManager(ctx context.Context, config *config.ActorOptions, qm queueutil.Q
 	managerOptn := &manager{
 		config:      config,
 		qm:          qm,
+		wpm:         queueutil.NewWorkManager[any](svc),
 		actorSystem: actorSystem,
 		processors:  make(map[ActorFunctionID]*functionOpt),
 		clusterName: clusterName,
@@ -100,7 +102,7 @@ func (m *manager) Start(ctx context.Context) error {
 
 	// Create the room actor props for the cluster
 	roomProcessorKind := actorV1.NewSequentialProcessorKind(func() actorV1.SequentialProcessor {
-		return NewSeqActor(ctx, m.cluster, m.qm, m.processors)
+		return NewSeqActor(ctx, m.cluster, m.qm, m.wpm, m.processors)
 	}, 0)
 
 	// Create the cluster configuration
