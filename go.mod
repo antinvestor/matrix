@@ -9,7 +9,7 @@ require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/validate v0.3.0
 	github.com/antinvestor/apis/go/common v1.36.3
-	github.com/antinvestor/apis/go/notification v1.35.3
+	github.com/antinvestor/apis/go/notification v1.36.4
 	github.com/antinvestor/apis/go/partition v1.35.3
 	github.com/antinvestor/apis/go/profile v1.36.4
 	github.com/antinvestor/gomatrix v0.1.4
