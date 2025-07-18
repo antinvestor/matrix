@@ -26,7 +26,7 @@ services:
         target: /etc/pgdog/users.toml
   datastore:
     hostname: datastore
-    image: paradedb/paradedb:0.16.4
+    image: paradedb/paradedb:0.17.0
     restart: always
     environment:
       POSTGRES_PASSWORD: s3cr3t
