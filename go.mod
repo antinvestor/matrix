@@ -14,7 +14,7 @@ require (
 	github.com/antinvestor/apis/go/profile v1.36.4
 	github.com/antinvestor/gomatrix v0.1.4
 	github.com/antinvestor/gomatrixserverlib v0.2.4
-	github.com/asynkron/protoactor-go v0.0.0-20240822202345-3c0e61ca19c9
+	github.com/asynkron/protoactor-go v0.0.0-20250718162332-fca678d1096c
 	github.com/getsentry/sentry-go v0.34.1
 	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/google/go-cmp v0.7.0
@@ -57,7 +57,7 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
-	github.com/Workiva/go-datastructures v1.1.3 // indirect
+	github.com/Workiva/go-datastructures v1.1.5 // indirect
 	github.com/XSAM/otelsql v0.39.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/asynkron/gofun v0.0.0-20220329210725-34fed760f4c2 // indirect
