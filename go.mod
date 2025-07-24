@@ -46,7 +46,7 @@ require (
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v3 v3.0.1
-	gorm.io/gorm v1.30.0
+	gorm.io/gorm v1.30.1
 	gotest.tools/v3 v3.5.2
 	maunium.net/go/mautrix v0.24.2
 )
