@@ -14,34 +14,34 @@ type lazyLoadingCacheKey struct {
 }
 
 type LazyLoadCache interface {
-	StoreLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, userID, eventID string) error
-	IsLazyLoadedUserCached(ctx context.Context, device *userapi.Device, roomID, userID string) (string, bool)
-	InvalidateLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, userID string) error
+	StoreLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, targetUserID, eventID string) error
+	IsLazyLoadedUserCached(ctx context.Context, device *userapi.Device, roomID, targetUserID string) (string, bool)
+	InvalidateLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, targetUserID string) error
 }
 
-func (c Caches) StoreLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, userID, eventID string) error {
+func (c Caches) StoreLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, targetUserID, eventID string) error {
 	return c.LazyLoading.Set(ctx, lazyLoadingCacheKey{
 		UserID:       device.UserID,
 		DeviceID:     device.ID,
 		RoomID:       roomID,
-		TargetUserID: userID,
+		TargetUserID: targetUserID,
 	}, eventID)
 }
 
-func (c Caches) IsLazyLoadedUserCached(ctx context.Context, device *userapi.Device, roomID, userID string) (string, bool) {
+func (c Caches) IsLazyLoadedUserCached(ctx context.Context, device *userapi.Device, roomID, targetUserID string) (string, bool) {
 	return c.LazyLoading.Get(ctx, lazyLoadingCacheKey{
 		UserID:       device.UserID,
 		DeviceID:     device.ID,
 		RoomID:       roomID,
-		TargetUserID: userID,
+		TargetUserID: targetUserID,
 	})
 }
 
-func (c Caches) InvalidateLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, userID string) error {
+func (c Caches) InvalidateLazyLoadedUser(ctx context.Context, device *userapi.Device, roomID, targetUserID string) error {
 	return c.LazyLoading.Unset(ctx, lazyLoadingCacheKey{
 		UserID:       device.UserID,
 		DeviceID:     device.ID,
 		RoomID:       roomID,
-		TargetUserID: userID,
+		TargetUserID: targetUserID,
 	})
 }

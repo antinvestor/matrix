@@ -77,6 +77,7 @@ func SendEvent(
 	rsAPI api.ClientRoomserverAPI,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
+
 	roomVersion, err := rsAPI.QueryRoomVersionForRoom(req.Context(), roomID)
 	if err != nil {
 		return util.JSONResponse{
