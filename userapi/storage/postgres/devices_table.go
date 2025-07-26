@@ -262,7 +262,7 @@ func (t *devicesTable) UpdateDeviceName(
 // SelectDeviceByToken retrieves a device from the database with the given access token.
 func (t *devicesTable) SelectDeviceByToken(
 	ctx context.Context, accessToken string,
-) (*api.Device, error) {
+) (context.Context, *api.Device, error) {
 	var dev api.Device
 	var localpart string
 	var serverName spec.ServerName
@@ -274,7 +274,7 @@ func (t *devicesTable) SelectDeviceByToken(
 		dev.UserID = userutil.MakeUserID(localpart, serverName)
 		dev.AccessToken = accessToken
 	}
-	return &dev, err
+	return ctx, &dev, err
 }
 
 // SelectDeviceByID retrieves a device from the database with the given user localpart and deviceID.

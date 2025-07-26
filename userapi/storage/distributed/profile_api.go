@@ -96,7 +96,7 @@ func (s *profilesApi) SetAvatarURL(
 	avatarURL string,
 ) (*authtypes.Profile, bool, error) {
 
-	updateResponse, err := s.profileClient.Client.Update(ctx, &profilev1.UpdateRequest{
+	updateResponse, err := s.profileClient.Svc().Update(ctx, &profilev1.UpdateRequest{
 		Id: localpart,
 		Properties: map[string]string{
 			"avatar_uri": avatarURL,
@@ -116,7 +116,7 @@ func (s *profilesApi) SetDisplayName(
 	displayName string,
 ) (*authtypes.Profile, bool, error) {
 
-	updateResponse, err := s.profileClient.Client.Update(ctx, &profilev1.UpdateRequest{
+	updateResponse, err := s.profileClient.Svc().Update(ctx, &profilev1.UpdateRequest{
 		Id: localpart,
 		Properties: map[string]string{
 			"matrix_name": displayName,
@@ -135,7 +135,7 @@ func (s *profilesApi) SelectProfilesBySearch(
 ) ([]authtypes.Profile, error) {
 	var profiles []authtypes.Profile
 
-	roster, err := s.profileClient.Client.SearchRoster(ctx, &profilev1.SearchRosterRequest{
+	roster, err := s.profileClient.Svc().SearchRoster(ctx, &profilev1.SearchRosterRequest{
 		ProfileId: localPart,
 		Query:     searchString,
 		Count:     int32(limit),

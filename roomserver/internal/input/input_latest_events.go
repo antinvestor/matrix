@@ -19,14 +19,12 @@ package input
 import (
 	"context"
 	"fmt"
-
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
 	"github.com/antinvestor/matrix/roomserver/types"
-	"github.com/getsentry/sentry-go"
 	"github.com/pitabwire/util"
 )
 
@@ -292,19 +290,6 @@ func (u *latestEventsUpdater) latestState() error {
 			WithField("old_latest", u.oldLatest.EventIDs()).
 			WithField("new_latest", u.latest.EventIDs()).
 			Warn("State reset detected (removing %d events)", removed)
-		sentry.WithScope(func(scope *sentry.Scope) {
-			scope.SetLevel("warning")
-			scope.SetTag("room_id", u.event.RoomID().String())
-			scope.SetContext("State reset", map[string]interface{}{
-				"Event ID":      u.event.EventID(),
-				"Old state NID": fmt.Sprintf("%d", u.oldStateNID),
-				"New state NID": fmt.Sprintf("%d", u.newStateNID),
-				"Old latest":    u.oldLatest.EventIDs(),
-				"New latest":    u.latest.EventIDs(),
-				"State removed": removed,
-			})
-			sentry.CaptureMessage("State reset detected")
-		})
 	}
 
 	// Also work out the state before the event removes and the event

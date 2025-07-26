@@ -60,7 +60,7 @@ type DevicesTable interface {
 	DeleteDevices(ctx context.Context, localpart string, serverName spec.ServerName, devices []string) error
 	DeleteDevicesByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName, exceptDeviceID string) error
 	UpdateDeviceName(ctx context.Context, localpart string, serverName spec.ServerName, deviceID string, displayName *string) error
-	SelectDeviceByToken(ctx context.Context, accessToken string) (*api.Device, error)
+	SelectDeviceByToken(ctx context.Context, accessToken string) (context.Context, *api.Device, error)
 	SelectDeviceByID(ctx context.Context, localpart string, serverName spec.ServerName, deviceID string) (*api.Device, error)
 	SelectDevicesByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName, exceptDeviceID string) ([]api.Device, error)
 	SelectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error)

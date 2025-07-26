@@ -32,7 +32,6 @@ import (
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/internal/httputil"
 	"github.com/antinvestor/matrix/setup/config"
-	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/gorilla/mux"
 	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
@@ -150,20 +149,8 @@ func SetupHTTPOption(
 
 	var clientHandler http.Handler
 	clientHandler = routers.Client
-	if cfg.Global.Sentry.Enabled {
-		sentryHandler := sentryhttp.New(sentryhttp.Options{
-			Repanic: true,
-		})
-		clientHandler = sentryHandler.Handle(routers.Client)
-	}
 	var federationHandler http.Handler
 	federationHandler = routers.Federation
-	if cfg.Global.Sentry.Enabled {
-		sentryHandler := sentryhttp.New(sentryhttp.Options{
-			Repanic: true,
-		})
-		federationHandler = sentryHandler.Handle(routers.Federation)
-	}
 	externalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(routers.DendriteAdmin)
 	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(clientHandler)
 	if !cfg.Global.DisableFederation {

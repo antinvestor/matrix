@@ -277,6 +277,7 @@ type QueryAccessTokenRequest struct {
 
 // QueryAccessTokenResponse is the response for QueryAccessToken
 type QueryAccessTokenResponse struct {
+	Ctx    context.Context
 	Device *Device
 	Err    string // e.g ErrorForbidden
 }
@@ -447,6 +448,8 @@ type Device struct {
 	// this is the appservice ID.
 	AppserviceID string
 	AccountType  AccountType
+
+	Reload func(ctx context.Context) error
 }
 
 func (d *Device) UserDomain() spec.ServerName {

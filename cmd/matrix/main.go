@@ -21,6 +21,7 @@ import (
 
 	"buf.build/gen/go/antinvestor/presence/connectrpc/go/presencev1connect"
 	apis "github.com/antinvestor/apis/go/common"
+	devicev1 "github.com/antinvestor/apis/go/device/v1"
 	notificationv1 "github.com/antinvestor/apis/go/notification/v1"
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
@@ -39,7 +40,6 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/setup/mscs"
 	"github.com/antinvestor/matrix/userapi"
-	"github.com/getsentry/sentry-go"
 	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -90,25 +90,9 @@ func main() {
 		)
 	}
 
-	// setup sentry
-	if globalCfg.Sentry.Enabled {
-		log.Info("Setting up Sentry for debugging...")
-		err := sentry.Init(sentry.ClientOptions{
-			Dsn:              globalCfg.Sentry.DSN,
-			Environment:      globalCfg.Sentry.Environment,
-			Debug:            true,
-			ServerName:       string(globalCfg.ServerName),
-			Release:          "matrix@" + internal.VersionString(),
-			AttachStacktrace: true,
-		})
-		if err != nil {
-			log.WithError(err).Panic("failed to start Sentry")
-		}
-
-	}
-
 	var (
 		profileCli      *profilev1.ProfileClient
+		deviceCli       *devicev1.DeviceClient
 		partitionCli    *partitionv1.PartitionClient
 		notificationCli *notificationv1.NotificationClient
 	)
@@ -140,6 +124,16 @@ func main() {
 		apiConfig := globalCfg.DistributedAPI
 		profileCli, err = profilev1.NewProfileClient(ctx,
 			apis.WithEndpoint(apiConfig.ProfileServiceUri),
+			apis.WithTokenEndpoint(oauth2ServiceURL),
+			apis.WithTokenUsername(service.JwtClientID()),
+			apis.WithTokenPassword(service.JwtClientSecret()),
+			apis.WithAudiences(audienceList...))
+		if err != nil {
+			log.WithError(err).Panic("failed to initialise profile api client")
+		}
+
+		deviceCli, err = devicev1.NewDeviceClient(ctx,
+			apis.WithEndpoint(apiConfig.DevicesServiceUri),
 			apis.WithTokenEndpoint(oauth2ServiceURL),
 			apis.WithTokenUsername(service.JwtClientID()),
 			apis.WithTokenPassword(service.JwtClientSecret()),
@@ -207,7 +201,7 @@ func main() {
 	// dependency. Other components also need updating after their dependencies are up.
 	rsAPI.SetFederationAPI(ctx, fsAPI, keyRing)
 
-	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, federationClient, profileCli, cacheutil.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
+	userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, federationClient, profileCli, deviceCli, cacheutil.EnableMetrics, fsAPI.IsBlacklistedOrBackingOff)
 	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, userAPI, rsAPI, notificationCli)
 
 	rsAPI.SetAppserviceAPI(ctx, asAPI)

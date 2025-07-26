@@ -17,6 +17,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	devicev1 "github.com/antinvestor/apis/go/device/v1"
 	"time"
 
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
@@ -31,6 +32,7 @@ import (
 func NewUserDatabase(
 	ctx context.Context,
 	profileCli *profilev1.ProfileClient,
+	deviceCli *devicev1.DeviceClient,
 	cm sqlutil.ConnectionManager,
 	serverName spec.ServerName,
 	bcryptCost int,
@@ -50,7 +52,7 @@ func NewUserDatabase(
 		return pgUserDb, nil
 	}
 
-	distributedDb, err := distributed.NewDatabase(ctx, profileCli, pgUserDb)
+	distributedDb, err := distributed.NewDatabase(ctx, profileCli, deviceCli, pgUserDb)
 	if err != nil {
 		return nil, err
 	}

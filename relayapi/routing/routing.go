@@ -16,7 +16,6 @@ package routing
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -26,7 +25,6 @@ import (
 	"github.com/antinvestor/matrix/internal/httputil"
 	relayInternal "github.com/antinvestor/matrix/relayapi/internal"
 	"github.com/antinvestor/matrix/setup/config"
-	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/pitabwire/util"
 )
@@ -106,19 +104,9 @@ func MakeRelayAPI(
 		if fedReq == nil {
 			return errResp
 		}
-		// add the user to Sentry, if enabled
-		hub := sentry.GetHubFromContext(req.Context())
-		if hub != nil {
-			// clone the hub, so we don't send garbage events with e.g. mismatching rooms/event_ids
-			hub = hub.Clone()
-			hub.Scope().SetTag("origin", string(fedReq.Origin()))
-			hub.Scope().SetTag("uri", fedReq.RequestURI())
-		}
+
 		defer func() {
 			if r := recover(); r != nil {
-				if hub != nil {
-					hub.CaptureException(fmt.Errorf("%s panicked", req.URL.Path))
-				}
 				// re-panic to return the 500
 				panic(r)
 			}
@@ -129,11 +117,6 @@ func MakeRelayAPI(
 		}
 
 		jsonRes := f(req, fedReq, vars)
-		// do not log 4xx as errors as they are client fails, not server fails
-		if hub != nil && jsonRes.Code >= 500 {
-			hub.Scope().SetExtra("response", jsonRes)
-			hub.CaptureException(fmt.Errorf("%s returned HTTP %d", req.URL.Path, jsonRes.Code))
-		}
 		return jsonRes
 	}
 	return httputil.MakeExternalAPI(metricsName, h)

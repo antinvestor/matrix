@@ -21,7 +21,7 @@ func TestCollect(t *testing.T) {
 		defer svc.Stop(ctx)
 
 		cm := sqlutil.NewConnectionManager(svc)
-		db, err := storage.NewUserDatabase(ctx, nil, cm, "localhost", bcrypt.MinCost, 1000, 1000, "")
+		db, err := storage.NewUserDatabase(ctx, nil, nil, cm, "localhost", bcrypt.MinCost, 1000, 1000, "")
 		if err != nil {
 			t.Error(err)
 		}

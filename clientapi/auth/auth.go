@@ -61,13 +61,15 @@ func VerifyUserFromRequest(
 			JSON: spec.MissingToken(err.Error()),
 		}
 	}
+
+	ctx := req.Context()
+
 	var res api.QueryAccessTokenResponse
-	err = userAPI.QueryAccessToken(req.Context(), &api.QueryAccessTokenRequest{
+	err = userAPI.QueryAccessToken(ctx, &api.QueryAccessTokenRequest{
 		AccessToken:      token,
 		AppServiceUserID: req.URL.Query().Get("user_id"),
 	}, &res)
 	if err != nil {
-		ctx := req.Context()
 		log := util.Log(ctx)
 		log.WithError(err).Error("userAPI.QueryAccessToken failed")
 		return nil, &util.JSONResponse{
@@ -89,6 +91,11 @@ func VerifyUserFromRequest(
 			JSON: spec.UnknownToken("Unknown token"),
 		}
 	}
+
+	if res.Ctx != nil {
+		req = req.WithContext(res.Ctx)
+	}
+
 	return res.Device, nil
 }
 
