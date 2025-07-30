@@ -18,20 +18,23 @@ import (
 	"context"
 	"fmt"
 
+	devicev1 "github.com/antinvestor/apis/go/device/v1"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/matrix/userapi/storage/shared"
-
-	// Import the postgres database driver.
-	_ "github.com/lib/pq"
 )
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(ctx context.Context, profileClient *profilev1.ProfileClient, localDb *shared.Database) (*shared.Database, error) {
+func NewDatabase(ctx context.Context, profileClient *profilev1.ProfileClient, deviceClient *devicev1.DeviceClient, localDb *shared.Database) (*shared.Database, error) {
 
 	var err error
 	localDb.Profiles, err = NewProfilesApi(ctx, profileClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create profiles api: %w", err)
+	}
+
+	localDb.Devices, err = NewDevicesApi(ctx, deviceClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create devices api: %w", err)
 	}
 
 	return localDb, nil

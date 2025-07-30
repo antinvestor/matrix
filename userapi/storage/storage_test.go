@@ -38,7 +38,7 @@ func mustCreateUserDatabase(ctx context.Context, svc *frame.Service, t *testing.
 
 	cm := sqlutil.NewConnectionManager(svc)
 
-	db, err := storage.NewUserDatabase(ctx, nil, cm, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
+	db, err := storage.NewUserDatabase(ctx, nil, nil, cm, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
 		t.Fatalf("NewUserDatabase returned %s", err)
 	}
@@ -174,7 +174,7 @@ func Test_Devices(t *testing.T) {
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, deviceWithID.ID, gotDevice.ID) // GetDeviceByID doesn't populate all fields
 
-		gotDeviceAccessToken, err := db.GetDeviceByAccessToken(ctx, accessToken)
+		_, gotDeviceAccessToken, err := db.GetDeviceByAccessToken(ctx, accessToken)
 		assert.NoError(t, err, "unable to get device by access token")
 		assert.Equal(t, deviceWithID.ID, gotDeviceAccessToken.ID) // GetDeviceByAccessToken doesn't populate all fields
 

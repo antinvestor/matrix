@@ -170,7 +170,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		asAPI := appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI, nil)
 
 		runCases(t, asAPI)
@@ -268,7 +268,7 @@ func TestAppserviceInternalAPI_UnixSocket_Simple(t *testing.T) {
 	cm := sqlutil.NewConnectionManager(svc)
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
-	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+	usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 	asAPI := appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI, nil)
 
 	t.Run("UserIDExists", func(t *testing.T) {
@@ -420,7 +420,7 @@ func TestRoomserverConsumerOneInvite(t *testing.T) {
 		// Create required internal APIs
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		// start the consumer
 		appservice.NewInternalAPI(ctx, cfg, qm, usrAPI, rsAPI, nil)
 
@@ -484,7 +484,7 @@ func TestOutputAppserviceEvent(t *testing.T) {
 			bob: {},
 		}
 
-		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		rsAPI.SetUserAPI(ctx, usrAPI)
 
 		clientapi.AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, usrAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)
@@ -621,7 +621,7 @@ func TestDistributedOutputAppserviceEvent(t *testing.T) {
 			bob: {},
 		}
 
-		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		usrAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 		rsAPI.SetUserAPI(ctx, usrAPI)
 
 		clientapi.AddPublicRoutes(ctx, routers, cfg, qm, nil, rsAPI, nil, nil, nil, usrAPI, nil, nil, nil, nil, cacheutil.DisableMetrics)

@@ -29,14 +29,12 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 	"golang.org/x/oauth2"
 )
 
 // devicesSchema defines the schema for devices table.
 const devicesSchema = `
--- This sequence is used for automatic allocation of session_id.
-CREATE SEQUENCE IF NOT EXISTS userapi_device_session_id_seq START 1;
-
 -- Stores data about devices.
 CREATE TABLE IF NOT EXISTS userapi_devices (
     -- The access token granted to this device. This has to be the primary key
@@ -48,7 +46,7 @@ CREATE TABLE IF NOT EXISTS userapi_devices (
     -- This can be used as a secure substitution of the access token in situations
     -- where data is associated with access tokens (e.g. transaction storage),
     -- so we don't have to store users' access tokens everywhere.
-    session_id BIGINT NOT NULL DEFAULT nextval('userapi_device_session_id_seq'),
+    session_id TEXT NOT NULL,
     -- The device identifier. This only needs to uniquely identify a device for a given user, not globally.
     -- access_tokens will be clobbered based on the device ID for a user.
     device_id TEXT NOT NULL,
@@ -78,12 +76,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS userapi_device_localpart_id_idx ON userapi_dev
 // devicesSchemaRevert defines the revert operation for devices schema.
 const devicesSchemaRevert = `
 DROP TABLE IF EXISTS userapi_devices;
-DROP SEQUENCE IF EXISTS userapi_device_session_id_seq;
 `
 
 // Insert a new device. Returns the device on success.
 const insertDeviceSQL = "" +
-	"INSERT INTO userapi_devices(device_id, localpart, server_name, access_token, extra_data, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
+	"INSERT INTO userapi_devices(device_id, localpart, server_name, session_id, access_token, extra_data, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)" +
 	" RETURNING session_id"
 
 // Look up the data for a device by the access token granted during login or registration.
@@ -178,8 +175,18 @@ func (t *devicesTable) InsertDevice(
 	localpart string, serverName spec.ServerName,
 	accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
 ) (*api.Device, error) {
+
+	sessionID := util.IDString()
+	return t.InsertDeviceWithSessionID(ctx, id, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent, sessionID)
+}
+
+func (t *devicesTable) InsertDeviceWithSessionID(ctx context.Context,
+	id, localpart string, serverName spec.ServerName,
+	accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
+	sessionID string,
+) (*api.Device, error) {
+
 	createdTimeMS := time.Now().UnixNano() / 1000000
-	var sessionID int64
 
 	extraDataJson, err := json.Marshal(extraData)
 	if err != nil {
@@ -187,8 +194,8 @@ func (t *devicesTable) InsertDevice(
 	}
 
 	db := t.cm.Connection(ctx, false)
-	row := db.Raw(t.insertDeviceSQL, id, localpart, serverName, accessToken, extraDataJson, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Row()
-	if err := row.Scan(&sessionID); err != nil {
+	row := db.Raw(t.insertDeviceSQL, id, localpart, serverName, sessionID, accessToken, extraDataJson, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Row()
+	if err = row.Scan(&sessionID); err != nil {
 		return nil, fmt.Errorf("insertDeviceStmt: %w", err)
 	}
 
@@ -196,26 +203,15 @@ func (t *devicesTable) InsertDevice(
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, serverName),
 		AccessToken: accessToken,
-
-		SessionID:  sessionID,
-		LastSeenTS: createdTimeMS,
-		LastSeenIP: ipAddr,
-		UserAgent:  userAgent,
+		SessionID:   sessionID,
+		LastSeenTS:  createdTimeMS,
+		LastSeenIP:  ipAddr,
+		UserAgent:   userAgent,
 	}
 	if displayName != nil {
 		dev.DisplayName = *displayName
 	}
 	return dev, nil
-}
-
-func (t *devicesTable) InsertDeviceWithSessionID(ctx context.Context,
-	id, localpart string, serverName spec.ServerName,
-	accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
-	sessionID int64,
-) (*api.Device, error) {
-	// Since we're using GORM and don't have direct control over the session ID sequence,
-	// we'll just perform a regular insert and let the database handle the session ID
-	return t.InsertDevice(ctx, id, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
 }
 
 // DeleteDevice removes a single device by id and user localpart.
@@ -262,7 +258,7 @@ func (t *devicesTable) UpdateDeviceName(
 // SelectDeviceByToken retrieves a device from the database with the given access token.
 func (t *devicesTable) SelectDeviceByToken(
 	ctx context.Context, accessToken string,
-) (*api.Device, error) {
+) (context.Context, *api.Device, error) {
 	var dev api.Device
 	var localpart string
 	var serverName spec.ServerName
@@ -274,7 +270,7 @@ func (t *devicesTable) SelectDeviceByToken(
 		dev.UserID = userutil.MakeUserID(localpart, serverName)
 		dev.AccessToken = accessToken
 	}
-	return &dev, err
+	return ctx, &dev, err
 }
 
 // SelectDeviceByID retrieves a device from the database with the given user localpart and deviceID.
@@ -323,7 +319,7 @@ func (t *devicesTable) SelectDevicesByID(ctx context.Context, deviceIDs []string
 	var displayName sql.NullString
 
 	for rows.Next() {
-		if err := rows.Scan(&dev.ID, &localpart, &serverName, &displayName, &lastseents, &dev.SessionID); err != nil {
+		if err = rows.Scan(&dev.ID, &localpart, &serverName, &displayName, &lastseents, &dev.SessionID); err != nil {
 			return nil, err
 		}
 		if displayName.Valid {

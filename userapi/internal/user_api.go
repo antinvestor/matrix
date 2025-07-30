@@ -567,7 +567,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 		}
 		// If the provided token wasn't an as_token (both err and appServiceDevice are nil), continue with normal auth.
 	}
-	device, err := a.DB.GetDeviceByAccessToken(ctx, req.AccessToken)
+	ctx0, device, err := a.DB.GetDeviceByAccessToken(ctx, req.AccessToken)
 	if err != nil {
 		if sqlutil.ErrorIsNoRows(err) {
 			return nil
@@ -587,6 +587,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 	}
 	device.AccountType = acc.AccountType
 	res.Device = device
+	res.Ctx = ctx0
 	return nil
 }
 
@@ -860,7 +861,7 @@ func (a *UserInternalAPI) PerformPusherDeletion(ctx context.Context, req *api.Pe
 	for i := range pushers {
 		log.WithField("pusher_session_id", pushers[i].SessionID).WithField("request_session_id", req.SessionID).Warn("pusher session details")
 		if pushers[i].SessionID != req.SessionID {
-			err := a.DB.RemovePusher(ctx, pushers[i].AppID, pushers[i].PushKey, req.Localpart, req.ServerName)
+			err = a.DB.RemovePusher(ctx, pushers[i].AppID, pushers[i].PushKey, req.Localpart, req.ServerName)
 			if err != nil {
 				return err
 			}

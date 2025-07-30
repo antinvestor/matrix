@@ -54,7 +54,7 @@ func TestLogin(t *testing.T) {
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 		// Needed for /login
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, nil, cacheutil.DisableMetrics, testIsBlacklistedOrBackingOff)
 
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
 		Setup(ctx, routers, cfg, nil, nil, userAPI, nil, nil, nil, nil, nil, nil, nil, nil, cacheutil.DisableMetrics)

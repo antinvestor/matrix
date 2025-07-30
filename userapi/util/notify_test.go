@@ -86,7 +86,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		defer srv.Close()
 
 		cm := sqlutil.NewConnectionManager(svc)
-		db, err := storage.NewUserDatabase(ctx, nil, cm, "test", bcrypt.MinCost, 0, 0, "")
+		db, err := storage.NewUserDatabase(ctx, nil, nil, cm, "test", bcrypt.MinCost, 0, 0, "")
 		if err != nil {
 			t.Error(err)
 		}

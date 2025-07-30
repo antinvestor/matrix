@@ -229,7 +229,7 @@ const testKeyID = "ed25519:c8NsuQ"
 
 const testKey = `
 -----BEGIN MATRIX PRIVATE KEY-----
-K-ID: ` + testKeyID + `
+Key-ID: ` + testKeyID + `
 7KRZiZ2sTyRR8uqqUjRwczuwRXXkUMYIUHq4Mc3t4bE=
 -----END MATRIX PRIVATE KEY-----
 `

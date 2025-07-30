@@ -40,7 +40,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		rsAPI.SetFederationAPI(ctx, nil, nil)
 
 		// Needed to create accounts
-		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, cacheutil.DisableMetrics, nil)
+		userAPI := userapi.NewInternalAPI(ctx, cfg, cm, qm, am, rsAPI, nil, nil, nil, cacheutil.DisableMetrics, nil)
 		rsAPI.SetUserAPI(ctx, userAPI)
 
 		deadline, _ := t.Deadline()

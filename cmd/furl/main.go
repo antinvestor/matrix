@@ -55,7 +55,7 @@ func main() {
 		[]*fclient.SigningIdentity{
 			{
 				ServerName: serverName,
-				KeyID:      gomatrixserverlib.KeyID(keyBlock.Headers["K-ID"]),
+				KeyID:      gomatrixserverlib.KeyID(keyBlock.Headers["Key-ID"]),
 				PrivateKey: privateKey,
 			},
 		},
@@ -99,7 +99,7 @@ func main() {
 
 	if err = req.Sign(
 		spec.ServerName(*requestFrom),
-		gomatrixserverlib.KeyID(keyBlock.Headers["K-ID"]),
+		gomatrixserverlib.KeyID(keyBlock.Headers["Key-ID"]),
 		privateKey,
 	); err != nil {
 		panic(err)
