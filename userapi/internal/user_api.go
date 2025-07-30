@@ -861,7 +861,7 @@ func (a *UserInternalAPI) PerformPusherDeletion(ctx context.Context, req *api.Pe
 	for i := range pushers {
 		log.WithField("pusher_session_id", pushers[i].SessionID).WithField("request_session_id", req.SessionID).Warn("pusher session details")
 		if pushers[i].SessionID != req.SessionID {
-			err := a.DB.RemovePusher(ctx, pushers[i].AppID, pushers[i].PushKey, req.Localpart, req.ServerName)
+			err = a.DB.RemovePusher(ctx, pushers[i].AppID, pushers[i].PushKey, req.Localpart, req.ServerName)
 			if err != nil {
 				return err
 			}

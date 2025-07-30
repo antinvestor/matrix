@@ -51,7 +51,7 @@ func GetPushers(
 		}
 	}
 	for i := range queryRes.Pushers {
-		queryRes.Pushers[i].SessionID = 0
+		queryRes.Pushers[i].SessionID = ""
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,

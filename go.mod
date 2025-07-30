@@ -9,10 +9,10 @@ require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/validate v0.3.0
 	github.com/antinvestor/apis/go/common v1.37.1
-	github.com/antinvestor/apis/go/device v1.37.2
-	github.com/antinvestor/apis/go/notification v1.37.2
-	github.com/antinvestor/apis/go/partition v1.37.2
-	github.com/antinvestor/apis/go/profile v1.37.2
+	github.com/antinvestor/apis/go/device v1.37.3
+	github.com/antinvestor/apis/go/notification v1.37.3
+	github.com/antinvestor/apis/go/partition v1.37.3
+	github.com/antinvestor/apis/go/profile v1.37.3
 	github.com/antinvestor/gomatrix v0.1.4
 	github.com/antinvestor/gomatrixserverlib v0.2.4
 	github.com/asynkron/protoactor-go v0.0.0-20250718162332-fca678d1096c
@@ -159,7 +159,7 @@ require (
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.243.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250721164621-a45f3dfb1074 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250728155136-f173205681a0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250721164621-a45f3dfb1074 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect

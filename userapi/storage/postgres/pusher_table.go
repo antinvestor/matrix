@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS userapi_pushers (
 	-- The Global user ID localpart for this pusher
 	localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
-	session_id BIGINT DEFAULT NULL,
+	session_id TEXT DEFAULT NULL,
 	profile_tag TEXT,
 	kind TEXT NOT NULL,
 	app_id TEXT NOT NULL,
@@ -116,12 +116,12 @@ func NewPostgresPusherTable(ctx context.Context, cm sqlutil.ConnectionManager) (
 // Returns an error if the user already has a pusher with the given pusher pushkey.
 // Returns nil error success.
 func (s *pushersTable) InsertPusher(
-	ctx context.Context, session_id int64,
+	ctx context.Context, sessionId string,
 	pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data,
 	localpart string, serverName spec.ServerName,
 ) error {
 	db := s.cm.Connection(ctx, false)
-	res := db.Exec(s.insertPusher, localpart, serverName, session_id, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
+	res := db.Exec(s.insertPusher, localpart, serverName, sessionId, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
 	return res.Error
 }
 
@@ -130,7 +130,7 @@ func (s *pushersTable) SelectPushers(
 	ctx context.Context,
 	localpart string, serverName spec.ServerName,
 ) ([]api.Pusher, error) {
-	pushers := []api.Pusher{}
+	var pushers []api.Pusher
 	db := s.cm.Connection(ctx, true)
 	rows, err := db.Raw(s.selectPushers, localpart, serverName).Rows()
 
@@ -156,7 +156,7 @@ func (s *pushersTable) SelectPushers(
 		if err != nil {
 			return pushers, err
 		}
-		err := json.Unmarshal(data, &pusher.Data)
+		err = json.Unmarshal(data, &pusher.Data)
 		if err != nil {
 			return pushers, err
 		}

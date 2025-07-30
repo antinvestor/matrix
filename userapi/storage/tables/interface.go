@@ -111,7 +111,7 @@ type ThreePIDTable interface {
 }
 
 type PusherTable interface {
-	InsertPusher(ctx context.Context, session_id int64, pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string, serverName spec.ServerName) error
+	InsertPusher(ctx context.Context, sessionId string, pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string, serverName spec.ServerName) error
 	SelectPushers(ctx context.Context, localpart string, serverName spec.ServerName) ([]api.Pusher, error)
 	DeletePusher(ctx context.Context, appid, pushkey, localpart string, serverName spec.ServerName) error
 	DeletePushers(ctx context.Context, appid, pushkey string) error

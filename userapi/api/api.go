@@ -439,7 +439,7 @@ type Device struct {
 	// The unique ID of the session identified by the access token.
 	// Can be used as a secure substitution in places where data needs to be
 	// associated with access tokens.
-	SessionID   int64
+	SessionID   string
 	DisplayName string
 	LastSeenTS  int64
 	LastSeenIP  string
@@ -448,6 +448,8 @@ type Device struct {
 	// this is the appservice ID.
 	AppserviceID string
 	AccountType  AccountType
+
+	Extra map[string]string
 
 	Reload func(ctx context.Context) error
 }
@@ -551,12 +553,12 @@ type PerformPusherSetRequest struct {
 type PerformPusherDeletionRequest struct {
 	Localpart  string
 	ServerName spec.ServerName
-	SessionID  int64
+	SessionID  string
 }
 
 // Pusher represents a push notification subscriber
 type Pusher struct {
-	SessionID         int64                  `json:"session_id,omitempty"`
+	SessionID         string                 `json:"session_id,omitempty"`
 	PushKey           string                 `json:"pushkey"`
 	PushKeyTS         int64                  `json:"pushkey_ts,omitempty"`
 	Kind              PusherKind             `json:"kind"`

@@ -10,6 +10,7 @@ import (
 	devicev1 "github.com/antinvestor/apis/go/device/v1"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/userutil"
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/pitabwire/frame"
@@ -25,36 +26,55 @@ type devicesApi struct {
 	client      *devicev1.DeviceClient
 }
 
-func NewDevicesApi(ctx context.Context, deviceClient *devicev1.DeviceClient) (tables.DevicesTable, error) {
+func NewDevicesApi(
+	ctx context.Context,
+	deviceClient *devicev1.DeviceClient,
+) (tables.DevicesTable, error) {
+
+	svc := frame.Svc(ctx)
+
+	cfg, ok := svc.Config().(*config.Global)
+	if !ok {
+		return nil, errors.New("failed to load global config")
+	}
+
 	return &devicesApi{
-		client: deviceClient,
+		client:      deviceClient,
+		svc:         svc,
+		serverName:  cfg.ServerName,
+		jwtAudience: cfg.Oauth2JwtVerifyAudience,
+		jwtIssuer:   cfg.Oauth2JwtVerifyIssuer,
 	}, nil
 }
 
-func (d *devicesApi) toDeviceApi(localPart string, serverName spec.ServerName, device *devicev1.DeviceObject) (*api.Device, error) {
+func (d *devicesApi) toDeviceApi(localPart string, serverName spec.ServerName, device *devicev1.DeviceObject) *api.Device {
 
 	dev := &api.Device{
 		ID:          device.GetId(),
+		SessionID:   device.GetSessionId(),
 		DisplayName: device.GetName(),
+		LastSeenIP:  device.GetIp(),
+		UserAgent:   device.GetUserAgent(),
+		Extra:       device.GetProperties(),
+	}
+
+	lastSeen, err := time.Parse(time.RFC3339, device.GetLastSeen())
+	if err == nil {
+		dev.LastSeenTS = lastSeen.Unix()
 	}
 
 	if localPart != "" && serverName != "" {
-		userIDStr := userutil.MakeUserID(localPart, serverName)
-		userID, err := spec.NewUserID(userIDStr, false)
-		if err != nil {
-			return nil, err
-		}
-		dev.UserID = userID.String()
+		dev.UserID = userutil.MakeUserID(localPart, serverName)
 	}
 
-	return dev, nil
+	return dev
 }
 
 func (d *devicesApi) InsertDevice(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string) (*api.Device, error) {
 	req := devicev1.LogRequest{
-		DeviceId:  id,
-		LinkId:    "",
-		Ip:        ipAddr,
+		DeviceId: id,
+		LinkId:   "",
+		Ip:       ipAddr,
 		Extras: func() map[string]string {
 			extras := map[string]string{}
 			if displayName != nil {
@@ -221,11 +241,7 @@ func (d *devicesApi) SelectDevicesByLocalpart(ctx context.Context, localpart str
 		}
 
 		for _, dev := range resp.GetData() {
-			device, err1 := d.toDeviceApi(localpart, serverName, dev)
-			if err1 != nil {
-				return nil, err1
-			}
-
+			device := d.toDeviceApi(localpart, serverName, dev)
 			devices = append(devices, *device)
 		}
 	}
@@ -242,11 +258,7 @@ func (d *devicesApi) SelectDevicesByID(ctx context.Context, deviceIDs []string) 
 
 	var devices []api.Device
 	for _, dev := range resp.GetData() {
-		device, err0 := d.toDeviceApi("", "", dev)
-		if err0 != nil {
-			return nil, err0
-		}
-
+		device := d.toDeviceApi("", "", dev)
 		devices = append(devices, *device)
 	}
 
