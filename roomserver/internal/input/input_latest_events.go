@@ -19,6 +19,7 @@ package input
 import (
 	"context"
 	"fmt"
+
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/api"

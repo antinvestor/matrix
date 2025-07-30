@@ -71,13 +71,18 @@ func MakeAuthAPI(
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
 		log := util.Log(req.Context())
-		device, err := auth.VerifyUserFromRequest(req, userAPI)
+		ctx, device, err := auth.VerifyUserFromRequest(req, userAPI)
 		if err != nil {
 			log.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
 			return *err
 		}
+
+		if ctx != nil {
+			req = req.WithContext(ctx)
+		}
+
 		// add the user ID to the log
-		log = log.WithField("user_id", device.UserID)
+		log = log.WithField("user_id", device.UserID).WithField("device_id", device.ID)
 		req = req.WithContext(util.ContextWithLogger(req.Context(), log))
 
 		defer func() {
@@ -205,13 +210,17 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 
 		if opts.WithAuth {
 			logger := util.Log(req.Context())
-			_, jsonErr := auth.VerifyUserFromRequest(req, userAPI)
+			nueCtx, _, jsonErr := auth.VerifyUserFromRequest(req, userAPI)
 			if jsonErr != nil {
 				w.WriteHeader(jsonErr.Code)
 				if err := json.NewEncoder(w).Encode(jsonErr.JSON); err != nil {
 					logger.WithError(err).Error("failed to encode JSON response")
 				}
 				return
+			}
+
+			if nueCtx != nil {
+				req = req.WithContext(nueCtx)
 			}
 		}
 

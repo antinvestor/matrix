@@ -3,6 +3,10 @@ package distributed
 import (
 	"context"
 	"errors"
+	"io"
+	"strconv"
+	"time"
+
 	devicev1 "github.com/antinvestor/apis/go/device/v1"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/userutil"
@@ -10,9 +14,6 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/pitabwire/frame"
 	"golang.org/x/oauth2"
-	"io"
-	"strconv"
-	"time"
 )
 
 type devicesApi struct {

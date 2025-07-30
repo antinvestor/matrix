@@ -147,10 +147,8 @@ func SetupHTTPOption(
 	// Serve a static page for login fallback
 	routers.Static.PathPrefix("/client/login/").Handler(http.StripPrefix("/_matrix/static/client/login/", http.FileServer(http.FS(sub))))
 
-	var clientHandler http.Handler
-	clientHandler = routers.Client
-	var federationHandler http.Handler
-	federationHandler = routers.Federation
+	var clientHandler http.Handler = routers.Client
+	var federationHandler http.Handler = routers.Federation
 	externalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(routers.DendriteAdmin)
 	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(clientHandler)
 	if !cfg.Global.DisableFederation {

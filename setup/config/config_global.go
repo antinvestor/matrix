@@ -632,8 +632,8 @@ func (c *ActorOptions) Verify(configErrs *Errors) {
 type DistributedAPI struct {
 	Enabled                bool   `yaml:"enabled"`
 	ProfileServiceUri      string `yaml:"profile_service_uri"`
-	DevicesServiceUri      string `yaml:"device_service_uri"`
-	PartitionServiceUri    string `yaml:"partition_service_uri"`
+	DevicesServiceUri      string `yaml:"devices_service_uri"`
+	TenancyServiceUri      string `yaml:"tenancy_service_uri"`
 	NotificationServiceUri string `yaml:"notification_service_uri"`
 }
 

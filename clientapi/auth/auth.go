@@ -52,11 +52,11 @@ type AccountDatabase interface {
 // On failure returns an JSON error response which can be sent to the client.
 func VerifyUserFromRequest(
 	req *http.Request, userAPI api.QueryAcccessTokenAPI,
-) (*api.Device, *util.JSONResponse) {
+) (context.Context, *api.Device, *util.JSONResponse) {
 	// Try to find the Application Service user
 	token, err := ExtractAccessToken(req)
 	if err != nil {
-		return nil, &util.JSONResponse{
+		return nil, nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: spec.MissingToken(err.Error()),
 		}
@@ -72,31 +72,27 @@ func VerifyUserFromRequest(
 	if err != nil {
 		log := util.Log(ctx)
 		log.WithError(err).Error("userAPI.QueryAccessToken failed")
-		return nil, &util.JSONResponse{
+		return nil, nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
 		}
 	}
 	if res.Err != "" {
 		if strings.HasPrefix(strings.ToLower(res.Err), "forbidden:") { // TODO: use actual error and no string comparison
-			return nil, &util.JSONResponse{
+			return nil, nil, &util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: spec.Forbidden(res.Err),
 			}
 		}
 	}
 	if res.Device == nil {
-		return nil, &util.JSONResponse{
+		return nil, nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: spec.UnknownToken("Unknown token"),
 		}
 	}
 
-	if res.Ctx != nil {
-		req = req.WithContext(res.Ctx)
-	}
-
-	return res.Device, nil
+	return res.Ctx, res.Device, nil
 }
 
 // GenerateAccessToken creates a new access token. Returns an error if failed to generate

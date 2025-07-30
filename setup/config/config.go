@@ -622,7 +622,7 @@ func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserv
 			return "", nil, fmt.Errorf("keyBlock is nil %q", path)
 		}
 		if keyBlock.Type == "MATRIX PRIVATE KEY" {
-			keyID := keyBlock.Headers["K-ID"]
+			keyID := keyBlock.Headers["Key-ID"]
 			if keyID == "" {
 				return "", nil, fmt.Errorf("missing key ID in PEM data in %q", path)
 			}

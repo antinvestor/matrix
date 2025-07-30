@@ -17,9 +17,9 @@ package storage
 import (
 	"context"
 	"fmt"
-	devicev1 "github.com/antinvestor/apis/go/device/v1"
 	"time"
 
+	devicev1 "github.com/antinvestor/apis/go/device/v1"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/internal/sqlutil"
