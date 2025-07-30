@@ -139,7 +139,7 @@ func main() {
 			apis.WithTokenPassword(service.JwtClientSecret()),
 			apis.WithAudiences(audienceList...))
 		if err != nil {
-			log.WithError(err).Panic("failed to initialise profile api client")
+			log.WithError(err).Panic("failed to initialise device api client")
 		}
 
 		partitionCli, err = partitionv1.NewPartitionsClient(ctx,
