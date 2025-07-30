@@ -80,7 +80,7 @@ DROP TABLE IF EXISTS userapi_devices;
 
 // Insert a new device. Returns the device on success.
 const insertDeviceSQL = "" +
-	"INSERT INTO userapi_devices(device_id, localpart, server_name, session_id, access_token, extra_data, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
+	"INSERT INTO userapi_devices(device_id, localpart, server_name, session_id, access_token, extra_data, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)" +
 	" RETURNING session_id"
 
 // Look up the data for a device by the access token granted during login or registration.
@@ -175,8 +175,18 @@ func (t *devicesTable) InsertDevice(
 	localpart string, serverName spec.ServerName,
 	accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
 ) (*api.Device, error) {
-	createdTimeMS := time.Now().UnixNano() / 1000000
+
 	sessionID := util.IDString()
+	return t.InsertDeviceWithSessionID(ctx, id, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent, sessionID)
+}
+
+func (t *devicesTable) InsertDeviceWithSessionID(ctx context.Context,
+	id, localpart string, serverName spec.ServerName,
+	accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
+	sessionID string,
+) (*api.Device, error) {
+
+	createdTimeMS := time.Now().UnixNano() / 1000000
 
 	extraDataJson, err := json.Marshal(extraData)
 	if err != nil {
@@ -193,26 +203,15 @@ func (t *devicesTable) InsertDevice(
 		ID:          id,
 		UserID:      userutil.MakeUserID(localpart, serverName),
 		AccessToken: accessToken,
-
-		SessionID:  sessionID,
-		LastSeenTS: createdTimeMS,
-		LastSeenIP: ipAddr,
-		UserAgent:  userAgent,
+		SessionID:   sessionID,
+		LastSeenTS:  createdTimeMS,
+		LastSeenIP:  ipAddr,
+		UserAgent:   userAgent,
 	}
 	if displayName != nil {
 		dev.DisplayName = *displayName
 	}
 	return dev, nil
-}
-
-func (t *devicesTable) InsertDeviceWithSessionID(ctx context.Context,
-	id, localpart string, serverName spec.ServerName,
-	accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string,
-	sessionID int64,
-) (*api.Device, error) {
-	// Since we're using GORM and don't have direct control over the session ID sequence,
-	// we'll just perform a regular insert and let the database handle the session ID
-	return t.InsertDevice(ctx, id, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
 }
 
 // DeleteDevice removes a single device by id and user localpart.

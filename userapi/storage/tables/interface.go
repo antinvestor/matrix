@@ -55,7 +55,7 @@ type AccountsTable interface {
 
 type DevicesTable interface {
 	InsertDevice(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string) (*api.Device, error)
-	InsertDeviceWithSessionID(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string, sessionID int64) (*api.Device, error)
+	InsertDeviceWithSessionID(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string, sessionID string) (*api.Device, error)
 	DeleteDevice(ctx context.Context, id, localpart string, serverName spec.ServerName) error
 	DeleteDevices(ctx context.Context, localpart string, serverName spec.ServerName, devices []string) error
 	DeleteDevicesByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName, exceptDeviceID string) error

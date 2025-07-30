@@ -3,8 +3,8 @@ package distributed
 import (
 	"context"
 	"errors"
+	"github.com/pitabwire/util"
 	"io"
-	"strconv"
 	"time"
 
 	devicev1 "github.com/antinvestor/apis/go/device/v1"
@@ -71,10 +71,19 @@ func (d *devicesApi) toDeviceApi(localPart string, serverName spec.ServerName, d
 }
 
 func (d *devicesApi) InsertDevice(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string) (*api.Device, error) {
+	sessionID := util.IDString()
+	return d.InsertDeviceWithSessionID(ctx, id, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent, sessionID)
+}
+
+func (d *devicesApi) InsertDeviceWithSessionID(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string, sessionID string) (*api.Device, error) {
 	req := devicev1.LogRequest{
-		DeviceId: id,
-		LinkId:   "",
-		Ip:       ipAddr,
+		DeviceId:  id,
+		SessionId: sessionID,
+		Ip:        ipAddr,
+		Locale:    "",
+		UserAgent: userAgent,
+		Os:        "",
+		LastSeen:  time.Now().String(),
 		Extras: func() map[string]string {
 			extras := map[string]string{}
 			if displayName != nil {
@@ -82,27 +91,6 @@ func (d *devicesApi) InsertDevice(ctx context.Context, id, localpart string, ser
 			}
 			return extras
 		}(),
-	}
-	_, err := d.client.Svc().Log(ctx, &req)
-	if err != nil {
-		return nil, err
-	}
-
-	return d.SelectDeviceByID(ctx, localpart, serverName, id)
-}
-
-func (d *devicesApi) InsertDeviceWithSessionID(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string, sessionID int64) (*api.Device, error) {
-	req := devicev1.LogRequest{
-		DeviceId:  id,
-		LinkId:    strconv.FormatInt(sessionID, 10),
-		Ip:        ipAddr,
-		Locale:    "",
-		UserAgent: userAgent,
-		Os:        "",
-		LastSeen:  time.Now().String(),
-		Extras: map[string]string{
-			"name": *displayName,
-		},
 	}
 	_, err := d.client.Svc().Log(ctx, &req)
 	if err != nil {
