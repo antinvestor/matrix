@@ -55,13 +55,13 @@ func (d *devicesApi) InsertDevice(ctx context.Context, id, localpart string, ser
 		DeviceId:  id,
 		LinkId:    "",
 		Ip:        ipAddr,
-		Locale:    "",
-		UserAgent: userAgent,
-		Os:        "",
-		LastSeen:  time.Now().String(),
-		Extras: map[string]string{
-			"name": *displayName,
-		},
+		Extras: func() map[string]string {
+			extras := map[string]string{}
+			if displayName != nil {
+				extras["name"] = *displayName
+			}
+			return extras
+		}(),
 	}
 	_, err := d.client.Svc().Log(ctx, &req)
 	if err != nil {
