@@ -3,7 +3,6 @@ package distributed
 import (
 	"context"
 	"errors"
-	"github.com/pitabwire/util"
 	"io"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/api"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/util"
 	"golang.org/x/oauth2"
 )
 
