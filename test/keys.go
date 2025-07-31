@@ -65,7 +65,7 @@ func SaveMatrixKey(matrixKeyPath string, data ed25519.PrivateKey) error {
 	err = pem.Encode(keyOut, &pem.Block{
 		Type: "MATRIX PRIVATE KEY",
 		Headers: map[string]string{
-			"K-ID": fmt.Sprintf("ed25519:%s", keyID[:6]),
+			"Key-ID": fmt.Sprintf("ed25519:%s", keyID[:6]),
 		},
 		Bytes: data,
 	})

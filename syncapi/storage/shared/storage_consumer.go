@@ -98,7 +98,7 @@ func (d *Database) StreamEventsToEvents(ctx context.Context, device *userapi.Dev
 				continue
 			}
 			if *deviceSenderID == in[i].SenderID() && device.SessionID == in[i].TransactionID.SessionID {
-				err := out[i].SetUnsignedField(
+				err = out[i].SetUnsignedField(
 					"transaction_id", in[i].TransactionID.TransactionID,
 				)
 				if err != nil {

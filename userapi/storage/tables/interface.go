@@ -55,12 +55,12 @@ type AccountsTable interface {
 
 type DevicesTable interface {
 	InsertDevice(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string) (*api.Device, error)
-	InsertDeviceWithSessionID(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string, sessionID int64) (*api.Device, error)
+	InsertDeviceWithSessionID(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string, sessionID string) (*api.Device, error)
 	DeleteDevice(ctx context.Context, id, localpart string, serverName spec.ServerName) error
 	DeleteDevices(ctx context.Context, localpart string, serverName spec.ServerName, devices []string) error
 	DeleteDevicesByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName, exceptDeviceID string) error
 	UpdateDeviceName(ctx context.Context, localpart string, serverName spec.ServerName, deviceID string, displayName *string) error
-	SelectDeviceByToken(ctx context.Context, accessToken string) (*api.Device, error)
+	SelectDeviceByToken(ctx context.Context, accessToken string) (context.Context, *api.Device, error)
 	SelectDeviceByID(ctx context.Context, localpart string, serverName spec.ServerName, deviceID string) (*api.Device, error)
 	SelectDevicesByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName, exceptDeviceID string) ([]api.Device, error)
 	SelectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error)
@@ -111,7 +111,7 @@ type ThreePIDTable interface {
 }
 
 type PusherTable interface {
-	InsertPusher(ctx context.Context, session_id int64, pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string, serverName spec.ServerName) error
+	InsertPusher(ctx context.Context, sessionId string, pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string, serverName spec.ServerName) error
 	SelectPushers(ctx context.Context, localpart string, serverName spec.ServerName) ([]api.Pusher, error)
 	DeletePusher(ctx context.Context, appid, pushkey, localpart string, serverName spec.ServerName) error
 	DeletePushers(ctx context.Context, appid, pushkey string) error

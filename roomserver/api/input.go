@@ -90,7 +90,7 @@ type InputRoomEvent struct {
 // TransactionID contains the transaction ID sent by a client when sending an
 // event, along with the ID of the client session.
 type TransactionID struct {
-	SessionID     int64  `json:"session_id"`
+	SessionID     string `json:"session_id"`
 	TransactionID string `json:"id"`
 }
 

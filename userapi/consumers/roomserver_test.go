@@ -31,7 +31,7 @@ func mustCreateDatabase(ctx context.Context, svc *frame.Service, t *testing.T, _
 	t.Helper()
 
 	cm := sqlutil.NewConnectionManager(svc)
-	db, err := storage.NewUserDatabase(ctx, nil, cm, "", 4, 0, 0, "")
+	db, err := storage.NewUserDatabase(ctx, nil, nil, cm, "", 4, 0, 0, "")
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestLocalRoomMembers(t *testing.T) {
 		}
 		rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 		rsAPI.SetFederationAPI(ctx, nil, nil)
-		db, err := storage.NewUserDatabase(ctx, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+		db, err := storage.NewUserDatabase(ctx, nil, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 		assert.NoError(t, err)
 
 		err = rsapi.SendEvents(ctx, rsAPI, rsapi.KindNew, room.Events(), "", "test", "test", nil, false)
@@ -321,7 +321,7 @@ func BenchmarkLocalRoomMembers(b *testing.B) {
 	}
 	rsAPI := roomserver.NewInternalAPI(ctx, cfg, cm, qm, caches, am, cacheutil.DisableMetrics)
 	rsAPI.SetFederationAPI(ctx, nil, nil)
-	db, err := storage.NewUserDatabase(ctx, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
+	db, err := storage.NewUserDatabase(ctx, nil, nil, cm, cfg.Global.ServerName, bcrypt.MinCost, 1000, 1000, "")
 	assert.NoError(b, err)
 
 	consumer := OutputRoomEventConsumer{db: db, rsAPI: rsAPI, serverName: "test", cfg: &cfg.UserAPI}

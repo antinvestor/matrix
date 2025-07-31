@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   add_state_ids TEXT[],
   remove_state_ids TEXT[],
   -- The client session that sent the event, if any
-  session_id BIGINT,
+  session_id TEXT,
   -- The transaction id used to send the event, if any
   transaction_id TEXT,
   -- Should the event be excluded from responses to /sync requests. Useful for
@@ -410,7 +410,7 @@ func (t *outputRoomEventsTable) InsertEvent(
 	transactionID *api.TransactionID, excludeFromSync bool, historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (streamPos types.StreamPosition, err error) {
 	var txnID *string
-	var sessionID *int64
+	var sessionID *string
 	if transactionID != nil {
 		sessionID = &transactionID.SessionID
 		txnID = &transactionID.TransactionID
@@ -488,7 +488,7 @@ func (t *outputRoomEventsTable) SelectRecentEvents(
 			streamPos         types.StreamPosition
 			eventBytes        []byte
 			excludeFromSync   bool
-			sessionID         *int64
+			sessionID         *string
 			txnID             *string
 			transactionID     *api.TransactionID
 			historyVisibility gomatrixserverlib.HistoryVisibility
@@ -825,7 +825,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			streamPos         types.StreamPosition
 			eventBytes        []byte
 			excludeFromSync   bool
-			sessionID         *int64
+			sessionID         *string
 			txnID             *string
 			transactionID     *api.TransactionID
 			historyVisibility gomatrixserverlib.HistoryVisibility

@@ -72,9 +72,6 @@ type Global struct {
 	// Metrics configuration
 	Metrics Metrics `yaml:"metrics"`
 
-	// Sentry configuration
-	Sentry Sentry `yaml:"sentry"`
-
 	// DNS caching options for all outbound HTTP requests
 	DNSCache DNSCacheOptions `yaml:"dns_cache"`
 
@@ -113,7 +110,6 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	// c.DatabaseOptions.Defaults(opts)
 	c.Metrics.Defaults(opts)
 	c.DNSCache.Defaults()
-	c.Sentry.Defaults()
 	c.ServerNotices.Defaults(opts)
 	c.ReportStats.Defaults()
 	c.Cache.Defaults(opts)
@@ -151,7 +147,6 @@ func (c *Global) Verify(configErrs *Errors) {
 
 	// c.DatabaseOptions.Verify(configErrs)
 	c.Metrics.Verify(configErrs)
-	c.Sentry.Verify(configErrs)
 	c.DNSCache.Verify(configErrs)
 	c.ServerNotices.Verify(configErrs)
 	c.ReportStats.Verify(configErrs)
@@ -458,24 +453,6 @@ func (c *ReportStats) Verify(configErrs *Errors) {
 	}
 }
 
-// The configuration to use for Sentry error reporting
-type Sentry struct {
-	Enabled bool `yaml:"enabled"`
-	// The DSN to connect to e.g "https://examplePublicKey@o0.ingest.sentry.io/0"
-	// See https://docs.sentry.io/platforms/go/configuration/options/
-	DSN string `yaml:"dsn"`
-	// The environment e.g "production"
-	// See https://docs.sentry.io/platforms/go/configuration/environments/
-	Environment string `yaml:"environment"`
-}
-
-func (c *Sentry) Defaults() {
-	c.Enabled = false
-}
-
-func (c *Sentry) Verify(configErrs *Errors) {
-}
-
 type DatabaseOptions struct {
 	Prefix    string `yaml:"prefix"`
 	Reference string `yaml:"reference"`
@@ -655,7 +632,8 @@ func (c *ActorOptions) Verify(configErrs *Errors) {
 type DistributedAPI struct {
 	Enabled                bool   `yaml:"enabled"`
 	ProfileServiceUri      string `yaml:"profile_service_uri"`
-	PartitionServiceUri    string `yaml:"partition_service_uri"`
+	DevicesServiceUri      string `yaml:"devices_service_uri"`
+	TenancyServiceUri      string `yaml:"tenancy_service_uri"`
 	NotificationServiceUri string `yaml:"notification_service_uri"`
 }
 

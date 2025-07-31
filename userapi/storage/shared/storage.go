@@ -599,7 +599,7 @@ func (d *Database) UpsertBackupKeys(
 // Returns sql.ErrNoRows if no matching device was found.
 func (d *Database) GetDeviceByAccessToken(
 	ctx context.Context, token string,
-) (*api.Device, error) {
+) (context.Context, *api.Device, error) {
 	return d.Devices.SelectDeviceByToken(ctx, token)
 }
 

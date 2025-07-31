@@ -61,7 +61,7 @@ func MustMakeInternalAPI(ctx context.Context, svc *frame.Service, cfg *config.Ma
 	cm := sqlutil.NewConnectionManager(svc)
 	qm := queueutil.NewQueueManager(svc)
 
-	accountDB, err := storage.NewUserDatabase(ctx, nil, cm, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
+	accountDB, err := storage.NewUserDatabase(ctx, nil, nil, cm, sName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
 		t.Fatalf("failed to create account Cm: %s", err)
 	}

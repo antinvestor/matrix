@@ -18,6 +18,7 @@ import (
 	"context"
 	"time"
 
+	devicev1 "github.com/antinvestor/apis/go/device/v1"
 	profilev1 "github.com/antinvestor/apis/go/profile/v1"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	fedsenderapi "github.com/antinvestor/matrix/federationapi/api"
@@ -42,18 +43,7 @@ import (
 //
 // Creating a new instance of the user API requires a roomserver API with a federation API set
 // using its `SetFederationAPI` method, other you may get nil-dereference errors.
-func NewInternalAPI(
-	ctx context.Context,
-	cfg *config.Matrix,
-	cm sqlutil.ConnectionManager,
-	qm queueutil.QueueManager,
-	am actorutil.ActorManager,
-	rsAPI rsapi.UserRoomserverAPI,
-	fedClient fedsenderapi.KeyserverFederationAPI,
-	profileCli *profilev1.ProfileClient,
-	enableMetrics bool,
-	blacklistedOrBackingOffFn func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error),
-) *internal.UserInternalAPI {
+func NewInternalAPI(ctx context.Context, cfg *config.Matrix, cm sqlutil.ConnectionManager, qm queueutil.QueueManager, am actorutil.ActorManager, rsAPI rsapi.UserRoomserverAPI, fedClient fedsenderapi.KeyserverFederationAPI, profileCli *profilev1.ProfileClient, deviceCli *devicev1.DeviceClient, enableMetrics bool, blacklistedOrBackingOffFn func(ctx context.Context, s spec.ServerName) (*statistics.ServerStatistics, error)) *internal.UserInternalAPI {
 
 	var err error
 
@@ -71,6 +61,7 @@ func NewInternalAPI(
 	db, err := storage.NewUserDatabase(
 		ctx,
 		profileCli,
+		deviceCli,
 		userapiCm,
 		cfg.Global.ServerName,
 		cfg.UserAPI.BCryptCost,

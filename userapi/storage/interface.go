@@ -72,7 +72,7 @@ type AccountData interface {
 }
 
 type Device interface {
-	GetDeviceByAccessToken(ctx context.Context, token string) (*api.Device, error)
+	GetDeviceByAccessToken(ctx context.Context, token string) (context.Context, *api.Device, error)
 	GetDeviceByID(ctx context.Context, localpart string, serverName spec.ServerName, deviceID string) (*api.Device, error)
 	GetDevicesByLocalpart(ctx context.Context, localpart string, serverName spec.ServerName) ([]api.Device, error)
 	GetDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error)
