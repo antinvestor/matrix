@@ -25,7 +25,7 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pitabwire/frame v1.50.21
-	github.com/pitabwire/util v0.3.1
+	github.com/pitabwire/util v0.3.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redis/go-redis/v9 v9.11.0
