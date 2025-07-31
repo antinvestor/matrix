@@ -315,7 +315,11 @@ func loadConfig(
 	readFile func(string) ([]byte, error),
 ) (*Matrix, error) {
 	var c Matrix
-	c.Defaults(DefaultOpts{})
+	c.Defaults(DefaultOpts{
+		DSDatabaseConn: DataSource(os.Getenv("DATABASE_URI")),
+		DSCacheConn:    DataSource(os.Getenv("CACHE_URI")),
+		DSQueueConn:    DataSource(os.Getenv("QUEUE_URI")),
+	})
 
 	err := yaml.Unmarshal(configData, &c)
 	if err != nil {
