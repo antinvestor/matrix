@@ -44,6 +44,8 @@ github.com/antinvestor/apis/go/device v1.37.4 h1:1+VlTweZ/Pj8c1tpr5UY644YL2YH8JY
 github.com/antinvestor/apis/go/device v1.37.4/go.mod h1:WP+kS+UJfXdFaVBGlcCRhI9wuk39P6MI7AdGF45z+HY=
 github.com/antinvestor/apis/go/device v1.37.6 h1:ZnlqJDWBhY0b5Jgfd1/PEgJWZ4FdJ9oFz7vrA+iaKdI=
 github.com/antinvestor/apis/go/device v1.37.6/go.mod h1:WP+kS+UJfXdFaVBGlcCRhI9wuk39P6MI7AdGF45z+HY=
+github.com/antinvestor/apis/go/device v1.37.7 h1:w31AUL6JBkTFKzErGZXfQcc+RZ4UAwBH/ZYufDSW1wI=
+github.com/antinvestor/apis/go/device v1.37.7/go.mod h1:WP+kS+UJfXdFaVBGlcCRhI9wuk39P6MI7AdGF45z+HY=
 github.com/antinvestor/apis/go/notification v1.37.3 h1:4p2Y7NjyvEIuGWq8xIz8mFxeGTn4F/afbpSk27sBOAU=
 github.com/antinvestor/apis/go/notification v1.37.3/go.mod h1:MGe59iFuSFzAx+7nStmJ6ZeX9SiBGCNcpgUtK1yJCbY=
 github.com/antinvestor/apis/go/partition v1.37.3 h1:9jSHC7gBnQFs8RrsK1WNWLzIPwS1tf+H0UqPRDwr/N8=
