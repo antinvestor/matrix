@@ -254,6 +254,15 @@ func main() {
 	serviceOptions := []frame.Option{httpOpt}
 	service.Init(ctx, serviceOptions...)
 
+	if cfg.Global.DoDatabaseMigrate() {
+		log.Info("Running database migrations")
+		err = cm.Migrate(ctx)
+		if err != nil {
+			log.WithError(err).Fatal("could not run database migrations")
+		}
+		return
+	}
+
 	log.WithField("server http port", globalCfg.HTTPServerPort).
 		Info(" Initiating server operations")
 	defer monolith.Service.Stop(ctx)
