@@ -293,7 +293,7 @@ func (r *Inputer) queueInputRoomEvents(
 	var replyToOpts *config.QueueOptions
 	var requestMsgID string
 	if !request.Asynchronous {
-		requestMsgID = frame.GenerateID(ctx)
+		requestMsgID = util.IDString()
 		replyToOpts = replyQOpts(ctx, &r.Cfg.Queues.InputRoomEvent, requestMsgID, true)
 
 		err = r.Qm.RegisterSubscriber(ctx, replyToOpts)
