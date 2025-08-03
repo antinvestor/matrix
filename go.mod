@@ -14,7 +14,7 @@ require (
 	github.com/antinvestor/apis/go/partition v1.37.3
 	github.com/antinvestor/apis/go/profile v1.37.3
 	github.com/antinvestor/gomatrix v0.1.4
-	github.com/antinvestor/gomatrixserverlib v0.2.4
+	github.com/antinvestor/gomatrixserverlib v0.2.5
 	github.com/asynkron/protoactor-go v0.0.0-20250718162332-fca678d1096c
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
@@ -24,8 +24,8 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pitabwire/frame v1.50.23
-	github.com/pitabwire/util v0.3.3
+	github.com/pitabwire/frame v1.51.3
+	github.com/pitabwire/util v0.3.4
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.0
 	github.com/redis/go-redis/v9 v9.11.0
@@ -125,6 +125,7 @@ require (
 	go.opentelemetry.io/contrib/bridges/otelslog v0.12.0 // indirect
 	go.opentelemetry.io/contrib/bridges/prometheus v0.62.0 // indirect
 	go.opentelemetry.io/contrib/exporters/autoexport v0.62.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0 // indirect
 	go.opentelemetry.io/contrib/propagators/autoprop v0.62.0 // indirect
 	go.opentelemetry.io/contrib/propagators/aws v1.37.0 // indirect
 	go.opentelemetry.io/contrib/propagators/b3 v1.37.0 // indirect
