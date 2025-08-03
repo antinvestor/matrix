@@ -19,9 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/matrix/internal"
@@ -33,7 +31,6 @@ import (
 	"github.com/antinvestor/matrix/syncapi/types"
 	"github.com/lib/pq"
 	"github.com/pitabwire/frame"
-	"gorm.io/gorm"
 )
 
 // SQL schema definition for the output room events table
@@ -76,7 +73,15 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   -- Excludes edited messages from the search index.  
   exclude_from_search BOOL DEFAULT FALSE,
   -- The history visibility before this event (1 - world_readable; 2 - shared; 3 - invited; 4 - joined)
-  history_visibility SMALLINT NOT NULL DEFAULT 2
+  history_visibility SMALLINT NOT NULL DEFAULT 2,
+  -- Search vector for full-text search
+  search_vector tsvector GENERATED ALWAYS AS (
+    to_tsvector('english', 
+      COALESCE(headered_event_json#>>'{content,body}', '') || ' ' || 
+      COALESCE(headered_event_json#>>'{content,name}', '') || ' ' || 
+      COALESCE(headered_event_json#>>'{content,topic}', '')
+    )
+  ) STORED
 );
 
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output_room_events (type);
@@ -86,13 +91,8 @@ CREATE INDEX IF NOT EXISTS syncapi_output_room_events_exclude_from_sync_idx ON s
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_add_state_ids_idx ON syncapi_output_room_events ((add_state_ids IS NOT NULL));
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_remove_state_ids_idx ON syncapi_output_room_events ((remove_state_ids IS NOT NULL));
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_recent_events_idx ON syncapi_output_room_events (room_id, exclude_from_sync, id, sender, type);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_search_vector_idx ON syncapi_output_room_events USING GIN (search_vector);
 
-CREATE INDEX IF NOT EXISTS syncapi_output_room_events_fts_idx ON syncapi_output_room_events
-USING bm25 (event_id, id, room_id, headered_event_json, type, exclude_from_search, sender, contains_url)
-WITH (
-    	key_field='event_id',
-    	json_fields = '{ "headered_event_json": {"fast": true, "normalizer": "raw"}}'
-    );
 `
 
 const outputRoomEventsSchemaRevert = `
@@ -221,11 +221,47 @@ const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_o
 // SQL query to exclude events from search index
 const excludeEventsFromIndexSQL = "UPDATE syncapi_output_room_events SET exclude_from_search = TRUE WHERE event_id = ANY($1)"
 
-// SQL query to search for events
-const searchEventsSQL = `SELECT id, event_id, headered_event_json, history_visibility, '' AS highlight, paradedb.score(event_id) AS score  
-FROM syncapi_output_room_events WHERE ? ORDER BY score LIMIT ? OFFSET ?`
+// SQL query to search for events (with room filtering)
+const searchEventsSQL = `SELECT id, event_id, headered_event_json, history_visibility, 
+	ts_headline('english', 
+		COALESCE(headered_event_json#>>'{content,body}', '') || ' ' || 
+		COALESCE(headered_event_json#>>'{content,name}', '') || ' ' || 
+		COALESCE(headered_event_json#>>'{content,topic}', ''), 
+		plainto_tsquery('english', @search_term)) AS highlight,
+	ts_rank(search_vector, plainto_tsquery('english', @search_term)) AS score  
+FROM syncapi_output_room_events 
+WHERE search_vector @@ plainto_tsquery('english', @search_term)
+	AND exclude_from_search = false 
+	AND room_id = ANY(@room_ids)
+ORDER BY score DESC 
+LIMIT @limit OFFSET @offset`
 
-const searchEventsCountSQL = `SELECT COUNT(*) FROM syncapi_output_room_events WHERE ?`
+// SQL query to search for events (without room filtering)
+const searchEventsNoRoomsSQL = `SELECT id, event_id, headered_event_json, history_visibility, 
+	ts_headline('english', 
+		COALESCE(headered_event_json#>>'{content,body}', '') || ' ' || 
+		COALESCE(headered_event_json#>>'{content,name}', '') || ' ' || 
+		COALESCE(headered_event_json#>>'{content,topic}', ''), 
+		plainto_tsquery('english', @search_term)) AS highlight,
+	ts_rank(search_vector, plainto_tsquery('english', @search_term)) AS score  
+FROM syncapi_output_room_events 
+WHERE search_vector @@ plainto_tsquery('english', @search_term)
+	AND exclude_from_search = false 
+ORDER BY score DESC 
+LIMIT @limit OFFSET @offset`
+
+// SQL query to count search events (with room filtering)
+const searchEventsCountSQL = `SELECT COUNT(*) 
+FROM syncapi_output_room_events 
+WHERE search_vector @@ plainto_tsquery('english', @search_term)
+	AND exclude_from_search = false 
+	AND room_id = ANY(@room_ids)`
+
+// SQL query to count search events (without room filtering)
+const searchEventsCountNoRoomsSQL = `SELECT COUNT(*) 
+FROM syncapi_output_room_events 
+WHERE search_vector @@ plainto_tsquery('english', @search_term)
+	AND exclude_from_search = false`
 
 // outputRoomEventsTable represents the table for storing output room events
 type outputRoomEventsTable struct {
@@ -249,7 +285,9 @@ type outputRoomEventsTable struct {
 	selectSearchSQL               string
 	excludeEventsFromIndexSQL     string
 	searchEventsSQL               string
+	searchEventsNoRoomsSQL        string
 	searchEventsCountSQL          string
+	searchEventsCountNoRoomsSQL   string
 }
 
 // NewPostgresEventsTable creates a new events table
@@ -286,7 +324,9 @@ func NewPostgresEventsTable(_ context.Context, cm sqlutil.ConnectionManager) (ta
 		selectSearchSQL:               selectSearchSQL,
 		excludeEventsFromIndexSQL:     excludeEventsFromIndexSQL,
 		searchEventsSQL:               searchEventsSQL,
+		searchEventsNoRoomsSQL:        searchEventsNoRoomsSQL,
 		searchEventsCountSQL:          searchEventsCountSQL,
+		searchEventsCountNoRoomsSQL:   searchEventsCountNoRoomsSQL,
 	}
 
 	return t, nil
@@ -732,78 +772,71 @@ func (t *outputRoomEventsTable) ReIndex(ctx context.Context, limit, afterID int6
 	return result, rows.Err()
 }
 
-// escapeSpecialCharacters escapes the special characters in a query term
-func (t *outputRoomEventsTable) escapeSpecialCharacters(input string) string {
-	specialChars := "+,^`,:{},\"[],()<>,~!\\* "
-	escaped := strings.Builder{}
-
-	for _, char := range input {
-		if strings.ContainsRune(specialChars, char) {
-			escaped.WriteRune('\\')
-		}
-		escaped.WriteRune(char)
-	}
-
-	return escaped.String()
-}
-
 // SearchEvents performs a search for events matching the given criteria
 func (t *outputRoomEventsTable) SearchEvents(
 	ctx context.Context, searchTerm string, roomIDs []string,
 	keys []string, limit, offset int,
 ) (*types.SearchResult, error) {
 	var (
-		rows            *sql.Rows
-		err             error
-		whereKeyStrings []string
-		whereParams     []any
-		totalCount      int
+		rows       *sql.Rows
+		err        error
+		totalCount int
 	)
-
-	escapedRoomIDs := make([]string, len(roomIDs))
-	for i, roomID := range roomIDs {
-		escapedRoomIDs[i] = t.escapeSpecialCharacters(roomID)
-	}
-	whereParams = append(whereParams, strings.Join(escapedRoomIDs, " "))
-
-	whereRoomIDQueryStr := ""
-	if len(roomIDs) > 0 {
-		whereRoomIDQueryStr = " room_id @@@ $1  AND "
-	}
-
-	whereExclusionQueryStr := " exclude_from_search @@@ 'false' "
-
-	whereShouldQueryStr := ""
-
-	if len(keys) == 0 {
-		keys = append(keys, "content.body", "content.name", "content.topic")
-	}
-
-	k := len(whereParams) + 1
-	whereParams = append(whereParams, searchTerm)
-	for _, key := range keys {
-
-		whereKeyString := fmt.Sprintf(" paradedb.match( field => 'headered_event_json.%s', value => $%d, distance => 0) ", key, k)
-		whereKeyStrings = append(whereKeyStrings, whereKeyString)
-	}
-
-	whereShouldQueryStr = fmt.Sprintf(" AND event_id @@@ paradedb.boolean(  should => ARRAY[ %s ] )", strings.Join(whereKeyStrings, ", "))
-
-	finalWhereStr := fmt.Sprintf(" %s %s %s", whereRoomIDQueryStr, whereExclusionQueryStr, whereShouldQueryStr)
 
 	db := t.cm.Connection(ctx, true)
 
-	// Get total count
-	whereExpr := gorm.Expr(finalWhereStr, whereParams...)
+	// Handle empty search term
+	if searchTerm == "" {
+		return &types.SearchResult{Results: make([]*types.SearchResultHit, 0), Total: 0}, nil
+	}
 
-	row := db.Raw(t.searchEventsCountSQL, whereExpr).Row()
-	err = row.Scan(&totalCount)
+	// Prepare room IDs array - use empty array instead of nil to avoid parameter issues
+	var roomIDArray interface{}
+	if len(roomIDs) > 0 {
+		roomIDArray = pq.StringArray(roomIDs)
+	} else {
+		// Use empty array instead of nil to satisfy SQL parameter requirements
+		roomIDArray = pq.StringArray([]string{})
+	}
+
+	// Get total count using the struct's SQL query
+	var countQueryToRun string
+	if len(roomIDs) > 0 {
+		countQueryToRun = t.searchEventsCountSQL
+		row := db.Raw(countQueryToRun,
+			sql.Named("search_term", searchTerm),
+			sql.Named("room_ids", roomIDArray),
+		).Row()
+		err = row.Scan(&totalCount)
+	} else {
+		countQueryToRun = t.searchEventsCountNoRoomsSQL
+		row := db.Raw(countQueryToRun,
+			sql.Named("search_term", searchTerm),
+		).Row()
+		err = row.Scan(&totalCount)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	// Get search results
-	rows, err = db.Raw(t.searchEventsSQL, whereExpr, limit, offset).Rows()
+	// Get search results using the struct's SQL query
+	var queryToRun string
+	if len(roomIDs) > 0 {
+		queryToRun = t.searchEventsSQL
+		rows, err = db.Raw(queryToRun,
+			sql.Named("search_term", searchTerm),
+			sql.Named("room_ids", roomIDArray),
+			sql.Named("limit", limit),
+			sql.Named("offset", offset),
+		).Rows()
+	} else {
+		queryToRun = t.searchEventsNoRoomsSQL
+		rows, err = db.Raw(queryToRun,
+			sql.Named("search_term", searchTerm),
+			sql.Named("limit", limit),
+			sql.Named("offset", offset),
+		).Rows()
+	}
 	if err != nil {
 		return nil, err
 	}
