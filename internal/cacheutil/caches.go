@@ -105,5 +105,5 @@ func NewCache(cfg *config.CacheOptions) (*Caches, error) {
 		return nil, errors.New("only redis is currently supported as cache")
 	}
 
-	return NewRedisCache(string(cfg.CacheURI), cfg.MaxAge)
+	return NewValkeyCache(string(cfg.CacheURI), cfg.MaxAge)
 }

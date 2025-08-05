@@ -154,7 +154,7 @@ func (d DataSource) IsDB() bool {
 }
 
 func (d DataSource) IsRedis() bool {
-	return strings.HasPrefix(string(d), "redis://")
+	return strings.HasPrefix(string(d), "redis://") || strings.HasPrefix(string(d), "rediss://")
 }
 func (d DataSource) IsCache() bool {
 	return d.IsRedis()

@@ -28,7 +28,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisCachePartition Define the RedisCachePartition type to replace Ristretto
+// ValkeyCachePartition Define the ValkeyCachePartition type to replace Ristretto
 type RedisCachePartition[K comparable, V any] struct {
 	client  *redis.Client
 	Prefix  byte
@@ -36,7 +36,7 @@ type RedisCachePartition[K comparable, V any] struct {
 	MaxAge  time.Duration
 }
 
-// NewRedisCache Main Redis-based caching setup
+// NewValkeyCache Main valkey-based caching setup
 func NewRedisCache(redisAddr string, maxAge time.Duration) (*Caches, error) {
 
 	opts, err := redis.ParseURL(redisAddr)
