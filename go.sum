@@ -238,6 +238,8 @@ github.com/petermattis/goid v0.0.0-20250508124226-395b08cebbdb/go.mod h1:pxMtw7c
 github.com/philhofer/fwd v1.1.1/go.mod h1:gk3iGcWd9+svBvR0sR+KPcfE+RNWozjowpeBVG3ZVNU=
 github.com/pitabwire/frame v1.51.3 h1:eeUyCcF6gdu3mHl/8CxtKnukaE9somBIyjzZPjzs9mU=
 github.com/pitabwire/frame v1.51.3/go.mod h1:pHB23g5vb7fIONA4TBOcexP+SQ6B4qksajd4sOIA7G0=
+github.com/pitabwire/frame v1.51.4 h1:/jXoDPbTJNb5VCsa4b5caSu0SVMO41HBqsB1VUbrli0=
+github.com/pitabwire/frame v1.51.4/go.mod h1:pHB23g5vb7fIONA4TBOcexP+SQ6B4qksajd4sOIA7G0=
 github.com/pitabwire/natspubsub v0.6.11 h1:7IEwgPrdzOxoyz9BWXXiUBaMXNUZS31cHxJnRwf2lQI=
 github.com/pitabwire/natspubsub v0.6.11/go.mod h1:pudFshYEmqs6jvgTfJo9HwMfwstWaNITFVLdEsFa3jo=
 github.com/pitabwire/util v0.3.4 h1:OOsNVgJlqrC4EFNBqXsTwi/GbvENKv0BuK8ZK1E+F/4=
