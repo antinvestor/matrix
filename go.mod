@@ -33,7 +33,7 @@ require (
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
-	github.com/valkey-io/valkey-go v1.0.63
+	github.com/valkey-io/valkey-go v1.0.64
 	go.mau.fi/util v0.8.8
 	go.uber.org/mock v0.5.2
 	golang.org/x/crypto v0.40.0
