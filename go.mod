@@ -24,7 +24,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pitabwire/frame v1.51.3
+	github.com/pitabwire/frame v1.51.4
 	github.com/pitabwire/util v0.3.4
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.0
@@ -33,17 +33,17 @@ require (
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
-	github.com/valkey-io/valkey-go v1.0.63
+	github.com/valkey-io/valkey-go v1.0.64
 	go.mau.fi/util v0.8.8
 	go.uber.org/mock v0.5.2
-	golang.org/x/crypto v0.40.0
+	golang.org/x/crypto v0.41.0
 	golang.org/x/exp v0.0.0-20250718183923-645b1fa84792
-	golang.org/x/image v0.29.0
+	golang.org/x/image v0.30.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sync v0.16.0
-	golang.org/x/term v0.33.0
+	golang.org/x/term v0.34.0
 	google.golang.org/grpc v1.74.2
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.7
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/gorm v1.30.1
@@ -156,8 +156,8 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	gocloud.dev v0.43.0 // indirect
 	golang.org/x/net v0.42.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.243.0 // indirect

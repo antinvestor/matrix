@@ -80,8 +80,6 @@ func NewOutputRoomEventConsumer(
 
 func (s *OutputRoomEventConsumer) Handle(ctx context.Context, metadata map[string]string, _ []byte) error {
 
-	util.Log(ctx).Info(" +++++++++++++++++++++++++  Federation api a new output room event ")
-
 	roomId, err := constants.DecodeRoomID(metadata[constants.RoomID])
 	if err != nil {
 		return err
