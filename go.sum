@@ -50,6 +50,8 @@ github.com/antinvestor/apis/go/device v1.37.7 h1:w31AUL6JBkTFKzErGZXfQcc+RZ4UAwB
 github.com/antinvestor/apis/go/device v1.37.7/go.mod h1:WP+kS+UJfXdFaVBGlcCRhI9wuk39P6MI7AdGF45z+HY=
 github.com/antinvestor/apis/go/notification v1.37.3 h1:4p2Y7NjyvEIuGWq8xIz8mFxeGTn4F/afbpSk27sBOAU=
 github.com/antinvestor/apis/go/notification v1.37.3/go.mod h1:MGe59iFuSFzAx+7nStmJ6ZeX9SiBGCNcpgUtK1yJCbY=
+github.com/antinvestor/apis/go/notification v1.38.2 h1:ls5t1TL3jCBW/miDStGivUdcep7ip5JiURzEhPlZ99I=
+github.com/antinvestor/apis/go/notification v1.38.2/go.mod h1:FdV+SePHq4EZdi2AIkyTpPX1ibeKlbNKwP62W+yTYPQ=
 github.com/antinvestor/apis/go/partition v1.37.3 h1:9jSHC7gBnQFs8RrsK1WNWLzIPwS1tf+H0UqPRDwr/N8=
 github.com/antinvestor/apis/go/partition v1.37.3/go.mod h1:YutoCxaAvnaXRf2qTvoyHz9SShnNpEiunTkPOSdVcY0=
 github.com/antinvestor/apis/go/profile v1.37.3 h1:5hOb2FKKd+uiziHJKTr38n1cMNYN/zGogSryV1KsIGU=
@@ -474,8 +476,12 @@ google.golang.org/genproto v0.0.0-20250715232539-7130f93afb79 h1:Nt6z9UHqSlIdIGJ
 google.golang.org/genproto v0.0.0-20250715232539-7130f93afb79/go.mod h1:kTmlBHMPqR5uCZPBvwa2B18mvubkjyY3CRLI0c6fj0s=
 google.golang.org/genproto/googleapis/api v0.0.0-20250728155136-f173205681a0 h1:0UOBWO4dC+e51ui0NFKSPbkHHiQ4TmrEfEZMLDyRmY8=
 google.golang.org/genproto/googleapis/api v0.0.0-20250728155136-f173205681a0/go.mod h1:8ytArBbtOy2xfht+y2fqKd5DRDJRUQhqbyEnQ4bDChs=
+google.golang.org/genproto/googleapis/api v0.0.0-20250804133106-a7a43d27e69b h1:ULiyYQ0FdsJhwwZUwbaXpZF5yUE3h+RA+gxvBu37ucc=
+google.golang.org/genproto/googleapis/api v0.0.0-20250804133106-a7a43d27e69b/go.mod h1:oDOGiMSXHL4sDTJvFvIB9nRQCGdLP1o/iVaqQK8zB+M=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250721164621-a45f3dfb1074 h1:qJW29YvkiJmXOYMu5Tf8lyrTp3dOS+K4z6IixtLaCf8=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250721164621-a45f3dfb1074/go.mod h1:qQ0YXyHHx3XkvlzUtpXDkS29lDSafHMZBAZDc03LQ3A=
+google.golang.org/genproto/googleapis/rpc v0.0.0-20250728155136-f173205681a0 h1:MAKi5q709QWfnkkpNQ0M12hYJ1+e8qYVDyowc4U1XZM=
+google.golang.org/genproto/googleapis/rpc v0.0.0-20250728155136-f173205681a0/go.mod h1:qQ0YXyHHx3XkvlzUtpXDkS29lDSafHMZBAZDc03LQ3A=
 google.golang.org/grpc v1.74.2 h1:WoosgB65DlWVC9FqI82dGsZhWFNBSLjQ84bjROOpMu4=
 google.golang.org/grpc v1.74.2/go.mod h1:CtQ+BGjaAIXHs/5YS3i473GqwBBa1zGQNevxdeBEXrM=
 google.golang.org/protobuf v1.36.7 h1:IgrO7UwFQGJdRNXH/sQux4R1Dj1WAKcLElzeeRaXV2A=
