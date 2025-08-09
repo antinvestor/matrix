@@ -44,6 +44,8 @@ github.com/XSAM/otelsql v0.39.0/go.mod h1:uMOXLUX+wkuAuP0AR3B45NXX7E9lJS2mERa8gq
 github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
 github.com/antinvestor/apis/go/common v1.37.1 h1:c2D3xyXnoVt12VRkG6BhHD908fZoNW2HwAcyX9eijTk=
 github.com/antinvestor/apis/go/common v1.37.1/go.mod h1:F0FMSX+VM6xvCrjNjjXEhUbAhq1LAx+2UdCudI4cs5w=
+github.com/antinvestor/apis/go/common v1.38.0 h1:UIOR6oK0Zcj8Z05+MhkB2y1apvf8tIY3YGRfuvHnKro=
+github.com/antinvestor/apis/go/common v1.38.0/go.mod h1:QIvObLIyzPGb0n0O20USqVpPkt/y1wDcEpHzF4N03fs=
 github.com/antinvestor/apis/go/device v1.37.7 h1:w31AUL6JBkTFKzErGZXfQcc+RZ4UAwBH/ZYufDSW1wI=
 github.com/antinvestor/apis/go/device v1.37.7/go.mod h1:WP+kS+UJfXdFaVBGlcCRhI9wuk39P6MI7AdGF45z+HY=
 github.com/antinvestor/apis/go/notification v1.37.3 h1:4p2Y7NjyvEIuGWq8xIz8mFxeGTn4F/afbpSk27sBOAU=
