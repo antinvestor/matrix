@@ -11,7 +11,7 @@ require (
 	github.com/antinvestor/apis/go/common v1.38.0
 	github.com/antinvestor/apis/go/device v1.38.2
 	github.com/antinvestor/apis/go/notification v1.38.2
-	github.com/antinvestor/apis/go/partition v1.37.3
+	github.com/antinvestor/apis/go/partition v1.38.2
 	github.com/antinvestor/apis/go/profile v1.37.3
 	github.com/antinvestor/gomatrix v0.1.4
 	github.com/antinvestor/gomatrixserverlib v0.2.5
