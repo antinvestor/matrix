@@ -80,6 +80,8 @@ github.com/asynkron/protoactor-go v0.0.0-20250812114916-edd245470729 h1:Wwn1w8Nv
 github.com/asynkron/protoactor-go v0.0.0-20250812114916-edd245470729/go.mod h1:UXghHDFb5p9SwGtfHmEp05xWf9sES9cVS9SqMk2RgYc=
 github.com/asynkron/protoactor-go v0.0.0-20250813064139-fca84a362d85 h1:4dN9mwkdFcez8IMFMwrQvxt9Q9vqn7AVXeRgtVD8Q6I=
 github.com/asynkron/protoactor-go v0.0.0-20250813064139-fca84a362d85/go.mod h1:UXghHDFb5p9SwGtfHmEp05xWf9sES9cVS9SqMk2RgYc=
+github.com/asynkron/protoactor-go v0.0.0-20250813194040-988f4d082b3f h1:jl+aBhNfzoZDiM4K7OsInXzCdoOyrIcaKtnzb0Q3Ui0=
+github.com/asynkron/protoactor-go v0.0.0-20250813194040-988f4d082b3f/go.mod h1:UXghHDFb5p9SwGtfHmEp05xWf9sES9cVS9SqMk2RgYc=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=
