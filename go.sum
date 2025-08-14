@@ -50,6 +50,8 @@ github.com/antinvestor/apis/go/device v1.37.7 h1:w31AUL6JBkTFKzErGZXfQcc+RZ4UAwB
 github.com/antinvestor/apis/go/device v1.37.7/go.mod h1:WP+kS+UJfXdFaVBGlcCRhI9wuk39P6MI7AdGF45z+HY=
 github.com/antinvestor/apis/go/device v1.38.2 h1:uWwL9jLrgDINi0/XlGfN1ifRHuL3JEpsCEuQXwnfMJY=
 github.com/antinvestor/apis/go/device v1.38.2/go.mod h1:SaexgOCLPXguqZ8uBYbbc6yKSTqyJc6gC2Z0ft+IKAI=
+github.com/antinvestor/apis/go/device v1.39.0 h1:Qz4Up0M7QpLugK0Z9HvM+dZHsdhMD1wNEnQhQhMv/eE=
+github.com/antinvestor/apis/go/device v1.39.0/go.mod h1:nUkvOOMMIDmPvCwKb6BOoT59IEerMHoUjb6m0+1LhCU=
 github.com/antinvestor/apis/go/notification v1.37.3 h1:4p2Y7NjyvEIuGWq8xIz8mFxeGTn4F/afbpSk27sBOAU=
 github.com/antinvestor/apis/go/notification v1.37.3/go.mod h1:MGe59iFuSFzAx+7nStmJ6ZeX9SiBGCNcpgUtK1yJCbY=
 github.com/antinvestor/apis/go/notification v1.38.2 h1:ls5t1TL3jCBW/miDStGivUdcep7ip5JiURzEhPlZ99I=
@@ -524,6 +526,8 @@ google.golang.org/genproto/googleapis/api v0.0.0-20250728155136-f173205681a0 h1:
 google.golang.org/genproto/googleapis/api v0.0.0-20250728155136-f173205681a0/go.mod h1:8ytArBbtOy2xfht+y2fqKd5DRDJRUQhqbyEnQ4bDChs=
 google.golang.org/genproto/googleapis/api v0.0.0-20250804133106-a7a43d27e69b h1:ULiyYQ0FdsJhwwZUwbaXpZF5yUE3h+RA+gxvBu37ucc=
 google.golang.org/genproto/googleapis/api v0.0.0-20250804133106-a7a43d27e69b/go.mod h1:oDOGiMSXHL4sDTJvFvIB9nRQCGdLP1o/iVaqQK8zB+M=
+google.golang.org/genproto/googleapis/api v0.0.0-20250811230008-5f3141c8851a h1:DMCgtIAIQGZqJXMVzJF4MV8BlWoJh2ZuFiRdAleyr58=
+google.golang.org/genproto/googleapis/api v0.0.0-20250811230008-5f3141c8851a/go.mod h1:y2yVLIE/CSMCPXaHnSKXxu1spLPnglFLegmgdY23uuE=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250721164621-a45f3dfb1074 h1:qJW29YvkiJmXOYMu5Tf8lyrTp3dOS+K4z6IixtLaCf8=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250721164621-a45f3dfb1074/go.mod h1:qQ0YXyHHx3XkvlzUtpXDkS29lDSafHMZBAZDc03LQ3A=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b h1:zPKJod4w6F1+nRGDI9ubnXYhU9NSWoFAijkHkUXeTK8=
