@@ -12,7 +12,7 @@ require (
 	github.com/antinvestor/apis/go/device v1.39.0
 	github.com/antinvestor/apis/go/notification v1.39.0
 	github.com/antinvestor/apis/go/partition v1.39.0
-	github.com/antinvestor/apis/go/profile v1.38.2
+	github.com/antinvestor/apis/go/profile v1.39.0
 	github.com/antinvestor/gomatrix v0.1.4
 	github.com/antinvestor/gomatrixserverlib v0.2.5
 	github.com/asynkron/protoactor-go v0.0.0-20250814165832-337823778e38
