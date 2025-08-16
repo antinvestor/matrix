@@ -592,6 +592,8 @@ k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 h1:qY1Ad8PODbnymg2pRbkyMT/ylpTrC
 k8s.io/utils v0.0.0-20230406110748-d93618cff8a2/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 maunium.net/go/mautrix v0.24.2 h1:+AVT5kbcA/QuT5svrJKp4ivwoUmz+RRplMp3DnfpheI=
 maunium.net/go/mautrix v0.24.2/go.mod h1:1ut900w++eE9by9yqCR2dQdMqwsHwZG5L+1bKB1EvSA=
+maunium.net/go/mautrix v0.25.0 h1:dhYoXIXSxI9A+kEPwBceuRP0wcpho15dVLucUF8k2eE=
+maunium.net/go/mautrix v0.25.0/go.mod h1:pDd6Ppg+1PbWrw/rg4ZQQfVYZICRGzH+DcliZ/BODvU=
 rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd h1:EDPBXCAspyGV4jQlpZSudPeMmr1bNJefnuqLsRAsHZo=
 sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd/go.mod h1:B8JuhiUyNFVKdsE8h686QcCxMaH6HrOAZj4vswFpcB0=

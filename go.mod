@@ -48,7 +48,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/gorm v1.30.1
 	gotest.tools/v3 v3.5.2
-	maunium.net/go/mautrix v0.24.2
+	maunium.net/go/mautrix v0.25.0
 )
 
 require (
