@@ -15,7 +15,7 @@ require (
 	github.com/antinvestor/apis/go/profile v1.39.0
 	github.com/antinvestor/gomatrix v0.1.4
 	github.com/antinvestor/gomatrixserverlib v0.2.5
-	github.com/asynkron/protoactor-go v0.0.0-20250815052215-f5fa862a4dbb
+	github.com/asynkron/protoactor-go 6eec031022a0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
