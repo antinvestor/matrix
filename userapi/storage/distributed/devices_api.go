@@ -55,7 +55,7 @@ func (d *devicesApi) toDeviceApi(localPart string, serverName spec.ServerName, d
 		DisplayName: device.GetName(),
 		LastSeenIP:  device.GetIp(),
 		UserAgent:   device.GetUserAgent(),
-		Extra:       device.GetProperties(),
+		Extra:       device.GetProperties().AsMap(),
 	}
 
 	lastSeen, err := time.Parse(time.RFC3339, device.GetLastSeen())
@@ -76,6 +76,12 @@ func (d *devicesApi) InsertDevice(ctx context.Context, id, localpart string, ser
 }
 
 func (d *devicesApi) InsertDeviceWithSessionID(ctx context.Context, id, localpart string, serverName spec.ServerName, accessToken string, extraData *oauth2.Token, displayName *string, ipAddr, userAgent string, sessionID string) (*api.Device, error) {
+
+	extras := frame.JSONMap{}
+	if displayName != nil {
+		extras["name"] = *displayName
+	}
+
 	req := devicev1.LogRequest{
 		DeviceId:  id,
 		SessionId: sessionID,
@@ -84,13 +90,7 @@ func (d *devicesApi) InsertDeviceWithSessionID(ctx context.Context, id, localpar
 		UserAgent: userAgent,
 		Os:        "",
 		LastSeen:  time.Now().String(),
-		Extras: func() map[string]string {
-			extras := map[string]string{}
-			if displayName != nil {
-				extras["name"] = *displayName
-			}
-			return extras
-		}(),
+		Extras:    extras.ToProtoStruct(),
 	}
 	_, err := d.client.Svc().Log(ctx, &req)
 	if err != nil {
@@ -256,7 +256,7 @@ func (d *devicesApi) SelectDevicesByID(ctx context.Context, deviceIDs []string) 
 func (d *devicesApi) UpdateDeviceLastSeen(ctx context.Context, _ string, _ spec.ServerName, deviceID, ipAddr, userAgent string) error {
 	req := devicev1.LogRequest{
 		DeviceId:  deviceID,
-		LinkId:    "",
+		SessionId: "",
 		Ip:        ipAddr,
 		Locale:    "",
 		UserAgent: userAgent,

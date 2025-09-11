@@ -268,15 +268,15 @@ func (s *OutputRoomEventConsumer) toNotification(ctx context.Context, event sync
 	}
 
 	data := ""
-	var payload map[string]string
+	var payload frame.JSONMap
 	err = json.Unmarshal(event.Content, &payload)
 	if err != nil {
-		payload = map[string]string{}
+		payload = map[string]any{}
 		data = string(event.Content)
 	}
 
 	return &notificationv1.Notification{
-		Id: payload[constants.IDKey],
+		Id: payload.GetString(constants.IDKey),
 		Source: &commonv1.ContactLink{
 			ProfileId: profileID,
 			ContactId: contactID,
@@ -285,7 +285,7 @@ func (s *OutputRoomEventConsumer) toNotification(ctx context.Context, event sync
 			ProfileId: roomProfileID,
 		},
 		Type:     "json",
-		Payload:  payload,
+		Payload:  payload.ToProtoStruct(),
 		Data:     data,
 		Language: language,
 	}

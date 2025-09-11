@@ -24,6 +24,7 @@ import (
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 	"golang.org/x/oauth2"
 )
 
@@ -89,19 +90,20 @@ func (auth *Authenticator) GetProvider(ctx context.Context, providerID string) (
 		return nil, err
 	}
 
-	partitionProperties := resp.GetProperties()
-	partitionClientID, ok := partitionProperties[partitionPropertyClientIDKey]
-	if !ok {
+	var partitionProperties frame.JSONMap
+	partitionProperties = resp.GetProperties().AsMap()
+	partitionClientID := partitionProperties.GetString(partitionPropertyClientIDKey)
+	if partitionClientID == "" {
 		return nil, fmt.Errorf("no client_id in partition properties :%v", partitionProperties)
 	}
 
-	partitionClientSecret, ok := resp.GetProperties()[partitionPropertyClientSecretKey]
-	if !ok {
+	partitionClientSecret := partitionProperties.GetString(partitionPropertyClientSecretKey)
+	if partitionClientSecret == "" {
 		return nil, fmt.Errorf("no client_secret in partition properties :%v", partitionProperties)
 	}
 
-	partitionDiscoveryUri, ok := resp.GetProperties()[partitionPropertyDiscoveryUriKey]
-	if !ok {
+	partitionDiscoveryUri := partitionProperties.GetString(partitionPropertyDiscoveryUriKey)
+	if partitionDiscoveryUri == "" {
 		return nil, fmt.Errorf("no discovery uri in partition properties :%v", partitionProperties)
 	}
 
