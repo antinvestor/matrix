@@ -90,8 +90,7 @@ func (auth *Authenticator) GetProvider(ctx context.Context, providerID string) (
 		return nil, err
 	}
 
-	var partitionProperties frame.JSONMap
-	partitionProperties = resp.GetProperties().AsMap()
+	var partitionProperties frame.JSONMap = resp.GetProperties().AsMap()
 	partitionClientID := partitionProperties.GetString(partitionPropertyClientIDKey)
 	if partitionClientID == "" {
 		return nil, fmt.Errorf("no client_id in partition properties :%v", partitionProperties)
