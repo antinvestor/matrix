@@ -52,7 +52,14 @@ func main() {
 	cfg := setup.ParseFlags(true)
 	globalCfg := cfg.Global
 
-	ctx, service := frame.NewService(serviceName, frame.WithConfig(&globalCfg))
+	ctx, service := frame.NewService(serviceName,
+		frame.WithConfig(&globalCfg),
+		frame.WithDatastore(),
+		frame.WithWorkerPoolOptions(
+			frame.WithSinglePoolCapacity(1000),
+			frame.WithConcurrency(1),
+			frame.WithPoolCount(1),
+		))
 	defer service.Stop(ctx)
 
 	log := util.Log(ctx)
@@ -263,7 +270,8 @@ func main() {
 		return
 	}
 
-	log.WithField("server http port", globalCfg.HTTPServerPort).
+	log.
+		WithField("server http port", globalCfg.HTTPServerPort).
 		Info(" Initiating server operations")
 	defer monolith.Service.Stop(ctx)
 	err = monolith.Service.Run(ctx, "")
