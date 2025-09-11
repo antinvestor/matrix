@@ -21,6 +21,7 @@ import (
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth/authtypes"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
+	"github.com/pitabwire/frame"
 )
 
 const (
@@ -40,11 +41,11 @@ func NewProfilesApi(ctx context.Context, profileClient *profilev1.ProfileClient)
 	}, nil
 }
 
-func (s *profilesApi) toProfile(profileID string, properties map[string]string, contacts []*profilev1.ContactObject) *authtypes.Profile {
+func (s *profilesApi) toProfile(profileID string, properties frame.JSONMap, contacts []*profilev1.ContactObject) *authtypes.Profile {
 
-	name, ok := properties[propertiesMatrixName]
-	if !ok {
-		name = properties[propertiesOriginName]
+	name := properties.GetString(propertiesMatrixName)
+	if name == "" {
+		name = properties.GetString(propertiesOriginName)
 	}
 
 	var internalContacts []authtypes.Contact
@@ -56,7 +57,7 @@ func (s *profilesApi) toProfile(profileID string, properties map[string]string, 
 		Localpart:   profileID,
 		ServerName:  s.serverNoticesLocalpart,
 		DisplayName: name,
-		AvatarURL:   properties[propertiesAvaterUri],
+		AvatarURL:   properties.GetString(propertiesAvaterUri),
 		Contacts:    internalContacts,
 	}
 }
@@ -87,7 +88,7 @@ func (s *profilesApi) SelectProfileByLocalpart(
 		return nil, err
 	}
 
-	return s.toProfile(pObj.GetId(), pObj.GetProperties(), pObj.GetContacts()), nil
+	return s.toProfile(pObj.GetId(), pObj.GetProperties().AsMap(), pObj.GetContacts()), nil
 }
 
 func (s *profilesApi) SetAvatarURL(
@@ -96,18 +97,20 @@ func (s *profilesApi) SetAvatarURL(
 	avatarURL string,
 ) (*authtypes.Profile, bool, error) {
 
+	properties := frame.JSONMap{
+		"avatar_uri": avatarURL,
+	}
+
 	updateResponse, err := s.profileClient.Svc().Update(ctx, &profilev1.UpdateRequest{
-		Id: localpart,
-		Properties: map[string]string{
-			"avatar_uri": avatarURL,
-		},
-		State: 0,
+		Id:         localpart,
+		Properties: properties.ToProtoStruct(),
+		State:      0,
 	})
 	if err != nil {
 		return nil, false, err
 	}
 	pObj := updateResponse.GetData()
-	return s.toProfile(pObj.GetId(), pObj.GetProperties(), pObj.GetContacts()), true, err
+	return s.toProfile(pObj.GetId(), pObj.GetProperties().AsMap(), pObj.GetContacts()), true, err
 }
 
 func (s *profilesApi) SetDisplayName(
@@ -116,18 +119,20 @@ func (s *profilesApi) SetDisplayName(
 	displayName string,
 ) (*authtypes.Profile, bool, error) {
 
+	properties := frame.JSONMap{
+		"matrix_name": displayName,
+	}
+
 	updateResponse, err := s.profileClient.Svc().Update(ctx, &profilev1.UpdateRequest{
-		Id: localpart,
-		Properties: map[string]string{
-			"matrix_name": displayName,
-		},
-		State: 0,
+		Id:         localpart,
+		Properties: properties.ToProtoStruct(),
+		State:      0,
 	})
 	if err != nil {
 		return nil, false, err
 	}
 	pObj := updateResponse.GetData()
-	return s.toProfile(pObj.GetId(), pObj.GetProperties(), pObj.GetContacts()), true, err
+	return s.toProfile(pObj.GetId(), pObj.GetProperties().AsMap(), pObj.GetContacts()), true, err
 }
 
 func (s *profilesApi) SelectProfilesBySearch(
@@ -155,7 +160,7 @@ func (s *profilesApi) SelectProfilesBySearch(
 			contact := []*profilev1.ContactObject{
 				rosterObj.GetContact(),
 			}
-			profiles = append(profiles, *s.toProfile(rosterObj.GetId(), rosterObj.GetExtra(), contact))
+			profiles = append(profiles, *s.toProfile(rosterObj.GetId(), rosterObj.GetExtra().AsMap(), contact))
 		}
 
 	}
