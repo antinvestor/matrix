@@ -22,16 +22,17 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/frame/frametests"
 )
 
 func newService(t *testing.T) (context.Context, *frame.Service) {
 	ctx := t.Context()
-	opts := []frame.Option{frame.WithNoopDriver()}
+	opts := []frame.Option{frametests.WithNoopDriver()}
 	return frame.NewServiceWithContext(ctx, "Test Srv", opts...)
 }
 
 func newServiceWithoutT() (context.Context, *frame.Service) {
-	opts := []frame.Option{frame.WithNoopDriver()}
+	opts := []frame.Option{frametests.WithNoopDriver()}
 	return frame.NewService("Test Srv", opts...)
 }
 

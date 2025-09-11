@@ -29,6 +29,7 @@ import (
 	"github.com/antinvestor/matrix/internal/pushrules"
 	"github.com/antinvestor/matrix/syncapi/synctypes"
 	"github.com/antinvestor/matrix/userapi/types"
+	"github.com/pitabwire/frame"
 	"golang.org/x/oauth2"
 )
 
@@ -449,7 +450,7 @@ type Device struct {
 	AppserviceID string
 	AccountType  AccountType
 
-	Extra map[string]string
+	Extra frame.JSONMap
 
 	Reload func(ctx context.Context) error
 }

@@ -17,6 +17,7 @@ import (
 
 	"github.com/antinvestor/apis/go/common"
 	notificationv1 "github.com/antinvestor/apis/go/notification/v1"
+	notificationv1_mocks "github.com/antinvestor/apis/go/notification/v1_mocks"
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/appservice"
@@ -658,7 +659,7 @@ func TestDistributedOutputAppserviceEvent(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		nCliMock := notificationv1.NewMockNotificationServiceClient(ctrl)
+		nCliMock := notificationv1_mocks.NewMockNotificationServiceClient(ctrl)
 
 		// Mock the Receive method to return a channel of responses
 		nCliMock.EXPECT().Receive(gomock.Any(), gomock.Any()).DoAndReturn(
