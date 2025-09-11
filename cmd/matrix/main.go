@@ -56,8 +56,8 @@ func main() {
 		frame.WithConfig(&globalCfg),
 		frame.WithDatastore(),
 		frame.WithWorkerPoolOptions(
-			frame.WithSinglePoolCapacity(1000),
-			frame.WithConcurrency(1),
+			frame.WithSinglePoolCapacity(10000),
+			frame.WithConcurrency(1000),
 			frame.WithPoolCount(1),
 		))
 	defer service.Stop(ctx)
