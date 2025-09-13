@@ -1,5 +1,5 @@
 ENV_LOCAL_TEST=\
-  TESTING_DATABASE_URI=postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable \
+  TESTING_DATABASE_URL=postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable \
   POSTGRES_PASSWORD=s3cr3t \
   POSTGRES_DB=matrix \
   POSTGRES_HOST=localhost \

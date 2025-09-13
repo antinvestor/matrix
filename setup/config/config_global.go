@@ -108,15 +108,12 @@ func (c *Global) Defaults(opts DefaultOpts) {
 
 	c.KeyValidityPeriod = time.Hour * 24 * 7
 
-	for _, db := range opts.DSDatabaseConn.ToArray() {
-		c.DatabasePrimaryURL = append(c.DatabasePrimaryURL, db.String())
-	}
-
 	c.Metrics.Defaults(opts)
 	c.DNSCache.Defaults()
 	c.ServerNotices.Defaults(opts)
 	c.ReportStats.Defaults()
 	c.Cache.Defaults(opts)
+	c.Queue.Defaults(opts)
 	c.DistributedAPI.Defaults()
 
 	c.SyncAPIPresenceURI = fmt.Sprintf("http://localhost%s", c.Port())
@@ -131,6 +128,11 @@ func (c *Global) LoadEnv() error {
 	}
 
 	err = c.Cache.LoadEnv()
+	if err != nil {
+		return err
+	}
+
+	err = c.Queue.LoadEnv()
 	if err != nil {
 		return err
 	}
@@ -408,12 +410,13 @@ func (q *QueueOptions) DSrc() DataSource {
 	return DataSource(uri.String())
 }
 
-func (q *QueueOptions) LoadEnv(ctx context.Context) error {
+func (q *QueueOptions) LoadEnv() error {
 
-	q.DS = DataSource(os.Getenv("QUEUE_URI"))
-	if !q.DS.IsQueue() {
-		util.Log(ctx).WithField("queue_uri", q.DS).Warn("Invalid queue uri in the config")
+	qURI := os.Getenv("QUEUE_URI")
+	if qURI != "" {
+		q.DS = DataSource(qURI)
 	}
+
 	return nil
 }
 
@@ -462,7 +465,7 @@ type DatabaseOptions struct {
 	Prefix    string `yaml:"prefix"`
 	Reference string `yaml:"reference"`
 	// The connection string, file:filename.db or postgres://server....
-	DatabaseURI DataSource `env:"DATABASE_URI"  yaml:"database_uri"`
+	DatabaseURI DataSource `env:"DATABASE_URL"  yaml:"database_uri"`
 	// Maximum open connections to the Cm (0 = use default, negative means unlimited)
 	MaxOpenConnections int `yaml:"max_open_conns"`
 	// Maximum idle connections to the Cm (0 = use default, negative means unlimited)
@@ -477,7 +480,7 @@ func (c *DatabaseOptions) Ref() string {
 
 func (c *DatabaseOptions) LoadEnv(ctx context.Context) error {
 
-	c.DatabaseURI = DataSource(os.Getenv("DATABASE_URI"))
+	c.DatabaseURI = DataSource(os.Getenv("DATABASE_URL"))
 	if !c.DatabaseURI.IsPostgres() {
 		util.Log(ctx).WithField("database_uri", c.DatabaseURI).Warn("Invalid database uri in the config")
 	}

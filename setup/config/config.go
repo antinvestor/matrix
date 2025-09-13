@@ -316,7 +316,7 @@ func loadConfig(
 ) (*Matrix, error) {
 	var c Matrix
 	c.Defaults(DefaultOpts{
-		DSDatabaseConn:   DataSource(os.Getenv("DATABASE_URI")),
+		DSDatabaseConn:   DataSource(os.Getenv("DATABASE_URL")),
 		DSCacheConn:      DataSource(os.Getenv("CACHE_URI")),
 		DSQueueConn:      DataSource(os.Getenv("QUEUE_URI")),
 		RandomnessPrefix: os.Getenv("RANDOMNESS_PREFIX"),

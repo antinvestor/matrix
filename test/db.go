@@ -148,7 +148,7 @@ func PrepareDatabaseConnection(ctx context.Context, randomnesPrefix string, test
 		return "", func(ctx context.Context) {}, errors.New("only postgresql is the supported database for now")
 	}
 
-	postgresUriStr := os.Getenv("TESTING_DATABASE_URI")
+	postgresUriStr := os.Getenv("TESTING_DATABASE_URL")
 	if postgresUriStr == "" {
 		postgresUriStr = "postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable"
 	}

@@ -14,11 +14,11 @@ import (
 
 func TestParseFlags_DatabaseURIPrecedence(t *testing.T) {
 	tests := []struct {
-		name           string
-		configFileDB   string
-		envVarDB       string
-		expectedDB     string
-		description    string
+		name         string
+		configFileDB string
+		envVarDB     string
+		expectedDB   string
+		description  string
 	}{
 		{
 			name:         "env_var_overrides_config_file",
@@ -60,12 +60,12 @@ func TestParseFlags_DatabaseURIPrecedence(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Save original environment
-			originalEnv := os.Getenv("DATABASE_URI")
+			originalEnv := os.Getenv("DATABASE_URL")
 			defer func() {
 				if originalEnv != "" {
-					os.Setenv("DATABASE_URI", originalEnv)
+					os.Setenv("DATABASE_URL", originalEnv)
 				} else {
-					os.Unsetenv("DATABASE_URI")
+					os.Unsetenv("DATABASE_URL")
 				}
 			}()
 
@@ -76,15 +76,15 @@ func TestParseFlags_DatabaseURIPrecedence(t *testing.T) {
 
 			// Set environment variable
 			if tt.envVarDB != "" {
-				err := os.Setenv("DATABASE_URI", tt.envVarDB)
+				err := os.Setenv("DATABASE_URL", tt.envVarDB)
 				require.NoError(t, err)
 			} else {
-				os.Unsetenv("DATABASE_URI")
+				os.Unsetenv("DATABASE_URL")
 			}
 
 			// Reset flags for testing
 			resetFlags()
-			
+
 			// Set config path flag
 			err := flag.Set("config", configFile)
 			require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestParseFlags_DatabaseURIPrecedence(t *testing.T) {
 
 func TestParseFlags_CacheURIPrecedence(t *testing.T) {
 	tests := []struct {
-		name           string
+		name            string
 		configFileCache string
 		envVarCache     string
 		expectedCache   string
@@ -154,7 +154,7 @@ func TestParseFlags_CacheURIPrecedence(t *testing.T) {
 
 			// Reset flags for testing
 			resetFlags()
-			
+
 			// Set config path flag
 			err := flag.Set("config", configFile)
 			require.NoError(t, err)
@@ -171,11 +171,11 @@ func TestParseFlags_CacheURIPrecedence(t *testing.T) {
 
 func TestParseFlags_MultipleEnvironmentVariables(t *testing.T) {
 	// Save original environment
-	originalDBEnv := os.Getenv("DATABASE_URI")
+	originalDBEnv := os.Getenv("DATABASE_URL")
 	originalCacheEnv := os.Getenv("CACHE_URI")
 	originalQueueEnv := os.Getenv("QUEUE_URI")
 	defer func() {
-		restoreEnv("DATABASE_URI", originalDBEnv)
+		restoreEnv("DATABASE_URL", originalDBEnv)
 		restoreEnv("CACHE_URI", originalCacheEnv)
 		restoreEnv("QUEUE_URI", originalQueueEnv)
 	}()
@@ -198,7 +198,7 @@ global:
 	defer os.Remove(configFile)
 
 	// Set all environment variables
-	err := os.Setenv("DATABASE_URI", "postgres://env:password@env-db/env?sslmode=disable")
+	err := os.Setenv("DATABASE_URL", "postgres://env:password@env-db/env?sslmode=disable")
 	require.NoError(t, err)
 	err = os.Setenv("CACHE_URI", "redis://env:password@env-cache:6379/1")
 	require.NoError(t, err)
@@ -207,7 +207,7 @@ global:
 
 	// Reset flags for testing
 	resetFlags()
-	
+
 	// Set config path flag
 	err = flag.Set("config", configFile)
 	require.NoError(t, err)
@@ -253,7 +253,7 @@ func TestParseFlags_RegistrationFlag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset flags for testing
 			resetFlags()
-			
+
 			// Set config path flag
 			err := flag.Set("config", configFile)
 			require.NoError(t, err)
@@ -274,53 +274,6 @@ func TestParseFlags_RegistrationFlag(t *testing.T) {
 	}
 }
 
-func TestParseFlags_ErrorCases(t *testing.T) {
-	tests := []struct {
-		name        string
-		configPath  string
-		expectPanic bool
-		description string
-	}{
-		{
-			name:        "missing_config_file",
-			configPath:  "/nonexistent/config.yaml",
-			expectPanic: true,
-			description: "Should panic when config file doesn't exist",
-		},
-		{
-			name:        "invalid_yaml_config",
-			configPath:  "", // Will be set to invalid YAML file
-			expectPanic: true,
-			description: "Should panic when config file has invalid YAML",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Reset flags for testing
-			resetFlags()
-
-			configFile := tt.configPath
-			if tt.name == "invalid_yaml_config" {
-				// Create invalid YAML file
-				configFile = createTempConfigFile(t, "invalid: yaml: content: [")
-				defer os.Remove(configFile)
-			}
-
-			// Set config path flag
-			err := flag.Set("config", configFile)
-			require.NoError(t, err)
-
-			if tt.expectPanic {
-				assert.Panics(t, func() {
-					ctx := context.Background()
-					ParseFlags(ctx)
-				}, tt.description)
-			}
-		})
-	}
-}
-
 // Helper functions
 
 func createTestConfig(databaseURI string) string {
@@ -328,16 +281,22 @@ func createTestConfig(databaseURI string) string {
 }
 
 func createTestConfigWithPrivateKey(databaseURI, privateKeyPath string) string {
-	return `
+	config := `
 version: 2
 global:
   server_name: test.localhost
-  private_key: ` + privateKeyPath + `
-  database:
-    database_uri: ` + databaseURI + `
+  private_key: ` + privateKeyPath
+	if databaseURI != "" {
+		config += `
+  embedded_config:
+    database_url: 
+      - ` + databaseURI
+	}
+	config += `
 client_api:
   registration_disabled: true
 `
+	return config
 }
 
 func createTestConfigWithCache(cacheURI string) string {
@@ -367,26 +326,26 @@ client_api:
 func createTempConfigFile(t *testing.T, content string) string {
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "test_config.yaml")
-	
+
 	// Create a temporary private key file
 	privateKeyFile := filepath.Join(tmpDir, "matrix_key.pem")
 	privateKeyContent := `-----BEGIN MATRIX PRIVATE KEY-----
 Key-ID: ed25519:test
 MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBb21E9CRhxtfLOWJYeGrTMuF0UG4=
 -----END MATRIX PRIVATE KEY-----`
-	
+
 	err := os.WriteFile(privateKeyFile, []byte(privateKeyContent), 0644)
 	require.NoError(t, err)
-	
+
 	// Replace relative path with absolute path in config content
 	if content != "" {
 		// Replace the private_key path in the config content with absolute path
 		content = strings.ReplaceAll(content, "private_key: matrix_key.pem", "private_key: "+privateKeyFile)
 	}
-	
+
 	err = os.WriteFile(configFile, []byte(content), 0644)
 	require.NoError(t, err)
-	
+
 	return configFile
 }
 

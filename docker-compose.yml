@@ -105,7 +105,7 @@ services:
       - internal
     restart: unless-stopped
     environment:
-      DATABASE_URI: postgres://matrix:s3cr3t@datastore/matrix?sslmode=disable
+      DATABASE_URL: postgres://matrix:s3cr3t@datastore/matrix?sslmode=disable
       CACHE_URI: redis://matrix:s3cr3t@cache:6379/0?protocol=3
       QUEUE_URI: nats://matrix:s3cr3t@queue:4222
     command: [ "--config", "/etc/matrix/config.yaml" ]
