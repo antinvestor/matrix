@@ -332,6 +332,9 @@ func loadConfig(
 		return nil, err
 	}
 
+	// Propagate environment variables to all service configurations
+	c.PropagateEnvToServices()
+
 	// Generate data from config options
 	err = c.Derive()
 	if err != nil {
