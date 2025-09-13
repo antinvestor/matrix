@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -49,10 +50,11 @@ func main() {
 
 	serviceName := "service_matrix"
 
-	cfg := setup.ParseFlags(true)
+	ctx := context.Background()
+	cfg := setup.ParseFlags(ctx)
 	globalCfg := cfg.Global
 
-	ctx, service := frame.NewService(serviceName,
+	ctx, service := frame.NewServiceWithContext(ctx, serviceName,
 		frame.WithConfig(&globalCfg),
 		frame.WithDatastore(),
 		frame.WithWorkerPoolOptions(
