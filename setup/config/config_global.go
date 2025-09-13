@@ -142,12 +142,12 @@ func (c *Global) LoadEnv() error {
 // PropagateEnvToServices propagates environment variables from Global to all service configurations
 // This should be called after LoadEnv() and before Verify() to ensure all services have proper database configuration
 func (config *Matrix) PropagateEnvToServices() {
-	// Get the database URI from environment variable, prioritizing DATABASE_URL then DATABASE_URI for backward compatibility
+	// Get the database URI from environment variable, prioritising DATABASE_URL then DATABASE_URI for backward compatibility
 	databaseURI := DataSource(os.Getenv("DATABASE_URL"))
 	if databaseURI == "" {
 		databaseURI = DataSource(os.Getenv("DATABASE_URI"))
 	}
-	
+
 	// If we have a database URI from environment, propagate it to all services
 	if databaseURI != "" {
 		// Propagate to all service database configurations
