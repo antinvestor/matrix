@@ -52,7 +52,7 @@ func main() {
 
 	ctx, svc := frame.NewService("resolve-state")
 
-	cfg := setup.ParseFlags(true)
+	cfg := setup.ParseFlags(ctx)
 
 	cfg.ClientAPI.RegistrationDisabled = true
 

@@ -83,7 +83,7 @@ jobs:
         env:
           TESTING_QUEUE_URI: nats://matrix:s3cr3t@localhost:4221
           TESTING_CACHE_URI: redis://matrix:s3cr3t@localhost:6378
-          TESTING_DATABASE_URI: postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable
+          TESTING_DATABASE_URL: postgres://matrix:s3cr3t@localhost:5431/matrix?sslmode=disable
         run: |
           set -euo pipefail
           go test -json -v ./... | tee /tmp/gotest.log | gotestfmt -hide all
@@ -186,7 +186,7 @@ jobs:
           DOCKER_BUILDKIT: 1
           QUEUE_URI: nats://matrix:s3cr3t@queuestore:4222
           CACHE_URI: redis://matrix:s3cr3t@cachestore:6379
-          DATABASE_URI: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
+          DATABASE_URL: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
         with:
@@ -202,7 +202,7 @@ jobs:
         env:
           COMPLEMENT_MATRIX_QUEUE_URI: nats://matrix:s3cr3t@queuestore:4222
           COMPLEMENT_MATRIX_CACHE_URI: redis://matrix:s3cr3t@cachestore:6379
-          COMPLEMENT_MATRIX_DATABASE_URI: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
+          COMPLEMENT_MATRIX_DATABASE_URL: postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable
           COMPLEMENT_BASE_IMAGE: complement-matrix:Postgres
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_MATRIX_
 

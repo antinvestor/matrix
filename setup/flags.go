@@ -32,7 +32,7 @@ var (
 )
 
 // ParseFlags parses the commandline flags and uses them to create a config.
-func ParseFlags(monolith bool) *config.Matrix {
+func ParseFlags(ctx context.Context) *config.Matrix {
 	flag.Parse()
 
 	if *version {
@@ -40,14 +40,12 @@ func ParseFlags(monolith bool) *config.Matrix {
 		os.Exit(0)
 	}
 
-	ctx := context.Background()
 	log := util.Log(ctx)
 	if *configPath == "" {
 		log.Fatal("--config must be supplied")
 	}
 
 	cfg, err := config.Load(*configPath)
-
 	if err != nil {
 		log.WithError(err).Fatal("Invalid config file")
 	}
