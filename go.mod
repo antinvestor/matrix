@@ -5,7 +5,6 @@ go 1.25.1
 require (
 	buf.build/gen/go/antinvestor/presence/connectrpc/go v1.18.1-20250520083445-2d0e51ca1296.1
 	buf.build/gen/go/antinvestor/presence/protocolbuffers/go v1.36.9-20250520083445-2d0e51ca1296.1
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.9-20250717185734-6c6e0d3c608e.1
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/validate v0.3.0
 	github.com/antinvestor/apis/go/common v1.42.0
@@ -52,6 +51,7 @@ require (
 )
 
 require (
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.9-20250717185734-6c6e0d3c608e.1 // indirect
 	buf.build/go/protovalidate v0.14.0 // indirect
 	cel.dev/expr v0.24.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
@@ -201,6 +201,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20230718181711-3c0fae5ee9fd // indirect
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
-	sigs.k8s.io/yaml v1.3.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.7.0 // indirect
+	sigs.k8s.io/yaml v1.4.0 // indirect
 )
