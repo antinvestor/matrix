@@ -107,7 +107,11 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	}
 
 	c.KeyValidityPeriod = time.Hour * 24 * 7
-	// c.DatabaseOptions.Defaults(opts)
+
+	for _, db := range opts.DSDatabaseConn.ToArray() {
+		c.DatabasePrimaryURL = append(c.DatabasePrimaryURL, db.String())
+	}
+
 	c.Metrics.Defaults(opts)
 	c.DNSCache.Defaults()
 	c.ServerNotices.Defaults(opts)
@@ -125,6 +129,7 @@ func (c *Global) LoadEnv() error {
 	if err != nil {
 		return err
 	}
+
 	err = c.Cache.LoadEnv()
 	if err != nil {
 		return err
