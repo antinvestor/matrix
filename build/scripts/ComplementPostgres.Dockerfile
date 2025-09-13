@@ -34,7 +34,7 @@ ENV COVER=0
 
 ENV QUEUE_URI="nats://matrix:s3cr3t@queuestore:4222"
 ENV CACHE_URI="redis://matrix:s3cr3t@cachestore:6379"
-ENV DATABASE_URI="postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable"
+ENV DATABASE_URL="postgres://matrix:s3cr3t@datastore:5432/matrix?sslmode=disable"
 
 # Expose ports
 EXPOSE 8008 8448
@@ -44,7 +44,7 @@ CMD ["sh", "-c", "/matrix/generate-keys --keysize 1024 --server $SERVER_NAME \
     --tls-cert /matrix/server.crt --tls-key /matrix/server.key --tls-authority-cert \
     /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key && \
     /matrix/generate-config -server $SERVER_NAME --ci --cache_uri $CACHE_URI \
-    --database_uri $DATABASE_URI --queue_uri $QUEUE_URI > /matrix/matrix.yaml && \
+    --database_uri $DATABASE_URL --queue_uri $QUEUE_URI > /matrix/matrix.yaml && \
     sed -i 's/max_open_conns:.*$/max_open_conns: 1990/g' /matrix/matrix.yaml && \
     cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && \
     update-ca-certificates && exec /matrix/complement-cmd.sh"]

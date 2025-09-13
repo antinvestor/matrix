@@ -78,9 +78,10 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, usage, name, name, name, name, name, name)
 		flag.PrintDefaults()
 	}
-	cfg := setup.ParseFlags(true)
+	ctx := context.Background()
+	cfg := setup.ParseFlags(ctx)
 
-	log := util.Log(context.Background()).WithField("cmd", "create-account")
+	log := util.Log(ctx).WithField("cmd", "create-account")
 
 	if *resetPassword {
 		log.Fatal("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")

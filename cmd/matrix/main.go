@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -49,10 +50,18 @@ func main() {
 
 	serviceName := "service_matrix"
 
-	cfg := setup.ParseFlags(true)
+	ctx := context.Background()
+	cfg := setup.ParseFlags(ctx)
 	globalCfg := cfg.Global
 
-	ctx, service := frame.NewService(serviceName, frame.WithConfig(&globalCfg))
+	ctx, service := frame.NewServiceWithContext(ctx, serviceName,
+		frame.WithConfig(&globalCfg),
+		frame.WithDatastore(),
+		frame.WithWorkerPoolOptions(
+			frame.WithSinglePoolCapacity(10000),
+			frame.WithConcurrency(1000),
+			frame.WithPoolCount(1),
+		))
 	defer service.Stop(ctx)
 
 	log := util.Log(ctx)
@@ -263,7 +272,8 @@ func main() {
 		return
 	}
 
-	log.WithField("server http port", globalCfg.HTTPServerPort).
+	log.
+		WithField("server http port", globalCfg.HTTPServerPort).
 		Info(" Initiating server operations")
 	defer monolith.Service.Stop(ctx)
 	err = monolith.Service.Run(ctx, "")
