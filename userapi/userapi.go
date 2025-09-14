@@ -54,15 +54,11 @@ func NewInternalAPI(ctx context.Context, cfg *config.Matrix, cm sqlutil.Connecti
 
 	pgClient := pushgateway.NewHTTPClient(cfgUsrApi.PushGatewayDisableTLSValidation)
 
-	userapiCm, err := cm.FromOptions(ctx, &cfgUsrApi.AccountDatabase)
-	if err != nil {
-		util.Log(ctx).WithError(err).Panic("failed to obtain accounts db connection manager :%v", err)
-	}
 	db, err := storage.NewUserDatabase(
 		ctx,
 		profileCli,
 		deviceCli,
-		userapiCm,
+		cm,
 		cfg.Global.ServerName,
 		cfg.UserAPI.BCryptCost,
 		cfg.UserAPI.OpenIDTokenLifetimeMS,
@@ -73,11 +69,7 @@ func NewInternalAPI(ctx context.Context, cfg *config.Matrix, cm sqlutil.Connecti
 		util.Log(ctx).WithError(err).Panic("failed to connect to accounts db")
 	}
 
-	keyCm, err := cm.FromOptions(ctx, &cfgKeySrv.Database)
-	if err != nil {
-		util.Log(ctx).WithError(err).Panic("failed to obtain key db connection manager")
-	}
-	keyDB, err := storage.NewKeyDatabase(ctx, keyCm)
+	keyDB, err := storage.NewKeyDatabase(ctx, cm)
 	if err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to connect to key db")
 	}

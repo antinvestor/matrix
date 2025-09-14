@@ -133,11 +133,7 @@ func NewInternalAPI(
 ) *internal.FederationInternalAPI {
 	cfg := &mcfg.FederationAPI
 
-	federationCm, err := cm.FromOptions(ctx, &cfg.Database)
-	if err != nil {
-		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to obtain federation sender db connection manager")
-	}
-	federationDB, err := storage.NewDatabase(ctx, federationCm, caches, cfg.Global.IsLocalServerName)
+	federationDB, err := storage.NewDatabase(ctx, cm, caches, cfg.Global.IsLocalServerName)
 	if err != nil {
 		util.Log(ctx).WithError(err).WithField("component", "federationapi").Panic("failed to connect to federation sender db")
 	}

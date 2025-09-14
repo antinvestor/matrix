@@ -42,12 +42,7 @@ func NewInternalAPI(
 	enableMetrics bool,
 ) api.RoomserverInternalAPI {
 
-	roomserverCm, err := cm.FromOptions(ctx, &cfg.RoomServer.Database)
-	if err != nil {
-		util.Log(ctx).WithError(err).Panic("could not obtain connection manager for roomserver")
-	}
-
-	roomserverDB, err := storage.NewDatabase(ctx, roomserverCm, caches)
+	roomserverDB, err := storage.NewDatabase(ctx, cm, caches)
 	if err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to connect to room server db")
 	}

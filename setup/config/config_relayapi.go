@@ -28,8 +28,4 @@ func (c *RelayAPI) Defaults(opts DefaultOpts) {
 	c.Database.DatabaseURI = opts.DSDatabaseConn
 }
 
-func (c *RelayAPI) Verify(configErrs *Errors) {
-	if c.Database.DatabaseURI == "" {
-		checkNotEmpty(configErrs, "relay_api.database.database_uri", string(c.Database.DatabaseURI))
-	}
-}
+func (c *RelayAPI) Verify(configErrs *Errors) {}

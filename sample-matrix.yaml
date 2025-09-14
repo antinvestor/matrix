@@ -36,15 +36,9 @@ global:
   # considered valid by other homeservers.
   key_validity_period: 168h0m0s
 
-  # Global database connection pool, for PostgreSQL monolith deployments only. If
-  # this section is populated then you can omit the "database" blocks in all other
-  # sections. For monolith deployments using SQLite databases,
-  # you must configure the "database" block for each component instead.
-  database:
-    database_uri: postgres://matrix:s3cr3t@datastore/matrix?sslmode=disable
-    max_open_conns: 90
-    max_idle_conns: 5
-    conn_max_lifetime: -1
+  embedded_config:
+    database_url:
+      - postgres://user:pass@localhost/matrix?sslmode=disable
 
   # Configuration for in-memory caches. Caches can often improve performance by
   # keeping frequently accessed items (like events, identifiers etc.) in memory

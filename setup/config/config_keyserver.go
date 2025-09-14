@@ -19,11 +19,7 @@ func (c *KeyServer) Defaults(opts DefaultOpts) {
 	c.Queues.Defaults(opts)
 }
 
-func (c *KeyServer) Verify(configErrs *Errors) {
-	if c.Database.DatabaseURI == "" {
-		checkNotEmpty(configErrs, "key_server.database.database_uri", string(c.Database.DatabaseURI))
-	}
-}
+func (c *KeyServer) Verify(configErrs *Errors) {}
 
 type KeyServerQueues struct {
 
