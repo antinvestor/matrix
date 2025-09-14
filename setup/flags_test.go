@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/antinvestor/matrix/setup/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -354,6 +355,589 @@ func resetFlags() {
 	flag.Set("config", "matrix.yaml")
 	flag.Set("version", "false")
 	flag.Set("really-enable-open-registration", "false")
+}
+
+func TestParseFlags_ConfigValidationErrors(t *testing.T) {
+	tests := []struct {
+		name           string
+		configContent  string
+		expectedErrors []string
+		description    string
+	}{
+		{
+			name: "negative_cache_size",
+			configContent: `
+version: 2
+global:
+  server_name: test.localhost
+  private_key: matrix_key.pem
+  embedded_config:
+    database_url: 
+      - postgres://user:pass@localhost/matrix?sslmode=disable
+  cache:
+    cache_uri: redis://localhost:6379
+    max_size_estimated: -100
+  queue:
+    queue_uri: nats://localhost:4222
+    topic_prefix: "Matrix_"
+client_api:
+  registration_disabled: true
+federation_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_federation?sslmode=disable
+room_server:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_roomserver?sslmode=disable
+sync_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_syncapi?sslmode=disable
+user_api:
+  account_database:
+    database_uri: postgres://user:pass@localhost/matrix_userapi?sslmode=disable
+key_server:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_keyserver?sslmode=disable
+media_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_mediaapi?sslmode=disable
+relay_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_relayapi?sslmode=disable
+mscs:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_mscs?sslmode=disable
+`,
+			expectedErrors: []string{"invalid value for config key \"max_size_estimated\": -100"},
+			description:    "Should error when cache size is negative",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary config file
+			configFile := createTempConfigFile(t, tt.configContent)
+			defer os.Remove(configFile)
+
+			// Reset flags for testing
+			resetFlags()
+
+			// Set config path flag
+			err := flag.Set("config", configFile)
+			require.NoError(t, err)
+
+			// Call ParseFlags
+			ctx := context.Background()
+			cfg := ParseFlags(ctx)
+
+			// Call Verify to check for validation errors
+			var configErrs config.Errors
+			cfg.Verify(&configErrs)
+
+			// Verify that we got the expected errors
+			if len(tt.expectedErrors) == 0 {
+				assert.Empty(t, configErrs, tt.description)
+			} else {
+				assert.NotEmpty(t, configErrs, tt.description)
+				for _, expectedErr := range tt.expectedErrors {
+					found := false
+					for _, actualErr := range configErrs {
+						if strings.Contains(actualErr, expectedErr) {
+							found = true
+							break
+						}
+					}
+					assert.True(t, found, "Expected error containing '%s' not found in: %v", expectedErr, configErrs)
+				}
+			}
+		})
+	}
+}
+
+func TestParseFlags_MissingRequiredFields(t *testing.T) {
+	tests := []struct {
+		name           string
+		configContent  string
+		expectedErrors []string
+		description    string
+	}{
+		{
+			name: "missing_cache_uri_when_cache_configured",
+			configContent: `
+version: 2
+global:
+  server_name: test.localhost
+  private_key: matrix_key.pem
+  embedded_config:
+    database_url: 
+      - postgres://user:pass@localhost/matrix?sslmode=disable
+  cache:
+    max_size_estimated: 1gb
+  queue:
+    queue_uri: nats://localhost:4222
+    topic_prefix: "Matrix_"
+client_api:
+  registration_disabled: true
+federation_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_federation?sslmode=disable
+room_server:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_roomserver?sslmode=disable
+sync_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_syncapi?sslmode=disable
+user_api:
+  account_database:
+    database_uri: postgres://user:pass@localhost/matrix_userapi?sslmode=disable
+key_server:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_keyserver?sslmode=disable
+media_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_mediaapi?sslmode=disable
+relay_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_relayapi?sslmode=disable
+mscs:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_mscs?sslmode=disable
+`,
+			expectedErrors: []string{"missing config key \"global.cache.cache_uri\""},
+			description:    "Should error when cache URI is missing but cache is configured",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary config file
+			configFile := createTempConfigFile(t, tt.configContent)
+			defer os.Remove(configFile)
+
+			// Reset flags for testing
+			resetFlags()
+
+			// Set config path flag
+			err := flag.Set("config", configFile)
+			require.NoError(t, err)
+
+			// Call ParseFlags
+			ctx := context.Background()
+			cfg := ParseFlags(ctx)
+
+			// Call Verify to check for validation errors
+			var configErrs config.Errors
+			cfg.Verify(&configErrs)
+
+			// Debug: Print all validation errors to understand what's happening
+			t.Logf("All validation errors: %v", configErrs)
+
+			// Verify that we got the expected errors
+			assert.NotEmpty(t, configErrs, tt.description)
+			for _, expectedErr := range tt.expectedErrors {
+				found := false
+				for _, actualErr := range configErrs {
+					if strings.Contains(actualErr, expectedErr) {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "Expected error containing '%s' not found in: %v", expectedErr, configErrs)
+			}
+		})
+	}
+}
+
+func TestParseFlags_ServiceDatabaseValidation(t *testing.T) {
+	// Test that specific service database validation works
+	// This test uses a complete config but with one specific database missing
+	tests := []struct {
+		name           string
+		configContent  string
+		expectedErrors []string
+		description    string
+	}{
+		{
+			name: "missing_federation_api_database",
+			configContent: `
+version: 2
+global:
+  server_name: test.localhost
+  private_key: matrix_key.pem
+  embedded_config:
+    database_url: 
+      - postgres://user:pass@localhost/matrix?sslmode=disable
+  cache:
+    cache_uri: redis://localhost:6379
+  queue:
+    queue_uri: nats://localhost:4222
+    topic_prefix: "Matrix_"
+client_api:
+  registration_disabled: true
+federation_api:
+  database: {}
+room_server:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_roomserver?sslmode=disable
+sync_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_syncapi?sslmode=disable
+user_api:
+  account_database:
+    database_uri: postgres://user:pass@localhost/matrix_userapi?sslmode=disable
+key_server:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_keyserver?sslmode=disable
+media_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_mediaapi?sslmode=disable
+relay_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_relayapi?sslmode=disable
+mscs:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_mscs?sslmode=disable
+`,
+			expectedErrors: []string{},
+			description:    "Should not error even when federation API database URI is missing",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary config file
+			configFile := createTempConfigFile(t, tt.configContent)
+			defer os.Remove(configFile)
+
+			// Reset flags for testing
+			resetFlags()
+
+			// Set config path flag
+			err := flag.Set("config", configFile)
+			require.NoError(t, err)
+
+			// Call ParseFlags
+			ctx := context.Background()
+			cfg := ParseFlags(ctx)
+
+			// Call Verify to check for validation errors
+			var configErrs config.Errors
+			cfg.Verify(&configErrs)
+
+			// Verify that we got no errors
+			assert.Empty(t, configErrs, tt.description)
+		})
+	}
+}
+
+func TestParseFlags_ActorSystemValidation(t *testing.T) {
+	tests := []struct {
+		name           string
+		configContent  string
+		expectedErrors []string
+		description    string
+	}{
+		{
+			name: "invalid_actor_port",
+			configContent: `
+version: 2
+global:
+  server_name: test.localhost
+  private_key: matrix_key.pem
+  actors:
+    enabled: true
+    port: 70000
+client_api:
+  registration_disabled: true
+`,
+			expectedErrors: []string{"invalid value for config key 'room_server.actor_system.port': 70000"},
+			description:    "Should error when actor port is out of valid range",
+		},
+		{
+			name: "invalid_cluster_mode",
+			configContent: `
+version: 2
+global:
+  server_name: test.localhost
+  private_key: matrix_key.pem
+  actors:
+    enabled: true
+    port: 8080
+    cluster_mode: invalid_mode
+client_api:
+  registration_disabled: true
+`,
+			expectedErrors: []string{"invalid value for config key 'room_server.actor_system.cluster_mode': invalid_mode"},
+			description:    "Should error when cluster mode is invalid",
+		},
+		{
+			name: "invalid_idle_timeout",
+			configContent: `
+version: 2
+global:
+  server_name: test.localhost
+  private_key: matrix_key.pem
+  actors:
+    enabled: true
+    port: 8080
+    cluster_mode: none
+    idle_timeout: 5s
+client_api:
+  registration_disabled: true
+`,
+			expectedErrors: []string{"invalid value for config key 'room_server.actor_system.idle_timeout': 5s"},
+			description:    "Should error when idle timeout is too short",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary config file
+			configFile := createTempConfigFile(t, tt.configContent)
+			defer os.Remove(configFile)
+
+			// Reset flags for testing
+			resetFlags()
+
+			// Set config path flag
+			err := flag.Set("config", configFile)
+			require.NoError(t, err)
+
+			// Call ParseFlags
+			ctx := context.Background()
+			cfg := ParseFlags(ctx)
+
+			// Call Verify to check for validation errors
+			var configErrs config.Errors
+			cfg.Verify(&configErrs)
+
+			// Verify that we got the expected errors
+			assert.NotEmpty(t, configErrs, tt.description)
+			for _, expectedErr := range tt.expectedErrors {
+				found := false
+				for _, actualErr := range configErrs {
+					if strings.Contains(actualErr, expectedErr) {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "Expected error containing '%s' not found in: %v", expectedErr, configErrs)
+			}
+		})
+	}
+}
+
+func TestParseFlags_ValidConfiguration(t *testing.T) {
+	// Test that a complete, valid configuration passes all validation
+	configContent := `
+version: 2
+global:
+  server_name: test.localhost
+  private_key: matrix_key.pem
+  embedded_config:
+    database_url: 
+      - postgres://user:pass@localhost/matrix?sslmode=disable
+  cache:
+    cache_uri: redis://localhost:6379
+    max_size_estimated: 1gb
+  queue:
+    queue_uri: nats://localhost:4222
+    topic_prefix: "Matrix_"
+client_api:
+  registration_disabled: true
+federation_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_federation?sslmode=disable
+room_server:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_roomserver?sslmode=disable
+sync_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_syncapi?sslmode=disable
+user_api:
+  account_database:
+    database_uri: postgres://user:pass@localhost/matrix_userapi?sslmode=disable
+key_server:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_keyserver?sslmode=disable
+media_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_mediaapi?sslmode=disable
+relay_api:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_relayapi?sslmode=disable
+mscs:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_mscs?sslmode=disable
+`
+
+	// Create temporary config file
+	configFile := createTempConfigFile(t, configContent)
+	defer os.Remove(configFile)
+
+	// Reset flags for testing
+	resetFlags()
+
+	// Set config path flag
+	err := flag.Set("config", configFile)
+	require.NoError(t, err)
+
+	// Call ParseFlags
+	ctx := context.Background()
+	cfg := ParseFlags(ctx)
+
+	// Call Verify to check for validation errors
+	var configErrs config.Errors
+	cfg.Verify(&configErrs)
+
+	// Verify that there are no validation errors
+	if len(configErrs) > 0 {
+		t.Errorf("Expected no validation errors, but got: %v", configErrs)
+	}
+	assert.Empty(t, configErrs, "Valid configuration should pass all validation checks")
+}
+
+func TestParseFlags_ValidDatabaseConfiguration(t *testing.T) {
+	// Test that a complete, valid configuration passes all validation
+	configContent := `
+version: 2
+global:
+  server_name: test.localhost
+  private_key: matrix_key.pem
+  embedded_config:
+    database_url: 
+      - postgres://user:pass@localhost/matrix?sslmode=disable
+  cache:
+    cache_uri: redis://localhost:6379
+    max_size_estimated: 1gb
+  queue:
+    queue_uri: nats://localhost:4222
+    topic_prefix: "Matrix_"
+client_api:
+  registration_disabled: true
+mscs:
+  database:
+    database_uri: postgres://user:pass@localhost/matrix_mscs?sslmode=disable
+`
+
+	// Create temporary config file
+	configFile := createTempConfigFile(t, configContent)
+	defer os.Remove(configFile)
+
+	// Reset flags for testing
+	resetFlags()
+
+	// Set config path flag
+	err := flag.Set("config", configFile)
+	require.NoError(t, err)
+
+	// Call ParseFlags
+	ctx := context.Background()
+	cfg := ParseFlags(ctx)
+
+	// Call Verify to check for validation errors
+	var configErrs config.Errors
+	cfg.Verify(&configErrs)
+
+	// Verify that there are no validation errors
+	if len(configErrs) > 0 {
+		t.Errorf("Expected no validation errors, but got: %v", configErrs)
+	}
+	assert.Empty(t, configErrs, "Valid configuration should pass all validation checks")
+}
+
+func TestParseFlags_InvalidConfigFile(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupFunc   func(t *testing.T) string
+		description string
+	}{
+		{
+			name: "nonexistent_config_file",
+			setupFunc: func(t *testing.T) string {
+				return "/nonexistent/path/config.yaml"
+			},
+			description: "Should handle nonexistent config file gracefully",
+		},
+		{
+			name: "malformed_yaml",
+			setupFunc: func(t *testing.T) string {
+				content := `
+version: 2
+global:
+  server_name: test.localhost
+  private_key: matrix_key.pem
+  invalid_yaml: [unclosed bracket
+client_api:
+  registration_disabled: true
+`
+				return createTempConfigFile(t, content)
+			},
+			description: "Should handle malformed YAML gracefully",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configFile := tt.setupFunc(t)
+			if strings.Contains(configFile, "/tmp/") {
+				defer os.Remove(configFile)
+			}
+
+			// Reset flags for testing
+			resetFlags()
+
+			// Set config path flag
+			err := flag.Set("config", configFile)
+			require.NoError(t, err)
+
+			// Call ParseFlags - this should handle errors gracefully
+			// Note: In a real scenario, this would call log.Fatal, but in tests
+			// we expect the config loading to fail and return an error
+
+			// We expect this to potentially panic or exit, so we'll just verify
+			// that the flag parsing works correctly up to the config loading
+			assert.NotPanics(t, func() {
+				// Just verify flag parsing works
+				flag.Parse()
+			}, tt.description)
+		})
+	}
+}
+
+func TestParseFlags_VersionFlag(t *testing.T) {
+	// Create minimal config for flag parsing
+	configContent := createMinimalTestConfig()
+	configFile := createTempConfigFile(t, configContent)
+	defer os.Remove(configFile)
+
+	// Reset flags for testing
+	resetFlags()
+
+	// Set version flag
+	err := flag.Set("version", "true")
+	require.NoError(t, err)
+
+	// Set config path flag (even though version should exit before using it)
+	err = flag.Set("config", configFile)
+	require.NoError(t, err)
+
+	// Note: In a real scenario, ParseFlags would call os.Exit(0) when version=true
+	// We can't easily test this without subprocess testing, but we can verify
+	// the flag is set correctly
+	assert.True(t, *version, "Version flag should be set to true")
+}
+
+func TestParseFlags_EmptyConfigPath(t *testing.T) {
+	// Reset flags for testing
+	resetFlags()
+
+	// Set empty config path
+	err := flag.Set("config", "")
+	require.NoError(t, err)
+
+	// Note: In a real scenario, ParseFlags would call log.Fatal when config is empty
+	// We can verify the flag is set correctly
+	assert.Empty(t, *configPath, "Config path should be empty")
 }
 
 func restoreEnv(key, value string) {

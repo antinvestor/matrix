@@ -139,45 +139,6 @@ func (c *Global) LoadEnv() error {
 	return nil
 }
 
-// PropagateEnvToServices propagates environment variables from Global to all service configurations
-// This should be called after LoadEnv() and before Verify() to ensure all services have proper database configuration
-func (config *Matrix) PropagateEnvToServices() {
-	// Get the database URI from environment variable, prioritising DATABASE_URL then DATABASE_URI for backward compatibility
-	databaseURI := DataSource(os.Getenv("DATABASE_URL"))
-	if databaseURI == "" {
-		databaseURI = DataSource(os.Getenv("DATABASE_URI"))
-	}
-
-	// If we have a database URI from environment, propagate it to all services
-	if databaseURI != "" {
-		// Propagate to all service database configurations
-		if config.FederationAPI.Database.DatabaseURI == "" {
-			config.FederationAPI.Database.DatabaseURI = databaseURI
-		}
-		if config.KeyServer.Database.DatabaseURI == "" {
-			config.KeyServer.Database.DatabaseURI = databaseURI
-		}
-		if config.MediaAPI.Database.DatabaseURI == "" {
-			config.MediaAPI.Database.DatabaseURI = databaseURI
-		}
-		if config.RoomServer.Database.DatabaseURI == "" {
-			config.RoomServer.Database.DatabaseURI = databaseURI
-		}
-		if config.SyncAPI.Database.DatabaseURI == "" {
-			config.SyncAPI.Database.DatabaseURI = databaseURI
-		}
-		if config.UserAPI.AccountDatabase.DatabaseURI == "" {
-			config.UserAPI.AccountDatabase.DatabaseURI = databaseURI
-		}
-		if config.RelayAPI.Database.DatabaseURI == "" {
-			config.RelayAPI.Database.DatabaseURI = databaseURI
-		}
-		if config.MSCs.Database.DatabaseURI == "" {
-			config.MSCs.Database.DatabaseURI = databaseURI
-		}
-	}
-}
-
 func (c *Global) Verify(configErrs *Errors) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
