@@ -71,8 +71,4 @@ func (c *MediaAPI) Verify(configErrs *Errors) {
 		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].width", i), int64(size.Width))
 		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].height", i), int64(size.Height))
 	}
-
-	if c.Database.DatabaseURI == "" {
-		checkNotEmpty(configErrs, "media_api.database.database_uri", string(c.Database.DatabaseURI))
-	}
 }

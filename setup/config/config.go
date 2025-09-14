@@ -511,10 +511,8 @@ func (config *Matrix) Verify(configErrs *Errors) {
 		Verify(configErrs *Errors)
 	}
 	for _, c := range []verifiable{
-		&config.Global, &config.ClientAPI, &config.FederationAPI,
-		&config.KeyServer, &config.MediaAPI, &config.RoomServer,
+		&config.Global, &config.ClientAPI, &config.MediaAPI, &config.RoomServer,
 		&config.SyncAPI, &config.UserAPI,
-		&config.AppServiceAPI, &config.RelayAPI, &config.MSCs,
 	} {
 		c.Verify(configErrs)
 	}
