@@ -52,11 +52,7 @@ func AddPublicRoutes(
 
 	cfgSyncAPI := cfg.SyncAPI
 
-	syncCm, err := cm.FromOptions(ctx, &cfgSyncAPI.Database)
-	if err != nil {
-		util.Log(ctx).WithError(err).Panic("failed to obtain sync db connection manager")
-	}
-	syncDB, err := storage.NewSyncServerDatabase(ctx, syncCm)
+	syncDB, err := storage.NewSyncServerDatabase(ctx, cm)
 	if err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to connect to sync db")
 	}

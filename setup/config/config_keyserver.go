@@ -19,6 +19,8 @@ func (c *KeyServer) Defaults(opts DefaultOpts) {
 	c.Queues.Defaults(opts)
 }
 
+func (c *KeyServer) Verify(configErrs *Errors) {}
+
 type KeyServerQueues struct {
 
 	// durable - FederationAPIKeyChangeConsumer

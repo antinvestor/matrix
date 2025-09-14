@@ -79,6 +79,8 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 	c.Queues.Defaults(opts)
 }
 
+func (c *FederationAPI) Verify(configErrs *Errors) {}
+
 // Proxy The config for setting a proxy to use for server->server requests
 type Proxy struct {
 	// Is the proxy enabled?

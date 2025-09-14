@@ -67,11 +67,7 @@ func NewRelayInternalAPI(
 	caches cacheutil.FederationCache,
 ) api.RelayInternalAPI {
 
-	relayCm, err := cm.FromOptions(ctx, &cfg.RelayAPI.Database)
-	if err != nil {
-		util.Log(ctx).WithError(err).Panic("failed to obtain relay db connection manager :%v", err)
-	}
-	relayDB, err := storage.NewDatabase(ctx, relayCm, caches, cfg.Global.IsLocalServerName)
+	relayDB, err := storage.NewDatabase(ctx, cm, caches, cfg.Global.IsLocalServerName)
 	if err != nil {
 		util.Log(ctx).WithError(err).Panic("failed to connect to relay db")
 	}
