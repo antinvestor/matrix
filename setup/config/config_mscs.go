@@ -27,3 +27,9 @@ func (c *MSCs) Enabled(msc string) bool {
 	}
 	return false
 }
+
+func (c *MSCs) Verify(configErrs *Errors) {
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "mscs.database.database_uri", string(c.Database.DatabaseURI))
+	}
+}

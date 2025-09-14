@@ -55,6 +55,9 @@ func (c *AppServiceAPI) Defaults(opts DefaultOpts) {
 	c.Queues.Defaults(opts)
 }
 
+func (c *AppServiceAPI) Verify(configErrs *Errors) {
+}
+
 // ApplicationServiceNamespace is the namespace that a specific application
 // service has management over.
 type ApplicationServiceNamespace struct {

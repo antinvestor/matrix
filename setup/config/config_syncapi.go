@@ -28,6 +28,9 @@ func (c *SyncAPI) Defaults(opts DefaultOpts) {
 
 func (c *SyncAPI) Verify(configErrs *Errors) {
 	c.Fulltext.Verify(configErrs)
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "sync_api.database", string(c.Database.DatabaseURI))
+	}
 }
 
 type Fulltext struct {

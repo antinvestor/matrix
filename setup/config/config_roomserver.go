@@ -28,6 +28,9 @@ func (c *RoomServer) Defaults(opts DefaultOpts) {
 }
 
 func (c *RoomServer) Verify(configErrs *Errors) {
+	if c.Database.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "room_server.database.database_uri", string(c.Database.DatabaseURI))
+	}
 
 	if !gomatrixserverlib.KnownRoomVersion(c.DefaultRoomVersion) {
 		configErrs.Add(fmt.Sprintf("invalid value for config key 'room_server.default_room_version': unsupported room version: %q", c.DefaultRoomVersion))

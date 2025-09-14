@@ -48,6 +48,9 @@ func (c *UserAPI) Defaults(opts DefaultOpts) {
 
 func (c *UserAPI) Verify(configErrs *Errors) {
 	checkPositive(configErrs, "user_api.openid_token_lifetime_ms", c.OpenIDTokenLifetimeMS)
+	if c.AccountDatabase.DatabaseURI == "" {
+		checkNotEmpty(configErrs, "user_api.account_database.database_uri", string(c.AccountDatabase.DatabaseURI))
+	}
 }
 
 type UserAPIQueues struct {
