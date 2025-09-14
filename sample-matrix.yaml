@@ -38,13 +38,13 @@ global:
 
   embedded_config:
     database_url:
-      - postgres://user:pass@localhost/matrix?sslmode=disable
+      - postgres://matrix:s3cr3t@localhost/matrix?sslmode=disable
 
   # Configuration for in-memory caches. Caches can often improve performance by
   # keeping frequently accessed items (like events, identifiers etc.) in memory
   # rather than having to read them from the database.
   cache:
-    database_uri: redis://matrix:s3cr3t@cache:6379/0?protocol=3
+    cache_uri: redis://matrix:s3cr3t@cache:6379/0?protocol=3
 
     # The estimated maximum size for the global cache in bytes, or in terabytes,
     # gigabytes, megabytes or kilobytes when the appropriate 'tb', 'gb', 'mb' or

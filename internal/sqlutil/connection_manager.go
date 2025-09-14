@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"sync"
 
 	"github.com/antinvestor/matrix/setup/config"
@@ -179,7 +180,7 @@ func NewConnectionManager(service *frame.Service) ConnectionManager {
 			opts = &config.DatabaseOptions{
 				Prefix:                 "",
 				Reference:              "",
-				DatabaseURI:            config.DataSource(primaryUrl[0]),
+				DatabaseURI:            config.DataSource(strings.Join(primaryUrl, ",")),
 				MaxOpenConnections:     cfg.GetMaxOpenConnections(),
 				MaxIdleConnections:     cfg.GetMaxIdleConnections(),
 				ConnMaxLifetimeSeconds: int(cfg.GetMaxConnectionLifeTimeInSeconds().Seconds()),
