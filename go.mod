@@ -5,14 +5,13 @@ go 1.25.1
 require (
 	buf.build/gen/go/antinvestor/presence/connectrpc/go v1.18.1-20250520083445-2d0e51ca1296.1
 	buf.build/gen/go/antinvestor/presence/protocolbuffers/go v1.36.9-20250520083445-2d0e51ca1296.1
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.9-20250912141014-52f32327d4b0.1
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/validate v0.3.0
-	github.com/antinvestor/apis/go/common v1.43.4
-	github.com/antinvestor/apis/go/device v1.43.4
-	github.com/antinvestor/apis/go/notification v1.43.4
-	github.com/antinvestor/apis/go/partition v1.43.4
-	github.com/antinvestor/apis/go/profile v1.43.4
+	github.com/antinvestor/apis/go/common v1.44.1
+	github.com/antinvestor/apis/go/device v1.44.1
+	github.com/antinvestor/apis/go/notification v1.44.1
+	github.com/antinvestor/apis/go/partition v1.44.1
+	github.com/antinvestor/apis/go/profile v1.44.1
 	github.com/antinvestor/gomatrix v0.1.6
 	github.com/antinvestor/gomatrixserverlib v0.2.7
 	github.com/asynkron/protoactor-go v0.0.0-20250815052215-f5fa862a4dbb
@@ -52,6 +51,7 @@ require (
 )
 
 require (
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.9-20250912141014-52f32327d4b0.1 // indirect
 	buf.build/go/protovalidate v1.0.0 // indirect
 	cel.dev/expr v0.24.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
@@ -191,7 +191,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.8.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	gocloud.dev v0.43.0 // indirect
 	golang.org/x/net v0.44.0 // indirect
@@ -200,9 +200,9 @@ require (
 	golang.org/x/time v0.13.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.249.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250826171959-ef028d996bc1 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250826171959-ef028d996bc1 // indirect
-	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250908214217-97024824d090 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250908214217-97024824d090 // indirect
+	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
