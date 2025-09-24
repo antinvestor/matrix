@@ -704,5 +704,8 @@ func isPrivilegedCreator(ctx context.Context, rsAPI roomserverAPI.ClientRoomserv
 		EventType: spec.MRoomCreate,
 		StateKey:  "",
 	})
+	if createEvent == nil {
+		return false
+	}
 	return gomatrixserverlib.MustGetRoomVersion(createEvent.Version()).PrivilegedCreators() && slices.Contains(gomatrixserverlib.CreatorsFromCreateEvent(createEvent), string(senderID))
 }
