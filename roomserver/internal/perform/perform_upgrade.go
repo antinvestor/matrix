@@ -385,6 +385,9 @@ func (r *Upgrader) userIsAuthorized(ctx context.Context, senderID spec.SenderID,
 		EventType: spec.MRoomCreate,
 		StateKey:  "",
 	})
+	if createEvent == nil {
+		return false
+	}
 	if gomatrixserverlib.MustGetRoomVersion(createEvent.Version()).PrivilegedCreators() &&
 		slices.Contains(gomatrixserverlib.CreatorsFromCreateEvent(createEvent), string(senderID)) {
 		return true
