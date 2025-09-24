@@ -64,8 +64,8 @@ github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYW
 github.com/antlr4-go/antlr/v4 v4.13.1/go.mod h1:GKmUxMtwp6ZgGwZSva4eWPC5mS6vUAmOABFgjdkM7Nw=
 github.com/asynkron/gofun v0.0.0-20220329210725-34fed760f4c2 h1:jEsFZ9d/ieJGVrx3fSPi8oe/qv21fRmyUL5cS3ZEn5A=
 github.com/asynkron/gofun v0.0.0-20220329210725-34fed760f4c2/go.mod h1:5GMOSqaYxNWwuVRWyampTPJEntwz7Mj9J8v1a7gSU2E=
-github.com/asynkron/protoactor-go v0.0.0-20250815052215-f5fa862a4dbb h1:qL4X8kzpTu2yNh7VZqn7lcu4oaBXuACwhQTdgkw9Z8E=
-github.com/asynkron/protoactor-go v0.0.0-20250815052215-f5fa862a4dbb/go.mod h1:UXghHDFb5p9SwGtfHmEp05xWf9sES9cVS9SqMk2RgYc=
+github.com/asynkron/protoactor-go v0.0.0-20250909165758-e952b3c0850e h1:JBQ2M5L4TZ+YSv6J3Z2Znp+a2m0uHi5SQLazHXaERxo=
+github.com/asynkron/protoactor-go v0.0.0-20250909165758-e952b3c0850e/go.mod h1:ei1eUEYzZOp1pPh0d0s/9daQLL7Q9D2XqbfwNJ01M28=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=
@@ -572,8 +572,8 @@ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8
 gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
-gopkg.in/evanphx/json-patch.v4 v4.13.0 h1:czT3CmqEaQ1aanPc5SdlgQrrEIb8w/wwCvWWnfEbYzo=
-gopkg.in/evanphx/json-patch.v4 v4.13.0/go.mod h1:p8EYWUEYMpynmqDbY58zCKCFZw8pRWMG4EsWvDvM72M=
+gopkg.in/evanphx/json-patch.v4 v4.12.0 h1:n6jtcsulIzXPJaxegRbvFNNrZDjbij7ny3gmSPG+6V4=
+gopkg.in/evanphx/json-patch.v4 v4.12.0/go.mod h1:p8EYWUEYMpynmqDbY58zCKCFZw8pRWMG4EsWvDvM72M=
 gopkg.in/h2non/bimg.v1 v1.1.9 h1:wZIUbeOnwr37Ta4aofhIv8OI8v4ujpjXC9mXnAGpQjM=
 gopkg.in/h2non/bimg.v1 v1.1.9/go.mod h1:PgsZL7dLwUbsGm1NYps320GxGgvQNTnecMCZqxV11So=
 gopkg.in/h2non/gock.v1 v1.1.2 h1:jBbHXgGBK/AoPVfJh5x4r/WxIrElvbLel8TCZkkZJoY=

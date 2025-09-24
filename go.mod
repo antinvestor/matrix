@@ -5,6 +5,7 @@ go 1.25.1
 require (
 	buf.build/gen/go/antinvestor/presence/connectrpc/go v1.18.1-20250520083445-2d0e51ca1296.1
 	buf.build/gen/go/antinvestor/presence/protocolbuffers/go v1.36.9-20250520083445-2d0e51ca1296.1
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.9-20250912141014-52f32327d4b0.1
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/validate v0.3.0
 	github.com/antinvestor/apis/go/common v1.44.1
@@ -14,7 +15,7 @@ require (
 	github.com/antinvestor/apis/go/profile v1.44.1
 	github.com/antinvestor/gomatrix v0.1.6
 	github.com/antinvestor/gomatrixserverlib v0.2.7
-	github.com/asynkron/protoactor-go v0.0.0-20250815052215-f5fa862a4dbb
+	github.com/asynkron/protoactor-go v0.0.0-20250909165758-e952b3c0850e
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -28,6 +29,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redis/go-redis/v9 v9.14.0
+	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
@@ -51,7 +53,6 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.9-20250912141014-52f32327d4b0.1 // indirect
 	buf.build/go/protovalidate v1.0.0 // indirect
 	cel.dev/expr v0.24.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
@@ -157,7 +158,6 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.25.8 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stoewer/go-strcase v1.3.1 // indirect
 	github.com/testcontainers/testcontainers-go v0.39.0 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
@@ -202,7 +202,7 @@ require (
 	google.golang.org/api v0.249.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250908214217-97024824d090 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250908214217-97024824d090 // indirect
-	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
+	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
