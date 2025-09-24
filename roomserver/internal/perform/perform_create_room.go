@@ -135,7 +135,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 			authEvents, 1, "", identity, createRequest.EventTime, string(senderID), roomID.String(), c.RSAPI,
 		)
 		if jsonErr != nil {
-			util.Log(ctx).WithError(err).Error("Failed to make the create event")
+util.Log(ctx).WithError(jsonErr).Error("Failed to make the create event")
 			return "", jsonErr
 		}
 		if err = authEvents.AddEvent(createEvent); err != nil {
