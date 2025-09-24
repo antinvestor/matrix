@@ -232,7 +232,7 @@ func createRoom(
 			authEvents, 1, "", identity, evTime, userID.String(), "", rsAPI,
 		)
 		if jsonErr != nil {
-logger.WithError(jsonErr).Error("Failed to make the create event")
+			logger.WithField("err", jsonErr).Error("Failed to make the create event")
 			return *jsonErr
 		}
 		createEventJSON = createEvent.JSON()
