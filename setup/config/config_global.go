@@ -92,6 +92,9 @@ type Global struct {
 
 	// Actors contains configuration for the Proto.Actor based distributed event processing system
 	Actors ActorOptions `yaml:"actors,omitempty"`
+
+	// Directory to serve static files from disk, with fallback to embedded content
+	StaticDir string `yaml:"static_dir"`
 }
 
 func (c *Global) Defaults(opts DefaultOpts) {
@@ -118,6 +121,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 
 	c.SyncAPIPresenceURI = fmt.Sprintf("http://localhost%s", c.Port())
 	c.Actors.Defaults(opts)
+	c.StaticDir = "./static"
 }
 
 func (c *Global) LoadEnv() error {

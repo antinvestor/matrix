@@ -126,9 +126,13 @@ func SetupHTTPOption(
 	ConfigureAdminEndpoints(ctx, routers)
 
 	// Parse and execute the landing page template
-	tmpl := template.Must(template.ParseFS(staticContent, "static/*.gotmpl"))
+	tmpl, err := loadLandingPageTemplate(cfg.Global.StaticDir)
+	if err != nil {
+		util.Log(ctx).WithError(err).Error("failed to load landing page template")
+		return nil, err
+	}
 	landingPage := &bytes.Buffer{}
-	if err := tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
+	if err = tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
 		"Version": internal.VersionString(),
 	}); err != nil {
 		util.Log(ctx).WithError(err).Error("failed to execute landing page template")
@@ -180,4 +184,14 @@ func WaitForShutdown(ctx context.Context) {
 
 	// ShutdownDendrite and WaitForComponentsToFinish are not used in this function, so we don't need to call them
 	util.Log(ctx).Warn("Matrix is exiting now")
+}
+
+func loadLandingPageTemplate(staticDir string) (*template.Template, error) {
+	// Try to load from disk first
+	tmpl, err := template.ParseGlob(staticDir + "/*.gotmpl")
+	if err != nil {
+		// Fall back to embedded content
+		return template.ParseFS(staticContent, "static/*.gotmpl")
+	}
+	return tmpl, nil
 }
