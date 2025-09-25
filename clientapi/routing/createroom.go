@@ -171,7 +171,7 @@ func createRoom(
 
 	roomVersion := rsAPI.DefaultRoomVersion()
 	if createRequest.RoomVersion != "" {
-		candidateVersion := createRequest.RoomVersion
+		candidateVersion := gomatrixserverlib.RoomVersion(createRequest.RoomVersion)
 		_, roomVersionError := roomserverVersion.SupportedRoomVersion(candidateVersion)
 		if roomVersionError != nil {
 			return util.JSONResponse{
@@ -182,15 +182,9 @@ func createRoom(
 		roomVersion = candidateVersion
 	}
 
-	logger.
-		WithField("userID", userID.String()).
-		WithField("roomID", roomID.String()).
-		WithField("roomVersion", roomVersion).
-		Info("Creating new room")
-
 	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID.String(), asAPI, profileAPI)
 	if err != nil {
-		util.Log(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
+		logger.WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
@@ -203,6 +197,49 @@ func createRoom(
 	keyID := cfg.Global.KeyID
 	privateKey := cfg.Global.PrivateKey
 
+	verImpl := gomatrixserverlib.MustGetRoomVersion(roomVersion)
+
+	var createEventJSON json.RawMessage
+	if verImpl.DomainlessRoomIDs() {
+		// make the create event up-front so the roomserver can calculate the room NID to store.
+		var additionalCreators []string
+		if createRequest.Preset == spec.PresetTrustedPrivateChat {
+			additionalCreators = createRequest.Invite
+		}
+		createContent, err := roomserverAPI.GenerateCreateContent(ctx, createRequest.RoomVersion, userID.String(), createRequest.CreationContent, additionalCreators)
+		if err != nil {
+			logger.WithError(err).Error("GenerateCreateContent failed")
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: spec.BadJSON("invalid create content"),
+			}
+		}
+		authEvents, _ := gomatrixserverlib.NewAuthEvents(nil)
+		identity, err := cfg.Global.SigningIdentityFor(userID.Domain())
+		if err != nil {
+			logger.WithError(err).Error("Failed to get signing identity")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: spec.InternalServerError{},
+			}
+		}
+		createEvent, jsonErr := roomserverAPI.GeneratePDU(
+			ctx, gomatrixserverlib.MustGetRoomVersion(roomVersion),
+			gomatrixserverlib.FledglingEvent{
+				Type:    spec.MRoomCreate,
+				Content: createContent,
+			},
+			authEvents, 1, "", identity, evTime, userID.String(), "", rsAPI,
+		)
+		if jsonErr != nil {
+			logger.WithField("err", jsonErr).Error("Failed to make the create event")
+			return *jsonErr
+		}
+		createEventJSON = createEvent.JSON()
+		r := createEvent.RoomID()
+		roomID = &r
+	}
+
 	req := roomserverAPI.PerformCreateRoomRequest{
 		InvitedUsers:              createRequest.Invite,
 		RoomName:                  createRequest.Name,
@@ -210,6 +247,7 @@ func createRoom(
 		Topic:                     createRequest.Topic,
 		StatePreset:               createRequest.Preset,
 		CreationContent:           createRequest.CreationContent,
+		CreateEvent:               createEventJSON,
 		InitialState:              createRequest.InitialState,
 		RoomAliasName:             createRequest.RoomAliasName,
 		RoomVersion:               roomVersion,
@@ -222,6 +260,12 @@ func createRoom(
 		PrivateKey:      privateKey,
 		EventTime:       evTime,
 	}
+
+	logger.
+		WithField("userID", userID.String()).
+		WithField("roomID", roomID.String()).
+		WithField("roomVersion", roomVersion).
+		Info("Creating new room")
 
 	roomAlias, createRes := rsAPI.PerformCreateRoom(ctx, *userID, *roomID, &req)
 	if createRes != nil {

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/antinvestor/gomatrix"
+	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/gomatrixserverlib/tokens"
 	appserviceAPI "github.com/antinvestor/matrix/appservice/api"
@@ -147,7 +148,7 @@ func SendServerNotice(
 
 	// create a new room for the user
 	if len(commonRooms) == 0 {
-		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID.String())
+		powerLevelContent := eventutil.InitialPowerLevelsContent(gomatrixserverlib.MustGetRoomVersion(roomVersion), senderUserID.String())
 		powerLevelContent.Users[r.UserID] = -10 // taken from Synapse
 		pl, err0 := json.Marshal(powerLevelContent)
 		if err0 != nil {

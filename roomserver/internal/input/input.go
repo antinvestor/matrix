@@ -210,6 +210,7 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 	// a string, because we might want to return that to the caller if
 	// it was a synchronous request.
 	var errString string
+	wasRejected := false
 	err = r.processRoomEvent(
 		ctx,
 		spec.ServerName(metadata["virtual_host"]),
@@ -228,6 +229,7 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 				WithField("event_id", inputRoomEvent.Event.EventID()).
 				WithField("type", inputRoomEvent.Event.Type()).
 				Warn("Roomserver rejected event")
+			wasRejected = true
 
 		default:
 
@@ -247,6 +249,10 @@ func (r *Inputer) HandleRoomEvent(ctx context.Context, metadata map[string]strin
 			err = nil
 		}
 
+	}
+
+	if wasRejected {
+		errString = api.InputWasRejected
 	}
 
 	// If it was a synchronous input request then the "sync" field
