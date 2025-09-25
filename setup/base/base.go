@@ -132,7 +132,7 @@ func SetupHTTPOption(
 		return nil, err
 	}
 	landingPage := &bytes.Buffer{}
-	if err := tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
+	if err = tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
 		"Version": internal.VersionString(),
 	}); err != nil {
 		util.Log(ctx).WithError(err).Error("failed to execute landing page template")
