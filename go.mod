@@ -3,9 +3,9 @@ module github.com/antinvestor/matrix
 go 1.25.1
 
 require (
-	buf.build/gen/go/antinvestor/presence/connectrpc/go v1.18.1-20250520083445-2d0e51ca1296.1
+	buf.build/gen/go/antinvestor/presence/connectrpc/go v1.19.0-20250520083445-2d0e51ca1296.1
 	buf.build/gen/go/antinvestor/presence/protocolbuffers/go v1.36.9-20250520083445-2d0e51ca1296.1
-	connectrpc.com/connect v1.18.1
+	connectrpc.com/connect v1.19.0
 	connectrpc.com/validate v0.3.0
 	github.com/antinvestor/apis/go/common v1.44.1
 	github.com/antinvestor/apis/go/device v1.44.1
@@ -23,7 +23,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pitabwire/frame v1.58.11
+	github.com/pitabwire/frame v1.58.12
 	github.com/pitabwire/util v0.3.4
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
@@ -197,7 +197,7 @@ require (
 	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.13.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
-	google.golang.org/api v0.249.0 // indirect
+	google.golang.org/api v0.250.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250908214217-97024824d090 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250908214217-97024824d090 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
