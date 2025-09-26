@@ -100,7 +100,8 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 					Subject: "asub",
 				},
 				DisplayName:     "aname",
-				SuggestedUserID: "auser",
+				SuggestedUserID: "@asub:example.com",
+				Contacts:        []string{"auser"},
 			},
 		},
 	}
@@ -201,7 +202,8 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 					Subject: "asub",
 				},
 				DisplayName:     "aname",
-				SuggestedUserID: "auser",
+				SuggestedUserID: "@asub:example.com",
+				Contacts:        []string{"auser"},
 			},
 		},
 	}
@@ -226,6 +228,7 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 					ClientID:     "aclientid",
 					ClientSecret: "aclientsecret",
 				},
+				serverName:        "example.com",
 				hc:                s.Client(),
 				exp:               time.Now().Add(2 * time.Minute),
 				resetOauth2Config: true,
