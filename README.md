@@ -69,7 +69,7 @@ Then point your favourite Matrix client at `http://localhost:8008` or `https://l
 This means Matrix support amongst others:
 
 - Core room functionality (creating rooms, invites, auth rules)
-- Room versions 1 to 10 supported
+- Room versions 1 to 12 supported
 - Backfilling locally and via federation
 - Accounts, profiles and devices
 - Published room lists

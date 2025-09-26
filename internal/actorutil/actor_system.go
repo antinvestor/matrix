@@ -39,9 +39,7 @@ func NewManager(ctx context.Context, config *config.ActorOptions, qm queueutil.Q
 
 	actorSystem := actor.NewActorSystem(actor.WithLoggerFactory(
 		func(sys *actor.ActorSystem) *slog.Logger {
-
 			log := svc.SLog(ctx)
-
 			return log
 		}))
 
