@@ -248,14 +248,12 @@ func (p *oidcIdentityProvider) getUserInfo(ctx context.Context, accessToken stri
 	if sub == "" {
 		return "", "", nil, fmt.Errorf("missing or invalid 'sub' field in user info response body")
 	}
+	subject = sub
 
 	name := data.GetString("name")
-	if name == "" {
-		return "", "", nil, fmt.Errorf("missing or invalid 'name' field in user info response body")
+	if name != "" {
+		displayName = name
 	}
-
-	subject = sub
-	displayName = name
 
 	// Extract optional suggested localpart from contacts
 	if contactList, ok := data["contacts"].([]any); ok {
