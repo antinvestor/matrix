@@ -157,6 +157,7 @@ type CallbackResult struct {
 	Identifier      UserIdentifier
 	DisplayName     string
 	SuggestedUserID string
+	Contacts        []string
 	Token           *oauth2.Token
 }
 

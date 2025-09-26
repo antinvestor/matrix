@@ -29,6 +29,7 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 	"golang.org/x/oauth2"
 )
@@ -146,7 +147,7 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 
 	logger.WithField("access token", token.AccessToken).WithField("refresh token", token.RefreshToken).Info("obtained token from authentication service")
 
-	subject, displayName, suggestedLocalpart, err := p.getUserInfo(ctx, token.AccessToken)
+	subject, displayName, contacts, err := p.getUserInfo(ctx, token.AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +162,8 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 			Subject: subject,
 		},
 		DisplayName:     displayName,
-		SuggestedUserID: suggestedLocalpart,
+		SuggestedUserID: subject,
+		Contacts:        contacts,
 		Token:           token,
 	}
 
@@ -212,43 +214,58 @@ func (p *oidcIdentityProvider) generateCodeChallenge(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
 
-func (p *oidcIdentityProvider) getUserInfo(ctx context.Context, accessToken string) (subject, displayName, suggestedLocalpart string, _ error) {
+func (p *oidcIdentityProvider) getUserInfo(ctx context.Context, accessToken string) (subject, displayName string, contacts []string, _ error) {
 	hreq, err := http.NewRequestWithContext(ctx, http.MethodGet, p.userInfoURL, nil)
 	if err != nil {
-		return "", "", "", err
+		return "", "", nil, err
 	}
 	hreq.Header.Set("Authorization", "Bearer "+accessToken)
 	hreq.Header.Set("Accept", p.responseMimeType)
 
 	hresp, err := httpDo(ctx, p.hc, hreq)
 	if err != nil {
-		return "", "", "", fmt.Errorf("user info: %w", err)
+		return "", "", nil, fmt.Errorf("user info: %w", err)
 	}
 	defer hresp.Body.Close() // nolint:errcheck
 
 	body, err := io.ReadAll(hresp.Body)
 	if err != nil {
-		return "", "", "", err
+		return "", "", nil, err
 	}
 
-	var profileInfo map[string]any
-	err = json.Unmarshal(body, &profileInfo)
+	var data frame.JSONMap
+	err = json.Unmarshal(body, &data)
 
 	if err != nil {
-		return "", "", "", fmt.Errorf("unmarshal user info response body: %w", err)
+		return "", "", nil, fmt.Errorf("unmarshal user info response body: %w", err)
 	}
 
-	subject = profileInfo["sub"].(string)
-	displayName = profileInfo["name"].(string)
+	// Extract required fields with type checking
+	sub := data.GetString("sub")
+	if sub == "" {
+		return "", "", nil, fmt.Errorf("missing or invalid 'sub' field in user info response body")
+	}
 
-	contacts, ok := profileInfo["contacts"].([]any)
-	if ok {
-		if len(contacts) == 0 {
-			return "", "", "", fmt.Errorf("no contacts in user info response body")
+	name := data.GetString("name")
+	if name == "" {
+		return "", "", nil, fmt.Errorf("missing or invalid 'name' field in user info response body")
+	}
+
+	subject = sub
+	displayName = name
+
+	// Extract optional suggested localpart from contacts
+	if contactList, ok := data["contacts"].([]any); ok {
+		for _, contactObj := range contactList {
+			if contact, ok0 := contactObj.(map[string]any); ok0 {
+				if detail, ok1 := contact["detail"]; ok1 {
+					detailStr, ok2 := detail.(string)
+					if ok2 && detailStr != "" {
+						contacts = append(contacts, detailStr)
+					}
+				}
+			}
 		}
-
-		firstContact := contacts[0].(map[string]any)
-		suggestedLocalpart = firstContact["detail"].(string)
 	}
 
 	return
