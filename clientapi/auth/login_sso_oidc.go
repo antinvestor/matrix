@@ -148,7 +148,7 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 		return nil, fmt.Errorf("failed to exchange token: %v", err)
 	}
 
-	logger.WithField("access token", token.AccessToken).WithField("refresh token", token.RefreshToken).Info("obtained token from authentication service")
+	logger.WithField("access token", token.AccessToken).WithField("refresh token", token.RefreshToken).Debug("obtained token from authentication service")
 
 	subject, displayName, contacts, err := p.getUserInfo(ctx, token.AccessToken)
 	if err != nil {

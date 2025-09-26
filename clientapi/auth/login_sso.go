@@ -51,6 +51,7 @@ func NewAuthenticator(serverName spec.ServerName, cfg *config.LoginSSO, partitio
 
 	a := &Authenticator{
 		cfg:          cfg,
+		serverName:   serverName,
 		partitionCli: partitionCli,
 		providers:    sync.Map{},
 	}
