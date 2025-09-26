@@ -11,7 +11,7 @@ import (
 )
 
 func TestNewAuthenticator(t *testing.T) {
-	a := NewAuthenticator(&config.LoginSSO{
+	a := NewAuthenticator("example.com", &config.LoginSSO{
 		Providers: []config.IdentityProvider{
 			{
 				ClientID: "aclientid",

@@ -90,7 +90,7 @@ func Setup(
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
-	ssoAuth := auth.NewAuthenticator(&cfg.LoginSSO, partitionCli)
+	ssoAuth := auth.NewAuthenticator(cfg.Global.ServerName, &cfg.LoginSSO, partitionCli)
 
 	if presenceCli == nil {
 		presenceCli = presencev1connect.NewPresenceServiceClient(

@@ -47,8 +47,10 @@ const oidcDiscoveryMaxStaleness = 24 * time.Hour
 //
 // See https://openid.net/specs/openid-connect-core-1_0.html and https://openid.net/specs/openid-connect-discovery-1_0.html.
 type oidcIdentityProvider struct {
-	cfg *config.IdentityProvider
-	hc  *http.Client
+	cfg        *config.IdentityProvider
+	serverName spec.ServerName
+
+	hc *http.Client
 
 	userInfoURL string
 
@@ -64,11 +66,12 @@ type oidcIdentityProvider struct {
 	mu   sync.Mutex
 }
 
-func newSSOIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) SSOIdentityProvider {
+func newSSOIdentityProvider(serverName spec.ServerName, cfg *config.IdentityProvider, hc *http.Client) SSOIdentityProvider {
 
 	return &oidcIdentityProvider{
-		cfg: cfg,
-		hc:  hc,
+		cfg:        cfg,
+		serverName: serverName,
+		hc:         hc,
 
 		scopes:           []string{"openid", "offline_access", "profile", "contact"},
 		responseMimeType: "application/json",
@@ -162,7 +165,7 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 			Subject: subject,
 		},
 		DisplayName:     displayName,
-		SuggestedUserID: subject,
+		SuggestedUserID: fmt.Sprintf("@%s:%s", subject, p.serverName),
 		Contacts:        contacts,
 		Token:           token,
 	}

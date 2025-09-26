@@ -23,6 +23,7 @@ import (
 	"time"
 
 	partitionv1 "github.com/antinvestor/apis/go/partition/v1"
+	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/frame"
 	"golang.org/x/oauth2"
@@ -41,11 +42,12 @@ const partitionPropertyDiscoveryUriKey = "client_discovery_uri"
 // calls to one of them, based on configured ID.
 type Authenticator struct {
 	cfg          *config.LoginSSO
+	serverName   spec.ServerName
 	partitionCli *partitionv1.PartitionClient
 	providers    sync.Map
 }
 
-func NewAuthenticator(cfg *config.LoginSSO, partitionCli *partitionv1.PartitionClient) *Authenticator {
+func NewAuthenticator(serverName spec.ServerName, cfg *config.LoginSSO, partitionCli *partitionv1.PartitionClient) *Authenticator {
 
 	a := &Authenticator{
 		cfg:          cfg,
@@ -63,7 +65,7 @@ func NewAuthenticator(cfg *config.LoginSSO, partitionCli *partitionv1.PartitionC
 
 	for _, pcfg := range cfg.Providers {
 		pcfg = pcfg.WithDefaults()
-		provider := newSSOIdentityProvider(&pcfg, hc)
+		provider := newSSOIdentityProvider(a.serverName, &pcfg, hc)
 		a.providers.Store(pcfg.ID, provider)
 	}
 
@@ -125,7 +127,7 @@ func (auth *Authenticator) GetProvider(ctx context.Context, providerID string) (
 		},
 	}
 
-	provider := newSSOIdentityProvider(&idp, hc)
+	provider := newSSOIdentityProvider(auth.serverName, &idp, hc)
 	auth.providers.Store(idp.ID, provider)
 	return provider, nil
 

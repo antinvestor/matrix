@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
 	s := httptest.NewServer(mux)
 	defer s.Close()
 
-	idp := newSSOIdentityProvider(&config.IdentityProvider{
+	idp := newSSOIdentityProvider("example.com", &config.IdentityProvider{
 		ClientID:     "aclientid",
 		DiscoveryURL: s.URL + "/discovery",
 	}, s.Client())
@@ -125,7 +126,7 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 			defer s.Close()
 
 			sURL = s.URL
-			idp := newSSOIdentityProvider(&config.IdentityProvider{
+			idp := newSSOIdentityProvider("example.com", &config.IdentityProvider{
 				ClientID:     "aclientid",
 				DiscoveryURL: sURL + "/discovery",
 			}, s.Client())
@@ -282,7 +283,7 @@ func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
 		responseMimeType: "application/json",
 	}
 
-	gotSub, gotName, gotSuggestedUser, err := idp.getUserInfo(ctx, "atoken")
+	gotSub, gotName, contacts, err := idp.getUserInfo(ctx, "atoken")
 	if err != nil {
 		t.Fatalf("getUserInfo failed: %v", err)
 	}
@@ -293,8 +294,8 @@ func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
 	if want := "aname"; gotName != want {
 		t.Errorf("getUserInfo displayName: got %q, want %q", gotName, want)
 	}
-	if want := "auser"; gotSuggestedUser != want {
-		t.Errorf("getUserInfo suggestedUser: got %q, want %q", gotSuggestedUser, want)
+	if want := []string{"auser"}; !slices.Equal(contacts, want) {
+		t.Errorf("getUserInfo contacts: got %q, want %q", contacts, want)
 	}
 
 	gotHeader.Del("Accept-Encoding")
