@@ -69,7 +69,7 @@ func newSSOIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) SSOId
 		cfg: cfg,
 		hc:  hc,
 
-		scopes:           []string{"openid", "profile", "offline", "contact"},
+		scopes:           []string{"openid", "offline_access", "profile", "contact"},
 		responseMimeType: "application/json",
 	}
 }
