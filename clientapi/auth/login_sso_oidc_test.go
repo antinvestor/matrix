@@ -58,7 +58,7 @@ func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
 		"client_id":             "aclientid",
 		"redirect_uri":          "https://matrix.example.com/continue",
 		"response_type":         "code",
-		"scope":                 "openid profile offline_access contact",
+		"scope":                 "openid offline_access profile contact",
 		"state":                 "anonce",
 		"code_challenge_method": "S256",
 		"access_type":           "offline",
