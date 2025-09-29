@@ -5,6 +5,7 @@ go 1.25.1
 require (
 	buf.build/gen/go/antinvestor/presence/connectrpc/go v1.19.0-20250520083445-2d0e51ca1296.1
 	buf.build/gen/go/antinvestor/presence/protocolbuffers/go v1.36.9-20250520083445-2d0e51ca1296.1
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.9-20250912141014-52f32327d4b0.1
 	connectrpc.com/connect v1.19.0
 	connectrpc.com/validate v0.6.0
 	github.com/antinvestor/apis/go/common v1.45.1
@@ -34,6 +35,8 @@ require (
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/valkey-io/valkey-go v1.0.66
 	go.mau.fi/util v0.9.1
+	go.opentelemetry.io/otel v1.38.0
+	go.opentelemetry.io/otel/trace v1.38.0
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.42.0
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621
@@ -51,7 +54,6 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.9-20250912141014-52f32327d4b0.1 // indirect
 	buf.build/go/protovalidate v1.0.0 // indirect
 	cel.dev/expr v0.24.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
@@ -176,7 +178,6 @@ require (
 	go.opentelemetry.io/contrib/propagators/b3 v1.38.0 // indirect
 	go.opentelemetry.io/contrib/propagators/jaeger v1.38.0 // indirect
 	go.opentelemetry.io/contrib/propagators/ot v1.38.0 // indirect
-	go.opentelemetry.io/otel v1.38.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.14.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.14.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.38.0 // indirect
@@ -193,7 +194,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.38.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.14.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.38.0 // indirect
-	go.opentelemetry.io/otel/trace v1.38.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.8.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
