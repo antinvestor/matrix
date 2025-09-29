@@ -74,7 +74,7 @@ func VerifyUserFromRequest(
 		log.WithError(err).Error("userAPI.QueryAccessToken failed")
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
+			JSON: spec.InternalServerError{Err: err.Error()},
 		}
 	}
 	if res.Err != "" {

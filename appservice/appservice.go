@@ -27,6 +27,7 @@ import (
 	roomserverAPI "github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/setup/config"
 	userapi "github.com/antinvestor/matrix/userapi/api"
+	"github.com/pitabwire/frame/telemetry"
 	"github.com/pitabwire/util"
 )
 
@@ -45,6 +46,7 @@ func NewInternalAPI(
 	// outbound and inbound requests (inbound only for the internal API)
 	appserviceQueryAPI := &query.AppServiceQueryAPI{
 		Cfg:           &cfg.AppServiceAPI,
+		Tracer:        telemetry.NewTracer("appservice"),
 		ProtocolCache: map[string]appserviceAPI.ASProtocolResponse{},
 		CacheMu:       sync.Mutex{},
 	}

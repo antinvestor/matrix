@@ -38,6 +38,7 @@ import (
 	"github.com/antinvestor/matrix/setup/constants"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/frame"
+	"github.com/pitabwire/frame/telemetry"
 	"github.com/pitabwire/util"
 )
 
@@ -85,6 +86,7 @@ type Inputer struct {
 	EnableMetrics           bool
 	repliesTopicRef         string
 	inputRoomEventsTopicRef string
+	tracer                  frame.Tracer
 }
 
 func NewInputer(
@@ -118,6 +120,7 @@ func NewInputer(
 		Queryer:         queryer,
 		UserAPI:         userAPI,
 		EnableMetrics:   enableMetrics,
+		tracer:          telemetry.NewTracer("input"),
 	}
 
 	am.EnableFunction(actorutil.ActorFunctionRoomServerInputEvents, &cfg.Queues.InputRoomEvent, c.HandleRoomEvent)

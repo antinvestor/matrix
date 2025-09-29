@@ -42,6 +42,8 @@ import (
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tidwall/gjson"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var processRoomEventDuration = prometheus.NewHistogramVec(
@@ -85,10 +87,13 @@ func (r *Inputer) processRoomEvent(
 	default:
 	}
 
-	trace, ctx := internal.StartRegion(ctx, "processRoomEvent")
-	trace.SetTag("room_id", input.Event.RoomID().String())
-	trace.SetTag("event_id", input.Event.EventID())
-	defer trace.EndRegion()
+	var err error
+	ctx, span := r.tracer.Start(ctx, "processRoomEvent",
+		trace.WithAttributes(
+			attribute.String("room_id", input.Event.RoomID().String()),
+			attribute.String("event_id", input.Event.EventID())),
+	)
+	defer r.tracer.End(ctx, span, err)
 
 	// Measure how long it takes to process this event.
 	started := time.Now()
@@ -118,9 +123,9 @@ func (r *Inputer) processRoomEvent(
 	// Don't waste time processing the event if the room doesn't exist.
 	// A room entry locally will only be created in response to a create
 	// event.
-	roomInfo, rerr := r.DB.RoomInfo(ctx, event.RoomID().String())
-	if rerr != nil {
-		return fmt.Errorf("r.Cm.RoomInfo: %w", rerr)
+	roomInfo, err := r.DB.RoomInfo(ctx, event.RoomID().String())
+	if err != nil {
+		return fmt.Errorf("r.Cm.RoomInfo: %w", err)
 	}
 	isCreateEvent := event.Type() == spec.MRoomCreate && event.StateKeyEquals("")
 	if roomInfo == nil && !isCreateEvent {
@@ -226,6 +231,8 @@ func (r *Inputer) processRoomEvent(
 		// processRoomEvent.
 		if len(serverRes.ServerNames) > 0 {
 			missingState := missingStateReq{
+				log:         logger,
+				tracer:      r.tracer,
 				origin:      input.Origin,
 				virtualHost: virtualHost,
 				inputer:     r,
@@ -698,8 +705,10 @@ func (r *Inputer) fetchAuthEvents(
 	known map[string]*types.Event,
 	servers []spec.ServerName,
 ) error {
-	trace, ctx := internal.StartRegion(ctx, "fetchAuthEvents")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := r.tracer.Start(ctx, "fetchAuthEvents")
+	defer r.tracer.End(ctx, span, err)
 
 	unknown := map[string]struct{}{}
 	authEventIDs := event.AuthEventIDs()
@@ -708,8 +717,8 @@ func (r *Inputer) fetchAuthEvents(
 	}
 
 	for _, authEventID := range authEventIDs {
-		authEvents, err := r.DB.EventsFromIDs(ctx, roomInfo, []string{authEventID})
-		if err != nil || len(authEvents) == 0 || authEvents[0].PDU == nil {
+		authEvents, loopErr := r.DB.EventsFromIDs(ctx, roomInfo, []string{authEventID})
+		if loopErr != nil || len(authEvents) == 0 || authEvents[0].PDU == nil {
 			unknown[authEventID] = struct{}{}
 			continue
 		}
@@ -717,15 +726,17 @@ func (r *Inputer) fetchAuthEvents(
 
 		isRejected := false
 		if roomInfo != nil {
-			isRejected, err = r.DB.IsEventRejected(ctx, roomInfo.RoomNID, ev.EventID())
-			if err != nil && !sqlutil.ErrorIsNoRows(err) {
-				return fmt.Errorf("r.Cm.IsEventRejected failed: %w", err)
+			isRejected, loopErr = r.DB.IsEventRejected(ctx, roomInfo.RoomNID, ev.EventID())
+			if loopErr != nil && !sqlutil.ErrorIsNoRows(loopErr) {
+				err = fmt.Errorf("r.Cm.IsEventRejected failed: %w", loopErr)
+				return err
 			}
 		}
 		known[authEventID] = &ev // don't take the pointer of the iterated event
 		if !isRejected {
-			if err = auth.AddEvent(ev.PDU); err != nil {
-				return fmt.Errorf("auth.AddEvent: %w", err)
+			if loopErr = auth.AddEvent(ev.PDU); loopErr != nil {
+				err = fmt.Errorf("auth.AddEvent: %w", loopErr)
+				return err
 			}
 		}
 	}
@@ -736,7 +747,6 @@ func (r *Inputer) fetchAuthEvents(
 		return nil
 	}
 
-	var err error
 	var res fclient.RespEventAuth
 	var found bool
 	for _, serverName := range servers {
@@ -847,8 +857,10 @@ func (r *Inputer) calculateAndSetState(
 	event gomatrixserverlib.PDU,
 	isRejected bool,
 ) error {
-	trace, ctx := internal.StartRegion(ctx, "calculateAndSetState")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := r.tracer.Start(ctx, "calculateAndSetState")
+	defer r.tracer.End(ctx, span, err)
 
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
 	if err != nil {

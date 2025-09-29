@@ -16,6 +16,7 @@ import (
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
@@ -42,6 +43,7 @@ func (p *parsedRespState) Events() []gomatrixserverlib.PDU {
 
 type missingStateReq struct {
 	log             *util.LogEntry
+	tracer          frame.Tracer
 	virtualHost     spec.ServerName
 	origin          spec.ServerName
 	db              storage.RoomDatabase
@@ -63,8 +65,10 @@ type missingStateReq struct {
 func (t *missingStateReq) processEventWithMissingState(
 	ctx context.Context, e gomatrixserverlib.PDU, roomVersion gomatrixserverlib.RoomVersion,
 ) (*parsedRespState, error) {
-	trace, ctx := internal.StartRegion(ctx, "processEventWithMissingState")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := t.tracer.Start(ctx, "processEventWithMissingState")
+	defer t.tracer.End(ctx, span, err)
 
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
@@ -246,8 +250,10 @@ func (t *missingStateReq) processEventWithMissingState(
 }
 
 func (t *missingStateReq) lookupResolvedStateBeforeEvent(ctx context.Context, e gomatrixserverlib.PDU, roomVersion gomatrixserverlib.RoomVersion) (*parsedRespState, error) {
-	trace, ctx := internal.StartRegion(ctx, "lookupResolvedStateBeforeEvent")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := t.tracer.Start(ctx, "lookupResolvedStateBeforeEvent")
+	defer t.tracer.End(ctx, span, err)
 
 	type respState struct {
 		// A snapshot is considered trustworthy if it came from our own roomserver.
@@ -339,8 +345,10 @@ func (t *missingStateReq) lookupResolvedStateBeforeEvent(ctx context.Context, e 
 // lookupStateAfterEvent returns the room state after `eventID`, which is the state before eventID with the state of `eventID` (if it's a state event)
 // added into the mix.
 func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (*parsedRespState, bool, error) {
-	trace, ctx := internal.StartRegion(ctx, "lookupStateAfterEvent")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := t.tracer.Start(ctx, "lookupStateAfterEvent")
+	defer t.tracer.End(ctx, span, err)
 
 	// try doing all this locally before we resort to querying federation
 	respState := t.lookupStateAfterEventLocally(ctx, eventID)
@@ -349,7 +357,7 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 	}
 
 	util.Log(ctx).WithContext(ctx).Warn("State for event %s not available locally, falling back to federation (via %d servers)", eventID, len(t.servers))
-	respState, err := t.lookupStateBeforeEvent(ctx, roomVersion, roomID, eventID)
+	respState, err = t.lookupStateBeforeEvent(ctx, roomVersion, roomID, eventID)
 	if err != nil {
 		util.Log(ctx).WithContext(ctx).WithError(err).Error("Failed to look up state before event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupStateBeforeEvent: %w", err)
@@ -403,8 +411,10 @@ func (t *missingStateReq) cacheAndReturn(ev gomatrixserverlib.PDU) gomatrixserve
 }
 
 func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, eventID string) *parsedRespState {
-	trace, ctx := internal.StartRegion(ctx, "lookupStateAfterEventLocally")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := t.tracer.Start(ctx, "lookupStateAfterEventLocally")
+	defer t.tracer.End(ctx, span, err)
 
 	var res parsedRespState
 	roomState := state.NewStateResolution(t.db, t.roomInfo, t.inputer.Queryer)
@@ -479,16 +489,20 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, even
 // the server supports.
 func (t *missingStateReq) lookupStateBeforeEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (
 	*parsedRespState, error) {
-	trace, ctx := internal.StartRegion(ctx, "lookupStateBeforeEvent")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := t.tracer.Start(ctx, "lookupStateBeforeEvent")
+	defer t.tracer.End(ctx, span, err)
 
 	// Attempt to fetch the missing state using /state_ids and /events
 	return t.lookupMissingStateViaStateIDs(ctx, roomID, eventID, roomVersion)
 }
 
 func (t *missingStateReq) resolveStatesAndCheck(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, states []*parsedRespState, backwardsExtremity gomatrixserverlib.PDU) (*parsedRespState, error) {
-	trace, ctx := internal.StartRegion(ctx, "resolveStatesAndCheck")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := t.tracer.Start(ctx, "resolveStatesAndCheck")
+	defer t.tracer.End(ctx, span, err)
 
 	var authEventList []gomatrixserverlib.PDU
 	var stateEventList []gomatrixserverlib.PDU
@@ -501,8 +515,8 @@ func (t *missingStateReq) resolveStatesAndCheck(ctx context.Context, roomVersion
 			return t.inputer.Queryer.QueryUserIDForSender(ctx, roomID, senderID)
 		},
 		func(eventID string) bool {
-			isRejected, err := t.db.IsEventRejected(ctx, t.roomInfo.RoomNID, eventID)
-			if err != nil {
+			isRejected, rejectedErr := t.db.IsEventRejected(ctx, t.roomInfo.RoomNID, eventID)
+			if rejectedErr != nil {
 				return true
 			}
 			return isRejected
@@ -552,8 +566,9 @@ retryAllowedState:
 // get missing events for `e`. If `isGapFilled`=true then `newEvents` contains all the events to inject,
 // without `e`. If `isGapFilled=false` then `newEvents` contains the response to /get_missing_events
 func (t *missingStateReq) getMissingEvents(ctx context.Context, e gomatrixserverlib.PDU, roomVersion gomatrixserverlib.RoomVersion) (newEvents []gomatrixserverlib.PDU, isGapFilled, prevStateKnown bool, err error) {
-	trace, ctx := internal.StartRegion(ctx, "getMissingEvents")
-	defer trace.EndRegion()
+
+	ctx, span := t.tracer.Start(ctx, "getMissingEvents")
+	defer t.tracer.End(ctx, span, err)
 
 	logger := t.log.WithField("event_id", e.EventID()).
 		WithField("room_id", e.RoomID().String())
@@ -688,8 +703,8 @@ func (t *missingStateReq) isPrevStateKnown(ctx context.Context, e gomatrixserver
 func (t *missingStateReq) lookupMissingStateViaState(
 	ctx context.Context, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (respState *parsedRespState, err error) {
-	trace, ctx := internal.StartRegion(ctx, "lookupMissingStateViaState")
-	defer trace.EndRegion()
+	ctx, span := t.tracer.Start(ctx, "lookupMissingStateViaState")
+	defer t.tracer.End(ctx, span, err)
 
 	state, err := t.federation.LookupState(ctx, t.virtualHost, t.origin, roomID, eventID, roomVersion)
 	if err != nil {
@@ -714,13 +729,15 @@ func (t *missingStateReq) lookupMissingStateViaState(
 
 func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
 	*parsedRespState, error) {
-	trace, ctx := internal.StartRegion(ctx, "lookupMissingStateViaStateIDs")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := t.tracer.Start(ctx, "lookupMissingStateViaStateIDs")
+	defer t.tracer.End(ctx, span, err)
 
 	t.log.WithField("event_id", eventID).Info("lookupMissingStateViaStateIDs %s", eventID)
 	// fetch the state event IDs at the time of the event
 	var stateIDs gomatrixserverlib.StateIDResponse
-	var err error
+
 	count := 0
 	totalctx, totalcancel := context.WithTimeout(ctx, time.Minute*5)
 	for _, serverName := range t.servers {
@@ -896,8 +913,10 @@ func (t *missingStateReq) createRespStateFromStateIDs(
 }
 
 func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, _, missingEventID string, localFirst bool) (gomatrixserverlib.PDU, error) {
-	trace, ctx := internal.StartRegion(ctx, "lookupEvent")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := t.tracer.Start(ctx, "lookupEvent")
+	defer t.tracer.End(ctx, span, err)
 
 	verImpl, err := gomatrixserverlib.GetRoomVersion(roomVersion)
 	if err != nil {
