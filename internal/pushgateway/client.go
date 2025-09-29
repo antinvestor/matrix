@@ -10,30 +10,37 @@ import (
 	"time"
 
 	"github.com/antinvestor/matrix/internal"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/frame/telemetry"
 )
 
 type httpClient struct {
-	hc *http.Client
+	hc     *http.Client
+	tracer frame.Tracer
 }
 
 // NewHTTPClient creates a new Push Gateway client.
 func NewHTTPClient(disableTLSValidation bool) Client {
-	hc := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: disableTLSValidation,
-			},
-			Proxy: http.ProxyFromEnvironment,
-		},
-	}
-	return &httpClient{hc: hc}
+	hc := frame.NewHTTPClient(
+		frame.WithHTTPTimeout(30*time.Second),
+		frame.WithHTTPTransport(
+			&http.Transport{
+				DisableKeepAlives: true,
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: disableTLSValidation,
+				},
+				Proxy: http.ProxyFromEnvironment,
+			}),
+	)
+
+	return &httpClient{hc: hc, tracer: telemetry.NewTracer("pushgateway")}
 }
 
 func (h *httpClient) Notify(ctx context.Context, url string, req *NotifyRequest, resp *NotifyResponse) error {
-	trace, ctx := internal.StartRegion(ctx, "Notify")
-	defer trace.EndRegion()
+	var err error
+
+	ctx, span := h.tracer.Start(ctx, "Notify")
+	defer h.tracer.End(ctx, span, err)
 
 	body, err := json.Marshal(req)
 	if err != nil {

@@ -25,9 +25,10 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib"
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/types"
+	"github.com/pitabwire/frame"
+	"github.com/pitabwire/frame/telemetry"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -52,6 +53,7 @@ type StateResolution struct {
 	roomInfo *types.RoomInfo
 	events   map[types.EventNID]gomatrixserverlib.PDU
 	Querier  api.QuerySenderIDAPI
+	tracer   frame.Tracer
 }
 
 func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo, querier api.QuerySenderIDAPI) StateResolution {
@@ -60,6 +62,7 @@ func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo, que
 		roomInfo: roomInfo,
 		events:   make(map[types.EventNID]gomatrixserverlib.PDU),
 		Querier:  querier,
+		tracer:   telemetry.NewTracer("state"),
 	}
 }
 
@@ -67,8 +70,8 @@ type PowerLevelResolver interface {
 	Resolve(ctx context.Context, eventID string) (*gomatrixserverlib.PowerLevelContent, error)
 }
 
-func (p *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatrixserverlib.PowerLevelContent, error) {
-	stateEntries, err := p.LoadStateAtEvent(ctx, eventID)
+func (sr *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatrixserverlib.PowerLevelContent, error) {
+	stateEntries, err := sr.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,10 +92,10 @@ func (p *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatri
 		return nil, fmt.Errorf("unable to find power level event")
 	}
 
-	if p.roomInfo == nil {
+	if sr.roomInfo == nil {
 		return nil, types.ErrorInvalidRoomInfo
 	}
-	events, err := p.db.Events(ctx, p.roomInfo.RoomVersion, []types.EventNID{plNID})
+	events, err := sr.db.Events(ctx, sr.roomInfo.RoomVersion, []types.EventNID{plNID})
 	if err != nil {
 		return nil, err
 	}
@@ -110,20 +113,22 @@ func (p *StateResolution) Resolve(ctx context.Context, eventID string) (*gomatri
 // LoadStateAtSnapshot loads the full state of a room at a particular snapshot.
 // This is typically the state before an event or the current state of a room.
 // Returns a sorted list of state entries or an error if there was a problem talking to the database.
-func (v *StateResolution) LoadStateAtSnapshot(
+func (sr *StateResolution) LoadStateAtSnapshot(
 	ctx context.Context, stateNID types.StateSnapshotNID,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadStateAtSnapshot")
-	defer trace.EndRegion()
 
-	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, []types.StateSnapshotNID{stateNID})
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.LoadStateAtSnapshot")
+	defer sr.tracer.End(ctx, span, err)
+
+	stateBlockNIDLists, err := sr.db.StateBlockNIDs(ctx, []types.StateSnapshotNID{stateNID})
 	if err != nil {
 		return nil, err
 	}
 	// We've asked for exactly one snapshot from the db so we should have exactly one entry in the result.
 	stateBlockNIDList := stateBlockNIDLists[0]
 
-	stateEntryLists, err := v.db.StateEntries(ctx, stateBlockNIDList.StateBlockNIDs)
+	stateEntryLists, err := sr.db.StateEntries(ctx, stateBlockNIDList.StateBlockNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -151,13 +156,15 @@ func (v *StateResolution) LoadStateAtSnapshot(
 }
 
 // LoadStateAtEvent loads the full state of a room before a particular event.
-func (v *StateResolution) LoadStateAtEvent(
+func (sr *StateResolution) LoadStateAtEvent(
 	ctx context.Context, eventID string,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadStateAtEvent")
-	defer trace.EndRegion()
 
-	snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.LoadStateAtEvent")
+	defer sr.tracer.End(ctx, span, err)
+
+	snapshotNID, err := sr.db.SnapshotNIDFromEventID(ctx, eventID)
 	if err != nil {
 		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %w", eventID, err)
 	}
@@ -165,7 +172,7 @@ func (v *StateResolution) LoadStateAtEvent(
 		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID(%s) returned 0 NID, was this event stored?", eventID)
 	}
 
-	stateEntries, err := v.LoadStateAtSnapshot(ctx, snapshotNID)
+	stateEntries, err := sr.LoadStateAtSnapshot(ctx, snapshotNID)
 	if err != nil {
 		return nil, err
 	}
@@ -173,14 +180,16 @@ func (v *StateResolution) LoadStateAtEvent(
 	return stateEntries, nil
 }
 
-func (v *StateResolution) LoadMembershipAtEvent(
+func (sr *StateResolution) LoadMembershipAtEvent(
 	ctx context.Context, eventIDs []string, stateKeyNID types.EventStateKeyNID,
 ) (map[string][]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadMembershipAtEvent")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.LoadMembershipAtEvent")
+	defer sr.tracer.End(ctx, span, err)
 
 	// Get a mapping from snapshotNID -> eventIDs
-	snapshotNIDMap, err := v.db.BulkSelectSnapshotsFromEventIDs(ctx, eventIDs)
+	snapshotNIDMap, err := sr.db.BulkSelectSnapshotsFromEventIDs(ctx, eventIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +199,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 		snapshotNIDs = append(snapshotNIDs, nid)
 	}
 
-	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, snapshotNIDs)
+	stateBlockNIDLists, err := sr.db.StateBlockNIDs(ctx, snapshotNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +209,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 		wantStateBlocks = append(wantStateBlocks, x.StateBlockNIDs...)
 	}
 
-	stateEntryLists, err := v.db.StateEntriesForTuples(ctx, uniqueStateBlockNIDs(wantStateBlocks), []types.StateKeyTuple{
+	stateEntryLists, err := sr.db.StateEntriesForTuples(ctx, uniqueStateBlockNIDs(wantStateBlocks), []types.StateKeyTuple{
 		{
 			EventTypeNID:     types.MRoomMemberNID,
 			EventStateKeyNID: stateKeyNID,
@@ -242,13 +251,15 @@ func (v *StateResolution) LoadMembershipAtEvent(
 }
 
 // LoadStateAtEvent loads the full state of a room before a particular event.
-func (v *StateResolution) LoadStateAtEventForHistoryVisibility(
+func (sr *StateResolution) LoadStateAtEventForHistoryVisibility(
 	ctx context.Context, eventID string,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadStateAtEventForHistoryVisibility")
-	defer trace.EndRegion()
 
-	snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.LoadStateAtEventForHistoryVisibility")
+	defer sr.tracer.End(ctx, span, err)
+
+	snapshotNID, err := sr.db.SnapshotNIDFromEventID(ctx, eventID)
 	if err != nil {
 		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %w", eventID, err)
 	}
@@ -256,7 +267,7 @@ func (v *StateResolution) LoadStateAtEventForHistoryVisibility(
 		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID(%s) returned 0 NID, was this event stored?", eventID)
 	}
 
-	stateEntries, err := v.LoadStateAtSnapshot(ctx, snapshotNID)
+	stateEntries, err := sr.LoadStateAtSnapshot(ctx, snapshotNID)
 	if err != nil {
 		return nil, err
 	}
@@ -267,11 +278,13 @@ func (v *StateResolution) LoadStateAtEventForHistoryVisibility(
 // LoadCombinedStateAfterEvents loads a snapshot of the state after each of the events
 // and combines those snapshots together into a single list. At this point it is
 // possible to run into duplicate (type, state key) tuples.
-func (v *StateResolution) LoadCombinedStateAfterEvents(
+func (sr *StateResolution) LoadCombinedStateAfterEvents(
 	ctx context.Context, prevStates []types.StateAtEvent,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadCombinedStateAfterEvents")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.LoadCombinedStateAfterEvents")
+	defer sr.tracer.End(ctx, span, err)
 
 	stateNIDs := make([]types.StateSnapshotNID, len(prevStates))
 	for i, state := range prevStates {
@@ -281,9 +294,9 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 	// Deduplicate the IDs before passing them to the database.
 	// There could be duplicates because the events could be state events where
 	// the snapshot of the room state before them was the same.
-	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, UniqueStateSnapshotNIDs(stateNIDs))
+	stateBlockNIDLists, err := sr.db.StateBlockNIDs(ctx, UniqueStateSnapshotNIDs(stateNIDs))
 	if err != nil {
-		return nil, fmt.Errorf("v.db.StateBlockNIDs: %w", err)
+		return nil, fmt.Errorf("sr.db.StateBlockNIDs: %w", err)
 	}
 
 	var stateBlockNIDs []types.StateBlockNID
@@ -294,9 +307,9 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 	// Deduplicate the IDs before passing them to the database.
 	// There could be duplicates because a block of state entries could be reused by
 	// multiple snapshots.
-	stateEntryLists, err := v.db.StateEntries(ctx, uniqueStateBlockNIDs(stateBlockNIDs))
+	stateEntryLists, err := sr.db.StateEntries(ctx, uniqueStateBlockNIDs(stateBlockNIDs))
 	if err != nil {
-		return nil, fmt.Errorf("v.db.StateEntries: %w", err)
+		return nil, fmt.Errorf("sr.db.StateEntries: %w", err)
 	}
 	stateBlockNIDsMap := stateBlockNIDListMap(stateBlockNIDLists)
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
@@ -342,11 +355,11 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 }
 
 // DifferenceBetweeenStateSnapshots works out which state entries have been added and removed between two snapshots.
-func (v *StateResolution) DifferenceBetweeenStateSnapshots(
+func (sr *StateResolution) DifferenceBetweeenStateSnapshots(
 	ctx context.Context, oldStateNID, newStateNID types.StateSnapshotNID,
 ) (removed, added []types.StateEntry, err error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.DifferenceBetweeenStateSnapshots")
-	defer trace.EndRegion()
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.DifferenceBetweeenStateSnapshots")
+	defer sr.tracer.End(ctx, span, err)
 
 	if oldStateNID == newStateNID {
 		// If the snapshot NIDs are the same then nothing has changed
@@ -356,13 +369,13 @@ func (v *StateResolution) DifferenceBetweeenStateSnapshots(
 	var oldEntries []types.StateEntry
 	var newEntries []types.StateEntry
 	if oldStateNID != 0 {
-		oldEntries, err = v.LoadStateAtSnapshot(ctx, oldStateNID)
+		oldEntries, err = sr.LoadStateAtSnapshot(ctx, oldStateNID)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
 	if newStateNID != 0 {
-		newEntries, err = v.LoadStateAtSnapshot(ctx, newStateNID)
+		newEntries, err = sr.LoadStateAtSnapshot(ctx, newStateNID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -404,30 +417,34 @@ func (v *StateResolution) DifferenceBetweeenStateSnapshots(
 // If there is no entry for a given event type and state key pair then it will be discarded.
 // This is typically the state before an event or the current state of a room.
 // Returns a sorted list of state entries or an error if there was a problem talking to the database.
-func (v *StateResolution) LoadStateAtSnapshotForStringTuples(
+func (sr *StateResolution) LoadStateAtSnapshotForStringTuples(
 	ctx context.Context,
 	stateNID types.StateSnapshotNID,
 	stateKeyTuples []gomatrixserverlib.StateKeyTuple,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadStateAtSnapshotForStringTuples")
-	defer trace.EndRegion()
 
-	numericTuples, err := v.stringTuplesToNumericTuples(ctx, stateKeyTuples)
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.LoadStateAtSnapshotForStringTuples")
+	defer sr.tracer.End(ctx, span, err)
+
+	numericTuples, err := sr.stringTuplesToNumericTuples(ctx, stateKeyTuples)
 	if err != nil {
 		return nil, err
 	}
-	return v.loadStateAtSnapshotForNumericTuples(ctx, stateNID, numericTuples)
+	return sr.loadStateAtSnapshotForNumericTuples(ctx, stateNID, numericTuples)
 }
 
 // stringTuplesToNumericTuples converts the string state key tuples into numeric IDs
 // If there isn't a numeric ID for either the event type or the event state key then the tuple is discarded.
 // Returns an error if there was a problem talking to the database.
-func (v *StateResolution) stringTuplesToNumericTuples(
+func (sr *StateResolution) stringTuplesToNumericTuples(
 	ctx context.Context,
 	stringTuples []gomatrixserverlib.StateKeyTuple,
 ) ([]types.StateKeyTuple, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.stringTuplesToNumericTuples")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.stringTuplesToNumericTuples")
+	defer sr.tracer.End(ctx, span, err)
 
 	eventTypes := make([]string, len(stringTuples))
 	stateKeys := make([]string, len(stringTuples))
@@ -436,12 +453,12 @@ func (v *StateResolution) stringTuplesToNumericTuples(
 		stateKeys[i] = stringTuples[i].StateKey
 	}
 	eventTypes = util.UniqueStrings(eventTypes)
-	eventTypeMap, err := v.db.EventTypeNIDs(ctx, eventTypes)
+	eventTypeMap, err := sr.db.EventTypeNIDs(ctx, eventTypes)
 	if err != nil {
 		return nil, err
 	}
 	stateKeys = util.UniqueStrings(stateKeys)
-	stateKeyMap, err := v.db.EventStateKeyNIDs(ctx, stateKeys)
+	stateKeyMap, err := sr.db.EventStateKeyNIDs(ctx, stateKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -466,22 +483,24 @@ func (v *StateResolution) stringTuplesToNumericTuples(
 // If there is no entry for a given event type and state key pair then it will be discarded.
 // This is typically the state before an event or the current state of a room.
 // Returns a sorted list of state entries or an error if there was a problem talking to the database.
-func (v *StateResolution) loadStateAtSnapshotForNumericTuples(
+func (sr *StateResolution) loadStateAtSnapshotForNumericTuples(
 	ctx context.Context,
 	stateNID types.StateSnapshotNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.loadStateAtSnapshotForNumericTuples")
-	defer trace.EndRegion()
 
-	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, []types.StateSnapshotNID{stateNID})
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.loadStateAtSnapshotForNumericTuples")
+	defer sr.tracer.End(ctx, span, err)
+
+	stateBlockNIDLists, err := sr.db.StateBlockNIDs(ctx, []types.StateSnapshotNID{stateNID})
 	if err != nil {
 		return nil, err
 	}
 	// We've asked for exactly one snapshot from the db so we should have exactly one entry in the result.
 	stateBlockNIDList := stateBlockNIDLists[0]
 
-	stateEntryLists, err := v.db.StateEntriesForTuples(
+	stateEntryLists, err := sr.db.StateEntriesForTuples(
 		ctx, stateBlockNIDList.StateBlockNIDs, stateKeyTuples,
 	)
 	if err != nil {
@@ -517,36 +536,41 @@ func (v *StateResolution) loadStateAtSnapshotForNumericTuples(
 // If there is no entry for a given event type and state key pair then it will be discarded.
 // This is typically the state before an event.
 // Returns a sorted list of state entries or an error if there was a problem talking to the database.
-func (v *StateResolution) LoadStateAfterEventsForStringTuples(
+func (sr *StateResolution) LoadStateAfterEventsForStringTuples(
 	ctx context.Context,
 	prevStates []types.StateAtEvent,
 	stateKeyTuples []gomatrixserverlib.StateKeyTuple,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.LoadStateAfterEventsForStringTuples")
-	defer trace.EndRegion()
 
-	numericTuples, err := v.stringTuplesToNumericTuples(ctx, stateKeyTuples)
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.LoadStateAfterEventsForStringTuples")
+	defer sr.tracer.End(ctx, span, err)
+
+	numericTuples, err := sr.stringTuplesToNumericTuples(ctx, stateKeyTuples)
 	if err != nil {
 		return nil, err
 	}
-	return v.loadStateAfterEventsForNumericTuples(ctx, prevStates, numericTuples)
+	return sr.loadStateAfterEventsForNumericTuples(ctx, prevStates, numericTuples)
 }
 
-func (v *StateResolution) loadStateAfterEventsForNumericTuples(
+func (sr *StateResolution) loadStateAfterEventsForNumericTuples(
 	ctx context.Context,
 	prevStates []types.StateAtEvent,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.loadStateAfterEventsForNumericTuples")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.loadStateAfterEventsForNumericTuples")
+	defer sr.tracer.End(ctx, span, err)
 
 	if len(prevStates) == 1 {
 		// Fast path for a single event.
 		prevState := prevStates[0]
-		result, err := v.loadStateAtSnapshotForNumericTuples(
+		result, loadErr := sr.loadStateAtSnapshotForNumericTuples(
 			ctx, prevState.BeforeStateSnapshotNID, stateKeyTuples,
 		)
-		if err != nil {
+		if loadErr != nil {
+			err = loadErr
 			return nil, err
 		}
 		if prevState.IsStateEvent() {
@@ -582,7 +606,7 @@ func (v *StateResolution) loadStateAfterEventsForNumericTuples(
 
 	// TODO: Add metrics for this as it could take a long time for big rooms
 	// with large conflicts.
-	fullState, _, _, err := v.calculateStateAfterManyEvents(ctx, v.roomInfo.RoomVersion, prevStates)
+	fullState, _, _, err := sr.calculateStateAfterManyEvents(ctx, sr.roomInfo.RoomVersion, prevStates)
 	if err != nil {
 		return nil, err
 	}
@@ -707,32 +731,36 @@ func init() {
 // CalculateAndStoreStateBeforeEvent calculates a snapshot of the state of a room before an event.
 // Stores the snapshot of the state in the database.
 // Returns a numeric ID for the snapshot of the state before the event.
-func (v *StateResolution) CalculateAndStoreStateBeforeEvent(
+func (sr *StateResolution) CalculateAndStoreStateBeforeEvent(
 	ctx context.Context,
 	event gomatrixserverlib.PDU,
 	isRejected bool,
 ) (types.StateSnapshotNID, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.CalculateAndStoreStateBeforeEvent")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.CalculateAndStoreStateBeforeEvent")
+	defer sr.tracer.End(ctx, span, err)
 
 	// Load the state at the prev events.
-	prevStates, err := v.db.StateAtEventIDs(ctx, event.PrevEventIDs())
+	prevStates, err := sr.db.StateAtEventIDs(ctx, event.PrevEventIDs())
 	if err != nil {
 		return 0, err
 	}
 
 	// The state before this event will be the state after the events that came before it.
-	return v.CalculateAndStoreStateAfterEvents(ctx, prevStates)
+	return sr.CalculateAndStoreStateAfterEvents(ctx, prevStates)
 }
 
 // CalculateAndStoreStateAfterEvents finds the room state after the given events.
 // Stores the resulting state in the database and returns a numeric ID for that snapshot.
-func (v *StateResolution) CalculateAndStoreStateAfterEvents(
+func (sr *StateResolution) CalculateAndStoreStateAfterEvents(
 	ctx context.Context,
 	prevStates []types.StateAtEvent,
 ) (types.StateSnapshotNID, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.CalculateAndStoreStateAfterEvents")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.CalculateAndStoreStateAfterEvents")
+	defer sr.tracer.End(ctx, span, err)
 
 	metrics := calculateStateMetrics{startTime: time.Now(), prevEventLength: len(prevStates)}
 
@@ -740,9 +768,9 @@ func (v *StateResolution) CalculateAndStoreStateAfterEvents(
 		// 2) There weren't any prev_events for this event so the state is
 		// empty.
 		metrics.algorithm = "empty_state"
-		stateNID, err := v.db.AddState(ctx, v.roomInfo.RoomNID, nil, nil)
-		if err != nil {
-			err = fmt.Errorf("v.db.AddState: %w", err)
+		stateNID, addStateErr := sr.db.AddState(ctx, sr.roomInfo.RoomNID, nil, nil)
+		if addStateErr != nil {
+			err = fmt.Errorf("sr.db.AddState: %w", addStateErr)
 		}
 		return metrics.stop(stateNID, err)
 	}
@@ -759,23 +787,24 @@ func (v *StateResolution) CalculateAndStoreStateAfterEvents(
 		}
 		// The previous event was a state event so we need to store a copy
 		// of the previous state updated with that event.
-		stateBlockNIDLists, err := v.db.StateBlockNIDs(
+		stateBlockNIDLists, stateErr := sr.db.StateBlockNIDs(
 			ctx, []types.StateSnapshotNID{prevState.BeforeStateSnapshotNID},
 		)
-		if err != nil {
+		if stateErr != nil {
 			metrics.algorithm = "_load_state_blocks"
-			return metrics.stop(0, fmt.Errorf("v.db.StateBlockNIDs: %w", err))
+			err = fmt.Errorf("sr.db.StateBlockNIDs: %w", stateErr)
+			return metrics.stop(0, err)
 		}
 		stateBlockNIDs := stateBlockNIDLists[0].StateBlockNIDs
 		if len(stateBlockNIDs) < maxStateBlockNIDs {
 			// 4) The number of state data blocks is small enough that we can just
 			// add the state event as a block of size one to the end of the blocks.
 			metrics.algorithm = "single_delta"
-			stateNID, err0 := v.db.AddState(
-				ctx, v.roomInfo.RoomNID, stateBlockNIDs, []types.StateEntry{prevState.StateEntry},
+			stateNID, err0 := sr.db.AddState(
+				ctx, sr.roomInfo.RoomNID, stateBlockNIDs, []types.StateEntry{prevState.StateEntry},
 			)
 			if err0 != nil {
-				err0 = fmt.Errorf("v.db.AddState: %w", err0)
+				err0 = fmt.Errorf("sr.db.AddState: %w", err0)
 			}
 			return metrics.stop(stateNID, err0)
 		}
@@ -783,9 +812,9 @@ func (v *StateResolution) CalculateAndStoreStateAfterEvents(
 		// So fall through to calculateAndStoreStateAfterManyEvents
 	}
 
-	stateNID, err := v.calculateAndStoreStateAfterManyEvents(ctx, v.roomInfo.RoomNID, prevStates, metrics)
+	stateNID, err := sr.calculateAndStoreStateAfterManyEvents(ctx, sr.roomInfo.RoomNID, prevStates, metrics)
 	if err != nil {
-		return 0, fmt.Errorf("v.calculateAndStoreStateAfterManyEvents: %w", err)
+		return 0, fmt.Errorf("sr.calculateAndStoreStateAfterManyEvents: %w", err)
 	}
 	return stateNID, nil
 }
@@ -800,42 +829,44 @@ const maxStateBlockNIDs = 64
 // calculateAndStoreStateAfterManyEvents finds the room state after the given events.
 // This handles the slow path of calculateAndStoreStateAfterEvents for when there is more than one event.
 // Stores the resulting state and returns a numeric ID for the snapshot.
-func (v *StateResolution) calculateAndStoreStateAfterManyEvents(
+func (sr *StateResolution) calculateAndStoreStateAfterManyEvents(
 	ctx context.Context,
 	roomNID types.RoomNID,
 	prevStates []types.StateAtEvent,
 	metrics calculateStateMetrics,
 ) (types.StateSnapshotNID, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.calculateAndStoreStateAfterManyEvents")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.calculateAndStoreStateAfterManyEvents")
+	defer sr.tracer.End(ctx, span, err)
 
 	state, algorithm, conflictLength, err :=
-		v.calculateStateAfterManyEvents(ctx, v.roomInfo.RoomVersion, prevStates)
+		sr.calculateStateAfterManyEvents(ctx, sr.roomInfo.RoomVersion, prevStates)
 	metrics.algorithm = algorithm
 	if err != nil {
-		return metrics.stop(0, fmt.Errorf("v.calculateStateAfterManyEvents: %w", err))
+		return metrics.stop(0, fmt.Errorf("sr.calculateStateAfterManyEvents: %w", err))
 	}
 
 	// TODO: Check if we can encode the new state as a delta against the
 	// previous state.
 	metrics.conflictLength = conflictLength
 	metrics.fullStateLength = len(state)
-	return metrics.stop(v.db.AddState(ctx, roomNID, nil, state))
+	return metrics.stop(sr.db.AddState(ctx, roomNID, nil, state))
 }
 
-func (v *StateResolution) calculateStateAfterManyEvents(
+func (sr *StateResolution) calculateStateAfterManyEvents(
 	ctx context.Context, roomVersion gomatrixserverlib.RoomVersion,
 	prevStates []types.StateAtEvent,
 ) (state []types.StateEntry, algorithm string, conflictLength int, err error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.calculateStateAfterManyEvents")
-	defer trace.EndRegion()
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.calculateStateAfterManyEvents")
+	defer sr.tracer.End(ctx, span, err)
 
 	var combined []types.StateEntry
 	// Conflict resolution.
 	// First stage: load the state after each of the prev events.
-	combined, err = v.LoadCombinedStateAfterEvents(ctx, prevStates)
+	combined, err = sr.LoadCombinedStateAfterEvents(ctx, prevStates)
 	if err != nil {
-		err = fmt.Errorf("v.LoadCombinedStateAfterEvents: %w", err)
+		err = fmt.Errorf("sr.LoadCombinedStateAfterEvents: %w", err)
 		algorithm = "_load_combined_state"
 		return
 	}
@@ -862,9 +893,9 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 		}
 
 		var resolved []types.StateEntry
-		resolved, err = v.resolveConflicts(ctx, roomVersion, notConflicted, conflicts)
+		resolved, err = sr.resolveConflicts(ctx, roomVersion, notConflicted, conflicts)
 		if err != nil {
-			err = fmt.Errorf("v.resolveConflits: %w", err)
+			err = fmt.Errorf("sr.resolveConflits: %w", err)
 			algorithm = "_resolve_conflicts"
 			return
 		}
@@ -878,12 +909,14 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 	return
 }
 
-func (v *StateResolution) resolveConflicts(
+func (sr *StateResolution) resolveConflicts(
 	ctx context.Context, version gomatrixserverlib.RoomVersion,
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.resolveConflicts")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.resolveConflicts")
+	defer sr.tracer.End(ctx, span, err)
 
 	verImpl, err := gomatrixserverlib.GetRoomVersion(version)
 	if err != nil {
@@ -893,11 +926,11 @@ func (v *StateResolution) resolveConflicts(
 	stateResAlgo := verImpl.StateResAlgorithm()
 	switch stateResAlgo {
 	case gomatrixserverlib.StateResV1:
-		return v.resolveConflictsV1(ctx, notConflicted, conflicted)
+		return sr.resolveConflictsV1(ctx, notConflicted, conflicted)
 	case gomatrixserverlib.StateResV2:
 		fallthrough
 	case gomatrixserverlib.StateResV2_1:
-		return v.resolveConflictsV2(ctx, notConflicted, conflicted)
+		return sr.resolveConflictsV2(ctx, notConflicted, conflicted)
 	}
 	return nil, fmt.Errorf("unsupported state resolution algorithm %v", stateResAlgo)
 }
@@ -909,15 +942,17 @@ func (v *StateResolution) resolveConflicts(
 // Returns a list that combines the entries without conflicts with the result of state resolution for the entries with conflicts.
 // The returned list is sorted by state key tuple.
 // Returns an error if there was a problem talking to the database.
-func (v *StateResolution) resolveConflictsV1(
+func (sr *StateResolution) resolveConflictsV1(
 	ctx context.Context,
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.resolveConflictsV1")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.resolveConflictsV1")
+	defer sr.tracer.End(ctx, span, err)
 
 	// Load the conflicted events
-	conflictedEvents, eventIDMap, err := v.loadStateEvents(ctx, conflicted)
+	conflictedEvents, eventIDMap, err := sr.loadStateEvents(ctx, conflicted)
 	if err != nil {
 		return nil, err
 	}
@@ -929,13 +964,13 @@ func (v *StateResolution) resolveConflictsV1(
 	var neededStateKeys []string
 	neededStateKeys = append(neededStateKeys, needed.Member...)
 	neededStateKeys = append(neededStateKeys, needed.ThirdPartyInvite...)
-	stateKeyNIDMap, err := v.db.EventStateKeyNIDs(ctx, neededStateKeys)
+	stateKeyNIDMap, err := sr.db.EventStateKeyNIDs(ctx, neededStateKeys)
 	if err != nil {
 		return nil, err
 	}
 
 	// Load the necessary auth events.
-	tuplesNeeded := v.stateKeyTuplesNeeded(stateKeyNIDMap, needed)
+	tuplesNeeded := sr.stateKeyTuplesNeeded(stateKeyNIDMap, needed)
 	var authEntries []types.StateEntry
 	for _, tuple := range tuplesNeeded {
 		if eventNID, ok := stateEntryMap(notConflicted).lookup(tuple); ok {
@@ -945,14 +980,14 @@ func (v *StateResolution) resolveConflictsV1(
 			})
 		}
 	}
-	authEvents, _, err := v.loadStateEvents(ctx, authEntries)
+	authEvents, _, err := sr.loadStateEvents(ctx, authEntries)
 	if err != nil {
 		return nil, err
 	}
 
 	// Resolve the conflicts.
 	resolvedEvents := gomatrixserverlib.ResolveStateConflicts(conflictedEvents, authEvents, func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
-		return v.Querier.QueryUserIDForSender(ctx, roomID, senderID)
+		return sr.Querier.QueryUserIDForSender(ctx, roomID, senderID)
 	})
 
 	// Map from the full events back to numeric state entries.
@@ -976,18 +1011,20 @@ func (v *StateResolution) resolveConflictsV1(
 // Returns a list that combines the entries without conflicts with the result of state resolution for the entries with conflicts.
 // The returned list is sorted by state key tuple.
 // Returns an error if there was a problem talking to the database.
-func (v *StateResolution) resolveConflictsV2(
+func (sr *StateResolution) resolveConflictsV2(
 	ctx context.Context,
 	notConflicted, conflicted []types.StateEntry,
 ) ([]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.resolveConflictsV2")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.resolveConflictsV2")
+	defer sr.tracer.End(ctx, span, err)
 
 	estimate := len(conflicted) + len(notConflicted)
 	eventIDMap := make(map[string]types.StateEntry, estimate)
 
 	// Load the conflicted events
-	conflictedEvents, conflictedEventMap, err := v.loadStateEvents(ctx, conflicted)
+	conflictedEvents, conflictedEventMap, err := sr.loadStateEvents(ctx, conflicted)
 	if err != nil {
 		return nil, err
 	}
@@ -996,7 +1033,7 @@ func (v *StateResolution) resolveConflictsV2(
 	}
 
 	// Load the non-conflicted events
-	nonConflictedEvents, nonConflictedEventMap, err := v.loadStateEvents(ctx, notConflicted)
+	nonConflictedEvents, nonConflictedEventMap, err := sr.loadStateEvents(ctx, notConflicted)
 	if err != nil {
 		return nil, err
 	}
@@ -1012,12 +1049,12 @@ func (v *StateResolution) resolveConflictsV2(
 	knownAuthEvents := make(map[string]types.Event, estimate*3)
 
 	// For each conflicted event, let's try and get the needed auth events.
-	if err = func() error {
-		loadAuthEventsTrace, sctx := internal.StartRegion(ctx, "StateResolution.loadAuthEvents")
-		defer loadAuthEventsTrace.EndRegion()
+	if err = func(ctx context.Context) error {
+		ctx, spanLoadAuthEvts := sr.tracer.Start(ctx, "StateResolution.loadAuthEvents")
+		defer spanLoadAuthEvts.End()
 
 		loader := authEventLoader{
-			v:              v,
+			v:              sr,
 			lookupFromDB:   make([]string, 0, len(conflictedEvents)*3),
 			lookupFromMem:  make([]string, 0, len(conflictedEvents)*3),
 			lookedUpEvents: make([]types.Event, 0, len(conflictedEvents)*3),
@@ -1029,7 +1066,7 @@ func (v *StateResolution) resolveConflictsV2(
 
 			// Store the newly found auth events in the auth set for this event.
 			var authEventMap map[string]types.StateEntry
-			authSets[key], authEventMap, err = loader.loadAuthEvents(sctx, v.roomInfo, conflictedEvent, knownAuthEvents)
+			authSets[key], authEventMap, err = loader.loadAuthEvents(ctx, sr.roomInfo, conflictedEvent, knownAuthEvents)
 			if err != nil {
 				return err
 			}
@@ -1048,7 +1085,7 @@ func (v *StateResolution) resolveConflictsV2(
 			}
 		}
 		return nil
-	}(); err != nil {
+	}(ctx); err != nil {
 		return nil, err
 	}
 
@@ -1057,26 +1094,26 @@ func (v *StateResolution) resolveConflictsV2(
 	gotAuthEvents = nil // nolint:ineffassign
 
 	// Resolve the conflicts.
-	resolvedEvents := func() []gomatrixserverlib.PDU {
-		resolvedTrace, _ := internal.StartRegion(ctx, "StateResolution.ResolveStateConflictsV2")
-		defer resolvedTrace.EndRegion()
+	resolvedEvents := func(ctx context.Context) []gomatrixserverlib.PDU {
+		ctx, resolvedTrace := sr.tracer.Start(ctx, "StateResolution.ResolveStateConflictsV2")
+		defer resolvedTrace.End()
 
 		return gomatrixserverlib.ResolveStateConflictsV2(
 			conflictedEvents,
 			nonConflictedEvents,
 			authEvents,
 			func(roomID spec.RoomID, senderID spec.SenderID) (*spec.UserID, error) {
-				return v.Querier.QueryUserIDForSender(ctx, roomID, senderID)
+				return sr.Querier.QueryUserIDForSender(ctx, roomID, senderID)
 			},
 			func(eventID string) bool {
-				isRejected, err := v.db.IsEventRejected(ctx, v.roomInfo.RoomNID, eventID)
+				isRejected, err := sr.db.IsEventRejected(ctx, sr.roomInfo.RoomNID, eventID)
 				if err != nil {
 					return true
 				}
 				return isRejected
 			},
 		)
-	}()
+	}(ctx)
 
 	// Map from the full events back to numeric state entries.
 	for _, resolvedEvent := range resolvedEvents {
@@ -1093,7 +1130,7 @@ func (v *StateResolution) resolveConflictsV2(
 }
 
 // stateKeyTuplesNeeded works out which numeric state key tuples we need to authenticate some events.
-func (v *StateResolution) stateKeyTuplesNeeded(stateKeyNIDMap map[string]types.EventStateKeyNID, stateNeeded gomatrixserverlib.StateNeeded) []types.StateKeyTuple {
+func (sr *StateResolution) stateKeyTuplesNeeded(stateKeyNIDMap map[string]types.EventStateKeyNID, stateNeeded gomatrixserverlib.StateNeeded) []types.StateKeyTuple {
 	var keyTuples []types.StateKeyTuple
 	if stateNeeded.Create {
 		keyTuples = append(keyTuples, types.StateKeyTuple{
@@ -1138,17 +1175,19 @@ func (v *StateResolution) stateKeyTuplesNeeded(stateKeyNIDMap map[string]types.E
 // Returns a list of state events in no particular order and a map from string event ID back to state entry.
 // The map can be used to recover which numeric state entry a given event is for.
 // Returns an error if there was a problem talking to the database.
-func (v *StateResolution) loadStateEvents(
+func (sr *StateResolution) loadStateEvents(
 	ctx context.Context, entries []types.StateEntry,
 ) ([]gomatrixserverlib.PDU, map[string]types.StateEntry, error) {
-	trace, ctx := internal.StartRegion(ctx, "StateResolution.loadStateEvents")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := sr.tracer.Start(ctx, "StateResolution.loadStateEvents")
+	defer sr.tracer.End(ctx, span, err)
 
 	result := make([]gomatrixserverlib.PDU, 0, len(entries))
 	eventEntries := make([]types.StateEntry, 0, len(entries))
 	eventNIDs := make(types.EventNIDs, 0, len(entries))
 	for _, entry := range entries {
-		if e, ok := v.events[entry.EventNID]; ok {
+		if e, ok := sr.events[entry.EventNID]; ok {
 			result = append(result, e)
 		} else {
 			eventEntries = append(eventEntries, entry)
@@ -1156,10 +1195,10 @@ func (v *StateResolution) loadStateEvents(
 		}
 	}
 
-	if v.roomInfo == nil {
+	if sr.roomInfo == nil {
 		return nil, nil, types.ErrorInvalidRoomInfo
 	}
-	events, err := v.db.Events(ctx, v.roomInfo.RoomVersion, eventNIDs)
+	events, err := sr.db.Events(ctx, sr.roomInfo.RoomVersion, eventNIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1171,7 +1210,7 @@ func (v *StateResolution) loadStateEvents(
 		}
 		result = append(result, event.PDU)
 		eventIDMap[event.EventID()] = entry
-		v.events[entry.EventNID] = event.PDU
+		sr.events[entry.EventNID] = event.PDU
 	}
 	return result, eventIDMap, nil
 }

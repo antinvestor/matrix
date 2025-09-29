@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/internal/helpers"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
@@ -36,8 +35,10 @@ func (r *Inputer) updateMemberships(
 	updater *shared.RoomUpdater,
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
-	trace, ctx := internal.StartRegion(ctx, "updateMemberships")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := r.tracer.Start(ctx, "updateMemberships")
+	defer r.tracer.End(ctx, span, err)
 
 	changes := membershipChanges(removed, added)
 	var eventNIDs []types.EventNID

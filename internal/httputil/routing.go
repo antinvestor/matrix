@@ -56,10 +56,7 @@ type Routers struct {
 func NewRouters() Routers {
 
 	// Create the validation interceptor provided by connectrpc.com/validate.
-	validator, err := validate.NewInterceptor()
-	if err != nil {
-		panic("error creating validation interceptor: " + err.Error())
-	}
+	validator := validate.NewInterceptor()
 
 	r := Routers{
 		Validator:     validator,

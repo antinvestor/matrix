@@ -61,7 +61,8 @@ func main() {
 			frame.WithSinglePoolCapacity(10000),
 			frame.WithConcurrency(1000),
 			frame.WithPoolCount(1),
-		))
+		),
+	)
 	defer service.Stop(ctx)
 
 	log := util.Log(ctx)

@@ -26,7 +26,6 @@ import (
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth"
-	"github.com/antinvestor/matrix/internal"
 	userapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/pitabwire/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -178,9 +177,6 @@ func MakeExternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 			}
 		}
 
-		trace, ctx := internal.StartTask(req.Context(), metricsName)
-		defer trace.EndTask()
-		req = req.WithContext(ctx)
 		h.ServeHTTP(nextWriter, req)
 
 	}
@@ -198,10 +194,6 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 			return
 		}
 
-		trace, ctx := internal.StartTask(req.Context(), metricsName)
-		defer trace.EndTask()
-		req = req.WithContext(ctx)
-
 		// apply additional checks, if any
 		opts := AuthAPIOpts{}
 		for _, opt := range checks {
@@ -212,6 +204,7 @@ func MakeHTTPAPI(metricsName string, userAPI userapi.QueryAcccessTokenAPI, enabl
 			logger := util.Log(req.Context())
 			nueCtx, _, jsonErr := auth.VerifyUserFromRequest(req, userAPI)
 			if jsonErr != nil {
+
 				w.WriteHeader(jsonErr.Code)
 				if err := json.NewEncoder(w).Encode(jsonErr.JSON); err != nil {
 					logger.WithError(err).Error("failed to encode JSON response")

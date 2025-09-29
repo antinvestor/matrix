@@ -50,7 +50,7 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 		util.Log(ctx).WithError(err).Error("UserAPI.QueryLoginToken failed")
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: spec.InternalServerError{},
+			JSON: spec.InternalServerError{Err: err.Error()},
 		}
 	}
 	if res.Data == nil {

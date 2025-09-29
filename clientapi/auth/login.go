@@ -39,22 +39,22 @@ func LoginFromJSONReader(
 ) (*Login, LoginCleanupFunc, *util.JSONResponse) {
 	reqBytes, err := io.ReadAll(req.Body)
 	if err != nil {
-		err := &util.JSONResponse{
+		response := &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("Reading request body failed: " + err.Error()),
 		}
-		return nil, nil, err
+		return nil, nil, response
 	}
 
 	var header struct {
 		Type string `json:"type"`
 	}
-	if err := json.Unmarshal(reqBytes, &header); err != nil {
-		err := &util.JSONResponse{
+	if err = json.Unmarshal(reqBytes, &header); err != nil {
+		response := &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.BadJSON("Reading request body failed: " + err.Error()),
 		}
-		return nil, nil, err
+		return nil, nil, response
 	}
 
 	var typ Type
@@ -70,13 +70,13 @@ func LoginFromJSONReader(
 			Config:  cfg,
 		}
 	case authtypes.LoginTypeApplicationService:
-		token, err := ExtractAccessToken(req)
-		if err != nil {
-			err := &util.JSONResponse{
+		token, extractErr := ExtractAccessToken(req)
+		if extractErr != nil {
+			responseErr := &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: spec.MissingToken(err.Error()),
+				JSON: spec.MissingToken(extractErr.Error()),
 			}
-			return nil, nil, err
+			return nil, nil, responseErr
 		}
 
 		typ = &LoginTypeApplicationService{
@@ -84,11 +84,11 @@ func LoginFromJSONReader(
 			Token:  token,
 		}
 	default:
-		err := util.JSONResponse{
+		response := util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.InvalidParam("unhandled login type: " + header.Type),
 		}
-		return nil, nil, &err
+		return nil, nil, &response
 	}
 
 	return typ.LoginFromJSON(req.Context(), reqBytes)

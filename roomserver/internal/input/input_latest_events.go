@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/antinvestor/gomatrixserverlib"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/roomserver/api"
 	"github.com/antinvestor/matrix/roomserver/state"
 	"github.com/antinvestor/matrix/roomserver/storage/shared"
@@ -55,8 +54,8 @@ func (r *Inputer) updateLatestEvents(
 	rewritesState bool,
 	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (err error) {
-	trace, ctx := internal.StartRegion(ctx, "updateLatestEvents")
-	defer trace.EndRegion()
+	ctx, span := r.tracer.Start(ctx, "updateLatestEvents")
+	defer r.tracer.End(ctx, span, err)
 
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
 	if err != nil {
@@ -204,10 +203,11 @@ func (u *latestEventsUpdater) doUpdateLatestEvents(ctx context.Context) error {
 }
 
 func (u *latestEventsUpdater) latestState() error {
-	trace, ctx := internal.StartRegion(u.ctx, "processEventWithMissingState")
-	defer trace.EndRegion()
 
 	var err error
+	ctx, span := u.api.tracer.Start(u.ctx, "processEventWithMissingState")
+	defer u.api.tracer.End(ctx, span, err)
+
 	roomState := state.NewStateResolution(u.updater, u.roomInfo, u.api.Queryer)
 
 	// Work out if the state at the extremities has actually changed
@@ -312,8 +312,10 @@ func (u *latestEventsUpdater) calculateLatest(ctx context.Context,
 	newEvent gomatrixserverlib.PDU,
 	newStateAndRef types.StateAtEventAndReference,
 ) (bool, error) {
-	trace, _ := internal.StartRegion(u.ctx, "calculateLatest")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := u.api.tracer.Start(ctx, "calculateLatest")
+	defer u.api.tracer.End(ctx, span, err)
 
 	// First of all, get a list of all of the events in our current
 	// set of forward extremities.
@@ -332,7 +334,8 @@ func (u *latestEventsUpdater) calculateLatest(ctx context.Context,
 	// If the "new" event is already referenced by an existing event
 	// then do nothing - it's not a candidate to be a new extremity if
 	// it has been referenced.
-	if referenced, err := u.updater.IsReferenced(ctx, newEvent.EventID()); err != nil {
+	referenced, err := u.updater.IsReferenced(ctx, newEvent.EventID())
+	if err != nil {
 		return false, fmt.Errorf("u.updater.IsReferenced(new): %w", err)
 	} else if referenced {
 		u.latest = oldLatest

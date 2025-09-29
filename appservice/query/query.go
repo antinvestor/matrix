@@ -26,14 +26,15 @@ import (
 	"sync"
 
 	"github.com/antinvestor/matrix/appservice/api"
-	"github.com/antinvestor/matrix/internal"
 	"github.com/antinvestor/matrix/setup/config"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 )
 
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI
 type AppServiceQueryAPI struct {
 	Cfg           *config.AppServiceAPI
+	Tracer        frame.Tracer
 	ProtocolCache map[string]api.ASProtocolResponse
 	CacheMu       sync.Mutex
 }
@@ -45,8 +46,9 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 	request *api.RoomAliasExistsRequest,
 	response *api.RoomAliasExistsResponse,
 ) error {
-	trace, ctx := internal.StartRegion(ctx, "ApplicationServiceRoomAlias")
-	defer trace.EndRegion()
+	var err error
+	ctx, span := a.Tracer.Start(ctx, "ApplicationServiceRoomAlias")
+	defer a.Tracer.End(ctx, span, err)
 
 	log := util.Log(ctx).WithField("room_alias", request.Alias)
 	// Determine which application service should handle this request
@@ -57,8 +59,9 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 				path = api.ASRoomAliasExistsLegacyPath
 			}
 			// The full path to the rooms API, includes hs token
-			URL, err := url.Parse(appservice.RequestUrl() + path)
-			if err != nil {
+			URL, loopErr := url.Parse(appservice.RequestUrl() + path)
+			if loopErr != nil {
+				err = loopErr
 				return err
 			}
 
@@ -72,18 +75,19 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 
 			// Send a request to each application service. If one responds that it has
 			// created the room, immediately return.
-			req, err := http.NewRequest(http.MethodGet, apiURL, nil)
-			if err != nil {
+			req, loopErr := http.NewRequest(http.MethodGet, apiURL, nil)
+			if loopErr != nil {
+				err = loopErr
 				return err
 			}
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", appservice.HSToken))
 			req = req.WithContext(ctx)
 
-			resp, err := appservice.HTTPClient.Do(req)
+			resp, loopErr := appservice.HTTPClient.Do(req)
 			if resp != nil {
 				defer func() {
-					err = resp.Body.Close()
-					if err != nil {
+					loopErr = resp.Body.Close()
+					if loopErr != nil {
 						log.
 							WithField("appservice_id", appservice.ID).
 							WithField("status_code", resp.StatusCode).
@@ -91,8 +95,9 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 					}
 				}()
 			}
-			if err != nil {
-				log.WithField("appservice_id", appservice.ID).WithError(err).Error("Issue querying room alias on application service %s", appservice.ID)
+			if loopErr != nil {
+				err = loopErr
+				log.WithField("appservice_id", appservice.ID).WithError(loopErr).Error("Issue querying room alias on application service %s", appservice.ID)
 				return err
 			}
 			switch resp.StatusCode {
@@ -123,8 +128,10 @@ func (a *AppServiceQueryAPI) UserIDExists(
 	request *api.UserIDExistsRequest,
 	response *api.UserIDExistsResponse,
 ) error {
-	trace, ctx := internal.StartRegion(ctx, "ApplicationServiceUserID")
-	defer trace.EndRegion()
+
+	var err error
+	ctx, span := a.Tracer.Start(ctx, "ApplicationServiceUserID")
+	defer a.Tracer.End(ctx, span, err)
 
 	log := util.Log(ctx)
 	// Determine which application service should handle this request
@@ -135,8 +142,9 @@ func (a *AppServiceQueryAPI) UserIDExists(
 			if a.Cfg.LegacyPaths {
 				path = api.ASUserExistsLegacyPath
 			}
-			URL, err := url.Parse(appservice.RequestUrl() + path)
-			if err != nil {
+			URL, loopErr := url.Parse(appservice.RequestUrl() + path)
+			if loopErr != nil {
+				err = loopErr
 				return err
 			}
 			URL.Path += request.UserID
@@ -149,16 +157,17 @@ func (a *AppServiceQueryAPI) UserIDExists(
 
 			// Send a request to each application service. If one responds that it has
 			// created the user, immediately return.
-			req, err := http.NewRequest(http.MethodGet, apiURL, nil)
-			if err != nil {
+			req, loopErr := http.NewRequest(http.MethodGet, apiURL, nil)
+			if loopErr != nil {
+				err = loopErr
 				return err
 			}
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", appservice.HSToken))
-			resp, err := appservice.HTTPClient.Do(req.WithContext(ctx))
+			resp, loopErr := appservice.HTTPClient.Do(req.WithContext(ctx))
 			if resp != nil {
 				defer func() {
-					err = resp.Body.Close()
-					if err != nil {
+					loopErr = resp.Body.Close()
+					if loopErr != nil {
 						log.
 							WithField("appservice_id", appservice.ID).
 							WithField("status_code", resp.StatusCode).
@@ -166,10 +175,11 @@ func (a *AppServiceQueryAPI) UserIDExists(
 					}
 				}()
 			}
-			if err != nil {
+			if loopErr != nil {
+				err = loopErr
 				log.
 					WithField("appservice_id", appservice.ID).
-					WithError(err).Error("issue querying user ID on application service")
+					WithError(loopErr).Error("issue querying user ID on application service")
 				return err
 			}
 			if resp.StatusCode == http.StatusOK {
