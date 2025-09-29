@@ -114,6 +114,7 @@ func completeAuth(
 		UserAgent:         userAgent,
 	}, &performRes)
 	if err != nil {
+		util.Log(ctx).WithError(err).Error("userAPI.PerformDeviceCreation failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.Unknown("failed to create device: " + err.Error()),
