@@ -60,17 +60,18 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 		return err
 	}
 
-	var atResp api.QueryAccessTokenResponse
-	err = a.QueryAccessToken(ctx, &api.QueryAccessTokenRequest{
-		AccessToken:      tokenData.SSOToken.AccessToken,
-		AppServiceUserID: tokenData.UserID,
-	}, &atResp)
-	if err != nil {
-		return err
+	if tokenData.SSOToken != nil {
+		var atResp api.QueryAccessTokenResponse
+		err = a.QueryAccessToken(ctx, &api.QueryAccessTokenRequest{
+			AccessToken:      tokenData.SSOToken.AccessToken,
+			AppServiceUserID: tokenData.UserID,
+		}, &atResp)
+		if err != nil {
+			return err
+		}
+
+		tokenData.DeviceID = &atResp.Device.ID
 	}
-
-	tokenData.DeviceID = &atResp.Device.ID
-
 	_, domain, err := gomatrixserverlib.SplitID('@', tokenData.UserID)
 	if err != nil {
 		return err
