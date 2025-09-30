@@ -26,7 +26,7 @@ import (
 
 // PerformLoginTokenCreation creates a new login token and associates it with the provided data.
 func (a *UserInternalAPI) PerformLoginTokenCreation(ctx context.Context, req *api.PerformLoginTokenCreationRequest, res *api.PerformLoginTokenCreationResponse) error {
-	util.Log(ctx).WithField("user_id", req.Data.UserID).Info("PerformLoginTokenCreation")
+	util.Log(ctx).WithField("user_id", req.Data.UserID).Debug("PerformLoginTokenCreation")
 	_, domain, err := gomatrixserverlib.SplitID('@', req.Data.UserID)
 	if err != nil {
 		return err

@@ -567,7 +567,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 		}
 		// If the provided token wasn't an as_token (both err and appServiceDevice are nil), continue with normal auth.
 	}
-	ctx0, device, err := a.DB.GetDeviceByAccessToken(ctx, req.AccessToken)
+	ctx, device, err := a.DB.GetDeviceByAccessToken(ctx, req.AccessToken)
 	if err != nil {
 		if sqlutil.ErrorIsNoRows(err) {
 			return nil
@@ -587,7 +587,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 	}
 	device.AccountType = acc.AccountType
 	res.Device = device
-	res.Ctx = ctx0
+	res.Ctx = ctx
 	return nil
 }
 
