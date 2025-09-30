@@ -47,6 +47,9 @@ type LoginTokenData struct {
 	// UserID is the full mxid of the user.
 	UserID   string
 	SSOToken *oauth2.Token
+
+	// Optional data
+	DeviceID *string
 }
 
 // LoginTokenMetadata contains metadata created and maintained by the User API.

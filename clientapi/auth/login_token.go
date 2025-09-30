@@ -63,6 +63,7 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 	r.Identifier.Type = "m.id.user"
 	r.Identifier.User = res.Data.UserID
 	r.ExtraData = res.Data.SSOToken
+	r.DeviceID = res.Data.DeviceID
 
 	cleanup := func(ctx context.Context, authRes *util.JSONResponse) {
 		if authRes == nil {

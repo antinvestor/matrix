@@ -59,20 +59,32 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 		}
 		return err
 	}
-	localpart, domain, err := gomatrixserverlib.SplitID('@', tokenData.UserID)
+
+	var accessTokenResp api.QueryAccessTokenResponse
+	err = a.QueryAccessToken(ctx, &api.QueryAccessTokenRequest{
+		AccessToken:      tokenData.SSOToken.AccessToken,
+		AppServiceUserID: tokenData.UserID,
+	}, &accessTokenResp)
+	if err != nil {
+		return err
+	}
+
+	tokenData.DeviceID = &accessTokenResp.Device.ID
+
+	_, domain, err := gomatrixserverlib.SplitID('@', tokenData.UserID)
 	if err != nil {
 		return err
 	}
 	if !a.Config.Global.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot return a login token for a remote user (server name %s)", domain)
 	}
-	if _, err = a.DB.GetAccountByLocalpart(ctx, localpart, domain); err != nil {
-		res.Data = nil
-		if sqlutil.ErrorIsNoRows(err) {
-			return nil
-		}
-		return err
-	}
+	// if _, err = a.DB.GetAccountByLocalpart(ctx, localpart, domain); err != nil {
+	// 	res.Data = nil
+	// 	if sqlutil.ErrorIsNoRows(err) {
+	// 		return nil
+	// 	}
+	// 	return err
+	// }
 	res.Data = tokenData
 	return nil
 }

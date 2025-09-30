@@ -192,7 +192,11 @@ func (d *devicesApi) SelectDeviceByToken(ctx context.Context, accessToken string
 		return nil
 	}
 
-	util.Log(ctx).WithField("access token", accessToken).WithField("device", device.ID).WithField("session id", device.SessionID).Info("device found")
+	util.Log(ctx).
+		WithField("access token", accessToken).
+		WithField("device", device.ID).
+		WithField("session id", device.SessionID).
+		Info("device found")
 
 	return ctx, &device, nil
 

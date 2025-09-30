@@ -64,10 +64,9 @@ type LoginIdentifier struct {
 
 // Login represents the shared fields used in all forms of login/sudo endpoints.
 type Login struct {
-	LoginIdentifier                 // Flat fields deprecated in favour of `identifier`.
-	Identifier      LoginIdentifier `json:"identifier"`
+	Identifier LoginIdentifier `json:"identifier"`
 
-	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
+	// DeviceID, DeviceSessionID and InitialDisplayName can be omitted, or empty strings ("")
 	// Thus a pointer is needed to differentiate between the two
 	InitialDisplayName *string       `json:"initial_device_display_name"`
 	DeviceID           *string       `json:"device_id"`
@@ -79,18 +78,13 @@ func (r *Login) Username() string {
 	if r.Identifier.Type == "m.id.user" {
 		return r.Identifier.User
 	}
-	// deprecated but without it Element iOS won't log in
-	return r.User
+	return ""
 }
 
 // ThirdPartyID returns the 3PID medium and address for this login, if it exists.
 func (r *Login) ThirdPartyID() (medium, address string) {
 	if r.Identifier.Type == "m.id.thirdparty" {
 		return r.Identifier.Medium, r.Identifier.Address
-	}
-	// deprecated
-	if r.Medium == "email" {
-		return "email", r.Address
 	}
 	return "", ""
 }
