@@ -69,8 +69,9 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 		if err != nil {
 			return err
 		}
-
-		tokenData.DeviceID = &atResp.Device.ID
+		if atResp.Device != nil {
+			tokenData.DeviceID = &atResp.Device.ID
+		}
 	}
 	_, domain, err := gomatrixserverlib.SplitID('@', tokenData.UserID)
 	if err != nil {
