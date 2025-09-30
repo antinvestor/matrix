@@ -125,6 +125,6 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		}
 	}
 	// Set the user, so login.Username() can do the right thing
-	r.Identifier.User = res.Account.UserID
+	r.User = res.Account.UserID
 	return &r.Login, nil
 }
