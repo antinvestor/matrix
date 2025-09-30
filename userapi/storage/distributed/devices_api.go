@@ -156,28 +156,35 @@ func (d *devicesApi) UpdateDeviceName(ctx context.Context, _ string, _ spec.Serv
 
 func (d *devicesApi) SelectDeviceByToken(ctx context.Context, accessToken string) (context.Context, *api.Device, error) {
 
-	ctx2, err := d.svc.Authenticate(ctx, accessToken, d.jwtAudience, d.jwtIssuer)
+	ctx, err := d.svc.Authenticate(ctx, accessToken, d.jwtAudience, d.jwtIssuer)
 	if err != nil {
 		return ctx, nil, err
 	}
 
-	claims := frame.ClaimsFromContext(ctx2)
+	claims := frame.ClaimsFromContext(ctx)
 	if claims == nil {
-		return ctx2, nil, errors.New("no claims found in authenticated context")
+		return ctx, nil, errors.New("no claims found in authenticated context")
 	}
 
 	userIDStr := userutil.MakeUserID(claims.Subject, d.serverName)
 
 	device := api.Device{
-		ID:     claims.DeviceID,
-		UserID: userIDStr,
+		ID:        claims.DeviceID,
+		SessionID: claims.SessionID,
+		UserID:    userIDStr,
 	}
 
 	device.Reload = func(ctx context.Context) error {
-		rd, err0 := d.SelectDeviceByID(ctx, claims.Subject, d.serverName, claims.DeviceID)
+		userID, err0 := spec.NewUserID(device.UserID, false)
 		if err0 != nil {
 			return err0
 		}
+
+		rd, err0 := d.SelectDeviceByID(ctx, userID.Local(), d.serverName, device.ID)
+		if err0 != nil {
+			return err0
+		}
+
 		device.DisplayName = rd.DisplayName
 		device.LastSeenTS = rd.LastSeenTS
 		device.LastSeenIP = rd.LastSeenIP
@@ -185,7 +192,9 @@ func (d *devicesApi) SelectDeviceByToken(ctx context.Context, accessToken string
 		return nil
 	}
 
-	return ctx2, &device, nil
+	util.Log(ctx).WithField("access token", accessToken).WithField("device", device.ID).WithField("session id", device.SessionID).Info("device found")
+
+	return ctx, &device, nil
 
 }
 

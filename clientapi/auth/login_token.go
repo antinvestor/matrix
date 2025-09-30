@@ -71,7 +71,8 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 		}
 		if authRes.Code == http.StatusOK {
 			var res uapi.PerformLoginTokenDeletionResponse
-			if err := t.UserAPI.PerformLoginTokenDeletion(ctx, &uapi.PerformLoginTokenDeletionRequest{Token: r.Token}, &res); err != nil {
+			err := t.UserAPI.PerformLoginTokenDeletion(ctx, &uapi.PerformLoginTokenDeletionRequest{Token: r.Token}, &res)
+			if err != nil {
 				util.Log(ctx).WithError(err).Error("UserAPI.PerformLoginTokenDeletion failed")
 			}
 		}
