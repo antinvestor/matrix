@@ -50,6 +50,14 @@ func ParseFlags(ctx context.Context) *config.Matrix {
 		log.WithError(err).Fatal("Invalid config file")
 	}
 
+	if cfg.Global.GetOauth2ServiceURI() != "" {
+
+		err = cfg.Global.LoadOauth2Config(ctx)
+		if err != nil {
+			log.WithError(err).Fatal("failed to load oauth2 settings")
+		}
+	}
+
 	if *enableRegistrationWithoutVerification {
 		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 	}
