@@ -30,7 +30,6 @@ import (
 	"github.com/antinvestor/matrix/roomserver/types"
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/pitabwire/util"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -84,7 +83,7 @@ func (c *Creator) PerformCreateRoom(ctx context.Context, userID spec.UserID, roo
 	// get the signing identity
 	identity, err := c.Cfg.Global.SigningIdentityFor(userID.Domain()) // we MUST use the server signing mxid_mapping
 	if err != nil {
-		logrus.WithError(err).WithField("domain", userID.Domain()).Error("unable to find signing identity for domain")
+		util.Log(ctx).WithError(err).WithField("domain", userID.Domain()).Error("unable to find signing identity for domain")
 		return "", &util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: spec.InternalServerError{},
