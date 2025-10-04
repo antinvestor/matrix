@@ -42,6 +42,7 @@ import (
 	"github.com/antinvestor/matrix/userapi/storage"
 	"github.com/antinvestor/matrix/userapi/storage/tables"
 	userapiUtil "github.com/antinvestor/matrix/userapi/util"
+	"github.com/pitabwire/frame"
 	"github.com/pitabwire/util"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -293,7 +294,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	isExisting := false
 	if req.DeviceID != nil && *req.DeviceID != "" {
 		existingDev, err := a.DB.GetDeviceByID(ctx, req.Localpart, req.ServerName, *req.DeviceID)
-		if err != nil && !sqlutil.ErrorIsNoRows(err) {
+		if err != nil && !frame.ErrIsNotFound(err) {
 			return err
 		}
 		isExisting = existingDev.ID == *req.DeviceID

@@ -528,17 +528,17 @@ func (d *Database) UpsertBackupKeys(
 ) (count int64, etag string, err error) {
 	// wrap the following logic in a txn to ensure we atomically upload keys
 	err = d.Cm.Do(ctx, func(ctx context.Context) error {
-		_, _, _, oldETag, deleted, err := d.KeyBackupVersions.SelectKeyBackup(ctx, userID, version)
-		if err != nil {
-			return err
+		_, _, _, oldETag, deleted, err0 := d.KeyBackupVersions.SelectKeyBackup(ctx, userID, version)
+		if err0 != nil {
+			return err0
 		}
 		if deleted {
 			return fmt.Errorf("backup was deleted")
 		}
 		// pull out all keys for this (user_id, version)
-		existingKeys, err := d.KeyBackups.SelectKeys(ctx, userID, version)
-		if err != nil {
-			return err
+		existingKeys, err0 := d.KeyBackups.SelectKeys(ctx, userID, version)
+		if err0 != nil {
+			return err0
 		}
 
 		changed := false
@@ -550,10 +550,10 @@ func (d *Database) UpsertBackupKeys(
 				existingSession, ok := existingRoom[newKey.SessionID]
 				if ok {
 					if existingSession.ShouldReplaceRoomKey(&newKey.KeyBackupSession) {
-						err = d.KeyBackups.UpdateBackupKey(ctx, userID, version, newKey)
+						err0 = d.KeyBackups.UpdateBackupKey(ctx, userID, version, newKey)
 						changed = true
-						if err != nil {
-							return fmt.Errorf("d.KeyBackups.UpdateBackupKey: %w", err)
+						if err0 != nil {
+							return fmt.Errorf("d.KeyBackups.UpdateBackupKey: %w", err0)
 						}
 					}
 					// if we shouldn't replace the key we do nothing with it
@@ -561,16 +561,16 @@ func (d *Database) UpsertBackupKeys(
 				}
 			}
 			// if we're here, either the room or session are new, either way, we insert
-			err = d.KeyBackups.InsertBackupKey(ctx, userID, version, newKey)
+			err0 = d.KeyBackups.InsertBackupKey(ctx, userID, version, newKey)
 			changed = true
-			if err != nil {
-				return fmt.Errorf("d.KeyBackups.InsertBackupKey: %w", err)
+			if err0 != nil {
+				return fmt.Errorf("d.KeyBackups.InsertBackupKey: %w", err0)
 			}
 		}
 
-		count, err = d.KeyBackups.CountKeys(ctx, userID, version)
-		if err != nil {
-			return err
+		count, err0 = d.KeyBackups.CountKeys(ctx, userID, version)
+		if err0 != nil {
+			return err0
 		}
 		if changed {
 			// update the etag
