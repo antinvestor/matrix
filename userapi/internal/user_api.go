@@ -299,7 +299,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 		}
 		isExisting = existingDev.ID == *req.DeviceID
 	}
-	util.Log(ctx).WithField("localpart", req.Localpart).WithField("device_id", req.DeviceID).WithField("display_name", req.DeviceDisplayName).Info("PerformDeviceCreation")
+	util.Log(ctx).WithField("localpart", req.Localpart).WithField("device_id", *req.DeviceID).WithField("display_name", *req.DeviceDisplayName).Info("PerformDeviceCreation")
 	dev, err := a.DB.CreateDevice(ctx, req.Localpart, serverName, req.DeviceID, req.AccessToken, req.ExtraData, req.DeviceDisplayName, req.IPAddr, req.UserAgent)
 	if err != nil {
 		return err

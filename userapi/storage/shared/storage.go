@@ -638,14 +638,8 @@ func (d *Database) CreateDevice(
 	if deviceID != nil {
 
 		returnErr = d.Cm.Do(ctx, func(ctx context.Context) error {
-			var err error
-			// Revoke existing tokens for this device
-			if err = d.Devices.DeleteDevice(ctx, *deviceID, localpart, serverName); err != nil {
-				return err
-			}
-
-			dev, err = d.Devices.InsertDevice(ctx, *deviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
-			return err
+			dev, returnErr = d.Devices.InsertDevice(ctx, *deviceID, localpart, serverName, accessToken, extraData, displayName, ipAddr, userAgent)
+			return returnErr
 		})
 
 	} else {

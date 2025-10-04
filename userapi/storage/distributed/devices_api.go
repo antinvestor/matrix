@@ -97,6 +97,11 @@ func (d *devicesApi) InsertDeviceWithSessionID(ctx context.Context, id, localpar
 		return nil, err
 	}
 
+	if accessToken != "" {
+		_, dev, err0 := d.SelectDeviceByToken(ctx, accessToken)
+		return dev, err0
+	}
+
 	return d.SelectDeviceByID(ctx, localpart, serverName, id)
 }
 
