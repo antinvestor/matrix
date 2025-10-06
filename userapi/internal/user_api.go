@@ -288,16 +288,20 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	if !a.Config.Global.IsLocalServerName(serverName) {
 		return fmt.Errorf("server name %s is not local", serverName)
 	}
+
+	var dev *api.Device
+	var err error
+
 	// If a device ID was specified, check if it already exists and
 	// avoid sending an empty device list update which would remove
 	// existing device keys.
 	isExisting := false
 	if req.DeviceID != nil && *req.DeviceID != "" {
-		existingDev, err := a.DB.GetDeviceByID(ctx, req.Localpart, req.ServerName, *req.DeviceID)
+		dev, err = a.DB.GetDeviceByID(ctx, req.Localpart, req.ServerName, *req.DeviceID)
 		if err != nil && !frame.ErrIsNotFound(err) {
 			return err
 		}
-		isExisting = existingDev.ID == *req.DeviceID
+		isExisting = dev.ID == *req.DeviceID
 	}
 	log := util.Log(ctx).WithField("localpart", req.Localpart)
 
@@ -308,10 +312,14 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	if req.DeviceDisplayName != nil {
 		log = log.WithField("display_name", *req.DeviceDisplayName)
 	}
-	log.Debug("PerformDeviceCreation")
-	dev, err := a.DB.CreateDevice(ctx, req.Localpart, serverName, req.DeviceID, req.AccessToken, req.ExtraData, req.DeviceDisplayName, req.IPAddr, req.UserAgent)
-	if err != nil {
-		return err
+
+	if !isExisting {
+		log.Debug("PerformDeviceCreation")
+
+		dev, err = a.DB.CreateDevice(ctx, req.Localpart, serverName, req.DeviceID, req.AccessToken, req.ExtraData, req.DeviceDisplayName, req.IPAddr, req.UserAgent)
+		if err != nil {
+			return err
+		}
 	}
 	res.DeviceCreated = true
 	res.Device = dev
