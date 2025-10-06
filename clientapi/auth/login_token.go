@@ -64,6 +64,12 @@ func (t *LoginTypeToken) LoginFromJSON(ctx context.Context, reqBytes []byte) (*L
 	r.Identifier.User = res.Data.UserID
 	r.ExtraData = res.Data.SSOToken
 
+	if r.ExtraData != nil {
+		util.Log(ctx).WithField("user_id", res.Data.UserID).WithField("has_access_token", r.ExtraData.AccessToken != "").WithField("has_refresh_token", r.ExtraData.RefreshToken != "").Debug("LoginTypeToken: SSO token retrieved from login token")
+	} else {
+		util.Log(ctx).WithField("user_id", res.Data.UserID).Debug("LoginTypeToken: no SSO token in login token data")
+	}
+
 	if res.Data.DeviceID != nil && *res.Data.DeviceID != "" {
 		r.DeviceID = res.Data.DeviceID
 	}

@@ -20,6 +20,16 @@ const (
 	clusterName = "matrix-room-cluster"
 )
 
+// minLevelHandler wraps an slog.Handler and filters out logs below a minimum level
+type minLevelHandler struct {
+	slog.Handler
+	minLevel slog.Level
+}
+
+func (h *minLevelHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return level >= h.minLevel && h.Handler.Enabled(ctx, level)
+}
+
 // manager manages a set of actors for processing room events
 type manager struct {
 	config      *config.ActorOptions
@@ -40,7 +50,12 @@ func NewManager(ctx context.Context, config *config.ActorOptions, qm queueutil.Q
 	actorSystem := actor.NewActorSystem(actor.WithLoggerFactory(
 		func(sys *actor.ActorSystem) *slog.Logger {
 			log := svc.SLog(ctx)
-			return log
+			// Create a new logger with minimum level set to Info (no debug logs)
+			handler := &minLevelHandler{
+				Handler:  log.Handler(),
+				minLevel: slog.LevelInfo,
+			}
+			return slog.New(handler).With(slog.String("component", "actor"))
 		}))
 
 	managerOptn := &manager{

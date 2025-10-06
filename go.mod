@@ -23,7 +23,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pitabwire/frame v1.59.8
+	github.com/pitabwire/frame v1.59.9
 	github.com/pitabwire/util v0.3.4
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2

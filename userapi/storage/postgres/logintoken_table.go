@@ -99,6 +99,12 @@ func (t *loginTokenTable) InsertLoginToken(ctx context.Context, metadata *api.Lo
 		return err
 	}
 
+	if data.SSOToken != nil {
+		util.Log(ctx).WithField("user_id", data.UserID).WithField("has_access_token", data.SSOToken.AccessToken != "").WithField("has_refresh_token", data.SSOToken.RefreshToken != "").Debug("InsertLoginToken: storing SSO token")
+	} else {
+		util.Log(ctx).WithField("user_id", data.UserID).Debug("InsertLoginToken: no SSO token to store")
+	}
+
 	db := t.cm.Connection(ctx, false)
 	err = db.Exec(t.insertLoginTokenSQL, metadata.Token, metadata.Expiration.UTC(), data.UserID, extraData).Error
 	return err
@@ -136,6 +142,8 @@ func (t *loginTokenTable) SelectLoginToken(ctx context.Context, token string) (*
 		return nil, err
 	}
 
+	util.Log(ctx).WithField("user_id", data.UserID).WithField("extra_data_len", len(extraData)).WithField("extra_data_preview", string(extraData[:min(len(extraData), 100)])).Debug("SelectLoginToken: retrieved from database")
+
 	if len(extraData) > 0 && string(extraData) != "null" {
 		ssoToken := &oauth2.Token{}
 		err = json.Unmarshal(extraData, ssoToken)
@@ -143,6 +151,9 @@ func (t *loginTokenTable) SelectLoginToken(ctx context.Context, token string) (*
 			return nil, err
 		}
 		data.SSOToken = ssoToken
+		util.Log(ctx).WithField("user_id", data.UserID).WithField("has_access_token", ssoToken.AccessToken != "").WithField("has_refresh_token", ssoToken.RefreshToken != "").Debug("SelectLoginToken: unmarshaled SSO token")
+	} else {
+		util.Log(ctx).WithField("user_id", data.UserID).Debug("SelectLoginToken: no SSO token data found")
 	}
 
 	return &data, nil

@@ -28,9 +28,10 @@ import (
 )
 
 type loginResponse struct {
-	UserID      string `json:"user_id"`
-	AccessToken string `json:"access_token"`
-	DeviceID    string `json:"device_id"`
+	UserID       string `json:"user_id"`
+	AccessToken  string `json:"access_token"`
+	DeviceID     string `json:"device_id"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type flows struct {
@@ -80,7 +81,7 @@ func completeAuth(
 	ipAddr, userAgent string,
 ) util.JSONResponse {
 
-	token, err := auth.GenerateAccessToken()
+	accessToken, err := auth.GenerateAccessToken()
 	if err != nil {
 		util.Log(ctx).WithError(err).Error("auth.GenerateAccessToken failed")
 		return util.JSONResponse{
@@ -89,8 +90,13 @@ func completeAuth(
 		}
 	}
 
+	refreshToken := ""
 	if login.ExtraData != nil {
-		token = login.ExtraData.AccessToken
+		accessToken = login.ExtraData.AccessToken
+		refreshToken = login.ExtraData.RefreshToken
+		util.Log(ctx).WithField("username", login.Username()).WithField("has_access_token", accessToken != "").WithField("has_refresh_token", refreshToken != "").Debug("completeAuth: using SSO tokens from login.ExtraData")
+	} else {
+		util.Log(ctx).WithField("username", login.Username()).Debug("completeAuth: no SSO tokens, using generated access token")
 	}
 
 	localpart, serverName, err := userutil.ParseUsernameParam(login.Username(), cfg)
@@ -106,7 +112,7 @@ func completeAuth(
 	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
 		DeviceDisplayName: login.InitialDisplayName,
 		DeviceID:          login.DeviceID,
-		AccessToken:       token,
+		AccessToken:       accessToken,
 		ExtraData:         login.ExtraData,
 		Localpart:         localpart,
 		ServerName:        serverName,
@@ -124,9 +130,10 @@ func completeAuth(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: loginResponse{
-			UserID:      performRes.Device.UserID,
-			AccessToken: performRes.Device.AccessToken,
-			DeviceID:    performRes.Device.ID,
+			UserID:       performRes.Device.UserID,
+			AccessToken:  accessToken,
+			RefreshToken: refreshToken,
+			DeviceID:     performRes.Device.ID,
 		},
 	}
 }

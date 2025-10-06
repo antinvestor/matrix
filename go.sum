@@ -318,8 +318,8 @@ github.com/patrickmn/go-cache v2.1.0+incompatible/go.mod h1:3Qf8kWWT7OJRJbdiICTK
 github.com/petermattis/goid v0.0.0-20250904145737-900bdf8bb490 h1:QTvNkZ5ylY0PGgA+Lih+GdboMLY/G9SEGLMEGVjTVA4=
 github.com/petermattis/goid v0.0.0-20250904145737-900bdf8bb490/go.mod h1:pxMtw7cyUw6B2bRH0ZBANSPg+AoSud1I1iyJHI69jH4=
 github.com/philhofer/fwd v1.1.1/go.mod h1:gk3iGcWd9+svBvR0sR+KPcfE+RNWozjowpeBVG3ZVNU=
-github.com/pitabwire/frame v1.59.8 h1:4LPN2QaLk9WFf7eSw2H2ndxdAwGboQK9T8Vu1jxDwXo=
-github.com/pitabwire/frame v1.59.8/go.mod h1:IRCrsnjp2yxRJZrflD9kKmtHAcmwDkaO93Mx+ncUzVI=
+github.com/pitabwire/frame v1.59.9 h1:Bq1yXzN2E1IK3iYZVTZYnUqx5Na7RpjTLe9WleD6jp8=
+github.com/pitabwire/frame v1.59.9/go.mod h1:IRCrsnjp2yxRJZrflD9kKmtHAcmwDkaO93Mx+ncUzVI=
 github.com/pitabwire/natspubsub v0.7.2 h1:IaFhv06lnAUD9TAhVhx22EEpenvlP1K7VSGfToGFpyU=
 github.com/pitabwire/natspubsub v0.7.2/go.mod h1:WvluTZHrDOPNC617BLovPcWuHNclY7CjpY7kVAOtUMY=
 github.com/pitabwire/util v0.3.4 h1:OOsNVgJlqrC4EFNBqXsTwi/GbvENKv0BuK8ZK1E+F/4=
