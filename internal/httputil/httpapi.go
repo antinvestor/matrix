@@ -72,7 +72,7 @@ func MakeAuthAPI(
 		log := util.Log(req.Context())
 		ctx, device, err := auth.VerifyUserFromRequest(req, userAPI)
 		if err != nil {
-			log.Debug("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
+			log.Error("VerifyUserFromRequest %s -> HTTP %d %v", req.RemoteAddr, err.Code, err.JSON)
 			return *err
 		}
 

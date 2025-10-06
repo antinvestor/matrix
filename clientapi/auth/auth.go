@@ -53,16 +53,17 @@ type AccountDatabase interface {
 func VerifyUserFromRequest(
 	req *http.Request, userAPI api.QueryAcccessTokenAPI,
 ) (context.Context, *api.Device, *util.JSONResponse) {
+	ctx := req.Context()
+	log := util.Log(ctx)
 	// Try to find the Application Service user
 	token, err := ExtractAccessToken(req)
 	if err != nil {
+		log.WithError(err).Warn(" ExtractAccessToken failed to extract access token")
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: spec.MissingToken(err.Error()),
 		}
 	}
-
-	ctx := req.Context()
 
 	var res api.QueryAccessTokenResponse
 	err = userAPI.QueryAccessToken(ctx, &api.QueryAccessTokenRequest{
@@ -70,7 +71,7 @@ func VerifyUserFromRequest(
 		AppServiceUserID: req.URL.Query().Get("user_id"),
 	}, &res)
 	if err != nil {
-		log := util.Log(ctx)
+
 		log.WithError(err).Error("userAPI.QueryAccessToken failed")
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
