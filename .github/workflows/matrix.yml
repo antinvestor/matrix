@@ -54,7 +54,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: Run docker compose
-        uses: hoverkraft-tech/compose-action@v2.4.0
+        uses: hoverkraft-tech/compose-action@v2.4.1
         with:
           compose-file: "./docker-compose.yml"
           services: |
@@ -144,7 +144,7 @@ jobs:
         with:
           path: matrix
       - name: Run docker compose
-        uses: hoverkraft-tech/compose-action@v2.4.0
+        uses: hoverkraft-tech/compose-action@v2.4.1
         with:
           compose-file: "./matrix/docker-compose.yml"
           services: |
