@@ -27,7 +27,10 @@ type minLevelHandler struct {
 }
 
 func (h *minLevelHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return level >= h.minLevel && h.Handler.Enabled(ctx, level)
+	if level < h.minLevel {
+		return false
+	}
+	return h.Handler.Enabled(ctx, level)
 }
 
 // manager manages a set of actors for processing room events

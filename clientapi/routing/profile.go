@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -44,7 +45,7 @@ func GetProfile(
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
 	if err != nil {
-		if err == appserviceAPI.ErrProfileNotExists {
+		if errors.Is(err, appserviceAPI.ErrProfileNotExists) {
 			return util.JSONResponse{
 				Code: http.StatusNotFound,
 				JSON: spec.NotFound("The user does not exist or does not have a profile"),
@@ -327,7 +328,8 @@ func getProfile(
 	if !cfg.Global.IsLocalServerName(domain) {
 		profile, fedErr := federation.LookupProfile(ctx, cfg.Global.ServerName, domain, userID, "")
 		if fedErr != nil {
-			if x, ok := fedErr.(gomatrix.HTTPError); ok {
+			var x gomatrix.HTTPError
+			if errors.As(fedErr, &x) {
 				if x.Code == http.StatusNotFound {
 					return nil, appserviceAPI.ErrProfileNotExists
 				}
