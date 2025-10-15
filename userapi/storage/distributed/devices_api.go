@@ -272,9 +272,15 @@ func (d *devicesApi) SelectDevicesByID(ctx context.Context, deviceIDs []string) 
 }
 
 func (d *devicesApi) UpdateDeviceLastSeen(ctx context.Context, _ string, _ spec.ServerName, deviceID, ipAddr, userAgent string) error {
+
+	claims := frame.ClaimsFromContext(ctx)
+	if claims == nil {
+		return errors.New("no claims found in authenticated context")
+	}
+
 	req := devicev1.LogRequest{
 		DeviceId:  deviceID,
-		SessionId: "",
+		SessionId: claims.SessionID,
 		Ip:        ipAddr,
 		Locale:    "",
 		UserAgent: userAgent,
