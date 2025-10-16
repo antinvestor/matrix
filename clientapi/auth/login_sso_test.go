@@ -8,6 +8,7 @@ import (
 
 	"github.com/antinvestor/matrix/setup/config"
 	"github.com/antinvestor/matrix/test/testrig"
+	"golang.org/x/oauth2"
 )
 
 func TestNewAuthenticator(t *testing.T) {
@@ -66,4 +67,8 @@ func (idp *fakeIdentityProvider) AuthorizationURL(ctx context.Context, callbackU
 
 func (idp *fakeIdentityProvider) ProcessCallback(ctx context.Context, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error) {
 	return &CallbackResult{DisplayName: "aname"}, nil
+}
+
+func (idp *fakeIdentityProvider) RefreshToken(ctx context.Context, refreshToken string) (*oauth2.Token, error) {
+	return &oauth2.Token{AccessToken: refreshToken, RefreshToken: refreshToken}, nil
 }
