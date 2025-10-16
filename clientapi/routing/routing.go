@@ -732,6 +732,15 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
+	v3mux.Handle("/refresh",
+		httputil.MakeExternalAPI("refresh", func(req *http.Request) util.JSONResponse {
+			if r := rateLimits.Limit(req, nil); r != nil {
+				return *r
+			}
+			return Refresh(req, ssoAuth, &cfg.LoginSSO)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	v3mux.Handle("/login/sso/callback",
 		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
 			return SSOCallback(req, userAPI, ssoAuth, &cfg.LoginSSO, cfg.Global.ServerName)

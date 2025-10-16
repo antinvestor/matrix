@@ -173,6 +173,12 @@ func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL,
 	return res, nil
 }
 
+func (p *oidcIdentityProvider) RefreshToken(ctx context.Context, refreshToken string) (*oauth2.Token, error) {
+
+	ts := p.oauth2Config.TokenSource(ctx, &oauth2.Token{RefreshToken: refreshToken})
+	return ts.Token()
+}
+
 func (p *oidcIdentityProvider) reload(ctx context.Context) (*oidcDiscovery, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

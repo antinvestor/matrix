@@ -296,6 +296,7 @@ type ssoAuthenticator interface {
 	GetProvider(ctx context.Context, providerID string) (auth.SSOIdentityProvider, error)
 	AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce, codeVerifier string) (string, error)
 	ProcessCallback(ctx context.Context, providerID, callbackURL, nonce, codeVerifier string, query url.Values) (*auth.CallbackResult, error)
+	RefreshToken(ctx context.Context, providerID, refreshToken string) (*oauth2.Token, error)
 }
 
 type userAPIForSSO interface {

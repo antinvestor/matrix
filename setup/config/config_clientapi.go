@@ -53,6 +53,10 @@ type ClientAPI struct {
 
 	LoginSSO LoginSSO `yaml:"login_sso"`
 
+	// RefreshTokenLifetimeMs is the lifetime of access tokens when using refresh tokens (MSC2918)
+	// Default is 5 minutes (300000ms) as recommended by the spec
+	RefreshTokenLifetimeMs int64 `yaml:"refresh_token_lifetime_ms"`
+
 	// TURN options
 	TURN TURN `yaml:"turn"`
 
@@ -74,6 +78,7 @@ func (c *ClientAPI) Defaults(opts DefaultOpts) {
 	c.RecaptchaSiteVerifyAPI = ""
 	c.RegistrationDisabled = true
 	c.OpenRegistrationWithoutVerificationEnabled = false
+	c.RefreshTokenLifetimeMs = 300000 // 5 minutes default per MSC2918
 	c.RateLimiting.Defaults()
 	c.Queues.Defaults(opts)
 }

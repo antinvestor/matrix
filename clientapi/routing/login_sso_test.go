@@ -14,6 +14,7 @@ import (
 	"github.com/antinvestor/matrix/setup/config"
 	uapi "github.com/antinvestor/matrix/userapi/api"
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/oauth2"
 )
 
 func TestSSORedirect(t *testing.T) {
@@ -525,8 +526,16 @@ func TestSSOCallbackError(t *testing.T) {
 }
 
 type fakeSSOAuthenticator struct {
+	callbackToken  *oauth2.Token
 	callbackResult auth.CallbackResult
 	callbackErr    error
+}
+
+func (auth *fakeSSOAuthenticator) RefreshToken(ctx context.Context, providerID, refreshToken string) (*oauth2.Token, error) {
+	if providerID == "" {
+		return nil, errors.New("empty providerID")
+	}
+	return auth.callbackToken, auth.callbackErr
 }
 
 func (auth *fakeSSOAuthenticator) GetProvider(ctx context.Context, providerID string) (auth.SSOIdentityProvider, error) {

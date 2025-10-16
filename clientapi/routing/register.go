@@ -256,9 +256,11 @@ func newUserInteractiveResponse(
 
 // https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3register
 type registerResponse struct {
-	UserID      string `json:"user_id"`
-	AccessToken string `json:"access_token,omitempty"`
-	DeviceID    string `json:"device_id,omitempty"`
+	UserID       string `json:"user_id"`
+	AccessToken  string `json:"access_token,omitempty"`
+	DeviceID     string `json:"device_id,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	ExpiresInMs  int64  `json:"expires_in_ms,omitempty"`
 }
 
 // recaptchaResponse represents the HTTP response from a Google Recaptcha server

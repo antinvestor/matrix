@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/antinvestor/gomatrixserverlib/spec"
 	"github.com/antinvestor/matrix/clientapi/auth"
@@ -31,7 +32,8 @@ type loginResponse struct {
 	UserID       string `json:"user_id"`
 	AccessToken  string `json:"access_token"`
 	DeviceID     string `json:"device_id"`
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	ExpiresInMs  int64  `json:"expires_in_ms,omitempty"`
 }
 
 type flows struct {
@@ -91,10 +93,18 @@ func completeAuth(
 	}
 
 	refreshToken := ""
+	var expiresInMs int64
 	if login.ExtraData != nil {
 		accessToken = login.ExtraData.AccessToken
 		refreshToken = login.ExtraData.RefreshToken
-		util.Log(ctx).WithField("username", login.Username()).WithField("has_access_token", accessToken != "").WithField("has_refresh_token", refreshToken != "").Debug("completeAuth: using SSO tokens from login.ExtraData")
+		// Calculate expires_in_ms if token has expiry (MSC2918)
+		if !login.ExtraData.Expiry.IsZero() {
+			expiresInMs = time.Until(login.ExtraData.Expiry).Milliseconds()
+			if expiresInMs < 0 {
+				expiresInMs = 0
+			}
+		}
+		util.Log(ctx).WithField("username", login.Username()).WithField("has_access_token", accessToken != "").WithField("has_refresh_token", refreshToken != "").WithField("expires_in_ms", expiresInMs).Debug("completeAuth: using SSO tokens from login.ExtraData")
 	} else {
 		util.Log(ctx).WithField("username", login.Username()).Debug("completeAuth: no SSO tokens, using generated access token")
 	}
@@ -133,6 +143,7 @@ func completeAuth(
 			UserID:       performRes.Device.UserID,
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
+			ExpiresInMs:  expiresInMs,
 			DeviceID:     performRes.Device.ID,
 		},
 	}

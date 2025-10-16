@@ -150,9 +150,18 @@ func (auth *Authenticator) ProcessCallback(ctx context.Context, partitionID, cal
 	return p.ProcessCallback(ctx, callbackURL, nonce, codeVerifier, query)
 }
 
+func (auth *Authenticator) RefreshToken(ctx context.Context, providerID, refreshToken string) (*oauth2.Token, error) {
+	p, err := auth.GetProvider(ctx, providerID)
+	if err != nil {
+		return nil, err
+	}
+	return p.RefreshToken(ctx, refreshToken)
+}
+
 type SSOIdentityProvider interface {
 	AuthorizationURL(ctx context.Context, callbackURL, nonce, codeVerifier string) (string, error)
 	ProcessCallback(ctx context.Context, callbackURL, nonce, codeVerifier string, query url.Values) (*CallbackResult, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*oauth2.Token, error)
 }
 
 type CallbackResult struct {
